@@ -74,6 +74,16 @@ pub struct Residual {
     pub cp: f64,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct Saturation {
+    pub temperature: f64,
+    pub pressure: f64,
+    pub liquid_volume: f64,
+    pub vapor_volume: f64,
+    /// dPsat/dT [Pa/K] from the Clapeyron equation.
+    pub dpdt: f64,
+}
+
 /// Cached temperature and composition parameters. Volume/pressure scans
 /// perform no allocations, database lookups or component-pair mixing.
 #[derive(Debug, Clone)]
@@ -90,6 +100,83 @@ pub struct PreparedState<'a> {
 }
 
 impl Cubic {
+    /// Pure-component vapor-liquid equilibrium at fixed temperature.
+    /// Brackets coexistence between the EOS spinodals and equates fugacities.
+    pub fn saturation_pressure(&self, temperature: f64) -> Result<Saturation> {
+        if self.components.len() != 1 {
+            return Err(Error::Unsupported("mixture saturation pressure"));
+        }
+        let state = self.prepare(temperature, &[1.0])?;
+        let (_, _, qc) = omega_with_critical_ratio(self.kind);
+        let center = qc * state.b;
+        if state.pressure(center)?.dv <= 0.0 {
+            return Err(Error::InvalidInput(
+                "temperature at or above EOS critical temperature",
+            ));
+        }
+        let bisect_spinodal = |mut low: f64, mut high: f64| -> Result<f64> {
+            let negative_at_low = state.pressure(low)?.dv < 0.0;
+            for _ in 0..80 {
+                let mid = (low + high) * 0.5;
+                if (state.pressure(mid)?.dv < 0.0) == negative_at_low {
+                    low = mid;
+                } else {
+                    high = mid;
+                }
+            }
+            Ok((low + high) * 0.5)
+        };
+        let liquid_spinodal = bisect_spinodal(state.b * (1.0 + 1e-8), center)?;
+        let mut high_volume = center * 2.0;
+        for _ in 0..60 {
+            if state.pressure(high_volume)?.dv < 0.0 {
+                break;
+            }
+            high_volume *= 2.0;
+        }
+        let vapor_spinodal = bisect_spinodal(center, high_volume)?;
+        let min_pressure = state.pressure(liquid_spinodal)?.value;
+        let max_pressure = state.pressure(vapor_spinodal)?.value;
+        let margin = 1e-4 * (max_pressure - min_pressure.max(0.0));
+        let mut low = (min_pressure + margin).max(max_pressure * 1e-9).ln();
+        let mut high = (max_pressure - margin).ln();
+        let evaluate = |log_pressure: f64| -> Result<(f64, f64, f64)> {
+            let (volumes, count) = state.volumes(log_pressure.exp())?;
+            if count != 2 {
+                return Err(Error::NotConverged("distinct saturation roots"));
+            }
+            let l = state.residual(volumes[0])?;
+            let v = state.residual(volumes[1])?;
+            let difference =
+                (l.enthalpy - v.enthalpy) / (R * temperature) - (l.entropy - v.entropy) / R;
+            Ok((difference, volumes[0], volumes[1]))
+        };
+        if evaluate(low)?.0 * evaluate(high)?.0 > 0.0 {
+            return Err(Error::NotConverged("saturation fugacity bracket"));
+        }
+        let mut low_f = evaluate(low)?.0;
+        for _ in 0..100 {
+            let mid = (low + high) * 0.5;
+            let (f, vl, vv) = evaluate(mid)?;
+            if f.abs() < 1e-13 || high - low < 1e-14 {
+                let latent_heat = state.residual(vv)?.enthalpy - state.residual(vl)?.enthalpy;
+                return Ok(Saturation {
+                    temperature,
+                    pressure: mid.exp(),
+                    liquid_volume: vl,
+                    vapor_volume: vv,
+                    dpdt: latent_heat / (temperature * (vv - vl)),
+                });
+            }
+            if (f > 0.0) == (low_f > 0.0) {
+                low = mid;
+                low_f = f;
+            } else {
+                high = mid;
+            }
+        }
+        Err(Error::NotConverged("saturation pressure"))
+    }
     pub fn new(kind: CubicKind, names: &[&str]) -> Result<Self> {
         if names.is_empty() {
             return Err(Error::InvalidInput("at least one component required"));
@@ -503,6 +590,11 @@ impl PreparedState<'_> {
 // Preserve the source iteration, including evaluating omega from the final
 // iteration's n/n1/n2 (cbCalcOmegaZc), rather than rounded textbook constants.
 fn omega(kind: CubicKind) -> (f64, f64) {
+    let (a, b, _) = omega_with_critical_ratio(kind);
+    (a, b)
+}
+
+fn omega_with_critical_ratio(kind: CubicKind) -> (f64, f64, f64) {
     let (d1, d2) = kind.deltas();
     let (m1, m2) = (-d2, -d1);
     let mut zcomb = 5.0;
@@ -524,5 +616,5 @@ fn omega(kind: CubicKind) -> (f64, f64) {
     }
     let arg = n1 * n2 / (n * n1 + n * n2);
     let b = (1.0 - arg) / (zcomb - 1.0);
-    (b * (1.0 / n - b) * n1 * n2, b)
+    (b * (1.0 / n - b) * n1 * n2, b, zcomb)
 }

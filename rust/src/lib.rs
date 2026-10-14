@@ -9,7 +9,7 @@ pub mod ideal;
 pub mod numerics;
 
 pub use component::{Component, component, components};
-pub use cubic::{Cubic, CubicKind, Phase, PreparedState, Pressure, Residual};
+pub use cubic::{Cubic, CubicKind, Phase, PreparedState, Pressure, Residual, Saturation};
 pub use error::{Error, Result};
 
 /// Gas constant [J/(mol K)], using the exact expression from ThermoPack.

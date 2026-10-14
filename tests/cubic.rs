@@ -145,6 +145,16 @@ fn rachford_rice_closure_and_polynomial_roots() {
     for (a, b) in roots.into_iter().zip([1.0, 2.0, 3.0]) {
         close(a, b, 1e-13);
     }
+    let small = 1e-10;
+    let (roots, n) = cubic_roots(
+        -(1.0 + 3.0 * small),
+        3.0 * small + 2.0 * small * small,
+        -2.0 * small * small,
+    );
+    assert_eq!(n, 3);
+    for (a, b) in roots.into_iter().zip([small, 2.0 * small, 1.0]) {
+        assert!((a - b).abs() < 1e-8 * b.abs());
+    }
     let z = [0.4, 0.6];
     let k = [3.0, 0.2];
     let beta = rachford_rice(&z, &k).unwrap();
@@ -161,4 +171,37 @@ fn rachford_rice_closure_and_polynomial_roots() {
         .sum();
     close(liquid, 1.0, 1e-13);
     close(vapor, 1.0, 1e-13);
+}
+
+#[test]
+fn pure_saturation_fugacity_and_clapeyron() {
+    for kind in [
+        CubicKind::PengRobinson,
+        CubicKind::SoaveRedlichKwong,
+        CubicKind::RedlichKwong,
+        CubicKind::VanDerWaals,
+    ] {
+        for name in ["C1", "CO2", "C3"] {
+            let model = Cubic::new(kind, &[name]).unwrap();
+            let tc = model.components()[0].critical_temperature;
+            for tr in [0.65, 0.8, 0.95, 0.999] {
+                let t = tc * tr;
+                let sat = model
+                    .saturation_pressure(t)
+                    .unwrap_or_else(|e| panic!("{kind:?} {name} Tr={tr}: {e}"));
+                assert!(sat.liquid_volume < sat.vapor_volume);
+                let state = model.prepare(t, &[1.0]).unwrap();
+                let (mut l, mut v) = ([0.0], [0.0]);
+                state.ln_fugacity_into(sat.liquid_volume, &mut l).unwrap();
+                state.ln_fugacity_into(sat.vapor_volume, &mut v).unwrap();
+                close(l[0], v[0], 1e-9);
+                let dt = tc * 1e-6;
+                let slope = (model.saturation_pressure(t + dt).unwrap().pressure
+                    - model.saturation_pressure(t - dt).unwrap().pressure)
+                    / (2.0 * dt);
+                close(sat.dpdt, slope, 1e-5);
+            }
+            assert!(model.saturation_pressure(tc * 1.01).is_err());
+        }
+    }
 }

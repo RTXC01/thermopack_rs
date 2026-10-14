@@ -7,7 +7,11 @@ pub fn cubic_roots(a: f64, b: f64, c: f64) -> ([f64; 3], usize) {
     let q = (2.0 * a * a * a / 27.0) - a * b / 3.0 + c;
     let half_q = q / 2.0;
     let third_p = p / 3.0;
-    let discriminant = half_q * half_q + third_p * third_p * third_p;
+    // Expanded polynomial discriminant avoids cancellation between O(1)
+    // depressed-cubic terms when two physical roots are very small.
+    let discriminant = -(a * a * b * b - 4.0 * b * b * b - 4.0 * a * a * a * c - 27.0 * c * c
+        + 18.0 * a * b * c)
+        / 108.0;
     let mut roots = [f64::NAN; 3];
     let count = if discriminant > 0.0 {
         // Compute the larger cube-root term first to avoid cancellation.
@@ -36,6 +40,26 @@ pub fn cubic_roots(a: f64, b: f64, c: f64) -> ([f64; 3], usize) {
             let derivative = (3.0 * *root + 2.0 * a) * *root + b;
             if derivative.abs() > 1e-14 {
                 *root -= residual / derivative;
+            }
+        }
+    }
+    if count == 3 {
+        let largest_index = (0..3)
+            .max_by(|&i, &j| roots[i].abs().total_cmp(&roots[j].abs()))
+            .unwrap();
+        let largest = roots[largest_index];
+        let smallest = roots.iter().map(|v| v.abs()).fold(f64::INFINITY, f64::min);
+        if largest.abs() > 100.0 * smallest && largest != 0.0 {
+            // Deflate the well-resolved root. Use coefficients to recover
+            // the small-root sum instead of subtracting nearly equal roots.
+            let product = -c / largest;
+            let linear = (product - b) / largest;
+            let discriminant = linear * linear - 4.0 * product;
+            if discriminant >= 0.0 {
+                let q = -0.5 * (linear + discriminant.sqrt().copysign(linear));
+                if q != 0.0 {
+                    roots = [largest, q, product / q];
+                }
             }
         }
     }

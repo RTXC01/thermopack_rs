@@ -1,0 +1,30 @@
+[package]
+name = "thermopack-rs"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+description = "Native Rust migration of the ThermoPack thermodynamics library"
+readme = "rust/README.md"
+
+[lib]
+path = "rust/src/lib.rs"
+
+[[example]]
+name = "cubic"
+path = "rust/examples/cubic.rs"
+
+[[example]]
+name = "parity"
+path = "rust/examples/parity.rs"
+
+[[bench]]
+name = "cubic"
+path = "rust/benches/cubic.rs"
+harness = false
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+
+[lints.rust]
+unsafe_code = "forbid"

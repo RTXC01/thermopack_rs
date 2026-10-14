@@ -13,12 +13,17 @@ Classic alpha coefficients come from `get_alpha_param_acentric`.
 Database selection must match the source's reference-selection rules. Aliases,
 critical data overrides, non-default reference sets and all kij/lij variants
 must eventually be covered. No silent approximations for unsupported models.
+For DEFAULT selection, the source skips exact-substring matching and retains
+the last default entry. Interaction constants use the compiled database's
+rounded values, rather than potentially higher-precision JSON values.
 
 Analytic derivatives are compared to central finite differences independently
 of parity tests. Cubic roots are filtered by admissible volume and polished
 against the pressure equation. Stable phase selection minimizes residual Gibbs
 energy among admissible roots; this alone does not establish mixture stability.
 Flashes require tangent-plane stability tests before being production-qualified.
+See [baseline-defects.md](baseline-defects.md) for the vdW derivative
+compatibility method; physical heat capacities remain consistent with values.
 
 The reference is a local build from the baseline source. Fixtures record source
 hashes, compiler, flags, case inputs, quantities and tolerances. Relative errors

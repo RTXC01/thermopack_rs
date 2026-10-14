@@ -16,6 +16,11 @@ The file is created by joining the contents of the files
 
 # [ThermoPack homepage](https://thermotools.github.io/thermopack/)
 
+This fork is developing a native Rust implementation alongside the original
+ThermoPack reference. Start with the [Rust guide](rust/README.md),
+[migration design](docs/rust/README.md), and [coverage ledger](docs/rust/coverage.md).
+The Rust port is in progress and is not yet a full replacement.
+
 For the full documentation and user guide to ThermoPack, see the [ThermoPack homepage.](https://thermotools.github.io/thermopack/)
 If you are running ThermoPack installed via `pip`, make sure to check the documentation for the correct version by selecting 
 the version number in the sidebar.

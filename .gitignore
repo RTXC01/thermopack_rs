@@ -60,3 +60,9 @@ venv*
 *.vscode
 scripts/
 !.github/scripts/
+
+# Rust migration and local reference toolchains
+/target/
+/.toolchains/
+/.reference/
+__pycache__/

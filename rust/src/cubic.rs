@@ -53,7 +53,7 @@ pub struct Cubic {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Pressure {
-    /// Pressure [Pa].
+    /// Pressure (Pa).
     pub value: f64,
     /// dP/dT at fixed molar volume [Pa/K].
     pub dt: f64,
@@ -216,8 +216,13 @@ impl Cubic {
             for j in i + 1..names.len() {
                 let a = model.components[i].ident;
                 let b = model.components[j].ident;
-                let k = interaction(kind.name(), a, b, false);
-                let l = interaction(kind.name(), a, b, true);
+                let database_eos = if kind == CubicKind::RedlichKwong {
+                    "SRK"
+                } else {
+                    kind.name()
+                };
+                let k = interaction(database_eos, a, b, false);
+                let l = interaction(database_eos, a, b, true);
                 model.kij[i * names.len() + j] = k;
                 model.kij[j * names.len() + i] = k;
                 model.lij[i * names.len() + j] = l;
@@ -424,6 +429,22 @@ impl PreparedState<'_> {
         let ideal_cp = self.ideal(self.pressure(volume)?.value)?.cp;
         let residual = self.residual(volume)?;
         Ok((ideal_cp + residual.cp, ideal_cp - R + residual.cv))
+    }
+
+    /// Compatibility with this fork's `enthalpy(..., dhdt=True)`.
+    /// For vdW only, preserves the erroneous F_TT expression in cubic.f90.
+    /// Use `heat_capacities` for a derivative consistent with enthalpy values.
+    /// See docs/rust/baseline-defects.md for the exact discrepancy.
+    pub fn baseline_enthalpy_derivative_tp(&self, volume: f64) -> Result<f64> {
+        let cp = self.heat_capacities(volume)?.0;
+        if self.model.kind == CubicKind::VanDerWaals {
+            Ok(
+                cp + 2.0 * self.a * self.temperature / (1000.0 * volume * volume)
+                    - 2.0 * self.a / (self.temperature * volume),
+            )
+        } else {
+            Ok(cp)
+        }
     }
 
     /// Single-phase equilibrium sound speed [m/s].

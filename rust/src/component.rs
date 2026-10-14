@@ -8,9 +8,9 @@ pub struct Component {
     pub aliases: &'static [&'static str],
     /// Molecular mass [g/mol].
     pub molar_mass: f64,
-    /// Critical temperature [K].
+    /// Critical temperature (K).
     pub critical_temperature: f64,
-    /// Critical pressure [Pa].
+    /// Critical pressure (Pa).
     pub critical_pressure: f64,
     pub acentric_factor: f64,
     pub(crate) cp_type: u8,
@@ -49,6 +49,7 @@ pub fn component(name: &str) -> Result<&'static Component> {
 pub(crate) fn interaction(eos: &str, first: &str, second: &str, covolume: bool) -> f64 {
     INTERACTIONS
         .iter()
+        .rev()
         .find(|k| {
             k.eos == eos
                 && k.covolume == covolume

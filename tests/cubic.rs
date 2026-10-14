@@ -145,6 +145,10 @@ fn rachford_rice_closure_and_polynomial_roots() {
     for (a, b) in roots.into_iter().zip([1.0, 2.0, 3.0]) {
         close(a, b, 1e-13);
     }
+    let (roots, n) = cubic_roots(-4.0, 5.0, -2.0);
+    assert_eq!(n, 2);
+    close(roots[0], 1.0, 1e-13);
+    close(roots[1], 2.0, 1e-13);
     let small = 1e-10;
     let (roots, n) = cubic_roots(
         -(1.0 + 3.0 * small),

@@ -13,12 +13,17 @@ pub fn cubic_roots(a: f64, b: f64, c: f64) -> ([f64; 3], usize) {
         + 18.0 * a * b * c)
         / 108.0;
     let mut roots = [f64::NAN; 3];
-    let count = if discriminant > 0.0 {
+    let mut count = if discriminant > 0.0 {
         // Compute the larger cube-root term first to avoid cancellation.
         let u = (-half_q - discriminant.sqrt().copysign(half_q)).cbrt();
         let v = if u != 0.0 { -third_p / u } else { 0.0 };
         roots[0] = u + v - a / 3.0;
         1
+    } else if discriminant == 0.0 {
+        let u = (-half_q).cbrt();
+        roots[0] = 2.0 * u - a / 3.0;
+        roots[1] = -u - a / 3.0;
+        if u == 0.0 { 1 } else { 2 }
     } else if p < 0.0 {
         let radius = 2.0 * (-third_p).sqrt();
         let theta = (-half_q / (-third_p * third_p * third_p).sqrt())
@@ -64,6 +69,18 @@ pub fn cubic_roots(a: f64, b: f64, c: f64) -> ([f64; 3], usize) {
         }
     }
     roots[..count].sort_by(f64::total_cmp);
+    let mut distinct = 0;
+    for i in 0..count {
+        if distinct == 0
+            || (roots[i] - roots[distinct - 1]).abs()
+                > 32.0 * f64::EPSILON * roots[i].abs().max(roots[distinct - 1].abs())
+        {
+            roots[distinct] = roots[i];
+            distinct += 1;
+        }
+    }
+    count = distinct;
+    roots[count..].fill(f64::NAN);
     (roots, count)
 }
 

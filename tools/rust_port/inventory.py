@@ -14,7 +14,7 @@ def inventory():
         source = path.read_bytes().decode("utf-8", errors="replace")
         files.append({"path": path.relative_to(ROOT).as_posix(),
                       "lines": len(source.splitlines()),
-                      "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                      "sha256": hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest(),
                       "modules": re.findall(r"^\s*module\s+(\w+)", source, re.M | re.I)})
     interfaces = []
     for path in sorted((ROOT / "addon/pycThermopack/thermopack").glob("*.py")):

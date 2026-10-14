@@ -18,6 +18,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
         let model = Cubic::new(kind, &fields[1].split(',').collect::<Vec<_>>())?;
         let t: f64 = fields[2].parse()?;
+        if fields[3] == "SAT" {
+            let sat = model.saturation_pressure(t)?;
+            println!(
+                "{:.17e},{:.17e},{:.17e},{:.17e}",
+                sat.pressure, sat.liquid_volume, sat.vapor_volume, sat.dpdt
+            );
+            continue;
+        }
         let p: f64 = fields[3].parse()?;
         let x: Vec<f64> = fields[4]
             .split(',')
@@ -37,8 +45,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut phi = vec![0.0; x.len()];
         state.ln_fugacity_into(v, &mut phi)?;
         print!(
-            "{v:.17e},{:.17e},{:.17e},{:.17e},{:.17e},{:.17e}",
-            pressure.value, pressure.dt, pressure.dv, residual.enthalpy, residual.entropy
+            "{v:.17e},{:.17e},{:.17e},{:.17e},{:.17e},{:.17e},{:.17e},{:.17e},{:.17e}",
+            pressure.value,
+            pressure.dt,
+            pressure.dv,
+            residual.enthalpy,
+            residual.entropy,
+            state.enthalpy(v)?,
+            state.entropy(v)?,
+            state.baseline_enthalpy_derivative_tp(v)?
         );
         for value in phi {
             print!(",{value:.17e}");

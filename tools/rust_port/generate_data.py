@@ -1,6 +1,7 @@
 """Generate deterministic Rust constants from the fork's JSON database."""
 import hashlib
 import json
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -22,9 +23,9 @@ def generate():
              "pub(super) const COMPONENTS: &[Component] = &["]
     inputs = sorted((ROOT / "fluids").glob("*.json"))
     for path in inputs:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
         cps = [v for k, v in data.items() if k.startswith("ideal_heat_capacity")]
-        cp = next((v for v in cps if "DEFAULT" in v["ref"].upper()), None)
+        cp = next((v for v in reversed(cps) if "DEFAULT" in v["ref"].upper()), None)
         coefficients = cp["cp"] if cp else []
         assert len(coefficients) <= 21
         coefficients = coefficients + [0] * (21 - len(coefficients))
@@ -43,22 +44,27 @@ def generate():
             "reference_pressure: " + number(101325 if ref.get("entropy_ref_state") == "1ATM" else 100000),
         ]) + " },")
     lines.extend(["];", "pub(super) const INTERACTIONS: &[Interaction] = &["])
-    for eos, filename, covolume in [("PR", "PR_kij.json", False),
-                                   ("SRK", "SRK_kij.json", False),
-                                   ("PR", "PR_lij.json", True)]:
-        path = ROOT / "binaries" / filename
-        inputs.append(path)
-        for key, value in json.loads(path.read_text()).items():
-            if not key.startswith("vdW") or "DEFAULT" not in value["ref"].upper():
+    # Compiled parameters are authoritative: JSON and generated Fortran can
+    # differ. Duplicate CO2/H2O defaults require last-default-wins selection.
+    path = ROOT / "src/mixdatadb.f90"
+    inputs.append(path)
+    source = path.read_text(encoding="utf-8")
+    for datatype, covolume in [("kijdatadb", False), ("lijdatadb", True)]:
+        for block in re.findall(datatype + r"\((.*?)^\s*\)", source, re.M | re.S):
+            values = dict(re.findall(r'(\w+)\s*=\s*"([^"]*)"', block))
+            if values["eosid"] not in ("PR", "SRK") or values["mruleid"].upper() != "VDW" \
+                    or "DEFAULT" not in values["ref"].upper():
                 continue
-            lines.append("Interaction { eos: " + string(eos) + ", first: " + string(value["comp1"])
-                         + ", second: " + string(value["comp2"]) + ", value: "
-                         + number(value["lij" if covolume else "kij"])
+            value = re.search(r"[kl]ijvalue\s*=\s*([\d.eEdD+-]+)", block)[1]
+            lines.append("Interaction { eos: " + string(values["eosid"])
+                         + ", first: " + string(values["uid1"])
+                         + ", second: " + string(values["uid2"]) + ", value: "
+                         + number(value.replace("D", "e").replace("d", "e"))
                          + ", covolume: " + str(covolume).lower() + " },")
     lines.append("];")
     for path in inputs:
         lines.append("// " + path.relative_to(ROOT).as_posix() + " sha256="
-                     + hashlib.sha256(path.read_bytes()).hexdigest())
+                     + hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest())
     return "\n".join(lines) + "\n"
 
 

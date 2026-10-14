@@ -10,7 +10,7 @@ pub struct IdealProperties {
 }
 
 impl Component {
-    /// Pure ideal gas at T [K], P [Pa], with the fork's reference state.
+    /// Pure ideal gas at T (K), P (Pa), with the fork's reference state.
     pub fn ideal(&self, temperature: f64, pressure: f64) -> Result<IdealProperties> {
         positive(temperature, "temperature")?;
         positive(pressure, "pressure")?;

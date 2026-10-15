@@ -180,14 +180,18 @@ pub fn solve_linear_in_place(matrix: &mut [f64], rhs: &mut [f64]) -> crate::Resu
 
 pub(crate) fn modified_newton_direction(hessian: &[f64], gradient: &[f64]) -> Vec<f64> {
     let n = gradient.len();
-    let scale = (0..n).map(|i| hessian[i * n + i].abs()).fold(1.0, f64::max);
+    // Equilibrate before testing positive definiteness. Trace phase amounts
+    // can put valid Hessian diagonal entries twenty orders of magnitude apart.
+    let scales: Vec<_> = (0..n)
+        .map(|i| hessian[i * n + i].abs().max(1e-30).sqrt())
+        .collect();
     let mut shift = 0.0;
     for _ in 0..16 {
         let mut l = vec![0.0; n * n];
         let mut positive = true;
         for i in 0..n {
             for j in 0..=i {
-                let mut value = hessian[i * n + j];
+                let mut value = hessian[i * n + j] / (scales[i] * scales[j]);
                 if i == j {
                     value += shift;
                 }
@@ -195,7 +199,7 @@ pub(crate) fn modified_newton_direction(hessian: &[f64], gradient: &[f64]) -> Ve
                     value -= l[i * n + k] * l[j * n + k];
                 }
                 if i == j {
-                    if value <= 1e-15 * scale || !value.is_finite() {
+                    if value <= 1e-15 || !value.is_finite() {
                         positive = false;
                         break;
                     }
@@ -209,7 +213,7 @@ pub(crate) fn modified_newton_direction(hessian: &[f64], gradient: &[f64]) -> Ve
             }
         }
         if positive {
-            let mut step: Vec<_> = gradient.iter().map(|g| -g).collect();
+            let mut step: Vec<_> = gradient.iter().zip(&scales).map(|(g, s)| -g / s).collect();
             for i in 0..n {
                 for j in 0..i {
                     step[i] -= l[i * n + j] * step[j];
@@ -222,13 +226,28 @@ pub(crate) fn modified_newton_direction(hessian: &[f64], gradient: &[f64]) -> Ve
                 }
                 step[i] /= l[i * n + i];
             }
+            for (value, scale) in step.iter_mut().zip(&scales) {
+                *value /= scale;
+            }
             return step;
         }
-        shift = if shift == 0.0 {
-            1e-10 * scale
-        } else {
-            10.0 * shift
-        };
+        shift = if shift == 0.0 { 1e-10 } else { 10.0 * shift };
     }
-    gradient.iter().map(|g| -g / scale).collect()
+    gradient
+        .iter()
+        .zip(&scales)
+        .map(|(g, s)| -g / (s * s))
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn equilibrated_newton_step_resolves_trace_scale_separation() {
+        let hessian = [1.0, 0.0, 0.0, 1e20];
+        let gradient = [-1.0, -1.0];
+        let step = super::modified_newton_direction(&hessian, &gradient);
+        assert!((step[0] - 1.0).abs() < 1e-14);
+        assert!((step[1] * 1e20 - 1.0).abs() < 1e-14);
+    }
 }

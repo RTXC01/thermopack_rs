@@ -305,31 +305,7 @@ fn select_record(
     mc: bool,
     reference: &str,
 ) -> Option<&'static crate::component::AlphaRecord> {
-    let mut best = None;
-    let mut fallback = None;
-    let mut rank = usize::MAX;
-    for record in crate::component::alpha_records()
-        .iter()
-        .filter(|r| r.eos == eos && r.component == component && r.mathias_copeman == mc)
-    {
-        let matching = reference
-            .split('/')
-            .map(str::trim)
-            .filter(|s| !s.eq_ignore_ascii_case("DEFAULT"))
-            .position(|s| {
-                record
-                    .reference
-                    .split('/')
-                    .any(|r| s.eq_ignore_ascii_case(r.trim()))
-            });
-        if let Some(position) = matching {
-            if position < rank {
-                best = Some(record);
-                rank = position;
-            }
-        } else if record.reference.to_ascii_uppercase().contains("DEFAULT") {
-            fallback = Some(record);
-        }
-    }
-    best.or(fallback)
+    crate::component::select_record(crate::component::alpha_records(), reference, |r| {
+        (r.eos == eos && r.component == component && r.mathias_copeman == mc).then_some(r.reference)
+    })
 }

@@ -57,3 +57,27 @@ subroutine initialize_alpha(name,nname,reference,nreference) bind(C,name='initia
     error stop 'reference probe requires a cubic model'
   end select
 end subroutine initialize_alpha
+
+subroutine query_translation(index,t,enabled,kind,params,values,temp_dep) bind(C,name='query_translation')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use thermopack_var, only: get_active_eos,get_active_comps,base_eos_param
+  use compdata, only: gendata_pointer
+  implicit none
+  integer(c_int), value :: index
+  real(c_double), value :: t
+  integer(c_int), intent(out) :: enabled,kind,temp_dep
+  real(c_double), intent(out) :: params(6),values(3)
+  class(base_eos_param), pointer :: active
+  type(gendata_pointer), pointer :: comps(:)
+  logical :: dependent
+  active=>get_active_eos()
+  comps=>get_active_comps()
+  enabled=active%volumeShiftId
+  associate(ci=>comps(index)%p_comp%cid)
+    kind=ci%c_type
+    params=[ci%ciA,ci%ciB,ci%ciC,ci%ciDD,ci%ciE,ci%ciF]
+    call ci%get_vol_trs_c(t,values(1),values(2),values(3),dependent)
+  end associate
+  temp_dep=0
+  if (dependent) temp_dep=1
+end subroutine query_translation

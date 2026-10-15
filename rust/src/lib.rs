@@ -24,16 +24,19 @@ pub mod flash;
 mod hydrogen;
 pub mod ideal;
 pub mod numerics;
+pub mod translation;
 
 pub use alpha::{Alpha, AlphaCorrelation, AlphaValue};
 pub use caloric::{CaloricFlashOptions, EquilibriumProperties};
 pub use component::{Component, component, components};
 pub use cubic::{
-    Cubic, CubicKind, Phase, PreparedState, Pressure, PseudoCritical, Residual, Saturation,
+    Cubic, CubicKind, CubicOptions, Phase, PreparedState, Pressure, PseudoCritical, Residual,
+    Saturation,
 };
 pub use error::{Error, Result};
 pub use flash::{FlashOptions, FlashPhase, FlashResult, Stability, StabilityTrial};
 pub use ideal::{EntropyReference, IdealGas, IdealProperties};
+pub use translation::{TranslationKind, TranslationValue, VolumeTranslation};
 
 /// Gas constant [J/(mol K)], using the exact expression from ThermoPack.
 pub const R: f64 = 6.02214076e23 * 1.380649e-23;

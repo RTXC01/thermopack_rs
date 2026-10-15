@@ -53,5 +53,7 @@ The [phase equilibrium notes](phase-equilibrium.md) describe stability,
 derivatives, TP/PH/PS result conventions and qualification limits.
 The [alpha notes](alpha.md) describe temperature correlations, setters,
 reference selection and the boundary between alpha and translated/quantum models.
+The [volume translation notes](volume-translation.md) cover ci polynomials,
+reference-aware constructors, physical volumes and caloric corrections.
 Regenerate inventory with
 `python tools/rust_port/inventory.py`.

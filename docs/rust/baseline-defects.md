@@ -13,9 +13,14 @@ method/parameters and returns explicit errors for unimplemented evaluation.
 
 Separately, the public cubic constructor overrides alpha to TWU and enables
 translation for tcPR references. QuantumCubic also changes beta and critical
-data. These combined models remain pending; alpha-kernel qualification must
-not be taken as their qualification. See [alpha.md](alpha.md) for exact scope
-and the source probe used to separate these layers.
+data. Full tcPR construction is now qualified separately from the isolated
+alpha kernel; QuantumCubic remains pending. See [alpha.md](alpha.md) and
+[volume-translation.md](volume-translation.md) for scope and source probes.
+
+The Python `init_peneloux_volume_translation(reference)` wrapper drops its
+reference argument before calling Fortran, selecting DEFAULT parameters.
+The public cubic constructor does pass its reference. Native APIs preserve
+both behaviors through distinct entry points, with explicit documentation.
 
 ## Compiled fluid constants differ from JSON
 
@@ -26,6 +31,13 @@ tolerances. DME and four hydrogen isomers also have rounded compiled masses.
 The Rust generator reads numerical fluid constants and default Cp records from
 the compiled database, retaining JSON names/aliases. It records hashes of both
 sources. The selected default Cp record still follows last-default-wins order.
+
+The public cubic constructor passes a length-100 reference to the Cp database's
+length-40 labels. Its case-sensitive `INDEX(label, reference)` cannot match,
+so `getCpDBindex` always uses the last `Default` record. Empty/slash references
+are qualified for CO2/NC16, which also have unlabelled alternate Cp records;
+the constructor cannot select those records. Native construction preserves
+this default fallback rather than interpreting the reference as Cp selection.
 
 ## Hydrogen ideal H/S and Cp use different scaling
 

@@ -50,6 +50,10 @@ database remain independent. `components()` exposes database metadata, while
 Effective parameters and fallback status are available through `alpha(i)`.
 See [alpha conventions](../docs/rust/alpha.md), including source initialization
 quirks and the separate scope of translated/quantum constructor behavior.
+`Cubic::with_options` selects alpha, ci and binary parameter references
+and optional volume translation; tcPR references force TWU and translation as
+in the source constructor. Component ci parameters and enable/disable controls
+are owned by each model. See [volume translation](../docs/rust/volume-translation.md).
 `state.fugacity_derivatives_into` provides analytic T/P/n derivatives into
 caller-owned buffers. See [phase equilibrium conventions](../docs/rust/phase-equilibrium.md),
 including the Single phase fraction sentinel and a known raw ordering mismatch.

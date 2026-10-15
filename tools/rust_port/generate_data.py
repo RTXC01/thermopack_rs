@@ -57,6 +57,7 @@ def generate():
             "critical_temperature: " + number(baseline['Tc']),
             "critical_pressure: " + number(baseline['Pc']),
             "acentric_factor: " + number(baseline['acf']),
+            "rackett_factor: " + number(baseline['Zra']),
             "cp_type: " + str(int(cp['cptype']) if cp else 0),
             "cp: [" + ", ".join(map(number, coefficients)) + "]",
             "reference_enthalpy: " + number(baseline['href']),
@@ -73,15 +74,15 @@ def generate():
     for datatype, covolume in [("kijdatadb", False), ("lijdatadb", True)]:
         for block in re.findall(datatype + r"\((.*?)^\s*\)", source, re.M | re.S):
             values = dict(re.findall(r'(\w+)\s*=\s*"([^"]*)"', block))
-            if values["eosid"] not in ("PR", "SRK") or values["mruleid"].upper() != "VDW" \
-                    or "DEFAULT" not in values["ref"].upper():
+            if values["eosid"] not in ("PR", "SRK") or values["mruleid"].upper() != "VDW":
                 continue
             value = re.search(r"[kl]ijvalue\s*=\s*([\d.eEdD+-]+)", block)[1]
             lines.append("Interaction { eos: " + string(values["eosid"])
                          + ", first: " + string(values["uid1"])
                          + ", second: " + string(values["uid2"]) + ", value: "
                          + number(value.replace("D", "e").replace("d", "e"))
-                         + ", covolume: " + str(covolume).lower() + " },")
+                         + ", covolume: " + str(covolume).lower()
+                         + ", reference: " + string(values['ref']) + " },")
     lines.extend(["];", "pub(super) const ALPHA_RECORDS: &[AlphaRecord] = &["])
     counters = {'twu': 0, 'mc': 0}
     source = compiled_path.read_text(encoding='utf-8')
@@ -100,6 +101,26 @@ def generate():
                      +', mathias_copeman: '+str(family=='mc').lower()+', parameters: ['
                      +', '.join(coefficients)+'] },')
     assert counters['twu'] > 0 and counters['mc'] > 0
+    lines.extend(["];", "pub(super) const TRANSLATION_RECORDS: &[TranslationRecord] = &["])
+    for block in re.findall(r'cidatadb\((.*?)^\s*\)',source,re.M|re.S):
+        values=dict(re.findall(r'(\w+)\s*=\s*"([^"]*)"',block))
+        numeric=dict(re.findall(r'\b(\w+)\s*=\s*([+-]?[\d.]+(?:[eEdD][+-]?\d+)?)',block))
+        coefficients=[number(numeric.get(k,'0').replace('D','e').replace('d','e'))
+                      for k in ['ciA','ciB','ciC','ciDD','ciE','ciF']]
+        lines.append('TranslationRecord { eos: '+string(values['eosid'])+', component: '
+                     +string(values['cid'])+', reference: '+string(values['ref'])
+                     +', correlation: '+str(int(numeric['c_type']))+', coefficients: ['
+                     +', '.join(coefficients)+'] },')
+    lines.extend(["];", "pub(super) const IDEAL_RECORDS: &[IdealRecord] = &["])
+    for block in re.findall(r'cpdata\((.*?)^\s*\)',source,re.M|re.S):
+        values=dict(re.findall(r'(\w+)\s*=\s*"([^"]*)"',block))
+        correlation=re.search(r'cptype\s*=\s*(\d+)',block)[1]
+        array=re.search(r'\bcp\s*=\s*\(/(.*?)/\)',block,re.S)[1]
+        coefficients=[number(v.strip().replace('D','e').replace('d','e'))
+                      for v in array.replace('&','').split(',')]
+        assert len(coefficients)==21
+        lines.append('IdealRecord { component: '+string(values['cid'])+', reference: '+string(values['ref'])
+                     +', correlation: '+correlation+', coefficients: ['+', '.join(coefficients)+'] },')
     lines.append("];")
     for path in inputs:
         lines.append("// " + path.relative_to(ROOT).as_posix() + " sha256="

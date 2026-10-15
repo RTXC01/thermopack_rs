@@ -29,6 +29,17 @@ def phase_permutation_allowed(model,result):
     return True
 
 
+def load_probe():
+    probe=CDLL(str(ROOT/'.reference'/('reference_probe.dll' if os.name=='nt' else 'libreference_probe.so')))
+    probe.query_alpha.argtypes=[c_int,c_double,POINTER(c_int),POINTER(c_double),POINTER(c_double)]
+    probe.query_alpha.restype=None
+    probe.initialize_alpha.argtypes=[c_char_p,c_int,c_char_p,c_int]
+    probe.initialize_alpha.restype=None
+    probe.query_translation.argtypes=[c_int,c_double,POINTER(c_int),POINTER(c_int),POINTER(c_double),POINTER(c_double),POINTER(c_int)]
+    probe.query_translation.restype=None
+    return probe
+
+
 def main(compiler_directory):
     cubic=load(compiler_directory)
     model,previous=None,None
@@ -37,24 +48,60 @@ def main(compiler_directory):
         request=json.loads(line)
         eos,comps=request['eos'],request['components']
         alpha=request.get('alpha','RK' if eos=='RK' else 'Classic')
-        ref=request.get('alpha_reference','Default')
-        key=(eos,comps,alpha,ref,'alpha_kernel' if request['mode'] in ('ALPHA','ALPHA_PROPERTIES') else 'public')
+        ref=request.get('parameter_reference',request.get('alpha_reference','Default'))
+        shift=request.get('volume_shift',False)
+        key=(eos,comps,alpha,ref,shift,'alpha_kernel' if request['mode'] in ('ALPHA','ALPHA_PROPERTIES') else 'public')
         if previous!=key:
             # ALPHA qualifies tpInitAlphaCorr separately from eoslibinit's
             # forced tcPR translation / QuantumCubic critical-data overrides.
             alpha_mode=request['mode'] in ('ALPHA','ALPHA_PROPERTIES')
             base_ref=('tcPR' if 'BUTANAL' in comps.split(',') else 'Default') if alpha_mode else ref
             model=cubic(comps,"SRK" if eos=="RK" else eos,
-                        alpha='Classic' if alpha_mode else alpha,parameter_reference=base_ref,volume_shift=False)
+                        alpha='Classic' if alpha_mode else alpha,parameter_reference=base_ref,volume_shift=shift)
             previous=key
         extra={}
-        if request['mode'] in ('ALPHA','ALPHA_PROPERTIES'):
+        if request['mode'].startswith('V_'):
+            for operation in request.get('operations',[]):
+                if operation[0]=='init':
+                    model.init_peneloux_volume_translation(operation[1])
+                elif operation[0]=='set':
+                    model.set_ci(operation[1]+1,*operation[3],ci_type=operation[2])
+                elif operation[0]=='disable':
+                    model.disable_volume_translation()
+                else:
+                    raise ValueError('unknown translation operation')
+                previous=None
+        if request['mode']=='V_CI':
             if probe is None:
-                probe=CDLL(str(ROOT/'.reference'/('reference_probe.dll' if os.name=='nt' else 'libreference_probe.so')))
-                probe.query_alpha.argtypes=[c_int,c_double,POINTER(c_int),POINTER(c_double),POINTER(c_double)]
-                probe.query_alpha.restype=None
-                probe.initialize_alpha.argtypes=[c_char_p,c_int,c_char_p,c_int]
-                probe.initialize_alpha.restype=None
+                probe=load_probe()
+            model.activate()
+            values=[]
+            for index in range(model.nc):
+                enabled,kind,dependent=c_int(),c_int(),c_int()
+                parameters=(c_double*6)()
+                derivatives=(c_double*3)()
+                probe.query_translation(index+1,request['temperature'],byref(enabled),byref(kind),parameters,derivatives,byref(dependent))
+                values.extend([enabled.value,kind.value,*map(float,parameters),*map(float,derivatives),dependent.value])
+            swappable=False
+        elif request['mode']=='V_PROP':
+            t,p,z=request['temperature'],request['pressure'],request['feed']
+            phase=model.LIQPH if request['phase']=='L' else model.VAPPH
+            v=model.specific_volume(t,p,z,phase)[0]
+            pressure,pt,pv=model.pressure_tv(t,v,z,dpdt=True,dpdv=True)
+            hr=model.enthalpy(t,p,z,phase,residual=True)[0]
+            sr=model.entropy(t,p,z,phase,residual=True)[0]
+            h,cp=model.enthalpy(t,p,z,phase,dhdt=True)
+            s=model.entropy(t,p,z,phase)[0]
+            phi,dt,dp,dn=model.thermo(t,p,z,phase,dlnfugdt=True,dlnfugdp=True,dlnfugdn=True)
+            values=list(map(float,[v,pressure,pt,pv,hr,sr,h,s,cp,*phi,*dt,*dp,*dn.flatten()]))
+            if not all(map(math.isfinite,values)):
+                print('THERMOPACK_RESULT='+json.dumps({'calculation_error':'non-finite translated property',
+                      'values':list(map(str,values))}),flush=True)
+                continue
+            swappable=False
+        elif request['mode'] in ('ALPHA','ALPHA_PROPERTIES'):
+            if probe is None:
+                probe=load_probe()
             model.activate()
             probe.initialize_alpha(alpha.encode('ascii'),len(alpha),ref.encode('ascii'),len(ref))
             for index,name,parameters in request.get('setters',[]):
@@ -126,7 +173,7 @@ def main(compiler_directory):
             routine(composition,byref(t),byref(p),byref(w),byref(z),byref(v))
             values=[t.value,p.value,v.value,z.value]
             swappable=False
-        elif request['mode']=='SAT_T':
+        elif request['mode'] in ('SAT_T','V_SAT'):
             z=request['feed']
             p=model.bubble_pressure(request['temperature'],z)[0]
             t=model.dew_temperature(p,z)[0]
@@ -137,13 +184,13 @@ def main(compiler_directory):
             values=[float(t),float(p),float(vl),float(vv),float((hv-hl)/(t*(vv-vl)))]
             swappable=False
             extra={'pressure':float(p)}
-        elif request['mode']=='TP':
+        elif request['mode'] in ('TP','V_TP'):
             result=model.two_phase_tpflash(request['temperature'],request['pressure'],request['feed'])
             values=[int(result.phase),float(result.betaV),float(result.betaL),
                     *map(float,result.x),*map(float,result.y)]
             swappable=phase_permutation_allowed(model,result)
-        elif request['mode'] in ('PH','PS'):
-            mode=request['mode']
+        elif request['mode'] in ('PH','PS','V_PH','V_PS'):
+            mode=request['mode'][-2:]
             t,z=request['temperature'],request['feed']
             quantity='enthalpy' if mode=='PH' else 'entropy'
             if 'quality' in request:

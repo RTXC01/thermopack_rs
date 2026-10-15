@@ -2,6 +2,49 @@
 use std::io::{self, BufRead};
 use thermopack_rs::{Cubic, CubicKind, Phase};
 
+fn translated_model(
+    kind: CubicKind,
+    components: &str,
+    config: &[&str],
+) -> thermopack_rs::Result<Cubic> {
+    let mut model = Cubic::with_options(
+        kind,
+        &components.split(',').collect::<Vec<_>>(),
+        thermopack_rs::CubicOptions {
+            alpha: Some(thermopack_rs::AlphaCorrelation::from_name(config[1])?),
+            parameter_reference: config[2],
+            volume_translation: config[3] == "1",
+        },
+    )?;
+    for operation in &config[4..] {
+        let data: Vec<_> = operation.split(':').collect();
+        match data[0] {
+            "init" => model.init_peneloux_volume_translation(data[1])?,
+            "disable" => model.disable_volume_translation(),
+            "set" => {
+                let coefficients = data[3]
+                    .split(',')
+                    .map(str::parse)
+                    .collect::<Result<Vec<f64>, _>>()
+                    .map_err(|_| thermopack_rs::Error::InvalidInput("translation coefficients"))?;
+                model.set_volume_translation(
+                    data[1]
+                        .parse()
+                        .map_err(|_| thermopack_rs::Error::InvalidInput("component index"))?,
+                    thermopack_rs::VolumeTranslation::new(
+                        thermopack_rs::TranslationKind::from_code(data[2].parse().unwrap())?,
+                        coefficients.try_into().map_err(|_| {
+                            thermopack_rs::Error::InvalidInput("six coefficients required")
+                        })?,
+                    )?,
+                )?;
+            }
+            _ => return Err(thermopack_rs::Error::InvalidInput("translation operation")),
+        }
+    }
+    Ok(model)
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     for line in io::stdin().lock().lines() {
         let line = line?;
@@ -124,7 +167,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         let property_config: Vec<_> = fields[5].split('@').collect();
         let alpha_properties = property_config[0].starts_with("A_");
-        let mut model = if alpha_properties {
+        let translated = property_config[0].starts_with("V_");
+        let mut model = if translated {
+            match translated_model(kind, fields[1], &property_config) {
+                Ok(model) => model,
+                Err(error) => {
+                    println!("ERROR: {error}");
+                    continue;
+                }
+            }
+        } else if alpha_properties {
             Cubic::with_alpha(
                 kind,
                 &fields[1].split(',').collect::<Vec<_>>(),
@@ -149,6 +201,41 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         let t: f64 = fields[2].parse()?;
+        if property_config[0] == "V_CI" {
+            let mut values = Vec::new();
+            for i in 0..model.components().len() {
+                let ci = model.volume_translation(i)?;
+                let c = ci.evaluate(t)?;
+                values.extend([
+                    if model.volume_translation_enabled() {
+                        1.
+                    } else {
+                        0.
+                    },
+                    ci.kind as u8 as f64,
+                ]);
+                values.extend(ci.coefficients);
+                values.extend([
+                    c.value,
+                    c.dt,
+                    c.dtt,
+                    if ci.kind == thermopack_rs::TranslationKind::Constant {
+                        0.
+                    } else {
+                        1.
+                    },
+                ]);
+            }
+            println!(
+                "{}",
+                values
+                    .iter()
+                    .map(|v| format!("{v:.17e}"))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            );
+            continue;
+        }
         if fields[3] == "PSEUDO" {
             let x: Vec<f64> = fields[4]
                 .split(',')
@@ -159,6 +246,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "{:.17e},{:.17e},{:.17e},{:.17e}",
                 critical.temperature, critical.pressure, critical.volume, critical.compressibility
             );
+            continue;
+        }
+        if property_config[0] == "V_SAT" {
+            match model.saturation_pressure(t) {
+                Ok(sat) => println!(
+                    "{:.17e},{:.17e},{:.17e},{:.17e},{:.17e}",
+                    sat.temperature, sat.pressure, sat.liquid_volume, sat.vapor_volume, sat.dpdt
+                ),
+                Err(error) => println!("ERROR: {error}"),
+            }
             continue;
         }
         if fields[3] == "SAT_T" {
@@ -182,8 +279,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .split(',')
             .map(str::parse)
             .collect::<Result<_, _>>()?;
-        if fields[5] == "PH" || fields[5] == "PS" {
-            let result = if fields[5] == "PH" {
+        if matches!(property_config[0], "PH" | "PS" | "V_PH" | "V_PS") {
+            let result = if property_config[0].ends_with("PH") {
                 model.ph_flash(p, &x, t)
             } else {
                 model.ps_flash(p, &x, t)
@@ -206,7 +303,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             continue;
         }
-        if fields[5] == "TP" {
+        if matches!(property_config[0], "TP" | "V_TP") {
             match model.tp_flash(t, p, &x) {
                 Ok(flash) => {
                     print!(
@@ -284,7 +381,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         for value in phi {
             print!(",{value:.17e}");
         }
-        if alpha_properties {
+        if alpha_properties || translated {
             let (mut dt, mut dp, mut dn) = (
                 vec![0.; x.len()],
                 vec![0.; x.len()],

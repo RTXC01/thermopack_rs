@@ -383,6 +383,10 @@ impl Cubic {
             alpha.correlation,
             &alpha.parameters[..alpha.correlation.parameter_count()],
         )?;
+        if self.volume_translation_enabled() {
+            pure.set_volume_translation(0, self.volume_translation(index)?)?;
+            pure.set_volume_translation_enabled(true);
+        }
         let critical = pure.pseudo_critical(&[1.0])?;
         let mut phase = FlashPhase::Single;
         if p < critical.pressure {

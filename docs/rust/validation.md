@@ -32,6 +32,8 @@ python tools/rust_port/validate_ideal.py
 python tools/rust_port/validate_ideal_configuration.py
 python tools/rust_port/validate_alpha.py
 python tools/rust_port/validate_alpha_properties.py
+python tools/rust_port/validate_translation.py
+python tools/rust_port/validate_translated_flash.py
 ```
 
 On Windows add `--compiler-directory /path/to/gfortran/bin` to the validation
@@ -92,7 +94,15 @@ hashes, compiler, flags and LAPACK revision invalidates stale cached objects.
   source terminations in unimplemented paths. Another 3240 EOS cases qualify
   alpha variants through complete properties and fugacity derivatives. See
   [alpha scope and source conventions](alpha.md); this isolates the alpha
-  initializer and does not qualify translated/quantum constructor behavior.
+  initializer and does not by itself qualify translated/quantum constructors.
+* 1977 volume-translation parameter cases and 3120 full EOS/property cases
+  qualify polynomial ci correlations, the Rackett fallback, full tcPR
+  construction, reference selection, setters and fugacity derivatives.
+  See [volume translation](volume-translation.md) for API and numerical scope.
+* 3960 translated flash/saturation attempts: 1130 TP, 1293 PH, 1326 PS and
+  72 pure saturation results match; 86 source terminations and 53 nonclosing
+  PH results are recorded separately. Native H/S closure and two-phase
+  material balances are independently checked in the committed fixture tests.
 
 Each comparison uses `abs(error) <= atol + rtol * max(abs(reference), abs(rust))`.
 Tolerances are quantity-specific and recorded in fixture metadata and tests.

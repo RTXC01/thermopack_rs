@@ -1,6 +1,6 @@
 //! Conventional cubic equations, classic alpha and van der Waals mixing.
 //! Ported from cbmix.f90, cbalpha.f90, cubic.f90 and cbhelm.f90.
-use crate::component::interaction;
+use crate::component::interaction_with_reference;
 use crate::error::positive;
 use crate::{Component, Error, R, Result, component, numerics};
 
@@ -50,6 +50,24 @@ pub struct Cubic {
     kij: Vec<f64>,
     lij: Vec<f64>,
     nonzero_kij: Vec<(usize, usize, f64)>,
+    translation_parameters: Option<Vec<crate::VolumeTranslation>>,
+    translation_enabled: bool,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct CubicOptions<'a> {
+    pub alpha: Option<crate::AlphaCorrelation>,
+    pub parameter_reference: &'a str,
+    pub volume_translation: bool,
+}
+impl Default for CubicOptions<'_> {
+    fn default() -> Self {
+        Self {
+            alpha: None,
+            parameter_reference: "DEFAULT",
+            volume_translation: false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -108,6 +126,7 @@ pub struct PreparedState<'a> {
     a_partial: Vec<f64>,
     b_partial: Vec<f64>,
     factors: Vec<(f64, f64, f64)>,
+    translation: Option<crate::translation::PreparedTranslation>,
 }
 
 impl Cubic {
@@ -126,16 +145,16 @@ impl Cubic {
         let state = self.prepare(temperature, z)?;
         let (_, _, qc) = omega_with_critical_ratio(self.kind);
         let center = qc * state.b;
-        if state.pressure(center)?.dv <= 0.0 {
+        if state.eos_pressure(center)?.dv <= 0.0 {
             return Err(Error::InvalidInput(
                 "temperature at or above EOS critical temperature",
             ));
         }
         let bisect_spinodal = |mut low: f64, mut high: f64| -> Result<f64> {
-            let negative_at_low = state.pressure(low)?.dv < 0.0;
+            let negative_at_low = state.eos_pressure(low)?.dv < 0.0;
             for _ in 0..80 {
                 let mid = (low + high) * 0.5;
-                if (state.pressure(mid)?.dv < 0.0) == negative_at_low {
+                if (state.eos_pressure(mid)?.dv < 0.0) == negative_at_low {
                     low = mid;
                 } else {
                     high = mid;
@@ -146,19 +165,19 @@ impl Cubic {
         let liquid_spinodal = bisect_spinodal(state.b * (1.0 + 1e-8), center)?;
         let mut high_volume = center * 2.0;
         for _ in 0..60 {
-            if state.pressure(high_volume)?.dv < 0.0 {
+            if state.eos_pressure(high_volume)?.dv < 0.0 {
                 break;
             }
             high_volume *= 2.0;
         }
         let vapor_spinodal = bisect_spinodal(center, high_volume)?;
-        let min_pressure = state.pressure(liquid_spinodal)?.value;
-        let max_pressure = state.pressure(vapor_spinodal)?.value;
+        let min_pressure = state.eos_pressure(liquid_spinodal)?.value;
+        let max_pressure = state.eos_pressure(vapor_spinodal)?.value;
         let margin = 1e-4 * (max_pressure - min_pressure.max(0.0));
         let mut low = (min_pressure + margin).max(max_pressure * 1e-9).ln();
         let mut high = (max_pressure - margin).ln();
         let evaluate = |log_pressure: f64| -> Result<(f64, f64, f64)> {
-            let (volumes, count) = state.volumes(log_pressure.exp())?;
+            let (volumes, count) = state.eos_volumes(log_pressure.exp())?;
             if count != 2 {
                 return Err(Error::NotConverged("distinct saturation roots"));
             }
@@ -178,6 +197,8 @@ impl Cubic {
             let mid = (low + high) * 0.5;
             let (f, vl, vv) = evaluate(mid)?;
             if f.abs() < 1e-13 || high - low < 1e-14 {
+                let shift = state.volume_translation().value;
+                let (vl, vv) = (vl - shift, vv - shift);
                 let latent_heat = state.residual(vv)?.enthalpy - state.residual(vl)?.enthalpy;
                 return Ok(Saturation {
                     temperature,
@@ -276,16 +297,43 @@ impl Cubic {
         Err(Error::NotConverged("fixed-composition critical point"))
     }
     pub fn new(kind: CubicKind, names: &[&str]) -> Result<Self> {
-        Self::with_alpha(
-            kind,
-            names,
-            if kind == CubicKind::RedlichKwong {
+        Self::with_options(kind, names, CubicOptions::default())
+    }
+
+    /// Public cubic initialization, including tcPR's forced TWU/translation.
+    /// QuantumCubic beta/critical-data initialization remains unsupported.
+    pub fn with_options(
+        kind: CubicKind,
+        names: &[&str],
+        options: CubicOptions<'_>,
+    ) -> Result<Self> {
+        let reference = options.parameter_reference.to_ascii_uppercase();
+        if reference.contains("QUANTUMCUBIC") {
+            return Err(Error::Unsupported(
+                "QuantumCubic beta and critical-data initialization",
+            ));
+        }
+        let tcpr = reference.contains("TCPR");
+        let requested = if tcpr {
+            crate::AlphaCorrelation::Twu
+        } else {
+            options.alpha.unwrap_or(if kind == CubicKind::RedlichKwong {
                 crate::AlphaCorrelation::RedlichKwong
             } else {
                 crate::AlphaCorrelation::Classic
-            },
-            "DEFAULT",
-        )
+            })
+        };
+        let mut model = Self::new_with_references(
+            kind,
+            names,
+            requested,
+            options.parameter_reference,
+            options.parameter_reference,
+        )?;
+        if tcpr || options.volume_translation {
+            model.enable_volume_translation(options.parameter_reference)?;
+        }
+        Ok(model)
     }
 
     /// Initialize alpha as in tpInitAlphaCorr. The reference selects alpha
@@ -295,6 +343,16 @@ impl Cubic {
         names: &[&str],
         requested: crate::AlphaCorrelation,
         alpha_reference: &str,
+    ) -> Result<Self> {
+        Self::new_with_references(kind, names, requested, alpha_reference, "DEFAULT")
+    }
+
+    fn new_with_references(
+        kind: CubicKind,
+        names: &[&str],
+        requested: crate::AlphaCorrelation,
+        alpha_reference: &str,
+        parameter_reference: &str,
     ) -> Result<Self> {
         if names.is_empty() {
             return Err(Error::InvalidInput("at least one component required"));
@@ -306,7 +364,7 @@ impl Cubic {
         let (omega_a, omega_b) = omega(kind);
         let ideal_gases = components
             .iter()
-            .map(|c| crate::ideal::IdealGas::new(c))
+            .map(|c| crate::ideal::IdealGas::new(&crate::component::ideal_component(c)))
             .collect();
         let alpha = components
             .iter()
@@ -322,6 +380,8 @@ impl Cubic {
             lij: vec![0.0; names.len().pow(2)],
             nonzero_kij: Vec::new(),
             components,
+            translation_parameters: None,
+            translation_enabled: false,
         };
         for c in &model.components {
             positive(c.critical_temperature, "critical temperature")?;
@@ -342,8 +402,8 @@ impl Cubic {
                 } else {
                     kind.name()
                 };
-                let k = interaction(database_eos, a, b, false);
-                let l = interaction(database_eos, a, b, true);
+                let k = interaction_with_reference(database_eos, a, b, false, parameter_reference);
+                let l = interaction_with_reference(database_eos, a, b, true, parameter_reference);
                 model.kij[i * names.len() + j] = k;
                 model.kij[j * names.len() + i] = k;
                 model.lij[i * names.len() + j] = l;
@@ -356,6 +416,56 @@ impl Cubic {
 
     pub fn kind(&self) -> CubicKind {
         self.kind
+    }
+
+    /// Select Peneloux parameters from the source database/Rackett fallback.
+    /// This is the lower-level initializer and honors the reference argument.
+    pub fn enable_volume_translation(&mut self, reference: &str) -> Result<()> {
+        let parameters = self
+            .components
+            .iter()
+            .map(|c| crate::VolumeTranslation::initialize(self.kind, c, reference))
+            .collect::<Result<Vec<_>>>()?;
+        self.translation_parameters = Some(parameters);
+        self.translation_enabled = true;
+        Ok(())
+    }
+    /// Match init_peneloux_volume_translation, whose source wrapper ignores ref.
+    pub fn init_peneloux_volume_translation(&mut self, _parameter_reference: &str) -> Result<()> {
+        self.enable_volume_translation("DEFAULT")
+    }
+    pub fn disable_volume_translation(&mut self) {
+        self.translation_enabled = false;
+    }
+    pub fn volume_translation_enabled(&self) -> bool {
+        self.translation_enabled
+    }
+    pub fn set_volume_translation_enabled(&mut self, enabled: bool) {
+        self.translation_enabled = enabled;
+    }
+    pub fn volume_translation(&self, index: usize) -> Result<crate::VolumeTranslation> {
+        if index >= self.components.len() {
+            return Err(Error::InvalidInput("component index out of range"));
+        }
+        Ok(self
+            .translation_parameters
+            .as_ref()
+            .map_or(crate::VolumeTranslation::default(), |values| values[index]))
+    }
+    /// Set ci parameters without changing the enabled flag, as in set_ci.
+    pub fn set_volume_translation(
+        &mut self,
+        index: usize,
+        parameters: crate::VolumeTranslation,
+    ) -> Result<()> {
+        if index >= self.components.len() {
+            return Err(Error::InvalidInput("component index out of range"));
+        }
+        crate::VolumeTranslation::new(parameters.kind, parameters.coefficients)?;
+        self.translation_parameters.get_or_insert_with(|| {
+            vec![crate::VolumeTranslation::default(); self.components.len()]
+        })[index] = parameters;
+        Ok(())
     }
     pub fn alpha(&self, index: usize) -> Result<&crate::Alpha> {
         self.alpha
@@ -526,6 +636,25 @@ impl Cubic {
         if !a.is_finite() || !at.is_finite() || !att.is_finite() {
             return Err(Error::InvalidInput("temperature outside numerical range"));
         }
+        let translation = if self.translation_enabled {
+            let components = (0..n)
+                .map(|i| self.volume_translation(i)?.evaluate(temperature))
+                .collect::<Result<Vec<_>>>()?;
+            let mut prepared = crate::translation::PreparedTranslation {
+                c: 0.,
+                ct: 0.,
+                ctt: 0.,
+                components,
+            };
+            for (&x, value) in composition.iter().zip(&prepared.components) {
+                prepared.c += x * value.value;
+                prepared.ct += x * value.dt;
+                prepared.ctt += x * value.dtt;
+            }
+            Some(prepared)
+        } else {
+            None
+        };
         Ok(PreparedState {
             model: self,
             temperature,
@@ -537,6 +666,7 @@ impl Cubic {
             a_partial,
             b_partial,
             factors,
+            translation,
         })
     }
 }
@@ -557,7 +687,9 @@ impl PreparedState<'_> {
         if dt.len() != n || dp.len() != n || dn.len() != n * n {
             return Err(Error::InvalidInput("fugacity derivative buffer dimensions"));
         }
-        let p = self.pressure(volume)?;
+        self.volume_check(volume)?;
+        let volume = self.eos_volume(volume);
+        let p = self.eos_pressure(volume)?;
         positive(p.value, "pressure for fugacity derivatives")?;
         if p.dv == 0.0 {
             return Err(Error::InvalidInput("singular volume derivative"));
@@ -603,6 +735,12 @@ impl PreparedState<'_> {
                         + self.a * ib * bnn)
                         / rt;
                 dn[i * n + j] = fnn + 1.0 + pi * pressure_n(j) / (rt * p.dv);
+            }
+        }
+        if let Some(shift) = &self.translation {
+            for (i, component) in shift.components.iter().enumerate() {
+                dt[i] += p.value / R * (component.value / (t * t) - component.dt / t);
+                dp[i] -= component.value / rt;
             }
         }
         Ok(())
@@ -686,6 +824,7 @@ impl PreparedState<'_> {
         let ideal = self.ideal(self.pressure(volume)?.value)?;
         let cp = ideal.cp + self.residual(volume)?.cp;
         if self.model.kind == CubicKind::VanDerWaals {
+            let volume = self.eos_volume(volume);
             Ok(
                 cp + 2.0 * self.a * self.temperature / (1000.0 * volume * volume)
                     - 2.0 * self.a / (self.temperature * volume),
@@ -715,11 +854,34 @@ impl PreparedState<'_> {
         &self.composition
     }
     pub fn covolume(&self) -> f64 {
+        self.b - self.translation.as_ref().map_or(0., |c| c.c)
+    }
+
+    /// Untranslated repulsive covolume (m3/mol).
+    pub fn eos_covolume(&self) -> f64 {
         self.b
+    }
+    pub fn volume_translation(&self) -> crate::TranslationValue {
+        self.translation.as_ref().map_or(
+            crate::TranslationValue {
+                value: 0.,
+                dt: 0.,
+                dtt: 0.,
+            },
+            |c| crate::TranslationValue {
+                value: c.c,
+                dt: c.ct,
+                dtt: c.ctt,
+            },
+        )
+    }
+    #[inline]
+    fn eos_volume(&self, volume: f64) -> f64 {
+        volume + self.translation.as_ref().map_or(0., |c| c.c)
     }
 
     fn volume_check(&self, volume: f64) -> Result<()> {
-        if volume.is_finite() && volume > self.b {
+        if volume.is_finite() && volume > 0. && self.eos_volume(volume) > self.b {
             Ok(())
         } else {
             Err(Error::InvalidInput("molar volume must exceed covolume"))
@@ -728,6 +890,17 @@ impl PreparedState<'_> {
 
     pub fn pressure(&self, volume: f64) -> Result<Pressure> {
         self.volume_check(volume)?;
+        let mut pressure = self.eos_pressure(self.eos_volume(volume))?;
+        if let Some(shift) = &self.translation {
+            pressure.dt += pressure.dv * shift.ct;
+        }
+        Ok(pressure)
+    }
+
+    fn eos_pressure(&self, volume: f64) -> Result<Pressure> {
+        if !volume.is_finite() || volume <= self.b {
+            return Err(Error::InvalidInput("EOS volume must exceed covolume"));
+        }
         let (d1, d2) = self.model.kind.deltas();
         let denom = (volume + d1 * self.b) * (volume + d2 * self.b);
         let free = volume - self.b;
@@ -749,12 +922,15 @@ impl PreparedState<'_> {
     }
 
     pub fn residual(&self, volume: f64) -> Result<Residual> {
-        let pressure = self.pressure(volume)?;
+        self.volume_check(volume)?;
+        let actual_volume = volume;
+        let volume = self.eos_volume(volume);
+        let pressure = self.eos_pressure(volume)?;
         positive(pressure.value, "pressure for T-P residual properties")?;
         let z = pressure.value * volume / (R * self.temperature);
         let integral = self.attraction_integral(volume);
         let cv = self.temperature * self.att * integral;
-        Ok(Residual {
+        let mut residual = Residual {
             compressibility: z,
             helmholtz_tv: -R * self.temperature * (-self.b / volume).ln_1p() - self.a * integral,
             enthalpy: R * self.temperature * (z - 1.0)
@@ -762,7 +938,19 @@ impl PreparedState<'_> {
             entropy: R * (z * (1.0 - self.b / volume)).ln() + self.at * integral,
             cv,
             cp: cv - self.temperature * pressure.dt.powi(2) / pressure.dv - R,
-        })
+        };
+        if let Some(shift) = &self.translation {
+            let t = self.temperature;
+            residual.compressibility = pressure.value * actual_volume / (R * t);
+            residual.helmholtz_tv += R * t * (-shift.c / volume).ln_1p();
+            residual.enthalpy += pressure.value * (t * shift.ct - shift.c);
+            residual.entropy += pressure.value * shift.ct;
+            residual.cv += 2. * t * pressure.dt * shift.ct
+                + t * pressure.dv * shift.ct * shift.ct
+                + pressure.value * t * shift.ctt;
+            residual.cp += pressure.value * t * shift.ctt;
+        }
+        Ok(residual)
     }
 
     /// Write log fugacity coefficients into a caller-owned buffer.
@@ -779,6 +967,7 @@ impl PreparedState<'_> {
         }
         self.volume_check(volume)?;
         positive(p, "pressure for fugacity")?;
+        let volume = self.eos_volume(volume);
         let rt = R * self.temperature;
         let z = p * volume / rt;
         let repulsion = (z * (1.0 - self.b / volume)).ln();
@@ -786,12 +975,34 @@ impl PreparedState<'_> {
         for (i, phi) in output.iter_mut().enumerate() {
             let br = self.b_partial[i] / self.b;
             *phi = br * (z - 1.0) - repulsion - (2.0 * self.a_partial[i] - self.a * br) * integral;
+            if let Some(shift) = &self.translation {
+                *phi -= p * shift.components[i].value / rt;
+            }
         }
         Ok(())
     }
 
     /// Physical roots at positive pressure, ascending by volume.
     pub fn volumes(&self, pressure: f64) -> Result<([f64; 3], usize)> {
+        let (mut roots, count) = self.eos_volumes(pressure)?;
+        if let Some(shift) = &self.translation {
+            let mut kept = 0;
+            for i in 0..count {
+                let physical = roots[i] - shift.c;
+                if physical > 0. {
+                    roots[kept] = physical;
+                    kept += 1;
+                }
+            }
+            if kept == 0 {
+                return Err(Error::NoPhysicalRoot);
+            }
+            return Ok((roots, kept));
+        }
+        Ok((roots, count))
+    }
+
+    fn eos_volumes(&self, pressure: f64) -> Result<([f64; 3], usize)> {
         positive(pressure, "pressure")?;
         let rt = R * self.temperature;
         let a = self.a * pressure / (rt * rt);
@@ -812,7 +1023,7 @@ impl PreparedState<'_> {
                 continue;
             }
             for _ in 0..4 {
-                let p = self.pressure(v)?;
+                let p = self.eos_pressure(v)?;
                 if p.dv == 0.0 {
                     break;
                 }
@@ -824,7 +1035,7 @@ impl PreparedState<'_> {
                     break;
                 }
             }
-            let p = self.pressure(v)?;
+            let p = self.eos_pressure(v)?;
             if p.dv > 0.0 || (p.value - pressure).abs() > 1e-7 * pressure + 1e-3 {
                 continue;
             }

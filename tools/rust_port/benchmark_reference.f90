@@ -9,6 +9,9 @@ program benchmark_reference
   use ph_solver, only: twoPhasePHflash
   use ps_solver, only: twoPhasePSflash
   use thermopack_constants, only: VAPPH
+  use thermopack_var, only: get_active_comps,Rgas
+  use compdata, only: gendata_pointer
+  use ideal, only: Hideal,Sideal_T,CPideal
   implicit none
   integer, parameter :: iterations=1000000
   integer :: i,phase,ierr,mode,j
@@ -16,6 +19,20 @@ program benchmark_reference
   real :: n(3), v, p, pt, pv, checksum(3)
   real :: t,beta,betaL,x(3),y(3),residual,scale
   real :: enthalpies(0:99),entropies(0:99)
+  type(gendata_pointer), pointer :: comps(:)
+  call init_cubic('C3','PR',mixing='vdW',alpha='Classic',vol_shift=.false.)
+  comps=>get_active_comps()
+  checksum=0.0
+  call system_clock(start,rate)
+  do i=0,iterations-1
+    t=150.0+real(mod(i,1000))*0.7
+    checksum(1)=checksum(1)+Hideal(comps(1)%p_comp,1,t)
+    checksum(2)=checksum(2)+Sideal_T(comps(1)%p_comp,1,t)-Rgas*log(1e5)
+    checksum(3)=checksum(3)+CPideal(comps(1)%p_comp,1,t)
+  enddo
+  call system_clock(finish)
+  write(*,'(a,4(es24.16,a))') 'ideal,',real(finish-start)/real(rate)*1e9/iterations,',', &
+    checksum(1),',',checksum(2),',',checksum(3),''
   n = [0.7, 0.2, 0.1]
   call init_cubic('CO2,C1,N2','PR',mixing='vdW',alpha='Classic',vol_shift=.false.)
   checksum = 0.0

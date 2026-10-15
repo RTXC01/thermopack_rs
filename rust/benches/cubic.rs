@@ -3,6 +3,33 @@ use std::time::Instant;
 use thermopack_rs::{Cubic, CubicKind, Phase};
 
 fn main() {
+    let component = thermopack_rs::component("C3").unwrap();
+    let ideal = thermopack_rs::IdealGas::new(component).unwrap();
+    let ideal_iterations = 1_000_000;
+    for cached in [false, true] {
+        let start = Instant::now();
+        let mut checksum = [0.0; 3];
+        for i in 0..ideal_iterations {
+            let t = black_box(150.0 + (i % 1000) as f64 * 0.7);
+            let result = if cached {
+                black_box(&ideal).properties(t, black_box(1e5))
+            } else {
+                black_box(component).ideal(t, black_box(1e5))
+            }
+            .unwrap();
+            checksum[0] += result.enthalpy;
+            checksum[1] += result.entropy;
+            checksum[2] += result.cp;
+        }
+        println!(
+            "ideal_{},{:.6},{:.17e},{:.17e},{:.17e}",
+            if cached { "cached" } else { "uncached" },
+            start.elapsed().as_nanos() as f64 / ideal_iterations as f64,
+            checksum[0],
+            checksum[1],
+            checksum[2]
+        );
+    }
     let model = Cubic::new(CubicKind::PengRobinson, &["CO2", "C1", "N2"]).unwrap();
     let state = model.prepare(300.0, &[0.7, 0.2, 0.1]).unwrap();
     let iterations = 1_000_000;

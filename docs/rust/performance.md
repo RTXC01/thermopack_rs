@@ -2,17 +2,19 @@
 
 Measured locally on 2026-10-15. See [benchmark.json](benchmark.json) for
 machine/compiler details, reference hashes and individual samples. These
-numbers qualify one workload, not the complete library.
+numbers qualify the documented workloads, not the complete library.
 
 | Native operation | Fortran ns/state | Rust ns/state | Speedup |
 |---|---:|---:|---:|
-| Pressure + T/V derivatives, including mixing | 933 | 395 | 2.36x |
-| Vapor volume, including mixing | 1059 | 588 | 1.80x |
-| Pressure + T/V derivatives, prepared state | 933 | 8.8 | 106x |
-| Vapor volume, prepared state | 1059 | 204 | 5.20x |
-| TP flash, including stability and split solving | 102289 | 39696 | 2.58x |
-| PH flash, including temperature recovery | 482025 | 357215 | 1.35x |
-| PS flash, including temperature recovery | 2333910 | 348610 | 6.69x |
+| Pressure + T/V derivatives, including mixing | 937 | 385 | 2.43x |
+| Vapor volume, including mixing | 1069 | 585 | 1.83x |
+| Pressure + T/V derivatives, prepared state | 937 | 8.4 | 112x |
+| Vapor volume, prepared state | 1069 | 200 | 5.35x |
+| TP flash, including stability and split solving | 105740 | 39663 | 2.67x |
+| PH flash, including temperature recovery | 487817 | 327818 | 1.49x |
+| PS flash, including temperature recovery | 2456299 | 321323 | 7.64x |
+| Ideal H/S/Cp, uncached reference constants | 176 | 490 | 0.36x |
+| Ideal H/S/Cp, cached reference constants | 176 | 229 | 0.77x |
 
 PR, CO2/methane/nitrogen at mole fractions 0.7/0.2/0.1, T=300 K.
 Pressure scans use 1000 molar volumes from 1e-4 to 1.099e-3 m3/mol;
@@ -32,6 +34,13 @@ checksums must agree. Reported values are medians of five samples after a
 discarded warm-up. All timed loops are native code. Checksums of pressure,
 derivatives and volume must agree before timings are accepted.
 
+The ideal-gas workload uses pure propane's default DIPPR correlation at 1000
+temperatures from 150 to 849.3 K, P=0.1 MPa, one million states per sample.
+Both paths return H, S and Cp, with their checksums compared to native Fortran.
+The cached Rust path is the one used by `Cubic` model calculations. It is
+2.14x faster than standalone `Component::ideal`, but the Fortran ideal kernel
+is still about 1.30x faster; this remains a measured optimization gap.
+
 Rust uses release thin LTO and one codegen unit. Fortran uses the recorded
 gfortran `-O3` flags. Neither uses fast-math or reduced precision. The reference
 uses its public numerical interface, which recalculates state parameters;
@@ -45,9 +54,11 @@ volume/pressure kernels without allocation, calculate roots analytically with
 polishing and stable deflation, embed database constants rather than parse
 them during calculations. Caloric flashes limit preliminary homogeneous
 iterations across a phase-transition jump and reuse ideal/residual evaluations
-for H/S/Cp. This reduced the preliminary local PH/PS times from approximately
-864/871 microseconds to the reported 357/349 microseconds, with the same
-tolerances and reference fixtures. Reusing preparation does not reduce precision.
+for H/S/Cp. Owned ideal parameters cache reference integration constants;
+DIPPR shares two exponential factors across Cp/H/S. Preliminary local PH/PS
+times were approximately 864/871 microseconds; the current report is 328/321
+microseconds with the same tolerances and reference fixtures. Reusing
+preparation does not reduce precision.
 
 Reproduce with:
 

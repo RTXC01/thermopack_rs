@@ -34,11 +34,12 @@ def benchmark(compiler, repeats):
     timings = {}
     for i in range(repeats + 1):
         reference = parse(subprocess.check_output([str(executable)], env=env, text=True),
-                          {"pressure": 4, "volume": 2, "tp": 4, "ph": 4, "ps": 4})
+                          {"pressure": 4, "volume": 2, "tp": 4, "ph": 4, "ps": 4, "ideal": 4})
         native = parse(subprocess.check_output(["cargo", "bench", "--bench", "cubic"], cwd=ROOT, text=True),
                        {"pressure_prepared": 4, "pressure_with_mixing": 4,
                         "volume_prepared": 2, "volume_with_mixing": 2,
-                        "tp_flash": 4, "ph_flash": 4, "ps_flash": 4})
+                        "tp_flash": 4, "ph_flash": 4, "ps_flash": 4,
+                        "ideal_uncached": 4, "ideal_cached": 4})
         for name, measurements in native.items():
             ref = reference[name.split('_')[0]]
             for a, b in zip(measurements[1:], ref[1:]):
@@ -56,9 +57,9 @@ def benchmark(compiler, repeats):
                   hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
                   for path in sorted((ROOT / "rust").rglob("*.rs"))},
               "cargo_profile": {"optimization": "release", "lto": "thin", "codegen_units": 1},
-              "iterations_per_sample": {"pressure":1000000,"volume":1000000,"tp":10000,"ph":1000,"ps":1000}, "samples_ns_per_state": timings,
+              "iterations_per_sample": {"pressure":1000000,"volume":1000000,"tp":10000,"ph":1000,"ps":1000,"ideal":1000000}, "samples_ns_per_state": timings,
               "median_ns_per_state": {name: statistics.median(values) for name, values in timings.items()},
-              "workload": "PR CO2/C1/N2 0.7/0.2/0.1, 300 K; pressure+T/V derivatives, vapor volume; TP/PH/PS flash C1/C2/C3 0.5/0.3/0.2 at 1 MPa, T=180 to 259.2 K, caloric temperature recovery with default initial guesses"}
+              "workload": "PR CO2/C1/N2 0.7/0.2/0.1, 300 K; pressure+T/V derivatives, vapor volume; TP/PH/PS flash C1/C2/C3 0.5/0.3/0.2 at 1 MPa, T=180 to 259.2 K, caloric temperature recovery with default initial guesses; ideal C3 H/S/Cp, T=150 to 849.3 K at 0.1 MPa"}
     (ROOT / "docs/rust/benchmark.json").write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report["median_ns_per_state"], indent=2))
 

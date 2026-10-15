@@ -78,4 +78,52 @@ fn main() {
         checksum[1],
         checksum[2]
     );
+    let mut targets = Vec::new();
+    for i in 0..100 {
+        let t = 180.0 + i as f64 * 0.8;
+        let properties = model
+            .equilibrium_properties(&model.tp_flash(t, 1e6, &[0.5, 0.3, 0.2]).unwrap())
+            .unwrap();
+        let ph = model
+            .ph_flash(1e6, &[0.5, 0.3, 0.2], properties.enthalpy)
+            .unwrap();
+        let ps = model
+            .ps_flash(1e6, &[0.5, 0.3, 0.2], properties.entropy)
+            .unwrap();
+        assert!((ph.temperature - t).abs() < 1e-5 && (ps.temperature - t).abs() < 1e-5);
+        targets.push((properties.enthalpy, properties.entropy));
+    }
+    let caloric_iterations = 1000;
+    for enthalpy in [true, false] {
+        let start = Instant::now();
+        let mut checksum = [0.0; 3];
+        for i in 0..caloric_iterations {
+            let target = targets[i % 100];
+            let flash = if enthalpy {
+                model.ph_flash(
+                    black_box(1e6),
+                    black_box(&[0.5, 0.3, 0.2]),
+                    black_box(target.0),
+                )
+            } else {
+                model.ps_flash(
+                    black_box(1e6),
+                    black_box(&[0.5, 0.3, 0.2]),
+                    black_box(target.1),
+                )
+            }
+            .unwrap();
+            checksum[0] += flash.temperature;
+            checksum[1] += flash.vapor_fraction;
+            checksum[2] += flash.phase as i32 as f64;
+        }
+        println!(
+            "{}_flash,{:.6},{:.17e},{:.17e},{:.17e}",
+            if enthalpy { "ph" } else { "ps" },
+            start.elapsed().as_nanos() as f64 / caloric_iterations as f64,
+            checksum[0],
+            checksum[1],
+            checksum[2]
+        );
+    }
 }

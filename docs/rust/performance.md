@@ -1,4 +1,4 @@
-# Native cubic and TP benchmarks
+# Native cubic and flash benchmarks
 
 Measured locally on 2026-10-15. See [benchmark.json](benchmark.json) for
 machine/compiler details, reference hashes and individual samples. These
@@ -6,11 +6,13 @@ numbers qualify one workload, not the complete library.
 
 | Native operation | Fortran ns/state | Rust ns/state | Speedup |
 |---|---:|---:|---:|
-| Pressure + T/V derivatives, including mixing | 926 | 397 | 2.33x |
-| Vapor volume, including mixing | 1072 | 590 | 1.82x |
-| Pressure + T/V derivatives, prepared state | 926 | 8.5 | 109x |
-| Vapor volume, prepared state | 1072 | 197 | 5.44x |
-| TP flash, including stability and split solving | 103156 | 39794 | 2.59x |
+| Pressure + T/V derivatives, including mixing | 933 | 395 | 2.36x |
+| Vapor volume, including mixing | 1059 | 588 | 1.80x |
+| Pressure + T/V derivatives, prepared state | 933 | 8.8 | 106x |
+| Vapor volume, prepared state | 1059 | 204 | 5.20x |
+| TP flash, including stability and split solving | 102289 | 39696 | 2.58x |
+| PH flash, including temperature recovery | 482025 | 357215 | 1.35x |
+| PS flash, including temperature recovery | 2333910 | 348610 | 6.69x |
 
 PR, CO2/methane/nitrogen at mole fractions 0.7/0.2/0.1, T=300 K.
 Pressure scans use 1000 molar volumes from 1e-4 to 1.099e-3 m3/mol;
@@ -19,7 +21,14 @@ one million states. The TP workload uses PR methane/ethane/propane at
 0.5/0.3/0.2, P=1 MPa, with 100 temperatures from 180 to 259.2 K. Each
 TP sample performs 10000 complete flashes, including allocation, stability,
 phase decisions and split iterations; phase-fraction/phase-code checksums
-must agree. Reported values are medians of five samples after a
+must agree. PH/PS use H/S targets generated at those same 100 states outside
+the timer. Each caloric sample performs 1000 complete calls with default
+initial guesses, including temperature recovery, stability, split solving and
+allocation. Before timing, both implementations must recover every target
+temperature within 1e-5 K; the source must also close H/(RT) or S/R within
+1e-8. The fork's PS wrapper permits status -1, so that status is allowed only
+when these independent checks pass. Temperature/phase-fraction/phase-code
+checksums must agree. Reported values are medians of five samples after a
 discarded warm-up. All timed loops are native code. Checksums of pressure,
 derivatives and volume must agree before timings are accepted.
 
@@ -34,7 +43,11 @@ Implemented optimizations: cache temperature/composition parameters, traverse
 only nonzero kij pairs after factoring the ideal attractive sum, evaluate
 volume/pressure kernels without allocation, calculate roots analytically with
 polishing and stable deflation, embed database constants rather than parse
-them during calculations. Reusing preparation does not reduce precision.
+them during calculations. Caloric flashes limit preliminary homogeneous
+iterations across a phase-transition jump and reuse ideal/residual evaluations
+for H/S/Cp. This reduced the preliminary local PH/PS times from approximately
+864/871 microseconds to the reported 357/349 microseconds, with the same
+tolerances and reference fixtures. Reusing preparation does not reduce precision.
 
 Reproduce with:
 

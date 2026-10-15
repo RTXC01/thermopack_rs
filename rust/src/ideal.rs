@@ -237,24 +237,29 @@ impl Component {
                 Ok((scale * cp, scale * (h * hscale + h_constant), scale * s))
             }
             7 => {
-                let x = c[2] / t;
-                let y = c[4] / t;
-                let sinh_ratio = if x.abs() < 1e-8 { 1.0 } else { x / x.sinh() };
-                let cosh_ratio = y / y.cosh();
-                let cp = c[0] + c[1] * sinh_ratio.powi(2) + c[3] * cosh_ratio.powi(2);
-                let h = c[0] * t
-                    + if x == 0.0 {
-                        c[1] * t
-                    } else {
-                        c[1] * c[2] / x.tanh()
-                    }
-                    - c[3] * c[4] * y.tanh();
+                let x = c[2].abs() / t;
+                let y = c[4].abs() / t;
+                // Share two Boltzmann factors across Cp, H and S instead of
+                // separately calling sinh/cosh/tanh and logarithmic helpers.
+                let qx = (-2.0 * x).exp();
+                let qy = (-2.0 * y).exp();
+                let dx = if x < 0.5 {
+                    -(-2.0 * x).exp_m1()
+                } else {
+                    1.0 - qx
+                };
+                let dy = 1.0 + qy;
+                let cp = c[0]
+                    + 4.0 * c[1] * x * x * qx / (dx * dx)
+                    + 4.0 * c[3] * y * y * qy / (dy * dy);
+                let h = c[0] * t + c[1] * c[2].abs() * (1.0 + qx) / dx
+                    - c[3] * c[4].abs() * (1.0 - qy) / dy;
+                // These include the source's raw entropy integration constant;
+                // it remains observable when a Cp setter preserves old offsets.
+                let log_dx = if x < 0.5 { dx.ln() } else { (-qx).ln_1p() };
                 let s = c[0] * t.ln()
-                    + c[1] * (x / x.tanh() - log_sinh(x))
-                    + c[3] * (log_cosh(y) - y * y.tanh());
-                // Preserve the source integration constant. It cancels in a
-                // default reference reset, but remains visible after Cp edits.
-                let s = s + (c[3] - c[1]) * 2.0_f64.ln();
+                    + c[1] * (2.0 * x * qx / dx - log_dx)
+                    + c[3] * (2.0 * y * qy / dy + qy.ln_1p());
                 Ok((cp * 1e-3, h * 1e-3, s * 1e-3))
             }
             9 => {
@@ -292,11 +297,4 @@ impl Component {
             )),
         }
     }
-}
-
-fn log_sinh(x: f64) -> f64 {
-    x.abs() + (-(-2.0 * x.abs()).exp()).ln_1p() - 2.0_f64.ln()
-}
-fn log_cosh(x: f64) -> f64 {
-    x.abs() + (-2.0 * x.abs()).exp().ln_1p() - 2.0_f64.ln()
 }

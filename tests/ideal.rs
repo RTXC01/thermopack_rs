@@ -157,6 +157,24 @@ fn configured_caloric_values_close_native_flash_targets() {
 }
 
 #[test]
+fn dippr_shared_exponentials_keep_low_and_high_temperature_limits() {
+    let mut gas = IdealGas::new(component("C1").unwrap()).unwrap();
+    gas.set_heat_capacity(7, &[30000., 20000., 700., 15000., 300.])
+        .unwrap();
+    assert!((gas.properties(1., 1e5).unwrap().cp - 30.).abs() < 1e-12);
+    assert!((gas.properties(1e9, 1e5).unwrap().cp - 50.).abs() < 1e-10);
+    for t in [1., 1400., 1e9] {
+        let dt = t * 1e-5;
+        let p = gas.properties(t + dt, 1e5).unwrap();
+        let m = gas.properties(t - dt, 1e5).unwrap();
+        let at = gas.properties(t, 1e5).unwrap();
+        assert!(at.enthalpy.is_finite() && at.entropy.is_finite());
+        assert!(((p.enthalpy - m.enthalpy) / (2. * dt) - at.cp).abs() < 1e-6 * at.cp);
+        assert!(((p.entropy - m.entropy) / (2. * dt) - at.cp / t).abs() < 1e-6 * at.cp / t);
+    }
+}
+
+#[test]
 fn all_finite_default_ideal_reference_cases() {
     let absolute = [1e-7, 1e-9, 1e-9, 1e-10, 1e-12];
     let mut count = 0;

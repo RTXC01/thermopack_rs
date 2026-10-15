@@ -15,6 +15,7 @@
 //! # Ok(())
 //! # }
 //! ```
+pub mod alpha;
 pub mod caloric;
 pub mod component;
 pub mod cubic;
@@ -24,6 +25,7 @@ mod hydrogen;
 pub mod ideal;
 pub mod numerics;
 
+pub use alpha::{Alpha, AlphaCorrelation, AlphaValue};
 pub use caloric::{CaloricFlashOptions, EquilibriumProperties};
 pub use component::{Component, component, components};
 pub use cubic::{

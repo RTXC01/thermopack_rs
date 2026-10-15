@@ -39,6 +39,7 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y gfortran-13
       - run: python -m pip install numpy
       - run: python tools/rust_port/build_reference.py --compiler /usr/bin/gfortran-13
+      - run: python tools/rust_port/build_probe.py --compiler /usr/bin/gfortran-13
       - run: python tools/rust_port/validate_cubic.py
       - run: python tools/rust_port/validate_saturation.py
       - run: python tools/rust_port/validate_derivatives.py
@@ -47,3 +48,5 @@ jobs:
       - run: python tools/rust_port/validate_caloric.py
       - run: python tools/rust_port/validate_ideal.py
       - run: python tools/rust_port/validate_ideal_configuration.py
+      - run: python tools/rust_port/validate_alpha.py
+      - run: python tools/rust_port/validate_alpha_properties.py

@@ -72,7 +72,82 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "VDW" => CubicKind::VanDerWaals,
             _ => return Err("unknown model".into()),
         };
-        let model = Cubic::new(kind, &fields[1].split(',').collect::<Vec<_>>())?;
+        if fields[5] == "ALPHA" {
+            let result = (|| -> Result<Vec<f64>, thermopack_rs::Error> {
+                let selection: Vec<_> = fields[4].split('@').collect();
+                let mut model = Cubic::with_alpha(
+                    kind,
+                    &fields[1].split(',').collect::<Vec<_>>(),
+                    thermopack_rs::AlphaCorrelation::from_name(fields[3])?,
+                    selection[0],
+                )?;
+                for setter in &selection[1..] {
+                    let data: Vec<_> = setter.split(':').collect();
+                    let parameters = data[2]
+                        .split(',')
+                        .map(str::parse)
+                        .collect::<Result<Vec<f64>, _>>()
+                        .map_err(|_| {
+                            thermopack_rs::Error::InvalidInput("invalid alpha parameter")
+                        })?;
+                    model.set_alpha(
+                        data[0].parse().map_err(|_| {
+                            thermopack_rs::Error::InvalidInput("invalid component index")
+                        })?,
+                        thermopack_rs::AlphaCorrelation::from_name(data[1])?,
+                        &parameters,
+                    )?;
+                }
+                let mut values = Vec::new();
+                for (i, component) in model.components().iter().enumerate() {
+                    let alpha = model.alpha(i)?;
+                    let value = alpha
+                        .evaluate(fields[2].parse().unwrap(), component.critical_temperature)?;
+                    values.extend([alpha.correlation as i32 as f64]);
+                    values.extend(alpha.parameters);
+                    values.extend([value.value, value.dt, value.dtt]);
+                }
+                Ok(values)
+            })();
+            match result {
+                Ok(values) => println!(
+                    "{}",
+                    values
+                        .iter()
+                        .map(|v| format!("{v:.17e}"))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                ),
+                Err(error) => println!("ERROR: {error}"),
+            }
+            continue;
+        }
+        let property_config: Vec<_> = fields[5].split('@').collect();
+        let alpha_properties = property_config[0].starts_with("A_");
+        let mut model = if alpha_properties {
+            Cubic::with_alpha(
+                kind,
+                &fields[1].split(',').collect::<Vec<_>>(),
+                thermopack_rs::AlphaCorrelation::from_name(property_config[1])?,
+                property_config[2],
+            )?
+        } else {
+            Cubic::new(kind, &fields[1].split(',').collect::<Vec<_>>())?
+        };
+        if alpha_properties {
+            for setter in &property_config[3..] {
+                let data: Vec<_> = setter.split(':').collect();
+                let parameters = data[2]
+                    .split(',')
+                    .map(str::parse)
+                    .collect::<Result<Vec<f64>, _>>()?;
+                model.set_alpha(
+                    data[0].parse()?,
+                    thermopack_rs::AlphaCorrelation::from_name(data[1])?,
+                    &parameters,
+                )?;
+            }
+        }
         let t: f64 = fields[2].parse()?;
         if fields[3] == "PSEUDO" {
             let x: Vec<f64> = fields[4]
@@ -167,7 +242,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let state = model.prepare(t, &x)?;
         let v = state.volume(
             p,
-            if fields[5].ends_with('L') {
+            if property_config[0].ends_with('L') {
                 Phase::Liquid
             } else {
                 Phase::Vapor
@@ -208,6 +283,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
         for value in phi {
             print!(",{value:.17e}");
+        }
+        if alpha_properties {
+            let (mut dt, mut dp, mut dn) = (
+                vec![0.; x.len()],
+                vec![0.; x.len()],
+                vec![0.; x.len() * x.len()],
+            );
+            state.fugacity_derivatives_into(v, &mut dt, &mut dp, &mut dn)?;
+            for value in dt.iter().chain(&dp).chain(&dn) {
+                print!(",{value:.17e}");
+            }
         }
         println!();
     }

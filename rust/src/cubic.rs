@@ -43,10 +43,10 @@ pub enum Phase {
 pub struct Cubic {
     kind: CubicKind,
     components: Vec<&'static Component>,
-    ideal_gases: Vec<crate::ideal::IdealGas>,
+    ideal_gases: Vec<Result<crate::ideal::IdealGas>>,
     a0: Vec<f64>,
     bi: Vec<f64>,
-    kappa: Vec<f64>,
+    alpha: Vec<crate::Alpha>,
     kij: Vec<f64>,
     lij: Vec<f64>,
     nonzero_kij: Vec<(usize, usize, f64)>,
@@ -276,6 +276,26 @@ impl Cubic {
         Err(Error::NotConverged("fixed-composition critical point"))
     }
     pub fn new(kind: CubicKind, names: &[&str]) -> Result<Self> {
+        Self::with_alpha(
+            kind,
+            names,
+            if kind == CubicKind::RedlichKwong {
+                crate::AlphaCorrelation::RedlichKwong
+            } else {
+                crate::AlphaCorrelation::Classic
+            },
+            "DEFAULT",
+        )
+    }
+
+    /// Initialize alpha as in tpInitAlphaCorr. The reference selects alpha
+    /// records only; other model parameters retain their default selection.
+    pub fn with_alpha(
+        kind: CubicKind,
+        names: &[&str],
+        requested: crate::AlphaCorrelation,
+        alpha_reference: &str,
+    ) -> Result<Self> {
         if names.is_empty() {
             return Err(Error::InvalidInput("at least one component required"));
         }
@@ -287,13 +307,17 @@ impl Cubic {
         let ideal_gases = components
             .iter()
             .map(|c| crate::ideal::IdealGas::new(c))
+            .collect();
+        let alpha = components
+            .iter()
+            .map(|c| crate::Alpha::initialize(kind, c, requested, alpha_reference))
             .collect::<Result<_>>()?;
         let mut model = Self {
             kind,
             ideal_gases,
             a0: Vec::with_capacity(names.len()),
             bi: Vec::with_capacity(names.len()),
-            kappa: Vec::with_capacity(names.len()),
+            alpha,
             kij: vec![0.0; names.len().pow(2)],
             lij: vec![0.0; names.len().pow(2)],
             nonzero_kij: Vec::new(),
@@ -302,18 +326,12 @@ impl Cubic {
         for c in &model.components {
             positive(c.critical_temperature, "critical temperature")?;
             positive(c.critical_pressure, "critical pressure")?;
-            let w = c.acentric_factor;
             model
                 .a0
                 .push(omega_a * (R * c.critical_temperature).powi(2) / c.critical_pressure);
             model
                 .bi
                 .push(omega_b * R * c.critical_temperature / c.critical_pressure);
-            model.kappa.push(match kind {
-                CubicKind::PengRobinson => 0.37464 + 1.54226 * w - 0.26992 * w * w,
-                CubicKind::SoaveRedlichKwong => 0.48 + 1.574 * w - 0.176 * w * w,
-                _ => 0.0,
-            });
         }
         for i in 0..names.len() {
             for j in i + 1..names.len() {
@@ -339,6 +357,26 @@ impl Cubic {
     pub fn kind(&self) -> CubicKind {
         self.kind
     }
+    pub fn alpha(&self, index: usize) -> Result<&crate::Alpha> {
+        self.alpha
+            .get(index)
+            .ok_or(Error::InvalidInput("component index out of range"))
+    }
+
+    /// Set one component's effective alpha with explicit coefficients.
+    pub fn set_alpha(
+        &mut self,
+        index: usize,
+        correlation: crate::AlphaCorrelation,
+        parameters: &[f64],
+    ) -> Result<()> {
+        let destination = self
+            .alpha
+            .get_mut(index)
+            .ok_or(Error::InvalidInput("component index out of range"))?;
+        *destination = crate::Alpha::new(correlation, parameters)?;
+        Ok(())
+    }
     /// Database metadata. Use ideal_gas for this model's active caloric parameters.
     pub fn components(&self) -> &[&'static Component] {
         &self.components
@@ -348,7 +386,9 @@ impl Cubic {
     pub fn ideal_gas(&self, index: usize) -> Result<&crate::ideal::IdealGas> {
         self.ideal_gases
             .get(index)
-            .ok_or(Error::InvalidInput("component index out of range"))
+            .ok_or(Error::InvalidInput("component index out of range"))?
+            .as_ref()
+            .map_err(Clone::clone)
     }
 
     /// Configure this model's ideal parameters without changing the database
@@ -356,7 +396,9 @@ impl Cubic {
     pub fn ideal_gas_mut(&mut self, index: usize) -> Result<&mut crate::ideal::IdealGas> {
         self.ideal_gases
             .get_mut(index)
-            .ok_or(Error::InvalidInput("component index out of range"))
+            .ok_or(Error::InvalidInput("component index out of range"))?
+            .as_mut()
+            .map_err(|e| e.clone())
     }
 
     pub fn kij(&self, i: usize, j: usize) -> Result<f64> {
@@ -427,27 +469,11 @@ impl Cubic {
         let (mut sum, mut sum_t, mut sum_tt) = (0.0, 0.0, 0.0);
         for (i, &x) in composition.iter().enumerate() {
             let tc = self.components[i].critical_temperature;
-            let tr = temperature / tc;
-            let k = self.kappa[i];
-            let (alpha, alpha_t, alpha_tt) = match self.kind {
-                CubicKind::VanDerWaals => (1.0, 0.0, 0.0),
-                CubicKind::RedlichKwong => {
-                    let alpha = 1.0 / tr.sqrt();
-                    (
-                        alpha,
-                        -0.5 * alpha / temperature,
-                        0.75 * alpha / temperature.powi(2),
-                    )
-                }
-                _ => {
-                    let yy = -2.0 * k * (k + 1.0);
-                    (
-                        1.0 + k * k * (tr - 1.0) + yy * (tr.sqrt() - 1.0),
-                        k * k / tc + 0.5 * yy / (temperature * tc).sqrt(),
-                        -yy / (4.0 * temperature * (temperature * tc).sqrt()),
-                    )
-                }
-            };
+            let crate::AlphaValue {
+                value: alpha,
+                dt: alpha_t,
+                dtt: alpha_tt,
+            } = self.alpha[i].evaluate(temperature, tc)?;
             let f = (self.a0[i] * alpha.max(0.0)).sqrt();
             let ft = if f > 0.0 {
                 0.5 * self.a0[i] * alpha_t / f
@@ -625,7 +651,10 @@ impl PreparedState<'_> {
             if x == 0.0 {
                 continue;
             }
-            let pure = gas.properties(self.temperature, pressure)?;
+            let pure = gas
+                .as_ref()
+                .map_err(Clone::clone)?
+                .properties(self.temperature, pressure)?;
             result.cp += x * pure.cp;
             result.enthalpy_dt += x * pure.enthalpy_dt;
             result.enthalpy += x * pure.enthalpy;

@@ -21,6 +21,7 @@ uses 14.3.0; the source warns about version 15), Python and NumPy:
 ```
 git submodule update --init --depth 1 external/lapack
 python tools/rust_port/build_reference.py --compiler /path/to/gfortran
+python tools/rust_port/build_probe.py --compiler /path/to/gfortran
 python tools/rust_port/validate_cubic.py
 python tools/rust_port/validate_saturation.py
 python tools/rust_port/validate_derivatives.py
@@ -29,6 +30,8 @@ python tools/rust_port/validate_initialization.py
 python tools/rust_port/validate_caloric.py
 python tools/rust_port/validate_ideal.py
 python tools/rust_port/validate_ideal_configuration.py
+python tools/rust_port/validate_alpha.py
+python tools/rust_port/validate_alpha_properties.py
 ```
 
 On Windows add `--compiler-directory /path/to/gfortran/bin` to the validation
@@ -85,6 +88,11 @@ hashes, compiler, flags and LAPACK revision invalidates stale cached objects.
   all 21 coefficients; correlation IDs/coefficients require exact equality.
   Native tests check parameter isolation, invalid setter atomicity and PH/PS
   closure with customized correlations and references.
+* 4312 alpha initializer/setter attempts: 4232 numerical results and 80 recorded
+  source terminations in unimplemented paths. Another 3240 EOS cases qualify
+  alpha variants through complete properties and fugacity derivatives. See
+  [alpha scope and source conventions](alpha.md); this isolates the alpha
+  initializer and does not qualify translated/quantum constructor behavior.
 
 Each comparison uses `abs(error) <= atol + rtol * max(abs(reference), abs(rust))`.
 Tolerances are quantity-specific and recorded in fixture metadata and tests.

@@ -45,6 +45,11 @@ states for component i (zero based). A Cp setter preserves integration constants
 reference setters recalculate them as in the source. Other models and the global
 database remain independent. `components()` exposes database metadata, while
 `ideal_gas(i)` exposes the active caloric parameters.
+`Cubic::with_alpha` selects an alpha correlation and parameter reference;
+`set_alpha(i, correlation, coefficients)` sets one component explicitly.
+Effective parameters and fallback status are available through `alpha(i)`.
+See [alpha conventions](../docs/rust/alpha.md), including source initialization
+quirks and the separate scope of translated/quantum constructor behavior.
 `state.fugacity_derivatives_into` provides analytic T/P/n derivatives into
 caller-owned buffers. See [phase equilibrium conventions](../docs/rust/phase-equilibrium.md),
 including the Single phase fraction sentinel and a known raw ordering mismatch.

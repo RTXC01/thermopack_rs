@@ -82,6 +82,24 @@ def generate():
                          + ", second: " + string(values["uid2"]) + ", value: "
                          + number(value.replace("D", "e").replace("d", "e"))
                          + ", covolume: " + str(covolume).lower() + " },")
+    lines.extend(["];", "pub(super) const ALPHA_RECORDS: &[AlphaRecord] = &["])
+    counters = {'twu': 0, 'mc': 0}
+    source = compiled_path.read_text(encoding='utf-8')
+    pattern = r'type\s*\(alphadatadb\),\s*parameter\s*::\s*(twu|mc)(\d+)\s*=\s*&\s*alphadatadb\((.*?)^\s*\)'
+    for family, index, block in re.findall(pattern, source, re.M | re.S | re.I):
+        family = family.lower()
+        counters[family] += 1
+        assert int(index) == counters[family], 'Alpha constructor order differs from database order'
+        values = dict(re.findall(r'(\w+)\s*=\s*"([^"]*)"', block))
+        coeffs = re.search(r'coeff\s*=\s*\(/(.*?)/\)', block, re.S)[1]
+        coefficients = [number(v.strip().replace('D', 'e').replace('d', 'e'))
+                        for v in coeffs.replace('&', '').split(',')]
+        assert len(coefficients) == 3
+        lines.append('AlphaRecord { eos: '+string(values['eosid'])+', component: '
+                     +string(values['cid'])+', reference: '+string(values['ref'])
+                     +', mathias_copeman: '+str(family=='mc').lower()+', parameters: ['
+                     +', '.join(coefficients)+'] },')
+    assert counters['twu'] > 0 and counters['mc'] > 0
     lines.append("];")
     for path in inputs:
         lines.append("// " + path.relative_to(ROOT).as_posix() + " sha256="

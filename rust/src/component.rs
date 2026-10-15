@@ -28,10 +28,23 @@ pub(crate) struct Interaction {
     pub value: f64,
     pub covolume: bool,
 }
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct AlphaRecord {
+    pub eos: &'static str,
+    pub component: &'static str,
+    pub reference: &'static str,
+    pub mathias_copeman: bool,
+    pub parameters: [f64; 3],
+}
 include!("data.rs");
 
 pub fn components() -> &'static [Component] {
     COMPONENTS
+}
+
+pub(crate) fn alpha_records() -> &'static [AlphaRecord] {
+    ALPHA_RECORDS
 }
 
 pub fn component(name: &str) -> Result<&'static Component> {

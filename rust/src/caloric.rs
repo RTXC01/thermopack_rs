@@ -376,7 +376,13 @@ impl Cubic {
         mut options: CaloricFlashOptions,
         index: usize,
     ) -> Result<FlashResult> {
-        let pure = Cubic::new(self.kind(), &[self.components()[index].ident])?;
+        let mut pure = Cubic::new(self.kind(), &[self.components()[index].ident])?;
+        let alpha = self.alpha(index)?;
+        pure.set_alpha(
+            0,
+            alpha.correlation,
+            &alpha.parameters[..alpha.correlation.parameter_count()],
+        )?;
         let critical = pure.pseudo_critical(&[1.0])?;
         let mut phase = FlashPhase::Single;
         if p < critical.pressure {

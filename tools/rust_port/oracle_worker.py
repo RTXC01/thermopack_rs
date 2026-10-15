@@ -4,8 +4,9 @@ import json
 import sys
 import warnings
 import math
-from ctypes import c_double,POINTER,byref
-from reference import load
+import os
+from ctypes import c_double,c_int,c_char_p,CDLL,POINTER,byref
+from reference import ROOT,load
 
 
 def overall(model,flash,method):
@@ -31,15 +32,63 @@ def phase_permutation_allowed(model,result):
 def main(compiler_directory):
     cubic=load(compiler_directory)
     model,previous=None,None
+    probe=None
     for line in sys.stdin:
         request=json.loads(line)
         eos,comps=request['eos'],request['components']
-        if previous!=(eos,comps):
+        alpha=request.get('alpha','RK' if eos=='RK' else 'Classic')
+        ref=request.get('alpha_reference','Default')
+        key=(eos,comps,alpha,ref,'alpha_kernel' if request['mode'] in ('ALPHA','ALPHA_PROPERTIES') else 'public')
+        if previous!=key:
+            # ALPHA qualifies tpInitAlphaCorr separately from eoslibinit's
+            # forced tcPR translation / QuantumCubic critical-data overrides.
+            alpha_mode=request['mode'] in ('ALPHA','ALPHA_PROPERTIES')
+            base_ref=('tcPR' if 'BUTANAL' in comps.split(',') else 'Default') if alpha_mode else ref
             model=cubic(comps,"SRK" if eos=="RK" else eos,
-                        alpha="RK" if eos=="RK" else "Classic",volume_shift=False)
-            previous=eos,comps
+                        alpha='Classic' if alpha_mode else alpha,parameter_reference=base_ref,volume_shift=False)
+            previous=key
         extra={}
-        if request['mode'] in ('IDEAL','IDEAL_CONFIG'):
+        if request['mode'] in ('ALPHA','ALPHA_PROPERTIES'):
+            if probe is None:
+                probe=CDLL(str(ROOT/'.reference'/('reference_probe.dll' if os.name=='nt' else 'libreference_probe.so')))
+                probe.query_alpha.argtypes=[c_int,c_double,POINTER(c_int),POINTER(c_double),POINTER(c_double)]
+                probe.query_alpha.restype=None
+                probe.initialize_alpha.argtypes=[c_char_p,c_int,c_char_p,c_int]
+                probe.initialize_alpha.restype=None
+            model.activate()
+            probe.initialize_alpha(alpha.encode('ascii'),len(alpha),ref.encode('ascii'),len(ref))
+            for index,name,parameters in request.get('setters',[]):
+                model.set_alpha_corr(index+1,name,parameters)
+                previous=None
+            model.activate()
+            values=[]
+            for index in range(model.nc):
+                method=c_int()
+                parameters=(c_double*3)()
+                derivatives=(c_double*3)()
+                probe.query_alpha(index+1,request['temperature'],byref(method),parameters,derivatives)
+                values.extend([method.value,*map(float,parameters),*map(float,derivatives)])
+            if not all(map(math.isfinite,values)):
+                print('THERMOPACK_RESULT='+json.dumps({'calculation_error':'non-finite alpha property',
+                      'values':list(map(str,values))}),flush=True)
+                continue
+            if request['mode']=='ALPHA_PROPERTIES':
+                t,p,z=request['temperature'],request['pressure'],request['feed']
+                phase=model.LIQPH if request['phase']=='L' else model.VAPPH
+                v=model.specific_volume(t,p,z,phase)[0]
+                pressure,pt,pv=model.pressure_tv(t,v,z,dpdt=True,dpdv=True)
+                hr=model.enthalpy(t,p,z,phase,residual=True)[0]
+                sr=model.entropy(t,p,z,phase,residual=True)[0]
+                h,cp=model.enthalpy(t,p,z,phase,dhdt=True)
+                s=model.entropy(t,p,z,phase)[0]
+                phi,dt,dp,dn=model.thermo(t,p,z,phase,dlnfugdt=True,dlnfugdp=True,dlnfugdn=True)
+                values=list(map(float,[v,pressure,pt,pv,hr,sr,h,s,cp,*phi,*dt,*dp,*dn.flatten()]))
+                if not all(map(math.isfinite,values)):
+                    print('THERMOPACK_RESULT='+json.dumps({'calculation_error':'non-finite alpha EOS property',
+                          'values':list(map(str,values))}),flush=True)
+                    continue
+            swappable=False
+        elif request['mode'] in ('IDEAL','IDEAL_CONFIG'):
             if request['mode']=='IDEAL_CONFIG':
                 # Every configuration case starts from fresh default offsets.
                 model=cubic(comps,'PR',volume_shift=False)

@@ -51,5 +51,7 @@ See [coverage.md](coverage.md), [inventory.json](inventory.json),
 [performance.md](performance.md) and [baseline-defects.md](baseline-defects.md).
 The [phase equilibrium notes](phase-equilibrium.md) describe stability,
 derivatives, TP/PH/PS result conventions and qualification limits.
+The [alpha notes](alpha.md) describe temperature correlations, setters,
+reference selection and the boundary between alpha and translated/quantum models.
 Regenerate inventory with
 `python tools/rust_port/inventory.py`.

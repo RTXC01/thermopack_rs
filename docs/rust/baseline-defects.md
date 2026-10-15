@@ -3,6 +3,20 @@
 Exact baseline: d68c794. These are observed differences, not hypothetical
 limitations. Compatibility and mathematical consistency are tested separately.
 
+## Alpha initialization and constructor overrides
+
+The alpha initializer reads TWU records for both TWU and MC requests. Several
+explicit correlation names leave their fitted coefficient zero. Non-water UMR
+and explicitly set GERG/UMR terminate on evaluation because the source lacks
+those evaluator branches. Native alpha selection preserves the effective
+method/parameters and returns explicit errors for unimplemented evaluation.
+
+Separately, the public cubic constructor overrides alpha to TWU and enables
+translation for tcPR references. QuantumCubic also changes beta and critical
+data. These combined models remain pending; alpha-kernel qualification must
+not be taken as their qualification. See [alpha.md](alpha.md) for exact scope
+and the source probe used to separate these layers.
+
 ## Compiled fluid constants differ from JSON
 
 `src/compdatadb.f90` rounds molecular masses when it is generated. For example,

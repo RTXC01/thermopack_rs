@@ -46,9 +46,9 @@ def benchmark(compiler, repeats):
                   hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
                   for path in sorted((ROOT / "rust").rglob("*.rs"))},
               "cargo_profile": {"optimization": "release", "lto": "thin", "codegen_units": 1},
-              "iterations_per_sample": 1000000, "samples_ns_per_state": timings,
+              "iterations_per_sample": {"pressure":1000000,"volume":1000000,"tp":10000}, "samples_ns_per_state": timings,
               "median_ns_per_state": {name: statistics.median(values) for name, values in timings.items()},
-              "workload": "PR CO2/C1/N2 0.7/0.2/0.1, 300 K; pressure+T/V derivatives, vapor volume"}
+              "workload": "PR CO2/C1/N2 0.7/0.2/0.1, 300 K; pressure+T/V derivatives, vapor volume; TP flash C1/C2/C3 0.5/0.3/0.2 at 1 MPa, T=180 to 259.2 K"}
     (ROOT / "docs/rust/benchmark.json").write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report["median_ns_per_state"], indent=2))
 

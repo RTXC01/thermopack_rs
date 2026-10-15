@@ -58,4 +58,24 @@ fn main() {
             start.elapsed().as_nanos() as f64 / iterations as f64
         );
     }
+    let model = Cubic::new(CubicKind::PengRobinson, &["C1", "C2", "C3"]).unwrap();
+    let flash_iterations = 10000;
+    let mut checksum = [0.0; 3];
+    let start = Instant::now();
+    for i in 0..flash_iterations {
+        let t = 180.0 + (i % 100) as f64 * 0.8;
+        let result = model
+            .tp_flash(black_box(t), black_box(1e6), black_box(&[0.5, 0.3, 0.2]))
+            .unwrap();
+        checksum[0] += result.vapor_fraction;
+        checksum[1] += result.liquid_fraction;
+        checksum[2] += result.phase as i32 as f64;
+    }
+    println!(
+        "tp_flash,{:.6},{:.17e},{:.17e},{:.17e}",
+        start.elapsed().as_nanos() as f64 / flash_iterations as f64,
+        checksum[0],
+        checksum[1],
+        checksum[2]
+    );
 }

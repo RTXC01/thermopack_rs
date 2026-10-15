@@ -135,74 +135,95 @@
     }
   },
   "native_sources_sha256": {
-    "rust/benches/cubic.rs": "20fb84705571ca5e5944258e7581c7f13d1d8ac6d12e0159e27e96dd3071fe58",
+    "rust/benches/cubic.rs": "cf1896687d34be7a2fa42a70c23e91b0f3980ec3c47738c933bdeb711447c245",
     "rust/examples/cubic.rs": "22a37961aaa5e8c2dad9c00bf59a2eaa813cd835bf150c7ac7dc877597d0dbef",
-    "rust/examples/parity.rs": "8f7ff03d8e71202d8c0ee426ff6a259ae0a21756259dfeec2237cc8043c586b4",
+    "rust/examples/parity.rs": "9534e67e2b51e43421ce4147da3a7530d20f2d3a1153b0d6681226dd03930632",
     "rust/src/component.rs": "8a2c7acef031536df452144e3cc4154a9dacb28cb578469399f608818e4d8bd4",
-    "rust/src/cubic.rs": "3554bc54c8f06af997e061f23201c2d94d45152deac0aed3258bcf5d470009ed",
+    "rust/src/cubic.rs": "cabe41738d0c1082a9a2068219b7900754ca381cf66d30153ba3a9e42e7dd3aa",
     "rust/src/data.rs": "7a390629ca129c299aab024c263207cc00cfbd37e3d4f284788df9c24cdec2b4",
     "rust/src/error.rs": "5621c03915ebb6154ebbef42e00f4c121af2a398131ffabb542b4794106316e3",
+    "rust/src/flash.rs": "4f28b7fdd3652ccc329edc618ebd2bb0b6eefb60dc617e7b363e1dc63e0dd3bb",
     "rust/src/ideal.rs": "404195ed259c7aa6f7ba9692f37e99f3a5ec6c96e9662a070679e6e491521729",
-    "rust/src/lib.rs": "94377020eadbd9dcde9d43ab9a51ed5bcb6df406fe857f77d706c3d74fd6bc81",
-    "rust/src/numerics.rs": "7165f8e560a0060c5352b7635134c09c1aac1161b0dc4014c1c134d950f444b3"
+    "rust/src/lib.rs": "4fbcabc91d6efbb82af8192c6ea21fcff070825fd69f1cea9b00900756c5c49d",
+    "rust/src/numerics.rs": "aa3b5fa3af31e231fa2ff21a320a7c1b24931ec5c7977b1ccc6736e85245c72d"
   },
   "cargo_profile": {
     "optimization": "release",
     "lto": "thin",
     "codegen_units": 1
   },
-  "iterations_per_sample": 1000000,
+  "iterations_per_sample": {
+    "pressure": 1000000,
+    "volume": 1000000,
+    "tp": 10000
+  },
   "samples_ns_per_state": {
     "rust_pressure_prepared": [
-      8.701,
-      8.3684,
-      8.397,
-      8.3494,
-      8.3872
+      8.3856,
+      8.653,
+      8.4231,
+      8.6188,
+      8.459
     ],
     "rust_pressure_with_mixing": [
-      386.3639,
-      386.038,
-      383.6698,
-      372.4831,
-      383.0916
+      386.2437,
+      391.8916,
+      399.7032,
+      396.6993,
+      414.8124
     ],
     "rust_volume_prepared": [
-      196.8119,
-      208.5216,
-      197.049,
-      196.4624,
-      202.5438
+      196.023,
+      193.9924,
+      197.1684,
+      211.4239,
+      199.2489
     ],
     "rust_volume_with_mixing": [
-      591.7282,
-      584.835,
-      597.4139,
-      592.1746,
-      579.4687
+      604.5469,
+      584.0314,
+      589.5517,
+      619.5562,
+      585.3285
+    ],
+    "rust_tp_flash": [
+      39701.36,
+      39794.04,
+      40463.18,
+      39329.94,
+      40774.65
     ],
     "fortran_pressure": [
-      919.6806,
-      914.8949,
-      908.4267,
-      1008.6208000000001,
-      914.9004
+      908.58,
+      925.6043,
+      921.9397,
+      961.7757,
+      945.3773
     ],
     "fortran_volume": [
-      1041.6563999999998,
-      1059.7642,
-      1046.1408999999999,
-      1040.8176,
-      1052.389
+      1039.8887000000002,
+      1075.7583,
+      1072.0946,
+      1085.8565,
+      1034.9386
+    ],
+    "fortran_tp": [
+      102898.20999999999,
+      102234.34,
+      103156.20000000001,
+      105863.36000000002,
+      103227.73000000001
     ]
   },
   "median_ns_per_state": {
-    "rust_pressure_prepared": 8.3872,
-    "rust_pressure_with_mixing": 383.6698,
-    "rust_volume_prepared": 197.049,
-    "rust_volume_with_mixing": 591.7282,
-    "fortran_pressure": 914.9004,
-    "fortran_volume": 1046.1408999999999
+    "rust_pressure_prepared": 8.459,
+    "rust_pressure_with_mixing": 396.6993,
+    "rust_volume_prepared": 197.1684,
+    "rust_volume_with_mixing": 589.5517,
+    "rust_tp_flash": 39794.04,
+    "fortran_pressure": 925.6043,
+    "fortran_volume": 1072.0946,
+    "fortran_tp": 103156.20000000001
   },
-  "workload": "PR CO2/C1/N2 0.7/0.2/0.1, 300 K; pressure+T/V derivatives, vapor volume"
+  "workload": "PR CO2/C1/N2 0.7/0.2/0.1, 300 K; pressure+T/V derivatives, vapor volume; TP flash C1/C2/C3 0.5/0.3/0.2 at 1 MPa, T=180 to 259.2 K"
 }

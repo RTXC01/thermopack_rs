@@ -8,10 +8,13 @@ from pathlib import Path
 import platform
 import statistics
 import subprocess
+from datetime import datetime,timezone
 from reference import ROOT
 
 
-def benchmark(compiler, repeats):
+def benchmark(compiler, repeats, tcpr=False):
+    if repeats < 1:
+        raise ValueError('At least one measured repetition is required')
     compiler = Path(compiler).resolve()
     env = dict(os.environ)
     env["PATH"] = str(compiler.parent) + os.pathsep + env["PATH"]
@@ -25,17 +28,19 @@ def benchmark(compiler, repeats):
     subprocess.run(["cargo", "bench", "--bench", "cubic", "--no-run"], cwd=ROOT, check=True)
     def parse(output, expected):
         rows = {row.split(',')[0]: list(map(float, row.split(',')[1:]))
-                for row in output.splitlines() if ',' in row}
+                for row in output.splitlines() if row.split(',')[0] in expected}
         assert rows.keys() == expected.keys(), (rows.keys(), expected.keys(), output)
         for name, values in rows.items():
             assert len(values) == expected[name] and all(map(math.isfinite, values)), (name, values)
             assert values[0] > 0.0, (name, values)
         return rows
     timings = {}
+    native_command=['cargo','bench','--bench','cubic']+(['--','--tcpr'] if tcpr else [])
+    reference_command=[str(executable)]+(['tcPR'] if tcpr else [])
     for i in range(repeats + 1):
-        reference = parse(subprocess.check_output([str(executable)], env=env, text=True),
+        reference = parse(subprocess.check_output(reference_command, env=env, text=True),
                           {"pressure": 4, "volume": 2, "tp": 4, "ph": 4, "ps": 4, "ideal": 4})
-        native = parse(subprocess.check_output(["cargo", "bench", "--bench", "cubic"], cwd=ROOT, text=True),
+        native = parse(subprocess.check_output(native_command, cwd=ROOT, text=True),
                        {"pressure_prepared": 4, "pressure_with_mixing": 4,
                         "volume_prepared": 2, "volume_with_mixing": 2,
                         "tp_flash": 4, "ph_flash": 4, "ps_flash": 4,
@@ -50,17 +55,22 @@ def benchmark(compiler, repeats):
             for name, measurements in reference.items():
                 timings.setdefault("fortran_" + name, []).append(measurements[0])
         print(f"Benchmark repetition {i}/{repeats} (0 is warm-up)", flush=True)
-    report = {"platform": platform.platform(), "processor": platform.processor(),
+    report = {"measured_at":datetime.now(timezone.utc).isoformat(),
+              "parameter_reference":"tcPR" if tcpr else "DEFAULT",
+              "platform": platform.platform(), "processor": platform.processor(),
               "rustc": subprocess.check_output(["rustc", "--version"], text=True).strip(),
               "reference": json.loads((out / "metadata.json").read_text()),
               "native_sources_sha256": {path.relative_to(ROOT).as_posix():
                   hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
                   for path in sorted((ROOT / "rust").rglob("*.rs"))},
+              "benchmark_sources_sha256":{path.relative_to(ROOT).as_posix():
+                  hashlib.sha256(path.read_bytes().replace(b'\r\n',b'\n')).hexdigest()
+                  for path in [Path(__file__),ROOT/'tools/rust_port/benchmark_reference.f90']},
               "cargo_profile": {"optimization": "release", "lto": "thin", "codegen_units": 1},
               "iterations_per_sample": {"pressure":1000000,"volume":1000000,"tp":10000,"ph":1000,"ps":1000,"ideal":1000000}, "samples_ns_per_state": timings,
               "median_ns_per_state": {name: statistics.median(values) for name, values in timings.items()},
               "workload": "PR CO2/C1/N2 0.7/0.2/0.1, 300 K; pressure+T/V derivatives, vapor volume; TP/PH/PS flash C1/C2/C3 0.5/0.3/0.2 at 1 MPa, T=180 to 259.2 K, caloric temperature recovery with default initial guesses; ideal C3 H/S/Cp, T=150 to 849.3 K at 0.1 MPa"}
-    (ROOT / "docs/rust/benchmark.json").write_text(json.dumps(report, indent=2) + "\n")
+    (ROOT / "docs/rust" / ("benchmark-tcpr.json" if tcpr else "benchmark.json")).write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report["median_ns_per_state"], indent=2))
 
 
@@ -68,5 +78,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--compiler", required=True)
     parser.add_argument("--repeats", type=int, default=5)
+    parser.add_argument("--tcpr", action='store_true', help='Benchmark full translated-consistent PR construction')
     args = parser.parse_args()
-    benchmark(args.compiler, args.repeats)
+    benchmark(args.compiler, args.repeats, args.tcpr)

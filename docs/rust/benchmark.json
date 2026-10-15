@@ -1,4 +1,6 @@
 {
+  "measured_at": "2026-10-15T19:50:50.091071+00:00",
+  "parameter_reference": "DEFAULT",
   "platform": "Windows-10-10.0.19045-SP0",
   "processor": "AMD64 Family 23 Model 1 Stepping 1, AuthenticAMD",
   "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
@@ -135,20 +137,25 @@
     }
   },
   "native_sources_sha256": {
-    "rust/benches/cubic.rs": "6ae5b1072cbdee396cfd299c067921edd41ede3293ce15b4bfdd8ba4dfbf9858",
+    "rust/benches/cubic.rs": "506c81f78af2daecc81c3b6902a36945a5f133a5c48c3355f27327ad2950eed0",
     "rust/examples/cubic.rs": "22a37961aaa5e8c2dad9c00bf59a2eaa813cd835bf150c7ac7dc877597d0dbef",
-    "rust/examples/parity.rs": "91396b405a5a010c5d4c4a692aa458c14a9ac8de59c9073a51f25fc8153570b2",
-    "rust/src/alpha.rs": "880ff3630d52d7800823205d6cc9db86afd39c1a9af2b6ce4e39c923e7f8151c",
-    "rust/src/caloric.rs": "06c8f84ea86fca668e0b54342688034e715c304e683886e39f2eb0fcf92345fb",
-    "rust/src/component.rs": "1c0c1b709013c12a7098e754ffb1c94271a63790fa7961509302c5126ac1a632",
-    "rust/src/cubic.rs": "de84a1a125f2f7f861e4983d5c31d01f188dc6b61ee08738f4e4218534e06249",
-    "rust/src/data.rs": "31ce153e180bffa2e9a43205299882a14be3ae131783dd40e4bdfd7d0bf74df3",
+    "rust/examples/parity.rs": "3925e028149fb23cb4aeefb75cfa8106028c91839dc155f094c69c68042b80ed",
+    "rust/src/alpha.rs": "5b53eadba0bd58038e962f64903e52ba48edab6990350aa2e2914c4890bfda9a",
+    "rust/src/caloric.rs": "936455f6535da82ff8db554e5e6d54cae4f0f3a099ed19fe1c1a10f64193f2c5",
+    "rust/src/component.rs": "c8467c692b5ff50a46870b7499f131b117e3685d751183e279982cd032eb1645",
+    "rust/src/cubic.rs": "b9690cf4e484f2863bfa1f7950e0f9ec231067beae775c2910cb1d8218a0bf18",
+    "rust/src/data.rs": "8081eb62e01eb3653a0bb1f41be8cd79d38756be07f33770c6aa7e43954ec12a",
     "rust/src/error.rs": "5621c03915ebb6154ebbef42e00f4c121af2a398131ffabb542b4794106316e3",
     "rust/src/flash.rs": "615cfe86f3ad9c0149bcda7732119af8780d7e71e47a1c3a50d5bd63efa0e0a4",
     "rust/src/hydrogen.rs": "05e1a4d1801fb12bbad0bd4915393d572319e7217c98b95b9de9e81ec600e794",
     "rust/src/ideal.rs": "3ca1ddedf7d9b063b2636984ffab2ce46bdd8855ba448cc26b0483f4e46e9d30",
-    "rust/src/lib.rs": "f85d07a2bb4e3d012795dcfdeb120fc9a623f4a57027deb10c83ccee348d71fa",
-    "rust/src/numerics.rs": "82eea67ffecf58bf361b49f5549fd31783e22c2ffac97186d0ba6f1bfaacf2ac"
+    "rust/src/lib.rs": "623eb5e1956e90748d1f7c878ec7b6bfd7c6b7b0ef898e679fc741737431503b",
+    "rust/src/numerics.rs": "82eea67ffecf58bf361b49f5549fd31783e22c2ffac97186d0ba6f1bfaacf2ac",
+    "rust/src/translation.rs": "8e9889468085287c3cf1506edc6a98815fdaf03ac29f9920c197dfb6328b6902"
+  },
+  "benchmark_sources_sha256": {
+    "tools/rust_port/benchmark.py": "9dc1f9b68c821080a44ec53a7eb57d6186e88799a4b44da789bec473d71a25e1",
+    "tools/rust_port/benchmark_reference.f90": "721c34b9dff0872be541d4caf754cd51813546e277c1486bdc305a90ff5f2b4e"
   },
   "cargo_profile": {
     "optimization": "release",
@@ -165,127 +172,127 @@
   },
   "samples_ns_per_state": {
     "rust_ideal_uncached": [
-      487.0004,
-      494.8729,
-      479.0856,
-      477.3447,
-      462.2819
+      471.7712,
+      455.8156,
+      494.7846,
+      460.6234,
+      467.9552
     ],
     "rust_ideal_cached": [
-      229.6495,
-      231.8782,
-      242.2177,
-      240.1761,
-      230.9538
+      227.347,
+      220.3664,
+      231.2956,
+      216.5911,
+      229.4051
     ],
     "rust_pressure_prepared": [
-      11.3017,
-      8.4773,
-      8.3952,
-      8.7518,
-      8.368
+      11.3942,
+      10.9577,
+      11.4222,
+      10.8133,
+      11.1645
     ],
     "rust_pressure_with_mixing": [
-      420.1936,
-      418.3825,
-      448.7995,
-      428.9034,
-      429.5745
+      400.9765,
+      415.7595,
+      413.4268,
+      417.1514,
+      406.5987
     ],
     "rust_volume_prepared": [
-      198.016,
-      197.4903,
-      232.3394,
-      195.7476,
-      195.7882
+      218.4714,
+      210.5825,
+      211.1029,
+      222.8139,
+      210.7957
     ],
     "rust_volume_with_mixing": [
-      637.2818,
-      605.9763,
-      622.8112,
-      613.93,
-      610.6557
+      585.1237,
+      582.6459,
+      607.4675,
+      611.2125,
+      587.9378
     ],
     "rust_tp_flash": [
-      39486.54,
-      38804.62,
-      40410.1,
-      38667.04,
-      39066.28
+      37987.43,
+      39201.92,
+      39486.05,
+      38533.05,
+      41165.76
     ],
     "rust_ph_flash": [
-      329569.3,
-      329912.7,
-      333405.8,
-      329978.3,
-      325714.9
+      341596.5,
+      325045.3,
+      324239.2,
+      324469.2,
+      335258.2
     ],
     "rust_ps_flash": [
-      329679.3,
-      315235.0,
-      321613.6,
-      321717.6,
-      322952.6
+      319048.8,
+      321473.3,
+      325749.3,
+      323671.2,
+      328937.5
     ],
     "fortran_ideal": [
-      166.6087,
-      186.0321,
-      185.6516,
-      180.7658,
-      164.9313
+      182.2087,
+      174.0289,
+      181.3248,
+      171.8853,
+      164.043
     ],
     "fortran_pressure": [
-      971.1917,
-      1004.1606000000002,
-      962.325,
-      977.5144,
-      997.7627
+      906.4588,
+      891.8464,
+      894.9352,
+      911.8217,
+      903.5461
     ],
     "fortran_volume": [
-      1097.7507,
-      1116.2717,
-      1101.3705,
-      1096.1915,
-      1174.6338
+      1034.7985,
+      1038.8308,
+      1030.2,
+      1035.8202,
+      999.169
     ],
     "fortran_tp": [
-      107654.43,
-      108247.16,
-      106796.09999999999,
-      106930.71,
-      107112.91999999998
+      109491.63,
+      111950.61,
+      109350.86,
+      108423.85,
+      108314.13
     ],
     "fortran_ph": [
-      520592.7,
-      533125.2,
-      497880.2,
-      496478.7,
-      512543.0
+      510002.70000000007,
+      528072.1000000001,
+      492762.3,
+      488351.3,
+      480474.6
     ],
     "fortran_ps": [
-      2455441.6,
-      2743931.6,
-      2477515.9,
-      2500192.4,
-      2583502.0
+      2472432.4,
+      2504422.8,
+      2498135.3,
+      2409983.5,
+      2520086.2
     ]
   },
   "median_ns_per_state": {
-    "rust_ideal_uncached": 479.0856,
-    "rust_ideal_cached": 231.8782,
-    "rust_pressure_prepared": 8.4773,
-    "rust_pressure_with_mixing": 428.9034,
-    "rust_volume_prepared": 197.4903,
-    "rust_volume_with_mixing": 613.93,
-    "rust_tp_flash": 39066.28,
-    "rust_ph_flash": 329912.7,
-    "rust_ps_flash": 321717.6,
-    "fortran_ideal": 180.7658,
-    "fortran_pressure": 977.5144,
-    "fortran_volume": 1101.3705,
-    "fortran_tp": 107112.91999999998,
-    "fortran_ph": 512543.0,
-    "fortran_ps": 2500192.4
+    "rust_ideal_uncached": 467.9552,
+    "rust_ideal_cached": 227.347,
+    "rust_pressure_prepared": 11.1645,
+    "rust_pressure_with_mixing": 413.4268,
+    "rust_volume_prepared": 211.1029,
+    "rust_volume_with_mixing": 587.9378,
+    "rust_tp_flash": 39201.92,
+    "rust_ph_flash": 325045.3,
+    "rust_ps_flash": 323671.2,
+    "fortran_ideal": 174.0289,
+    "fortran_pressure": 903.5461,
+    "fortran_volume": 1034.7985,
+    "fortran_tp": 109350.86,
+    "fortran_ph": 492762.3,
+    "fortran_ps": 2498135.3
   },
   "workload": "PR CO2/C1/N2 0.7/0.2/0.1, 300 K; pressure+T/V derivatives, vapor volume; TP/PH/PS flash C1/C2/C3 0.5/0.3/0.2 at 1 MPa, T=180 to 259.2 K, caloric temperature recovery with default initial guesses; ideal C3 H/S/Cp, T=150 to 849.3 K at 0.1 MPa"
 }

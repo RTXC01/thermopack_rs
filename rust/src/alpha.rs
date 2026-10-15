@@ -229,8 +229,16 @@ impl Alpha {
             C::Twu => {
                 let b1 = c * (b - 1.);
                 let b2 = c * b;
-                let a1 = tr.powf(b1);
-                let a2 = tr.powf(b2);
+                // Both powers share the same base. Retain separate factors
+                // so their underflow/overflow order follows the source.
+                let (a1, a2) = if tr.is_normal() {
+                    let log_tr = tr.ln();
+                    ((b1 * log_tr).exp(), (b2 * log_tr).exp())
+                } else {
+                    // Preserve pow's zero-exponent rules when T/Tc itself
+                    // underflows or overflows although T and Tc are finite.
+                    (tr.powf(b1), tr.powf(b2))
+                };
                 let alpha = a1 * (a * (1. - a2)).exp();
                 (
                     alpha,

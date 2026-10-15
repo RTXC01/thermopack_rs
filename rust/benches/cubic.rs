@@ -1,8 +1,21 @@
 use std::hint::black_box;
 use std::time::Instant;
-use thermopack_rs::{Cubic, CubicKind, Phase};
+use thermopack_rs::{Cubic, CubicKind, CubicOptions, Phase};
+
+fn cubic(names: &[&str], tcpr: bool) -> Cubic {
+    Cubic::with_options(
+        CubicKind::PengRobinson,
+        names,
+        CubicOptions {
+            parameter_reference: if tcpr { "tcPR" } else { "DEFAULT" },
+            ..Default::default()
+        },
+    )
+    .unwrap()
+}
 
 fn main() {
+    let tcpr = std::env::args().any(|argument| argument == "--tcpr");
     let component = thermopack_rs::component("C3").unwrap();
     let ideal = thermopack_rs::IdealGas::new(component).unwrap();
     let ideal_iterations = 1_000_000;
@@ -30,7 +43,7 @@ fn main() {
             checksum[2]
         );
     }
-    let model = Cubic::new(CubicKind::PengRobinson, &["CO2", "C1", "N2"]).unwrap();
+    let model = cubic(&["CO2", "C1", "N2"], tcpr);
     let state = model.prepare(300.0, &[0.7, 0.2, 0.1]).unwrap();
     let iterations = 1_000_000;
     for prepare in [false, true] {
@@ -85,7 +98,7 @@ fn main() {
             start.elapsed().as_nanos() as f64 / iterations as f64
         );
     }
-    let model = Cubic::new(CubicKind::PengRobinson, &["C1", "C2", "C3"]).unwrap();
+    let model = cubic(&["C1", "C2", "C3"], tcpr);
     let flash_iterations = 10000;
     let mut checksum = [0.0; 3];
     let start = Instant::now();

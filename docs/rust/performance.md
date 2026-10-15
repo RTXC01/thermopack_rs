@@ -1,20 +1,21 @@
 # Native cubic and flash benchmarks
 
 Measured locally on 2026-10-15. See [benchmark.json](benchmark.json) for
-machine/compiler details, reference hashes and individual samples. These
+machine/compiler details, reference hashes and individual samples. Full tcPR
+construction has its own [report](benchmark-tcpr.json). These
 numbers qualify the documented workloads, not the complete library.
 
 | Native operation | Fortran ns/state | Rust ns/state | Speedup |
 |---|---:|---:|---:|
-| Pressure + T/V derivatives, including mixing | 978 | 429 | 2.28x |
-| Vapor volume, including mixing | 1101 | 614 | 1.79x |
-| Pressure + T/V derivatives, prepared state | 978 | 8.5 | 115x |
-| Vapor volume, prepared state | 1101 | 197 | 5.58x |
-| TP flash, including stability and split solving | 107113 | 39066 | 2.74x |
-| PH flash, including temperature recovery | 512543 | 329913 | 1.55x |
-| PS flash, including temperature recovery | 2500192 | 321718 | 7.77x |
-| Ideal H/S/Cp, uncached reference constants | 181 | 479 | 0.38x |
-| Ideal H/S/Cp, cached reference constants | 181 | 232 | 0.78x |
+| Pressure + T/V derivatives, including mixing | 904 | 413 | 2.19x |
+| Vapor volume, including mixing | 1035 | 588 | 1.76x |
+| Pressure + T/V derivatives, prepared state | 904 | 11.2 | 80.9x |
+| Vapor volume, prepared state | 1035 | 211 | 4.90x |
+| TP flash, including stability and split solving | 109351 | 39202 | 2.79x |
+| PH flash, including temperature recovery | 492762 | 325045 | 1.52x |
+| PS flash, including temperature recovery | 2498135 | 323671 | 7.72x |
+| Ideal H/S/Cp, uncached reference constants | 174 | 468 | 0.37x |
+| Ideal H/S/Cp, cached reference constants | 174 | 227 | 0.77x |
 
 PR, CO2/methane/nitrogen at mole fractions 0.7/0.2/0.1, T=300 K.
 Pressure scans use 1000 molar volumes from 1e-4 to 1.099e-3 m3/mol;
@@ -38,8 +39,8 @@ The ideal-gas workload uses pure propane's default DIPPR correlation at 1000
 temperatures from 150 to 849.3 K, P=0.1 MPa, one million states per sample.
 Both paths return H, S and Cp, with their checksums compared to native Fortran.
 The cached Rust path is the one used by `Cubic` model calculations. It is
-2.07x faster than standalone `Component::ideal`, but the Fortran ideal kernel
-is still about 1.28x faster; this remains a measured optimization gap.
+2.06x faster than standalone `Component::ideal`, but the Fortran ideal kernel
+is still about 1.31x faster; this remains a measured optimization gap.
 
 Rust uses release thin LTO and one codegen unit. Fortran uses the recorded
 gfortran `-O3` flags. Neither uses fast-math or reduced precision. The reference
@@ -57,16 +58,46 @@ iterations across a phase-transition jump and reuse ideal/residual evaluations
 for H/S/Cp. Owned ideal parameters cache reference integration constants;
 DIPPR shares two exponential factors across Cp/H/S. The alpha evaluator is
 inlined into parameter preparation to reduce the cost of per-component
-correlation dispatch. These timings use default classic alpha; they do not
-qualify the performance of every new correlation. Preliminary local PH/PS
-times were approximately 864/871 microseconds; the current report is 330/322
+correlation dispatch. The first table uses default classic alpha; neither table
+qualifies every alpha correlation. Preliminary local PH/PS
+times were approximately 864/871 microseconds; the current default report is 325/324
 microseconds with the same tolerances and reference fixtures. Reusing
 preparation does not reduce precision.
+
+The tcPR workload uses exactly the same state grids, but both implementations
+initialize `parameter_reference="tcPR"`. This forces TWU alpha and volume
+translation, including their temperature derivatives. Ideal C3 measurements
+still use the default correlation in both runs. Initialization is outside the
+timed state loops; the rows with mixing include per-call parameter preparation.
+The harness validates numeric row names explicitly because tcPR initialization
+can print informational lines containing commas. Every required timing row,
+finite checksum and caloric preflight must still pass.
+
+| Full tcPR operation | Fortran ns/state | Rust ns/state | Speedup |
+|---|---:|---:|---:|
+| Pressure + T/V derivatives, including mixing | 1569 | 1026 | 1.53x |
+| Vapor volume, including mixing | 1544 | 1232 | 1.25x |
+| TP flash | 138005 | 58965 | 2.34x |
+| PH flash | 641238 | 496890 | 1.29x |
+| PS flash | 3269557 | 495581 | 6.60x |
+
+TWU's two powers share `ln(T/Tc)` before exponentiation, saving one logarithm
+per component evaluation. Separate multiplicative factors retain the source's
+evaluation order. Ratios outside the normal floating-point range use the
+original power functions, including their zero-exponent semantics. Alpha and
+full translated property/flash reference fixtures pass unchanged. The
+[pre-optimization tcPR measurements](benchmark-tcpr-before-shared-log.json)
+retain the source hashes and five raw samples for comparison.
+On that workload, sharing the logarithm reduced the observed median Rust
+pressure call including mixing from 1272 to 1026 ns (19%) and the volume call
+including mixing from 1450 to 1232 ns (15%). These are local before/after
+measurements; the individual samples remain available in both reports.
 
 Reproduce with:
 
 ```
 python tools/rust_port/benchmark.py --compiler /path/to/gfortran --repeats 5
+python tools/rust_port/benchmark.py --compiler /path/to/gfortran --repeats 5 --tcpr
 ```
 
 Next optimization targets are reusable preparation buffers, separately

@@ -19,7 +19,10 @@ program benchmark_reference
   real :: n(3), v, p, pt, pv, checksum(3)
   real :: t,beta,betaL,x(3),y(3),residual,scale
   real :: enthalpies(0:99),entropies(0:99)
+  character(len=100) :: parameter_reference
   type(gendata_pointer), pointer :: comps(:)
+  call get_command_argument(1,parameter_reference)
+  if (len_trim(parameter_reference)==0) parameter_reference='DEFAULT'
   call init_cubic('C3','PR',mixing='vdW',alpha='Classic',vol_shift=.false.)
   comps=>get_active_comps()
   checksum=0.0
@@ -34,7 +37,8 @@ program benchmark_reference
   write(*,'(a,4(es24.16,a))') 'ideal,',real(finish-start)/real(rate)*1e9/iterations,',', &
     checksum(1),',',checksum(2),',',checksum(3),''
   n = [0.7, 0.2, 0.1]
-  call init_cubic('CO2,C1,N2','PR',mixing='vdW',alpha='Classic',vol_shift=.false.)
+  call init_cubic('CO2,C1,N2','PR',mixing='vdW',alpha='Classic',vol_shift=.false., &
+                  parameter_reference=trim(parameter_reference))
   checksum = 0.0
   call system_clock(start,rate)
   do i=0,iterations-1
@@ -55,7 +59,8 @@ program benchmark_reference
   call system_clock(finish)
   write(*,'(a,2(es24.16,a))') 'volume,',real(finish-start)/real(rate)*1e9/iterations,',',checksum(1),''
   n=[0.5,0.3,0.2]
-  call init_cubic('C1,C2,C3','PR',mixing='vdW',alpha='Classic',vol_shift=.false.)
+  call init_cubic('C1,C2,C3','PR',mixing='vdW',alpha='Classic',vol_shift=.false., &
+                  parameter_reference=trim(parameter_reference))
   checksum=0.0
   call system_clock(start,rate)
   do i=0,9999

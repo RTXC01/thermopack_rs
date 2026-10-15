@@ -1,6 +1,17 @@
 use thermopack_rs::{Alpha, AlphaCorrelation as C, Cubic, CubicKind};
 
 #[test]
+fn constant_twu_retains_zero_exponent_limits_at_extreme_reduced_temperatures() {
+    let alpha = Alpha::new(C::Twu, &[0.2, 1., 0.]).unwrap();
+    for (t, tc) in [(1e-100, 1e300), (1e-100, 1e210), (1e100, 1e-300)] {
+        let value = alpha.evaluate(t, tc).unwrap();
+        assert_eq!(value.value, 1.);
+        assert_eq!(value.dt, 0.);
+        assert_eq!(value.dtt, 0.);
+    }
+}
+
+#[test]
 fn alpha_variants_match_eos_properties_and_fugacity_derivatives() {
     let absolute = [1e-14, 1e-2, 1e-6, 1e-2, 1e-7, 1e-9, 1e-7, 1e-9, 1e-7];
     let mut count = 0;

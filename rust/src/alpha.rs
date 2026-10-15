@@ -213,6 +213,7 @@ impl Alpha {
         Ok(selected)
     }
 
+    #[inline]
     pub fn evaluate(&self, t: f64, tc: f64) -> Result<AlphaValue> {
         positive(t, "temperature")?;
         positive(tc, "critical temperature")?;

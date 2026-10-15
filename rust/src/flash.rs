@@ -62,7 +62,8 @@ pub struct FlashResult {
     pub liquid_fraction: f64,
     pub liquid_volume: Option<f64>,
     pub vapor_volume: Option<f64>,
-    /// Split iterations; the separate stability searches are excluded.
+    /// Primary split/temperature iterations; internal initial estimates and
+    /// separate stability searches are excluded.
     pub iterations: usize,
     pub fugacity_residual: f64,
 }
@@ -473,6 +474,11 @@ impl Cubic {
                 .map(|&i| y[i].ln() + v.phi[i] - x[i].ln() - l.phi[i])
                 .collect();
             let error = gradient.iter().map(|g| g.abs()).fold(0.0, f64::max);
+            if error < options.fugacity_tolerance && g > g_feed + 1e-12 {
+                return Err(Error::NotConverged(
+                    "TP split has higher Gibbs energy than the feed",
+                ));
+            }
             if error < options.fugacity_tolerance && g <= g_feed + 1e-12 {
                 return Ok(two_phase(
                     t,

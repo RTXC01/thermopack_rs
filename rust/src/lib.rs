@@ -15,6 +15,7 @@
 //! # Ok(())
 //! # }
 //! ```
+pub mod caloric;
 pub mod component;
 pub mod cubic;
 mod error;
@@ -22,8 +23,11 @@ pub mod flash;
 pub mod ideal;
 pub mod numerics;
 
+pub use caloric::{CaloricFlashOptions, EquilibriumProperties};
 pub use component::{Component, component, components};
-pub use cubic::{Cubic, CubicKind, Phase, PreparedState, Pressure, Residual, Saturation};
+pub use cubic::{
+    Cubic, CubicKind, Phase, PreparedState, Pressure, PseudoCritical, Residual, Saturation,
+};
 pub use error::{Error, Result};
 pub use flash::{FlashOptions, FlashPhase, FlashResult, Stability, StabilityTrial};
 

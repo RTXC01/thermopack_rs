@@ -84,6 +84,15 @@ pub struct Saturation {
     pub dpdt: f64,
 }
 
+/// Critical point of the EOS at fixed composition (not a mixture critical point).
+#[derive(Debug, Clone, Copy)]
+pub struct PseudoCritical {
+    pub temperature: f64,
+    pub pressure: f64,
+    pub volume: f64,
+    pub compressibility: f64,
+}
+
 /// Cached temperature and composition parameters. Volume/pressure scans
 /// perform no allocations, database lookups or component-pair mixing.
 #[derive(Debug, Clone)]
@@ -107,7 +116,13 @@ impl Cubic {
         if self.components.len() != 1 {
             return Err(Error::Unsupported("mixture saturation pressure"));
         }
-        let state = self.prepare(temperature, &[1.0])?;
+        self.pseudo_saturation_pressure(temperature, &[1.0])
+    }
+
+    /// Coexistence with both phase compositions fixed to z, as in PureSat.
+    /// For mixtures this is a numerical initial estimate, not VLE saturation.
+    pub fn pseudo_saturation_pressure(&self, temperature: f64, z: &[f64]) -> Result<Saturation> {
+        let state = self.prepare(temperature, z)?;
         let (_, _, qc) = omega_with_critical_ratio(self.kind);
         let center = qc * state.b;
         if state.pressure(center)?.dv <= 0.0 {
@@ -146,10 +161,12 @@ impl Cubic {
             if count != 2 {
                 return Err(Error::NotConverged("distinct saturation roots"));
             }
-            let l = state.residual(volumes[0])?;
-            let v = state.residual(volumes[1])?;
-            let difference =
-                (l.enthalpy - v.enthalpy) / (R * temperature) - (l.entropy - v.entropy) / R;
+            let difference = log_pressure.exp() * (volumes[0] - volumes[1]) / (R * temperature)
+                - ((volumes[0] - state.b) / (volumes[1] - state.b)).ln()
+                - state.a
+                    * (state.attraction_integral(volumes[0])
+                        - state.attraction_integral(volumes[1]))
+                    / (R * temperature);
             Ok((difference, volumes[0], volumes[1]))
         };
         if evaluate(low)?.0 * evaluate(high)?.0 > 0.0 {
@@ -177,6 +194,85 @@ impl Cubic {
             }
         }
         Err(Error::NotConverged("saturation pressure"))
+    }
+
+    /// Inverse pure-fluid saturation pressure, including both phase volumes.
+    pub fn saturation_temperature(&self, pressure: f64) -> Result<Saturation> {
+        if self.components.len() != 1 {
+            return Err(Error::Unsupported("mixture saturation temperature"));
+        }
+        self.pseudo_saturation_temperature(pressure, &[1.0])
+    }
+
+    /// Fixed-composition saturation estimate; mixtures are not in true VLE.
+    pub fn pseudo_saturation_temperature(&self, pressure: f64, z: &[f64]) -> Result<Saturation> {
+        positive(pressure, "saturation pressure")?;
+        let critical = self.pseudo_critical(z)?;
+        if pressure >= critical.pressure {
+            return Err(Error::InvalidInput(
+                "pressure at or above fixed-composition critical pressure",
+            ));
+        }
+        let w: f64 = z
+            .iter()
+            .zip(&self.components)
+            .map(|(x, c)| x * c.acentric_factor)
+            .sum();
+        let mut low = 0.15 * critical.temperature;
+        let mut high = critical.temperature * (1.0 - 1e-9);
+        let mut t = (critical.temperature
+            / (1.0 - (pressure / critical.pressure).ln() / (5.373 * (1.0 + w))))
+            .clamp(0.3 * critical.temperature, 0.999 * critical.temperature);
+        for _ in 0..80 {
+            let sat = self.pseudo_saturation_pressure(t, z)?;
+            let residual = sat.pressure - pressure;
+            if residual.abs() <= 1e-10 * pressure || high - low < 1e-10 * critical.temperature {
+                return Ok(sat);
+            }
+            if residual < 0.0 {
+                low = t;
+            } else {
+                high = t;
+            }
+            let next = t - residual / sat.dpdt;
+            t = if next > low && next < high {
+                next
+            } else {
+                (low + high) * 0.5
+            };
+        }
+        Err(Error::NotConverged("saturation temperature"))
+    }
+
+    /// Port of cbCalcPseudo for the native conventional cubic family.
+    pub fn pseudo_critical(&self, z: &[f64]) -> Result<PseudoCritical> {
+        let mut t: f64 = z
+            .iter()
+            .zip(&self.components)
+            .map(|(x, c)| x * c.critical_temperature)
+            .sum();
+        let (oa, ob, qc) = omega_with_critical_ratio(self.kind);
+        for _ in 0..80 {
+            let state = self.prepare(t, z)?;
+            let f = state.a - (oa / ob) * R * t * state.b;
+            let df = state.at - (oa / ob) * R * state.b;
+            let arg = 1.0 - 2.0 * f * state.att / (df * df);
+            let mut step = -2.0 * f / (df * (1.0 + if arg > 0.0 { arg.sqrt() } else { 1.0 }));
+            step = step.clamp(-0.5 * t, 0.5 * t);
+            t += step;
+            if step.abs() < 1e-10 {
+                let state = self.prepare(t, z)?;
+                let p = ob * R * t / state.b;
+                let volume = qc * state.b;
+                return Ok(PseudoCritical {
+                    temperature: t,
+                    pressure: p,
+                    volume,
+                    compressibility: p * volume / (R * t),
+                });
+            }
+        }
+        Err(Error::NotConverged("fixed-composition critical point"))
     }
     pub fn new(kind: CubicKind, names: &[&str]) -> Result<Self> {
         if names.is_empty() {

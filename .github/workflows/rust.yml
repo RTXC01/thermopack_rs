@@ -43,3 +43,5 @@ jobs:
       - run: python tools/rust_port/validate_saturation.py
       - run: python tools/rust_port/validate_derivatives.py
       - run: python tools/rust_port/validate_flash.py
+      - run: python tools/rust_port/validate_initialization.py
+      - run: python tools/rust_port/validate_caloric.py

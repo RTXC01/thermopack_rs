@@ -18,6 +18,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
         let model = Cubic::new(kind, &fields[1].split(',').collect::<Vec<_>>())?;
         let t: f64 = fields[2].parse()?;
+        if fields[3] == "PSEUDO" {
+            let x: Vec<f64> = fields[4]
+                .split(',')
+                .map(str::parse)
+                .collect::<Result<_, _>>()?;
+            let critical = model.pseudo_critical(&x)?;
+            println!(
+                "{:.17e},{:.17e},{:.17e},{:.17e}",
+                critical.temperature, critical.pressure, critical.volume, critical.compressibility
+            );
+            continue;
+        }
+        if fields[3] == "SAT_T" {
+            let sat = model.saturation_temperature(t)?;
+            println!(
+                "{:.17e},{:.17e},{:.17e},{:.17e},{:.17e}",
+                sat.temperature, sat.pressure, sat.liquid_volume, sat.vapor_volume, sat.dpdt
+            );
+            continue;
+        }
         if fields[3] == "SAT" {
             let sat = model.saturation_pressure(t)?;
             println!(
@@ -31,6 +51,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .split(',')
             .map(str::parse)
             .collect::<Result<_, _>>()?;
+        if fields[5] == "PH" || fields[5] == "PS" {
+            let result = if fields[5] == "PH" {
+                model.ph_flash(p, &x, t)
+            } else {
+                model.ps_flash(p, &x, t)
+            };
+            match result {
+                Ok(flash) => {
+                    print!(
+                        "{:.17e},{},{:.17e},{:.17e}",
+                        flash.temperature,
+                        flash.phase as i32,
+                        flash.vapor_fraction,
+                        flash.liquid_fraction
+                    );
+                    for value in flash.liquid.iter().chain(&flash.vapor) {
+                        print!(",{value:.17e}");
+                    }
+                    println!();
+                }
+                Err(error) => println!("ERROR: {error}"),
+            }
+            continue;
+        }
         if fields[5] == "TP" {
             match model.tp_flash(t, p, &x) {
                 Ok(flash) => {
@@ -43,6 +87,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     println!();
                 }
+                Err(error) => println!("ERROR: {error}"),
+            }
+            continue;
+        }
+        if fields[5] == "EQ" {
+            match model
+                .tp_flash(t, p, &x)
+                .and_then(|f| Ok((f.phase, model.equilibrium_properties(&f)?)))
+            {
+                Ok((phase, prop)) => println!(
+                    "{},{:.17e},{:.17e},{:.17e},{:.17e}",
+                    phase as i32,
+                    prop.enthalpy,
+                    prop.entropy,
+                    prop.heat_capacity.unwrap_or(f64::NAN),
+                    prop.volume
+                ),
                 Err(error) => println!("ERROR: {error}"),
             }
             continue;

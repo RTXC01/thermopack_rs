@@ -47,3 +47,23 @@ Rust reports betaV approximately 0.900939298 and x(CO2) approximately
 Both phase compositions have a unique volume root, so root selection cannot
 enforce the labels. Qualification records this permutation explicitly.
 Exact raw phase-order compatibility is still pending.
+
+## PH/PS failures and non-closing successful returns
+
+The 912-case caloric grid records 14 reference process terminations, 106
+wrapper calculation failures and 95 results that return successfully but do
+not close the specified H or S. Of the latter, 82 are vdW and 13 are PR/SRK/RK.
+All failed requests, source output where available, and non-closing residuals
+are retained in `tests/fixtures/caloric_flash.metadata.json`.
+
+The vdW derivative defect above also affects caloric solvers; it is not the
+explanation for every failure in this grid. The oracle computes the requested
+property independently at the returned state and requires residuals below
+1e-8 in H/(RT) or S/R before accepting a numerical result. It recognizes only
+the wrapper's known calculation exceptions/warning; unexpected Python errors
+fail validation. PS's permitted status -1 is also subject to closure checks.
+
+The 697 closing results qualify raw output parity for those cases only.
+Native caloric solvers use physical Cp and require closure. Reproducing the
+fork's non-closing outputs remains an explicit compatibility gap, rather
+than silently treating them as a correct physical solution.

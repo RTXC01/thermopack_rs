@@ -25,6 +25,8 @@ python tools/rust_port/validate_cubic.py
 python tools/rust_port/validate_saturation.py
 python tools/rust_port/validate_derivatives.py
 python tools/rust_port/validate_flash.py
+python tools/rust_port/validate_initialization.py
+python tools/rust_port/validate_caloric.py
 ```
 
 On Windows add `--compiler-directory /path/to/gfortran/bin` to the validation
@@ -57,6 +59,17 @@ hashes, compiler, flags and LAPACK revision invalidates stale cached objects.
   upstream eight-component near-critical regressions. One physical split
   requires exchanging phase labels; three source calls terminate their process.
   See [phase equilibrium qualification](phase-equilibrium.md).
+* 64 initialization cases: 28 fixed-composition pseudo-critical states and
+  36 pure saturation-temperature inversions across all four cubic models.
+* 912 attempted PH/PS flashes: 697 closing source results match temperature,
+  phase code, both fractions and both composition arrays. The other 215
+  source calls abort, raise calculation errors or return states that fail
+  independent caloric closure. They remain recorded failures, not parity
+  successes. The grid covers eight feeds, four temperatures, three pressures
+  and pure latent-heat qualities. Metadata contains every failed request.
+* Equilibrium Cp includes phase redistribution and agrees with independent
+  finite differences of equilibrium H and S. Native PH/PS results also close
+  their specified H or S independently of the reference comparisons.
 
 Each comparison uses `abs(error) <= atol + rtol * max(abs(reference), abs(rust))`.
 Tolerances are quantity-specific and recorded in fixture metadata and tests.

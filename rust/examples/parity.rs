@@ -9,14 +9,38 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if fields.len() != 6 {
             return Err("expected six fields".into());
         }
-        if fields[5] == "IDEAL" {
-            match thermopack_rs::component(fields[1])
-                .and_then(|c| c.ideal(fields[2].parse().unwrap(), fields[3].parse().unwrap()))
-            {
+        if fields[5] == "IDEAL" || fields[5] == "IDEAL_CONFIG" {
+            let t: f64 = fields[2].parse()?;
+            let p: f64 = fields[3].parse()?;
+            let mut gas = thermopack_rs::IdealGas::new(thermopack_rs::component(fields[1])?)?;
+            if fields[5] == "IDEAL_CONFIG" {
+                for action in fields[4].split('/') {
+                    let tokens: Vec<_> = action.split(':').collect();
+                    match tokens[0] {
+                        "cp" => gas.set_heat_capacity(
+                            tokens[1].parse()?,
+                            &tokens[2]
+                                .split(',')
+                                .filter(|v| !v.is_empty())
+                                .map(str::parse)
+                                .collect::<Result<Vec<_>, _>>()?,
+                        )?,
+                        "h" => gas.set_formation_enthalpy(tokens[1].parse()?)?,
+                        "s" => gas.set_standard_entropy(
+                            tokens[1].parse()?,
+                            if tokens[2] == "101325.0" {
+                                thermopack_rs::EntropyReference::Atmosphere
+                            } else {
+                                thermopack_rs::EntropyReference::Bar
+                            },
+                        )?,
+                        _ => return Err("unknown ideal action".into()),
+                    }
+                }
+            }
+            match gas.properties(t, p) {
                 Ok(properties) => {
-                    let t: f64 = fields[2].parse()?;
-                    let p: f64 = fields[3].parse()?;
-                    println!(
+                    print!(
                         "{:.17e},{:.17e},{:.17e},{:.17e},{:.17e}",
                         properties.enthalpy,
                         properties.entropy,
@@ -24,6 +48,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         properties.cp / t,
                         -thermopack_rs::R / p
                     );
+                    if fields[5] == "IDEAL_CONFIG" {
+                        let (corr, params) = gas.heat_capacity_correlation();
+                        print!(
+                            ",{:.17e},{:.17e},{corr}",
+                            gas.formation_enthalpy(),
+                            gas.standard_entropy()
+                        );
+                        for value in params {
+                            print!(",{value:.17e}");
+                        }
+                    }
+                    println!();
                 }
                 Err(error) => println!("ERROR: {error}"),
             }

@@ -46,3 +46,4 @@ jobs:
       - run: python tools/rust_port/validate_initialization.py
       - run: python tools/rust_port/validate_caloric.py
       - run: python tools/rust_port/validate_ideal.py
+      - run: python tools/rust_port/validate_ideal_configuration.py

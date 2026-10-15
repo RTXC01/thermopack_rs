@@ -30,6 +30,22 @@ The default ideal-property grid qualifies 2592 cases for 108 fluids. BUTANAL's
 default correlation is 100, which terminates the reference and returns an
 explicit unsupported-correlation error in Rust; all 24 attempts are recorded.
 
+## Ideal reference getters and setter order
+
+`set_ideal_cp_correlation` changes coefficients without recalculating the H/S
+integration constants. The reference-energy setters do recalculate them,
+except when both declared references are zero or a sentinel exceeds 1e15.
+Therefore setter order affects returned values. The native owned `IdealGas`
+preserves these rules and caches the integration constants. The API rejects
+oversized arrays rather than applying the Python wrapper's silent truncation.
+
+`get_standard_entropy` subtracts `R*ln(1.01325)` when the declared reference
+pressure is 1ATM. Converting actual entropy to 1bar would add this term.
+`IdealGas::standard_entropy` preserves the source getter; use
+`properties(298.15, 1e5).entropy` for the actual value at 1bar. All correlations
+and six setter sequences are qualified in 720 source comparisons, including
+nonzero raw API44 enthalpy constants and the DIPPR entropy integration constant.
+
 ## Duplicate interaction defaults
 
 For PR CO2/H2O, both JSON and compiled `src/mixdatadb.f90` contain duplicate

@@ -43,6 +43,7 @@ pub enum Phase {
 pub struct Cubic {
     kind: CubicKind,
     components: Vec<&'static Component>,
+    ideal_gases: Vec<crate::ideal::IdealGas>,
     a0: Vec<f64>,
     bi: Vec<f64>,
     kappa: Vec<f64>,
@@ -283,8 +284,13 @@ impl Cubic {
             .map(|name| component(name))
             .collect::<Result<_>>()?;
         let (omega_a, omega_b) = omega(kind);
+        let ideal_gases = components
+            .iter()
+            .map(|c| crate::ideal::IdealGas::new(c))
+            .collect::<Result<_>>()?;
         let mut model = Self {
             kind,
+            ideal_gases,
             a0: Vec::with_capacity(names.len()),
             bi: Vec::with_capacity(names.len()),
             kappa: Vec::with_capacity(names.len()),
@@ -333,8 +339,24 @@ impl Cubic {
     pub fn kind(&self) -> CubicKind {
         self.kind
     }
+    /// Database metadata. Use ideal_gas for this model's active caloric parameters.
     pub fn components(&self) -> &[&'static Component] {
         &self.components
+    }
+
+    /// Active ideal parameters; component indices are zero based.
+    pub fn ideal_gas(&self, index: usize) -> Result<&crate::ideal::IdealGas> {
+        self.ideal_gases
+            .get(index)
+            .ok_or(Error::InvalidInput("component index out of range"))
+    }
+
+    /// Configure this model's ideal parameters without changing the database
+    /// or any other model instance. Existing prepared states borrow the model.
+    pub fn ideal_gas_mut(&mut self, index: usize) -> Result<&mut crate::ideal::IdealGas> {
+        self.ideal_gases
+            .get_mut(index)
+            .ok_or(Error::InvalidInput("component index out of range"))
     }
 
     pub fn kij(&self, i: usize, j: usize) -> Result<f64> {
@@ -599,11 +621,11 @@ impl PreparedState<'_> {
             enthalpy: 0.0,
             entropy: 0.0,
         };
-        for (&x, c) in self.composition.iter().zip(&self.model.components) {
+        for (&x, gas) in self.composition.iter().zip(&self.model.ideal_gases) {
             if x == 0.0 {
                 continue;
             }
-            let pure = c.ideal(self.temperature, pressure)?;
+            let pure = gas.properties(self.temperature, pressure)?;
             result.cp += x * pure.cp;
             result.enthalpy_dt += x * pure.enthalpy_dt;
             result.enthalpy += x * pure.enthalpy;

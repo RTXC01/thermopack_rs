@@ -31,6 +31,7 @@ pub use cubic::{
 };
 pub use error::{Error, Result};
 pub use flash::{FlashOptions, FlashPhase, FlashResult, Stability, StabilityTrial};
+pub use ideal::{EntropyReference, IdealGas, IdealProperties};
 
 /// Gas constant [J/(mol K)], using the exact expression from ThermoPack.
 pub const R: f64 = 6.02214076e23 * 1.380649e-23;

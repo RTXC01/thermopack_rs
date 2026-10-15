@@ -1,4 +1,19 @@
 //! Analytic ideal-gas caloric correlations from ideal.f90.
+//!
+//! ```
+//! use thermopack_rs::{Cubic, CubicKind, EntropyReference};
+//! # fn main() -> Result<(), thermopack_rs::Error> {
+//! let mut model = Cubic::new(CubicKind::PengRobinson, &["C1"])?;
+//! let ideal = model.ideal_gas_mut(0)?; // Rust component indices start at zero.
+//! ideal.set_heat_capacity(8, &[2.5])?;
+//! ideal.set_formation_enthalpy(0.0)?;
+//! ideal.set_standard_entropy(150.0, EntropyReference::Bar)?;
+//! let values = ideal.properties(298.15, 1e5)?;
+//! assert!(values.enthalpy.abs() < 1e-8);
+//! assert!((values.entropy - 150.0).abs() < 1e-8);
+//! # Ok(())
+//! # }
+//! ```
 use crate::error::positive;
 use crate::{Component, Error, R, Result};
 
@@ -13,30 +28,150 @@ pub struct IdealProperties {
     pub entropy: f64,
 }
 
+/// Reference pressure accepted by the fork's standard-entropy setter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EntropyReference {
+    Bar,
+    Atmosphere,
+}
+impl EntropyReference {
+    pub fn pressure(self) -> f64 {
+        match self {
+            Self::Bar => 100000.0,
+            Self::Atmosphere => 101325.0,
+        }
+    }
+}
+
+/// Owned ideal-gas parameters with cached integration constants. Changing Cp
+/// preserves those constants, as in set_ideal_cp_correlation. Changing a
+/// reference value recalculates them, as in set_reference_energy.
+#[derive(Debug, Clone)]
+pub struct IdealGas {
+    data: Component,
+    offsets: (f64, f64),
+}
+impl IdealGas {
+    pub fn new(component: &Component) -> Result<Self> {
+        Ok(Self {
+            data: *component,
+            offsets: component.ideal_offsets()?.unwrap_or((0.0, 0.0)),
+        })
+    }
+
+    pub fn properties(&self, temperature: f64, pressure: f64) -> Result<IdealProperties> {
+        self.data
+            .ideal_with_offsets(temperature, pressure, self.offsets)
+    }
+
+    /// Correlation identifier and all 21 coefficients, including zero padding.
+    pub fn heat_capacity_correlation(&self) -> (u8, &[f64; 21]) {
+        (self.data.cp_type, &self.data.cp)
+    }
+
+    /// Set a supported correlation. Short arrays are zero padded. Unlike the
+    /// Python wrapper, oversized arrays return an error instead of truncating.
+    /// Integration constants remain unchanged until a reference setter is used.
+    pub fn set_heat_capacity(&mut self, correlation: u8, coefficients: &[f64]) -> Result<()> {
+        if !(1..=12).contains(&correlation) {
+            return Err(Error::Unsupported("ideal heat-capacity correlation"));
+        }
+        if coefficients.len() > 21 || coefficients.iter().any(|v| !v.is_finite()) {
+            return Err(Error::InvalidInput(
+                "at most 21 finite Cp coefficients required",
+            ));
+        }
+        if correlation == 10 && !["P-H2", "N-H2", "O-H2", "E-H2"].contains(&self.data.ident) {
+            return Err(Error::InvalidInput("type-10 Cp requires a hydrogen isomer"));
+        }
+        self.data.cp_type = correlation;
+        self.data.cp.fill(0.0);
+        self.data.cp[..coefficients.len()].copy_from_slice(coefficients);
+        Ok(())
+    }
+
+    pub fn set_standard_entropy(
+        &mut self,
+        entropy: f64,
+        reference: EntropyReference,
+    ) -> Result<()> {
+        if !entropy.is_finite() {
+            return Err(Error::InvalidInput("finite standard entropy required"));
+        }
+        let mut data = self.data;
+        data.reference_entropy = entropy;
+        data.reference_pressure = reference.pressure();
+        self.update_reference(data)
+    }
+
+    /// Preserve get_standard_entropy's reference-pressure conversion, including
+    /// its minus sign for 1ATM. Use properties(298.15, 1e5) for actual S at 1bar.
+    pub fn standard_entropy(&self) -> f64 {
+        self.data.reference_entropy - R * (self.data.reference_pressure / 1e5).ln()
+    }
+
+    pub fn set_formation_enthalpy(&mut self, enthalpy: f64) -> Result<()> {
+        if !enthalpy.is_finite() {
+            return Err(Error::InvalidInput("finite formation enthalpy required"));
+        }
+        let mut data = self.data;
+        data.reference_enthalpy = enthalpy;
+        self.update_reference(data)
+    }
+
+    pub fn formation_enthalpy(&self) -> f64 {
+        self.data.reference_enthalpy
+    }
+
+    fn update_reference(&mut self, data: Component) -> Result<()> {
+        if let Some(offsets) = data.ideal_offsets()? {
+            self.offsets = offsets;
+        }
+        self.data = data;
+        Ok(())
+    }
+}
+
 impl Component {
     /// Pure ideal gas at T (K), P (Pa), with the fork's reference state.
     pub fn ideal(&self, temperature: f64, pressure: f64) -> Result<IdealProperties> {
+        self.ideal_with_offsets(
+            temperature,
+            pressure,
+            self.ideal_offsets()?.unwrap_or((0.0, 0.0)),
+        )
+    }
+
+    fn ideal_with_offsets(
+        &self,
+        temperature: f64,
+        pressure: f64,
+        offsets: (f64, f64),
+    ) -> Result<IdealProperties> {
         positive(temperature, "temperature")?;
         positive(pressure, "pressure")?;
         let (cp, h, s) = self.ideal_primitives(temperature)?;
-        let valid_reference = (self.reference_enthalpy != 0.0 || self.reference_entropy != 0.0)
-            && self.reference_enthalpy.abs() < 1e15
-            && self.reference_entropy.abs() < 1e15;
-        let (enthalpy, entropy) = if valid_reference {
-            let (_, h0, s0) = self.ideal_primitives(298.15)?;
-            (
-                self.reference_enthalpy + h - h0,
-                self.reference_entropy + s - s0 - R * (pressure / self.reference_pressure).ln(),
-            )
-        } else {
-            (h, s - R * pressure.ln())
-        };
         Ok(IdealProperties {
             cp,
             enthalpy_dt: cp * if self.cp_type == 10 { 1000.0 } else { 1.0 },
-            enthalpy,
-            entropy,
+            enthalpy: h + offsets.0,
+            entropy: s + offsets.1 - R * pressure.ln(),
         })
+    }
+
+    fn ideal_offsets(&self) -> Result<Option<(f64, f64)>> {
+        let valid_reference = (self.reference_enthalpy != 0.0 || self.reference_entropy != 0.0)
+            && self.reference_enthalpy.abs() < 1e15
+            && self.reference_entropy.abs() < 1e15;
+        if valid_reference {
+            let (_, h0, s0) = self.ideal_primitives(298.15)?;
+            Ok(Some((
+                self.reference_enthalpy - h0,
+                self.reference_entropy - s0 + R * self.reference_pressure.ln(),
+            )))
+        } else {
+            Ok(None)
+        }
     }
 
     fn ideal_primitives(&self, t: f64) -> Result<(f64, f64, f64)> {
@@ -98,7 +233,8 @@ impl Component {
                     11 => 1e3,
                     _ => 1.0,
                 };
-                Ok((scale * cp, scale * h * hscale, scale * s))
+                let h_constant = if self.cp_type == 2 { c[0] } else { 0.0 };
+                Ok((scale * cp, scale * (h * hscale + h_constant), scale * s))
             }
             7 => {
                 let x = c[2] / t;
@@ -116,6 +252,9 @@ impl Component {
                 let s = c[0] * t.ln()
                     + c[1] * (x / x.tanh() - log_sinh(x))
                     + c[3] * (log_cosh(y) - y * y.tanh());
+                // Preserve the source integration constant. It cancels in a
+                // default reference reset, but remains visible after Cp edits.
+                let s = s + (c[3] - c[1]) * 2.0_f64.ln();
                 Ok((cp * 1e-3, h * 1e-3, s * 1e-3))
             }
             9 => {

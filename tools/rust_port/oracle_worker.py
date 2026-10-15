@@ -39,7 +39,21 @@ def main(compiler_directory):
                         alpha="RK" if eos=="RK" else "Classic",volume_shift=False)
             previous=eos,comps
         extra={}
-        if request['mode']=='IDEAL':
+        if request['mode'] in ('IDEAL','IDEAL_CONFIG'):
+            if request['mode']=='IDEAL_CONFIG':
+                # Every configuration case starts from fresh default offsets.
+                model=cubic(comps,'PR',volume_shift=False)
+                previous=None
+                for action in request['actions']:
+                    if action[0]=='cp':
+                        model.set_ideal_cp(1,action[1],action[2])
+                    elif action[0]=='h':
+                        model.set_enthalpy_of_formation(1,action[1])
+                    elif action[0]=='s':
+                        model.set_standard_entropy(1,action[1],
+                            reference_pressure='1ATM' if action[2]==101325. else '1BAR')
+                    else:
+                        raise ValueError('unknown ideal configuration action')
             t,p=request['temperature'],request['pressure']
             h,cp=model.idealenthalpysingle(t,1,dhdt=True)
             s,st,sp=model.idealentropysingle(t,p,1,dsdt=True,dsdp=True)
@@ -48,6 +62,10 @@ def main(compiler_directory):
                 print('THERMOPACK_RESULT='+json.dumps({'calculation_error':'non-finite ideal property',
                       'values':list(map(str,values))}),flush=True)
                 continue
+            if request['mode']=='IDEAL_CONFIG':
+                corr,parameters=model.get_ideal_cp(1)
+                values.extend([float(model.get_enthalpy_of_formation(1)),
+                               float(model.get_standard_entropy(1)),int(corr),*map(float,parameters)])
             swappable=False
         elif request['mode']=='PSEUDO':
             model.activate()

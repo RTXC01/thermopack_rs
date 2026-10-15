@@ -28,6 +28,7 @@ python tools/rust_port/validate_flash.py
 python tools/rust_port/validate_initialization.py
 python tools/rust_port/validate_caloric.py
 python tools/rust_port/validate_ideal.py
+python tools/rust_port/validate_ideal_configuration.py
 ```
 
 On Windows add `--compiler-directory /path/to/gfortran/bin` to the validation
@@ -78,6 +79,12 @@ hashes, compiler, flags and LAPACK revision invalidates stale cached objects.
   invalid default Cp correlation 100. Native H/S temperature derivatives are
   independently checked for all 108 supported fluids, including the explicit
   type-10 hydrogen factor-1000 discrepancy.
+* 720 configured ideal-property cases: all 12 correlations, all four hydrogen
+  isomers for type 10, six ordered setter sequences, four temperatures and two
+  pressures. They compare properties, reference getters, correlation IDs and
+  all 21 coefficients; correlation IDs/coefficients require exact equality.
+  Native tests check parameter isolation, invalid setter atomicity and PH/PS
+  closure with customized correlations and references.
 
 Each comparison uses `abs(error) <= atol + rtol * max(abs(reference), abs(rust))`.
 Tolerances are quantity-specific and recorded in fixture metadata and tests.

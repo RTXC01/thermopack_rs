@@ -40,6 +40,11 @@ phase amounts from molar enthalpy or entropy. Use
 including phase redistribution. Caloric options set temperature bounds and
 initial guesses; defaults are 80 to 999 K. `pseudo_critical(z)` is a
 fixed-composition estimate, not the true critical point of a mixture.
+`model.ideal_gas_mut(i)` configures owned ideal Cp parameters and H/S reference
+states for component i (zero based). A Cp setter preserves integration constants;
+reference setters recalculate them as in the source. Other models and the global
+database remain independent. `components()` exposes database metadata, while
+`ideal_gas(i)` exposes the active caloric parameters.
 `state.fugacity_derivatives_into` provides analytic T/P/n derivatives into
 caller-owned buffers. See [phase equilibrium conventions](../docs/rust/phase-equilibrium.md),
 including the Single phase fraction sentinel and a known raw ordering mismatch.

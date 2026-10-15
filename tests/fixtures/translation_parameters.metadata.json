@@ -170,6 +170,6 @@
     "dp": 1e-11,
     "dn": 1e-08
   },
-  "fixture_sha256": "3f9fed4215c16c8f98f1b527333db3c3fc5eea287e282dce9c629cfe24ccb81e",
+  "fixture_sha256": "ed94d6f7954ed0af4da6372a8de820cb15a61d1b35f6cfb3de0e7f2bbb39bdd4",
   "generator": "tools/rust_port/validate_translation.py"
 }

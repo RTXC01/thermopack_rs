@@ -122,7 +122,7 @@ def validate(compiler_directory):
     for mode,name in [('V_CI','translation_parameters'),('V_PROP','translation_properties')]:
         output=ROOT/'tests/fixtures'/(name+'.csv')
         with output.open('w',newline='') as handle:
-            writer=csv.writer(handle,delimiter=';');writer.writerow(['case','values...'])
+            writer=csv.writer(handle,delimiter=';',lineterminator='\n');writer.writerow(['case','values...'])
             writer.writerows([[case,*values] for case,values in grouped[mode]])
         metadata=json.loads((ROOT/'.reference/metadata.json').read_text())
         metadata.update({'cases':len(grouped[mode]),'attempted_cases':modes.count(mode),'probe':probe,

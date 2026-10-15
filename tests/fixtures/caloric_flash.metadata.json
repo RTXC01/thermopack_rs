@@ -4354,6 +4354,6 @@
   "absolute_tolerance": 2e-06,
   "relative_tolerance": 2e-07,
   "phase_flag_tolerance": 0,
-  "fixture_sha256": "4786890b3db07f30b5967440a2bfd377413d8fdbcdb20649f010dc5156ec9730",
+  "fixture_sha256": "80c2498d6343a4ec835fbed0aca0a4ea87dc58673c12b34044f0fa92be445f07",
   "generator": "tools/rust_port/validate_caloric.py"
 }

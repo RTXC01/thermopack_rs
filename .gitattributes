@@ -1,0 +1,2 @@
+# Reference fixture hashes cover exact bytes, independent of core.autocrlf.
+tests/fixtures/*.csv text eol=lf

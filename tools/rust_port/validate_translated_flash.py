@@ -80,7 +80,7 @@ def validate(compiler_directory):
     for mode,rows in grouped.items():
         output=ROOT/'tests/fixtures'/('translated_'+mode[2:].lower()+'.csv')
         with output.open('w',newline='') as handle:
-            writer=csv.writer(handle,delimiter=';')
+            writer=csv.writer(handle,delimiter=';',lineterminator='\n')
             writer.writerow(['case','phase_permutation_allowed','values...'])
             writer.writerows([[case,int(swap),*values] for case,swap,values in rows])
         mode_errors=[e for e in errors if e['request']['mode']==mode]

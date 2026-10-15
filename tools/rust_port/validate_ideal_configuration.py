@@ -75,7 +75,7 @@ def validate(compiler_directory):
                 failures.append({'case': case, 'quantity': i, 'reference': a, 'rust': b})
     output = ROOT / 'tests/fixtures/ideal_configuration.csv'
     with output.open('w', newline='') as handle:
-        writer = csv.writer(handle, delimiter=';')
+        writer = csv.writer(handle, delimiter=';', lineterminator='\n')
         writer.writerow(['case', 'h', 's', 'cp', 'dsdt_baseline', 'dsdp', 'formation_enthalpy',
                          'standard_entropy', 'correlation', 'coefficients...'])
         writer.writerows([[case, *values] for case, values in zip(inputs, expected)])

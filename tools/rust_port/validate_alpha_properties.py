@@ -64,7 +64,7 @@ def validate(compiler_directory):
                 failures.append({'case':case,'quantity':i,'reference':a,'rust':b})
     output=ROOT/'tests/fixtures/alpha_properties.csv'
     with output.open('w',newline='') as handle:
-        writer=csv.writer(handle,delimiter=';')
+        writer=csv.writer(handle,delimiter=';',lineterminator='\n')
         writer.writerow(['case','v,p,dpdt,dpdv,hr,sr,h,s,dhdt_baseline,phi[n],phiT[n],phiP[n],phin[n*n]'])
         writer.writerows([[case,*values] for case,values in zip(inputs,expected)])
     metadata=json.loads((ROOT/'.reference/metadata.json').read_text())

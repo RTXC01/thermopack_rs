@@ -184,6 +184,6 @@
       "relative": 2e-08
     }
   },
-  "fixture_sha256": "d4b700bb43a7eb70d2258f3afd9065c22ea69226fe31a63dd670db6bcbb0bc21",
+  "fixture_sha256": "7f59b9461adb1192b92d5fccaf3b608e705dde53f6be7c667f28e55a916fb364",
   "generator": "tools/rust_port/validate_cubic.py"
 }

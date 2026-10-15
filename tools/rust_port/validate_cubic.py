@@ -68,7 +68,7 @@ def validate(compiler_directory):
     output = ROOT / "tests/fixtures"
     output.mkdir(exist_ok=True)
     with (output / "cubic.csv").open("w", newline="") as handle:
-        writer = csv.writer(handle, delimiter=';')
+        writer = csv.writer(handle, delimiter=';', lineterminator='\n')
         writer.writerow(["case", *labels, "ln_phi..."])
         writer.writerows([[case, *values] for case, values in zip(inputs, expected)])
     metadata = json.loads((ROOT / ".reference/metadata.json").read_text())

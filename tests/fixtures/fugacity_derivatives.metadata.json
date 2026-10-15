@@ -141,6 +141,6 @@
     "dn": 1e-08
   },
   "relative_tolerance": 2e-07,
-  "fixture_sha256": "b38d536da888b66a33ee18b9a8c7771dcabd5df32f379cbf212394c28ff49acc",
+  "fixture_sha256": "b14872453fb2fe774465f5d0deedcbcd48e921e68abc9991f3179f8bd650e37b",
   "generator": "tools/rust_port/validate_derivatives.py"
 }

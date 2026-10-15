@@ -9,11 +9,15 @@ cargo test --all-targets
 cargo test --release --tests
 cargo test --doc
 cargo doc --no-deps
+python tools/rust_port/verify_fixtures.py
 ```
 
 `cargo test` checks committed reference fixtures without a Fortran runtime.
 `tests/fixtures/*.metadata.json` records source hashes, compiler, flags,
 the pinned LAPACK commit, the reference library hash and tolerances.
+Fixture SHA-256 values cover exact CSV bytes with LF line endings, enforced
+by `.gitattributes` and the generators on every platform. The integrity checker
+also verifies row counts; native CI runs it without building Fortran.
 
 To regenerate fixtures from this fork, install gfortran (the local qualification
 uses 14.3.0; the source warns about version 15), Python and NumPy:

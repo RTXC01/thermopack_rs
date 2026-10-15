@@ -40,7 +40,7 @@ def validate(compiler_directory):
             assert abs(a-b)<=atol+2e-8*max(abs(a),abs(b)),(case,i,a,b)
     output=ROOT/'tests/fixtures/initialization.csv'
     with output.open('w',newline='') as handle:
-        writer=csv.writer(handle,delimiter=';')
+        writer=csv.writer(handle,delimiter=';',lineterminator='\n')
         writer.writerow(['case','values...'])
         writer.writerows([[case,*row] for case,row in zip(inputs,expected)])
     metadata=json.loads((ROOT/'.reference/metadata.json').read_text())

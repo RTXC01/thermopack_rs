@@ -3956,6 +3956,6 @@
       "-frecursive"
     ]
   },
-  "fixture_sha256": "6a4f10636d6d889333b294e56f521ce78c6710edf9032f760132196649875488",
+  "fixture_sha256": "5c91677b69724a712869151d9514190da5f93406d994d6505040da082f77c2c3",
   "generator": "tools/rust_port/validate_alpha.py"
 }

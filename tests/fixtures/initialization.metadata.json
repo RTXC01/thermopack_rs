@@ -138,6 +138,6 @@
     1e-12,
     1e-06
   ],
-  "fixture_sha256": "f48fad01a0c7bdf41941b07ce59f1e12cea9484f1df276d41b0250113a9aa87e",
+  "fixture_sha256": "7f431e2256855e003eb65302d4cb17e8258453bb119d3aabc686a41c31a796b9",
   "generator": "tools/rust_port/validate_initialization.py"
 }

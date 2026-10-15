@@ -42,7 +42,7 @@ def validate(compiler_directory):
                 failures.append({"case":case,"quantity":label,"reference":a,"rust":b})
     output=ROOT/"tests/fixtures/fugacity_derivatives.csv"
     with output.open('w',newline='') as handle:
-        writer=csv.writer(handle,delimiter=';')
+        writer=csv.writer(handle,delimiter=';',lineterminator='\n')
         writer.writerow(["case","dt[n],dp[n],dn[n*n]..."])
         writer.writerows([[case,*row] for case,row in zip(inputs,expected)])
     metadata=json.loads((ROOT/".reference/metadata.json").read_text())

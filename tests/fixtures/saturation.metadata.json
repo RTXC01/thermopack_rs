@@ -145,6 +145,6 @@
     ],
     "relative": 2e-07
   },
-  "fixture_sha256": "a237ff7985fbb0efc1b1703338a42563022e5ecf8a734fc8c657052aed2d8ba3",
+  "fixture_sha256": "b5d84d055c2f94be53ae674361338c735fc910fcec5d5fe2c77f5719eccea7c9",
   "generator": "tools/rust_port/validate_saturation.py"
 }

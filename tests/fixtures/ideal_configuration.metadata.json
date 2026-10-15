@@ -164,6 +164,6 @@
   ],
   "relative_tolerance": 2e-08,
   "exact_quantities_from_index": 7,
-  "fixture_sha256": "18ff259b2d22712a382e7430ce56cc3dddca2d44980b4c860c3dcdaedce9afd4",
+  "fixture_sha256": "07a19332455b9f7eeb989c1d7f85939b1ebaf88dd5b9df21b4a22d7c592a403e",
   "generator": "tools/rust_port/validate_ideal_configuration.py"
 }

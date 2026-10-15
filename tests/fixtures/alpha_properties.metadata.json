@@ -164,6 +164,6 @@
     "dp": 1e-11,
     "dn": 1e-08
   },
-  "fixture_sha256": "77d664546a177cf5144d753e84f89735040e999b3cc83c0ffe30cf3423321a3c",
+  "fixture_sha256": "26da88454ea4d95c7a94d474b4fb0beaffc94002ef81a6dfaf356f0fc2da871d",
   "generator": "tools/rust_port/validate_alpha_properties.py"
 }

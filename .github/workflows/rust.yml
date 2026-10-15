@@ -18,6 +18,7 @@ jobs:
         with:
           components: rustfmt, clippy
       - run: cargo fmt --all -- --check
+      - run: python tools/rust_port/verify_fixtures.py
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test --all-targets
       - run: cargo test --release --tests
@@ -52,3 +53,4 @@ jobs:
       - run: python tools/rust_port/validate_alpha_properties.py
       - run: python tools/rust_port/validate_translation.py
       - run: python tools/rust_port/validate_translated_flash.py
+      - run: python tools/rust_port/verify_fixtures.py

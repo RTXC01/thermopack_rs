@@ -1197,6 +1197,6 @@
     1e-12
   ],
   "relative_tolerance": 2e-08,
-  "fixture_sha256": "2a3307d40eb7287647ddf601973f970c23d847964c542ffa53c2655758a742e2",
+  "fixture_sha256": "04e0acee1aaaaed6ee8782e9a5e84ff93d33320736bc7d31daf648182b9ff073",
   "generator": "tools/rust_port/validate_ideal.py"
 }

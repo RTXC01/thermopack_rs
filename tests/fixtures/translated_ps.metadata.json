@@ -2809,6 +2809,6 @@
     1e-11,
     0.001
   ],
-  "fixture_sha256": "046fbbb3dcb2f0c5940aa5dad2ccdbe3b45f4ec382265eb9a9a098aa7ff2882e",
+  "fixture_sha256": "37d975f76b94ba535a5976750f544f230cf3bd71a9f1e23e973524b4952af9c2",
   "generator": "tools/rust_port/validate_translated_flash.py"
 }

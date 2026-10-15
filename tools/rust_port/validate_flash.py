@@ -88,7 +88,7 @@ def validate(compiler_directory):
                 failures.append({"case":case,"quantity":i,"reference":a,"rust":b})
     output=ROOT/"tests/fixtures/tp_flash.csv"
     with output.open('w',newline='') as handle:
-        writer=csv.writer(handle,delimiter=';')
+        writer=csv.writer(handle,delimiter=';',lineterminator='\n')
         writer.writerow(["case","phase_permutation_allowed","phase,betaV,betaL,x[n],y[n]..."])
         writer.writerows([[case,int(can_swap),*row] for case,row,can_swap in zip(inputs,expected,swappable) if row is not None])
     metadata=json.loads((ROOT/".reference/metadata.json").read_text())

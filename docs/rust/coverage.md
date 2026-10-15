@@ -11,8 +11,8 @@ not qualify an entire family.
 | PR, SRK, RK, van der Waals; classic alpha/vdW mixing | cbmix, cbalpha, cubic, cbhelm | validated: 1320 state cases; RK = SRK with RK alpha in the reference |
 | Other cubic, alpha, beta, mixing, translation, pseudo fluids | cubic_eos, cbselect, cbbeta, excess_gibbs, wong_sandler, volume_shift | pending |
 | Ideal gas, H2, caloric reference states | ideal, idealh2 | native correlations 1-9, 11-12; sampled caloric parity validated; H2 (10) pending |
-| T-V / T-P properties and derivatives, chemical potentials, sound | eos, eostv, single_phase, speed_of_sound | validated cubic P, dP/dT, dP/dv, H, S, log fugacity and baseline dH/dT; other derivatives pending; physical sound native, source sound compatibility pending |
-| Stable TP/PH/PS/UV/SV/mu-T flashes, grid flashes | stability, tp_solver, ph_solver, ps_solver, uv_solver, sv_solver, mut_solver | pending |
+| T-V / T-P properties and derivatives, chemical potentials, sound | eos, eostv, single_phase, speed_of_sound | validated cubic P, dP/dT, dP/dv, H, S, log fugacity and its T/P/n derivatives, baseline dH/dT; other derivatives pending; physical sound native, source sound compatibility pending |
+| Stable TP/PH/PS/UV/SV/mu-T flashes, grid flashes | stability, tp_solver, ph_solver, ps_solver, uv_solver, sv_solver, mut_solver | native TP stability/split solving; 1043 physical-split comparisons with one phase permutation and three recorded reference aborts; raw ordering and PH/PS/UV/SV/mu-T/grid flashes pending |
 | Pure/mixture saturation and phase envelopes, VLLE | saturation*, puresaturation, binaryplot, multi_phase_envelope_tv | validated pure cubic saturation P, phase volumes, Clapeyron slope in 48 cases; mixture saturation/envelopes/VLLE pending |
 | Critical points, spinodals, isolines, Joule-Thomson | critical, spinodal, isolines, joule_thompson_inversion | pending |
 | CPA, association, polar interactions | cpa_parameters, saft_association, association_var, multipol | pending |

@@ -97,6 +97,7 @@ pub struct PreparedState<'a> {
     b: f64,
     a_partial: Vec<f64>,
     b_partial: Vec<f64>,
+    factors: Vec<(f64, f64, f64)>,
 }
 
 impl Cubic {
@@ -391,11 +392,108 @@ impl Cubic {
             b,
             a_partial,
             b_partial,
+            factors,
         })
     }
 }
 
 impl PreparedState<'_> {
+    /// Analytic derivatives of log fugacity coefficients at constant T/P.
+    /// `dt` is 1/K, `dp` is 1/Pa, and `dn` is a row-major n*n matrix
+    /// of derivatives with respect to mole numbers at total amount 1 mol.
+    /// All output buffers are caller-owned and must have the exact dimensions.
+    pub fn fugacity_derivatives_into(
+        &self,
+        volume: f64,
+        dt: &mut [f64],
+        dp: &mut [f64],
+        dn: &mut [f64],
+    ) -> Result<()> {
+        let n = self.composition.len();
+        if dt.len() != n || dp.len() != n || dn.len() != n * n {
+            return Err(Error::InvalidInput("fugacity derivative buffer dimensions"));
+        }
+        let p = self.pressure(volume)?;
+        positive(p.value, "pressure for fugacity derivatives")?;
+        if p.dv == 0.0 {
+            return Err(Error::InvalidInput("singular volume derivative"));
+        }
+        let t = self.temperature;
+        let rt = R * t;
+        let free = volume - self.b;
+        let (d1, d2) = self.model.kind.deltas();
+        let denom = (volume + d1 * self.b) * (volume + d2 * self.b);
+        let denom_b = (d1 + d2) * volume + 2.0 * d1 * d2 * self.b;
+        let (integral, ib, ibb) = self.attraction_integral_derivatives(volume);
+        let pressure_n = |i: usize| {
+            rt / free + rt * self.b_partial[i] / free.powi(2) - 2.0 * self.a_partial[i] / denom
+                + self.a * denom_b * self.b_partial[i] / denom.powi(2)
+        };
+        for i in 0..n {
+            let mut ai_t = 0.0;
+            for j in 0..n {
+                ai_t += self.composition[j]
+                    * (1.0 - self.model.kij[i * n + j])
+                    * (self.factors[i].1 * self.factors[j].0
+                        + self.factors[i].0 * self.factors[j].1);
+            }
+            let bi = self.b_partial[i];
+            let di = 2.0 * self.a_partial[i];
+            let pi = pressure_n(i);
+            let fnt =
+                -(2.0 * ai_t - di / t) * integral / rt - (self.at - self.a / t) * ib * bi / rt;
+            dt[i] = fnt + pi * p.dt / (rt * p.dv) + 1.0 / t;
+            dp[i] = -pi / (rt * p.dv) - 1.0 / p.value;
+            for j in 0..n {
+                let bj = self.b_partial[j];
+                let dj = 2.0 * self.a_partial[j];
+                let bij =
+                    (1.0 - self.model.lij[i * n + j]) * (self.model.bi[i] + self.model.bi[j]) / 2.0;
+                let bnn = 2.0 * bij - bi - bj;
+                let dnn =
+                    2.0 * (1.0 - self.model.kij[i * n + j]) * self.factors[i].0 * self.factors[j].0;
+                let fnn = (bi + bj + bnn) / free + bi * bj / free.powi(2)
+                    - (dnn * integral
+                        + (di * bj + dj * bi) * ib
+                        + self.a * ibb * bi * bj
+                        + self.a * ib * bnn)
+                        / rt;
+                dn[i * n + j] = fnn + 1.0 + pi * pressure_n(j) / (rt * p.dv);
+            }
+        }
+        Ok(())
+    }
+
+    fn attraction_integral_derivatives(&self, volume: f64) -> (f64, f64, f64) {
+        let (d1, d2) = self.model.kind.deltas();
+        if d1 == d2 {
+            return (1.0 / volume, 0.0, 0.0);
+        }
+        let ratio = self.b / volume;
+        if ratio < 0.01 {
+            let (mut i, mut ib, mut ibb) = (0.0, 0.0, 0.0);
+            for k in 0_i32..12 {
+                let coefficient = (-1.0_f64).powi(k) * (d1.powi(k + 1) - d2.powi(k + 1))
+                    / ((d1 - d2) * (k + 1) as f64);
+                i += coefficient * ratio.powi(k) / volume;
+                if k >= 1 {
+                    ib += coefficient * k as f64 * ratio.powi(k - 1) / volume.powi(2);
+                }
+                if k >= 2 {
+                    ibb += coefficient * (k * (k - 1)) as f64 * ratio.powi(k - 2) / volume.powi(3);
+                }
+            }
+            (i, ib, ibb)
+        } else {
+            let integral = self.attraction_integral(volume);
+            let log_b = d1 / (volume + d1 * self.b) - d2 / (volume + d2 * self.b);
+            let log_bb =
+                -(d1 / (volume + d1 * self.b)).powi(2) + (d2 / (volume + d2 * self.b)).powi(2);
+            let ib = (log_b / (d1 - d2) - integral) / self.b;
+            let ibb = (log_bb / (d1 - d2) - 2.0 * ib) / self.b;
+            (integral, ib, ibb)
+        }
+    }
     /// Ideal mixture enthalpy, entropy (including entropy of mixing) and Cp.
     pub fn ideal(&self, pressure: f64) -> Result<crate::ideal::IdealProperties> {
         positive(pressure, "pressure")?;
@@ -519,10 +617,17 @@ impl PreparedState<'_> {
 
     /// Write log fugacity coefficients into a caller-owned buffer.
     pub fn ln_fugacity_into(&self, volume: f64, output: &mut [f64]) -> Result<()> {
+        self.ln_fugacity_tp_into(self.pressure(volume)?.value, volume, output)
+    }
+
+    /// Fugacity at an imposed TP pressure and its solved molar volume.
+    /// Using the specified pressure avoids reconstructing it by subtracting
+    /// large repulsive/attractive terms in dense, low-pressure liquids.
+    pub fn ln_fugacity_tp_into(&self, p: f64, volume: f64, output: &mut [f64]) -> Result<()> {
         if output.len() != self.composition.len() {
             return Err(Error::InvalidInput("fugacity buffer length"));
         }
-        let p = self.pressure(volume)?.value;
+        self.volume_check(volume)?;
         positive(p, "pressure for fugacity")?;
         let rt = R * self.temperature;
         let z = p * volume / rt;

@@ -30,3 +30,20 @@ enthalpy/internal-energy finite differences. The compatibility correction is
 the source's conversion of cubic volume to L/mol. Native sound speed uses
 physical heat capacities. Additional upstream derivative interfaces involving
 the erroneous F_TT remain pending in the coverage ledger.
+
+## TP flash reference aborts and phase ordering
+
+At T=200 K, P=1 MPa, z(CO2,H2O)=(0.9,0.1), PR, SRK and SRK with RK
+alpha terminate the calling process: the modified Newton solution has higher
+Gibbs energy than the feed. The complete outputs are in
+`tests/fixtures/tp_flash.metadata.json`. These calls are attempted and recorded,
+but cannot provide numerical expected values. Rust returns a result or an
+explicit error without terminating its caller.
+
+At SRK, T=300 K, P=5 MPa and the same composition, the baseline reports
+betaV approximately 0.0990607025 and x(CO2) approximately 0.998871541;
+Rust reports betaV approximately 0.900939298 and x(CO2) approximately
+0.000781095. Swapping phases gives the same fractions and compositions.
+Both phase compositions have a unique volume root, so root selection cannot
+enforce the labels. Qualification records this permutation explicitly.
+Exact raw phase-order compatibility is still pending.

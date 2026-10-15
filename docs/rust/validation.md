@@ -23,6 +23,8 @@ git submodule update --init --depth 1 external/lapack
 python tools/rust_port/build_reference.py --compiler /path/to/gfortran
 python tools/rust_port/validate_cubic.py
 python tools/rust_port/validate_saturation.py
+python tools/rust_port/validate_derivatives.py
+python tools/rust_port/validate_flash.py
 ```
 
 On Windows add `--compiler-directory /path/to/gfortran/bin` to the validation
@@ -49,6 +51,12 @@ hashes, compiler, flags and LAPACK revision invalidates stale cached objects.
   volumes and Clapeyron slope.
 * Independent finite-difference and physical-identity tests, low-pressure
   cubic roots, input errors, Rachford-Rice closure and concurrent model use.
+* 1320 fugacity T/P/mole-number derivative cases, independently checked with
+  finite differences, Hessian symmetry, Gibbs-Duhem and nonzero lij.
+* 1046 attempted TP flashes: 1043 numerical source results, including the
+  upstream eight-component near-critical regressions. One physical split
+  requires exchanging phase labels; three source calls terminate their process.
+  See [phase equilibrium qualification](phase-equilibrium.md).
 
 Each comparison uses `abs(error) <= atol + rtol * max(abs(reference), abs(rust))`.
 Tolerances are quantity-specific and recorded in fixture metadata and tests.

@@ -31,15 +31,49 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .split(',')
             .map(str::parse)
             .collect::<Result<_, _>>()?;
+        if fields[5] == "TP" {
+            match model.tp_flash(t, p, &x) {
+                Ok(flash) => {
+                    print!(
+                        "{},{:.17e},{:.17e}",
+                        flash.phase as i32, flash.vapor_fraction, flash.liquid_fraction
+                    );
+                    for value in flash.liquid.iter().chain(&flash.vapor) {
+                        print!(",{value:.17e}");
+                    }
+                    println!();
+                }
+                Err(error) => println!("ERROR: {error}"),
+            }
+            continue;
+        }
         let state = model.prepare(t, &x)?;
         let v = state.volume(
             p,
-            if fields[5] == "L" {
+            if fields[5].ends_with('L') {
                 Phase::Liquid
             } else {
                 Phase::Vapor
             },
         )?;
+        if fields[5].starts_with('D') {
+            let (mut dt, mut dp, mut dn) = (
+                vec![0.0; x.len()],
+                vec![0.0; x.len()],
+                vec![0.0; x.len() * x.len()],
+            );
+            state.fugacity_derivatives_into(v, &mut dt, &mut dp, &mut dn)?;
+            let values: Vec<_> = dt.into_iter().chain(dp).chain(dn).collect();
+            println!(
+                "{}",
+                values
+                    .iter()
+                    .map(|v| format!("{v:.17e}"))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            );
+            continue;
+        }
         let pressure = state.pressure(v)?;
         let residual = state.residual(v)?;
         let mut phi = vec![0.0; x.len()];

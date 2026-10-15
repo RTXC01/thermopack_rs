@@ -32,13 +32,17 @@ state.ln_fugacity_into(volume, &mut ln_phi)?;
 
 Pure cubic saturation: `model.saturation_pressure(temperature)` for a model
 with one component. Returns coexistence pressure, phase volumes and Clapeyron
-slope. The sound-speed and heat-capacity API uses physical derivatives;
+slope. `model.tp_flash(T,P,z)` performs VLE stability checks and a TP split.
+`state.fugacity_derivatives_into` provides analytic T/P/n derivatives into
+caller-owned buffers. See [phase equilibrium conventions](../docs/rust/phase-equilibrium.md),
+including the Single phase fraction sentinel and a known raw ordering mismatch.
+The sound-speed and heat-capacity API uses physical derivatives;
 `baseline_enthalpy_derivative_tp` explicitly preserves a vdW derivative defect
 in this fork. See [numerical differences](../docs/rust/baseline-defects.md).
 
 See [validation](../docs/rust/validation.md),
 [benchmarks](../docs/rust/performance.md) and the
-[migration design](../docs/rust/README.md). SAFT, flashes, phase envelopes,
+[migration design](../docs/rust/README.md). SAFT, PH/PS/UV/SV/mu-T flashes, phase envelopes,
 solids/hydrates and existing language-interface compatibility remain pending.
 
 Regenerate data with `python tools/rust_port/generate_data.py`.

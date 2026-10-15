@@ -49,5 +49,7 @@ adapter, not a completed Rust port.
 See [coverage.md](coverage.md), [inventory.json](inventory.json),
 [numerics.md](numerics.md), [validation.md](validation.md),
 [performance.md](performance.md) and [baseline-defects.md](baseline-defects.md).
+The [phase equilibrium notes](phase-equilibrium.md) describe stability,
+derivatives, TP result conventions and qualification limits.
 Regenerate inventory with
 `python tools/rust_port/inventory.py`.

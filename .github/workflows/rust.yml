@@ -41,3 +41,5 @@ jobs:
       - run: python tools/rust_port/build_reference.py --compiler /usr/bin/gfortran-13
       - run: python tools/rust_port/validate_cubic.py
       - run: python tools/rust_port/validate_saturation.py
+      - run: python tools/rust_port/validate_derivatives.py
+      - run: python tools/rust_port/validate_flash.py

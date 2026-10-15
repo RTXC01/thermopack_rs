@@ -133,3 +133,102 @@ pub fn rachford_rice(z: &[f64], k: &[f64]) -> crate::Result<f64> {
     }
     Err(crate::Error::NotConverged("Rachford-Rice"))
 }
+
+/// Solve a dense row-major linear system in place by partial pivoting.
+/// The matrix is overwritten with its elimination factors; rhs holds x.
+pub fn solve_linear_in_place(matrix: &mut [f64], rhs: &mut [f64]) -> crate::Result<()> {
+    let n = rhs.len();
+    if n == 0 || matrix.len() != n * n || matrix.iter().chain(rhs.iter()).any(|x| !x.is_finite()) {
+        return Err(crate::Error::InvalidInput(
+            "finite square linear system required",
+        ));
+    }
+    for k in 0..n {
+        let pivot = (k..n)
+            .max_by(|&i, &j| matrix[i * n + k].abs().total_cmp(&matrix[j * n + k].abs()))
+            .unwrap();
+        if matrix[pivot * n + k].abs() < f64::MIN_POSITIVE {
+            return Err(crate::Error::NotConverged("singular linear system"));
+        }
+        if pivot != k {
+            for j in 0..n {
+                matrix.swap(k * n + j, pivot * n + j);
+            }
+            rhs.swap(k, pivot);
+        }
+        for i in k + 1..n {
+            let factor = matrix[i * n + k] / matrix[k * n + k];
+            matrix[i * n + k] = factor;
+            for j in k + 1..n {
+                matrix[i * n + j] -= factor * matrix[k * n + j];
+            }
+            rhs[i] -= factor * rhs[k];
+        }
+    }
+    for i in (0..n).rev() {
+        for j in i + 1..n {
+            rhs[i] -= matrix[i * n + j] * rhs[j];
+        }
+        rhs[i] /= matrix[i * n + i];
+    }
+    if rhs.iter().any(|x| !x.is_finite()) {
+        Err(crate::Error::NotConverged("non-finite linear solution"))
+    } else {
+        Ok(())
+    }
+}
+
+pub(crate) fn modified_newton_direction(hessian: &[f64], gradient: &[f64]) -> Vec<f64> {
+    let n = gradient.len();
+    let scale = (0..n).map(|i| hessian[i * n + i].abs()).fold(1.0, f64::max);
+    let mut shift = 0.0;
+    for _ in 0..16 {
+        let mut l = vec![0.0; n * n];
+        let mut positive = true;
+        for i in 0..n {
+            for j in 0..=i {
+                let mut value = hessian[i * n + j];
+                if i == j {
+                    value += shift;
+                }
+                for k in 0..j {
+                    value -= l[i * n + k] * l[j * n + k];
+                }
+                if i == j {
+                    if value <= 1e-15 * scale || !value.is_finite() {
+                        positive = false;
+                        break;
+                    }
+                    l[i * n + j] = value.sqrt();
+                } else {
+                    l[i * n + j] = value / l[j * n + j];
+                }
+            }
+            if !positive {
+                break;
+            }
+        }
+        if positive {
+            let mut step: Vec<_> = gradient.iter().map(|g| -g).collect();
+            for i in 0..n {
+                for j in 0..i {
+                    step[i] -= l[i * n + j] * step[j];
+                }
+                step[i] /= l[i * n + i];
+            }
+            for i in (0..n).rev() {
+                for j in i + 1..n {
+                    step[i] -= l[j * n + i] * step[j];
+                }
+                step[i] /= l[i * n + i];
+            }
+            return step;
+        }
+        shift = if shift == 0.0 {
+            1e-10 * scale
+        } else {
+            10.0 * shift
+        };
+    }
+    gradient.iter().map(|g| -g / scale).collect()
+}

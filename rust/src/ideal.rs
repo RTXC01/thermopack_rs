@@ -4,7 +4,11 @@ use crate::{Component, Error, R, Result};
 
 #[derive(Debug, Clone, Copy)]
 pub struct IdealProperties {
+    /// Source Cp correlation [J/(mol K)]. Type 10 in this fork differs from
+    /// the derivative of its enthalpy by a factor 1000; see `enthalpy_dt`.
     pub cp: f64,
+    /// Actual dH/dT of the returned values. Native caloric solves use this.
+    pub enthalpy_dt: f64,
     pub enthalpy: f64,
     pub entropy: f64,
 }
@@ -29,6 +33,7 @@ impl Component {
         };
         Ok(IdealProperties {
             cp,
+            enthalpy_dt: cp * if self.cp_type == 10 { 1000.0 } else { 1.0 },
             enthalpy,
             entropy,
         })
@@ -142,7 +147,7 @@ impl Component {
                 }
                 Ok((cp * R, h * R, s * R))
             }
-            10 => Err(Error::Unsupported("hydrogen ideal heat capacity")),
+            10 => crate::hydrogen::primitives(self.ident, t),
             _ => Err(Error::Unsupported(
                 "component has no default ideal heat-capacity correlation",
             )),

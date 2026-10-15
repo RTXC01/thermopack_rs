@@ -45,7 +45,9 @@ caller-owned buffers. See [phase equilibrium conventions](../docs/rust/phase-equ
 including the Single phase fraction sentinel and a known raw ordering mismatch.
 The sound-speed and heat-capacity API uses physical derivatives;
 `baseline_enthalpy_derivative_tp` explicitly preserves a vdW derivative defect
-in this fork. See [numerical differences](../docs/rust/baseline-defects.md).
+and the ideal-H2 Cp convention in this fork. `Component::ideal` exposes the
+source Cp and a separate `enthalpy_dt` for the derivative of its H values.
+See [numerical differences](../docs/rust/baseline-defects.md).
 
 See [validation](../docs/rust/validation.md),
 [benchmarks](../docs/rust/performance.md) and the

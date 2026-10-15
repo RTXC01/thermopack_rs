@@ -9,6 +9,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if fields.len() != 6 {
             return Err("expected six fields".into());
         }
+        if fields[5] == "IDEAL" {
+            match thermopack_rs::component(fields[1])
+                .and_then(|c| c.ideal(fields[2].parse().unwrap(), fields[3].parse().unwrap()))
+            {
+                Ok(properties) => {
+                    let t: f64 = fields[2].parse()?;
+                    let p: f64 = fields[3].parse()?;
+                    println!(
+                        "{:.17e},{:.17e},{:.17e},{:.17e},{:.17e}",
+                        properties.enthalpy,
+                        properties.entropy,
+                        properties.cp,
+                        properties.cp / t,
+                        -thermopack_rs::R / p
+                    );
+                }
+                Err(error) => println!("ERROR: {error}"),
+            }
+            continue;
+        }
         let kind = match fields[0] {
             "PR" => CubicKind::PengRobinson,
             "SRK" => CubicKind::SoaveRedlichKwong,

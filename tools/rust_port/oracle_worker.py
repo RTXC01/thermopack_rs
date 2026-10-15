@@ -39,7 +39,17 @@ def main(compiler_directory):
                         alpha="RK" if eos=="RK" else "Classic",volume_shift=False)
             previous=eos,comps
         extra={}
-        if request['mode']=='PSEUDO':
+        if request['mode']=='IDEAL':
+            t,p=request['temperature'],request['pressure']
+            h,cp=model.idealenthalpysingle(t,1,dhdt=True)
+            s,st,sp=model.idealentropysingle(t,p,1,dsdt=True,dsdp=True)
+            values=list(map(float,[h,s,cp,st,sp]))
+            if not all(map(math.isfinite,values)):
+                print('THERMOPACK_RESULT='+json.dumps({'calculation_error':'non-finite ideal property',
+                      'values':list(map(str,values))}),flush=True)
+                continue
+            swappable=False
+        elif request['mode']=='PSEUDO':
             model.activate()
             composition=(c_double*len(request['feed']))(*request['feed'])
             t,p,w,z,v=(c_double() for _ in range(5))

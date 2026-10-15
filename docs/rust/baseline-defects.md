@@ -3,6 +3,33 @@
 Exact baseline: d68c794. These are observed differences, not hypothetical
 limitations. Compatibility and mathematical consistency are tested separately.
 
+## Compiled fluid constants differ from JSON
+
+`src/compdatadb.f90` rounds molecular masses when it is generated. For example,
+R1234yf is 114.0416 g/mol in the compiled fork and 114.041593 in JSON. This
+affects its mass-based ideal caloric correlation and exceeds the chosen parity
+tolerances. DME and four hydrogen isomers also have rounded compiled masses.
+The Rust generator reads numerical fluid constants and default Cp records from
+the compiled database, retaining JSON names/aliases. It records hashes of both
+sources. The selected default Cp record still follows last-default-wins order.
+
+## Hydrogen ideal H/S and Cp use different scaling
+
+For correlation 10, `src/idealh2.f90` multiplies its H and S primitives by 1000
+but not Cp. Consequently numerical dH/dT is 1000 times the reported ideal Cp.
+The routine uses its own fitting gas constant, 8.3144772 J/(mol K). N-H2 and
+E-H2 select this correlation by default; P-H2 and O-H2 select correlation 12.
+The source also omits its last two oscillator terms at T <= 30 K.
+
+`Component::ideal` preserves source H, S and Cp, including reference states.
+Its `enthalpy_dt` field explicitly reports the derivative of those H values.
+Native `heat_capacities` and caloric solves use that derivative;
+`baseline_enthalpy_derivative_tp` preserves the source Cp convention. This
+maintains the distinction between reference parity and value consistency.
+The default ideal-property grid qualifies 2592 cases for 108 fluids. BUTANAL's
+default correlation is 100, which terminates the reference and returns an
+explicit unsupported-correlation error in Rust; all 24 attempts are recorded.
+
 ## Duplicate interaction defaults
 
 For PR CO2/H2O, both JSON and compiled `src/mixdatadb.f90` contain duplicate

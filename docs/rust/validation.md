@@ -27,6 +27,7 @@ python tools/rust_port/validate_derivatives.py
 python tools/rust_port/validate_flash.py
 python tools/rust_port/validate_initialization.py
 python tools/rust_port/validate_caloric.py
+python tools/rust_port/validate_ideal.py
 ```
 
 On Windows add `--compiler-directory /path/to/gfortran/bin` to the validation
@@ -70,6 +71,13 @@ hashes, compiler, flags and LAPACK revision invalidates stale cached objects.
 * Equilibrium Cp includes phase redistribution and agrees with independent
   finite differences of equilibrium H and S. Native PH/PS results also close
   their specified H or S independently of the reference comparisons.
+* 2616 attempted ideal-property cases covering every default fluid, eight
+  temperatures (including the 30 K hydrogen branch), and three pressures:
+  2592 finite source results across 108 fluids match H, S, Cp and the reported
+  entropy derivatives. BUTANAL's 24 attempts terminate the reference with its
+  invalid default Cp correlation 100. Native H/S temperature derivatives are
+  independently checked for all 108 supported fluids, including the explicit
+  type-10 hydrogen factor-1000 discrepancy.
 
 Each comparison uses `abs(error) <= atol + rtol * max(abs(reference), abs(rust))`.
 Tolerances are quantity-specific and recorded in fixture metadata and tests.

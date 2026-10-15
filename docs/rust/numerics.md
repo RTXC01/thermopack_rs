@@ -16,6 +16,11 @@ must eventually be covered. No silent approximations for unsupported models.
 For DEFAULT selection, the source skips exact-substring matching and retains
 the last default entry. Interaction constants use the compiled database's
 rounded values, rather than potentially higher-precision JSON values.
+Numerical pure-fluid constants and default Cp records likewise use the compiled
+`compdatadb.f90`, while JSON supplies aliases. Type-10 hydrogen ideal values
+have a source scaling discrepancy: `IdealProperties::cp` preserves the source
+correlation and `enthalpy_dt` differentiates its returned H. Native caloric
+iterations use the latter.
 
 Analytic derivatives are compared to central finite differences independently
 of parity tests. Cubic roots are filtered by admissible volume and polished

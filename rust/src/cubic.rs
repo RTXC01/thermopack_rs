@@ -595,6 +595,7 @@ impl PreparedState<'_> {
         positive(pressure, "pressure")?;
         let mut result = crate::ideal::IdealProperties {
             cp: 0.0,
+            enthalpy_dt: 0.0,
             enthalpy: 0.0,
             entropy: 0.0,
         };
@@ -604,6 +605,7 @@ impl PreparedState<'_> {
             }
             let pure = c.ideal(self.temperature, pressure)?;
             result.cp += x * pure.cp;
+            result.enthalpy_dt += x * pure.enthalpy_dt;
             result.enthalpy += x * pure.enthalpy;
             result.entropy += x * (pure.entropy - R * x.ln());
         }
@@ -620,17 +622,18 @@ impl PreparedState<'_> {
 
     /// Single-phase heat capacities (Cp, Cv) [J/(mol K)].
     pub fn heat_capacities(&self, volume: f64) -> Result<(f64, f64)> {
-        let ideal_cp = self.ideal(self.pressure(volume)?.value)?.cp;
+        let ideal_cp = self.ideal(self.pressure(volume)?.value)?.enthalpy_dt;
         let residual = self.residual(volume)?;
         Ok((ideal_cp + residual.cp, ideal_cp - R + residual.cv))
     }
 
     /// Compatibility with this fork's `enthalpy(..., dhdt=True)`.
-    /// For vdW only, preserves the erroneous F_TT expression in cubic.f90.
+    /// Preserves the vdW F_TT expression and type-10 ideal-H2 Cp discrepancy.
     /// Use `heat_capacities` for a derivative consistent with enthalpy values.
     /// See docs/rust/baseline-defects.md for the exact discrepancy.
     pub fn baseline_enthalpy_derivative_tp(&self, volume: f64) -> Result<f64> {
-        let cp = self.heat_capacities(volume)?.0;
+        let ideal = self.ideal(self.pressure(volume)?.value)?;
+        let cp = ideal.cp + self.residual(volume)?.cp;
         if self.model.kind == CubicKind::VanDerWaals {
             Ok(
                 cp + 2.0 * self.a * self.temperature / (1000.0 * volume * volume)

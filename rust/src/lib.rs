@@ -20,6 +20,7 @@ pub mod component;
 pub mod cubic;
 mod error;
 pub mod flash;
+mod hydrogen;
 pub mod ideal;
 pub mod numerics;
 

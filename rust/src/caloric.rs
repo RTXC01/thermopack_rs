@@ -471,7 +471,7 @@ fn phase_caloric(state: &PreparedState<'_>, volume: f64) -> Result<(f64, f64, f6
     Ok((
         ideal.enthalpy + residual.enthalpy,
         ideal.entropy + residual.entropy,
-        ideal.cp + residual.cp,
+        ideal.enthalpy_dt + residual.cp,
     ))
 }
 

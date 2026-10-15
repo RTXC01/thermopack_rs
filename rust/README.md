@@ -30,9 +30,16 @@ let mut ln_phi = [0.0; 2];
 state.ln_fugacity_into(volume, &mut ln_phi)?;
 ```
 
-Pure cubic saturation: `model.saturation_pressure(temperature)` for a model
-with one component. Returns coexistence pressure, phase volumes and Clapeyron
-slope. `model.tp_flash(T,P,z)` performs VLE stability checks and a TP split.
+Pure cubic saturation: `model.saturation_pressure(temperature)` and
+`model.saturation_temperature(pressure)` for a model with one component.
+Returns coexistence temperature/pressure, phase volumes and Clapeyron slope.
+`model.tp_flash(T,P,z)` performs VLE stability checks and a TP split.
+`model.ph_flash(P,z,H)` and `model.ps_flash(P,z,S)` recover temperature and
+phase amounts from molar enthalpy or entropy. Use
+`model.equilibrium_properties(&flash)` for overall V/H/S/U and equilibrium Cp,
+including phase redistribution. Caloric options set temperature bounds and
+initial guesses; defaults are 80 to 999 K. `pseudo_critical(z)` is a
+fixed-composition estimate, not the true critical point of a mixture.
 `state.fugacity_derivatives_into` provides analytic T/P/n derivatives into
 caller-owned buffers. See [phase equilibrium conventions](../docs/rust/phase-equilibrium.md),
 including the Single phase fraction sentinel and a known raw ordering mismatch.
@@ -42,7 +49,7 @@ in this fork. See [numerical differences](../docs/rust/baseline-defects.md).
 
 See [validation](../docs/rust/validation.md),
 [benchmarks](../docs/rust/performance.md) and the
-[migration design](../docs/rust/README.md). SAFT, PH/PS/UV/SV/mu-T flashes, phase envelopes,
+[migration design](../docs/rust/README.md). SAFT, UV/SV/mu-T flashes, phase envelopes,
 solids/hydrates and existing language-interface compatibility remain pending.
 
 Regenerate data with `python tools/rust_port/generate_data.py`.

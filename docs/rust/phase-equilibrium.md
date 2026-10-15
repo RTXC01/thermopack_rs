@@ -89,6 +89,9 @@ physical derivatives, including for vdW; see the baseline defect notes.
 The solver first tries a cheap homogeneous caloric solve, accepting it only
 after a TP stability check and caloric closure. Otherwise it brackets the
 equilibrium target and uses safeguarded Newton steps with nested TP flashes.
+The preliminary homogeneous search is limited to 16 root iterations: its
+minimum-Gibbs branch can jump at coexistence and leave no homogeneous root.
+Shared ideal integrals and residual derivatives are evaluated once per phase.
 A failed TP trial may be retried toward a valid bracket endpoint. Every
 accepted value comes from an actual successful evaluation; an unresolved
 interval returns an explicit error. This is not a complete multiphase solver.

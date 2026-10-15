@@ -1,7 +1,22 @@
 //! Equilibrium caloric properties and pressure/enthalpy or pressure/entropy
 //! flashes. Uses analytic equilibrium heat capacity with safeguarded Newton.
+//!
+//! ```
+//! use thermopack_rs::{Cubic, CubicKind};
+//! # fn main() -> Result<(), thermopack_rs::Error> {
+//! let model = Cubic::new(CubicKind::PengRobinson, &["C1", "C2", "C3"])?;
+//! let z = [0.5, 0.3, 0.2];
+//! let initial = model.tp_flash(200.0, 1e6, &z)?;
+//! let properties = model.equilibrium_properties(&initial)?;
+//! let recovered = model.ph_flash(1e6, &z, properties.enthalpy)?;
+//! assert!((recovered.temperature - 200.0).abs() < 1e-6);
+//! # Ok(())
+//! # }
+//! ```
 use crate::error::positive;
-use crate::{Cubic, Error, FlashOptions, FlashPhase, FlashResult, Phase, R, Result, numerics};
+use crate::{
+    Cubic, Error, FlashOptions, FlashPhase, FlashResult, Phase, PreparedState, R, Result, numerics,
+};
 
 #[derive(Debug, Clone, Copy)]
 pub struct EquilibriumProperties {
@@ -73,9 +88,7 @@ impl Cubic {
         if flash.phase != FlashPhase::TwoPhase {
             let state = self.prepare(t, &flash.feed)?;
             let v = state.volume(p, Phase::MinimumGibbs)?;
-            let h = state.enthalpy(v)?;
-            let s = state.entropy(v)?;
-            let cp = state.heat_capacities(v)?.0;
+            let (h, s, cp) = phase_caloric(&state, v)?;
             return Ok(EquilibriumProperties {
                 volume: v,
                 enthalpy: h,
@@ -96,8 +109,10 @@ impl Cubic {
         let v = self.prepare(t, &flash.vapor)?;
         let vl = l.volume(p, Phase::Liquid)?;
         let vv = v.volume(p, Phase::Vapor)?;
-        let h = (1.0 - beta) * l.enthalpy(vl)? + beta * v.enthalpy(vv)?;
-        let s = (1.0 - beta) * l.entropy(vl)? + beta * v.entropy(vv)?;
+        let (hl, sl, cpl) = phase_caloric(&l, vl)?;
+        let (hv, sv, cpv) = phase_caloric(&v, vv)?;
+        let h = (1.0 - beta) * hl + beta * hv;
+        let s = (1.0 - beta) * sl + beta * sv;
         let volume = (1.0 - beta) * vl + beta * vv;
         let active: Vec<_> = flash
             .feed
@@ -128,8 +143,7 @@ impl Cubic {
             }
             let mut response = delta.clone();
             if numerics::solve_linear_in_place(&mut matrix, &mut response).is_ok() {
-                let frozen =
-                    (1.0 - beta) * l.heat_capacities(vl)?.0 + beta * v.heat_capacities(vv)?.0;
+                let frozen = (1.0 - beta) * cpl + beta * cpv;
                 let cp = frozen
                     + R * t * t * delta.iter().zip(&response).map(|(a, b)| a * b).sum::<f64>();
                 if cp.is_finite() && cp > 0.0 {
@@ -227,7 +241,14 @@ impl Cubic {
             let properties = self.equilibrium_properties(&flash)?;
             Ok((flash, properties))
         };
-        if let Ok(mut candidate) = solve_scalar(target, mode, initial, options, &homogeneous) {
+        // A minimum-Gibbs homogeneous branch jumps at fixed-composition
+        // coexistence. A target in that jump has no homogeneous root; do not
+        // spend the full equilibrium iteration budget bisecting it.
+        let mut homogeneous_options = options;
+        homogeneous_options.max_iterations = homogeneous_options.max_iterations.min(16);
+        if let Ok(mut candidate) =
+            solve_scalar(target, mode, initial, homogeneous_options, &homogeneous)
+        {
             let stable = self.tp_flash_with_options(candidate.temperature, p, z, options.tp)?;
             let props = self.equilibrium_properties(&stable)?;
             if (mode.value(&props) - target).abs()
@@ -419,9 +440,7 @@ impl Cubic {
                 flash.liquid_volume
             }
             .ok_or(Error::NoPhysicalRoot)?;
-            let h = state.enthalpy(volume)?;
-            let s = state.entropy(volume)?;
-            let cp = state.heat_capacities(volume)?.0;
+            let (h, s, cp) = phase_caloric(&state, volume)?;
             Ok((
                 flash,
                 EquilibriumProperties {
@@ -443,6 +462,17 @@ impl Cubic {
         flash.vapor = z.to_vec();
         Ok(flash)
     }
+}
+
+// Evaluate shared ideal integrals and residual derivatives once per phase.
+fn phase_caloric(state: &PreparedState<'_>, volume: f64) -> Result<(f64, f64, f64)> {
+    let residual = state.residual(volume)?;
+    let ideal = state.ideal(state.pressure(volume)?.value)?;
+    Ok((
+        ideal.enthalpy + residual.enthalpy,
+        ideal.entropy + residual.entropy,
+        ideal.cp + residual.cp,
+    ))
 }
 
 fn solve_scalar<F>(
@@ -502,6 +532,9 @@ where
             low = flash.temperature;
         } else {
             high = flash.temperature;
+        }
+        if high - low <= 8.0 * f64::EPSILON * flash.temperature {
+            return Err(Error::NotConverged("caloric bracket has no closing root"));
         }
         let newton = mode
             .slope(&properties, flash.temperature)

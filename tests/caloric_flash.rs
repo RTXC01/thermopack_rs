@@ -1,4 +1,64 @@
-use thermopack_rs::{Cubic, CubicKind};
+use thermopack_rs::{CaloricFlashOptions, Cubic, CubicKind, FlashPhase};
+
+#[test]
+fn caloric_options_and_absent_components() {
+    let model = Cubic::new(CubicKind::PengRobinson, &["C1", "C2", "C3"]).unwrap();
+    let z = [0.5, 0.3, 0.2];
+    let props = model
+        .equilibrium_properties(&model.tp_flash(200.0, 1e6, &z).unwrap())
+        .unwrap();
+    let options = CaloricFlashOptions {
+        temperature_guess: Some(202.0),
+        minimum_temperature: 190.0,
+        maximum_temperature: 210.0,
+        ..Default::default()
+    };
+    for flash in [
+        model.ph_flash_with_options(1e6, &z, props.enthalpy, options),
+        model.ps_flash_with_options(1e6, &z, props.entropy, options),
+    ] {
+        assert!((flash.unwrap().temperature - 200.0).abs() < 1e-6);
+    }
+    let excluded = CaloricFlashOptions {
+        minimum_temperature: 300.0,
+        maximum_temperature: 400.0,
+        ..Default::default()
+    };
+    assert!(
+        model
+            .ph_flash_with_options(1e6, &z, props.enthalpy, excluded)
+            .is_err()
+    );
+    assert!(
+        model
+            .ps_flash_with_options(1e6, &z, props.entropy, excluded)
+            .is_err()
+    );
+    assert!(model.ph_flash(1e6, &z, f64::NAN).is_err());
+    assert!(model.ps_flash(0.0, &z, props.entropy).is_err());
+
+    let pure = Cubic::new(CubicKind::PengRobinson, &["CO2"]).unwrap();
+    let sparse = Cubic::new(CubicKind::PengRobinson, &["C1", "CO2", "N2"]).unwrap();
+    let sat = pure.saturation_pressure(250.0).unwrap();
+    let state = pure.prepare(250.0, &[1.0]).unwrap();
+    let target = 0.7 * state.enthalpy(sat.liquid_volume).unwrap()
+        + 0.3 * state.enthalpy(sat.vapor_volume).unwrap();
+    let flash = sparse
+        .ph_flash(sat.pressure, &[0.0, 1.0, 0.0], target)
+        .unwrap();
+    assert_eq!(flash.phase, FlashPhase::TwoPhase);
+    assert_eq!(flash.liquid, [0.0, 1.0, 0.0]);
+    assert_eq!(flash.vapor, [0.0, 1.0, 0.0]);
+    assert!((flash.temperature - 250.0).abs() < 1e-7);
+    assert!((flash.vapor_fraction - 0.3).abs() < 1e-8);
+    assert!(
+        sparse
+            .equilibrium_properties(&flash)
+            .unwrap()
+            .heat_capacity
+            .is_none()
+    );
+}
 
 #[test]
 fn saturation_temperature_and_pseudo_critical() {

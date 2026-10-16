@@ -84,6 +84,38 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if fields.len() != 6 {
             return Err("expected six fields".into());
         }
+        if fields[5] == "RR" {
+            let z: Vec<f64> = fields[1]
+                .split(',')
+                .map(str::parse)
+                .collect::<Result<_, _>>()?;
+            let k: Vec<f64> = fields[2]
+                .split(',')
+                .map(str::parse)
+                .collect::<Result<_, _>>()?;
+            let mut state = thermopack_rs::numerics::RachfordRiceState::new(z.len());
+            state.vapor_fraction = fields[3].parse()?;
+            match thermopack_rs::numerics::rachford_rice_extended(
+                &z,
+                &k,
+                &mut state,
+                fields[4] == "1",
+            ) {
+                Ok(false) => println!("0"),
+                Ok(true) => {
+                    print!(
+                        "1,{:.17e},{:.17e}",
+                        state.vapor_fraction, state.liquid_fraction
+                    );
+                    for value in state.liquid.iter().chain(&state.vapor) {
+                        print!(",{value:.17e}");
+                    }
+                    println!();
+                }
+                Err(error) => println!("ERROR: {error}"),
+            }
+            continue;
+        }
         if fields[5] == "IDEAL" || fields[5] == "IDEAL_CONFIG" {
             let t: f64 = fields[2].parse()?;
             let p: f64 = fields[3].parse()?;

@@ -38,6 +38,7 @@ python tools/rust_port/validate_alpha.py
 python tools/rust_port/validate_alpha_properties.py
 python tools/rust_port/validate_translation.py
 python tools/rust_port/validate_beta.py
+python tools/rust_port/validate_rr.py
 python tools/rust_port/validate_translated_flash.py
 ```
 
@@ -54,6 +55,11 @@ pinned LAPACK/BLAS routines required by ThermoPack. A fingerprint of all source
 hashes, compiler, flags and LAPACK revision invalidates stale cached objects.
 
 ## Qualified cases
+
+* 704 extended/one-step Rachford–Rice attempts: 698 finite source results/statuses
+  match; six non-finite source updates are recorded. See
+  [extended RR conventions](rachford-rice.md). This does not qualify full flash
+  convergence or source output fields left undefined on a failed RR solve.
 
 * 1320 cubic states: PR, SRK, SRK with RK alpha, vdW; six pure fluids and five
   mixtures, 200/300/500 K, 1 kPa through 20 MPa, liquid/vapor requests, zero

@@ -1,4 +1,5 @@
-//! Small numerical kernels with bounded work and no allocation.
+//! Small numerical kernels with bounded work. Caller-owned RR buffers avoid
+//! allocations during repeated solves.
 
 /// Real roots of x^3 + a*x^2 + b*x + c, sorted in ascending order.
 /// Unused entries are NaN. Returns the number of distinct roots.
@@ -135,6 +136,180 @@ pub fn rachford_rice(z: &[f64], k: &[f64]) -> crate::Result<f64> {
         };
     }
     Err(crate::Error::NotConverged("Rachford-Rice"))
+}
+
+/// Workspace/results for the fork's extended Rachford-Rice solver.
+/// Fractions may lie outside [0,1] during negative-flash initialization.
+#[derive(Debug, Clone)]
+pub struct RachfordRiceState {
+    pub vapor_fraction: f64,
+    pub liquid_fraction: f64,
+    pub liquid: Vec<f64>,
+    pub vapor: Vec<f64>,
+}
+impl RachfordRiceState {
+    pub fn new(components: usize) -> Self {
+        Self {
+            vapor_fraction: 0.5,
+            liquid_fraction: 0.5,
+            liquid: vec![0.; components],
+            vapor: vec![0.; components],
+        }
+    }
+}
+
+/// Port of tp_solver::rr_solve, including extended bounds and the liquid-
+/// fraction formulation near a vapor endpoint. True means an RR result was
+/// obtained, not thermodynamic stability or fractions inside [0,1].
+///
+/// False preserves arrays not written by the source's failure path. Their
+/// contents must not be interpreted as a new solution. `single_step` performs
+/// the source's one-Newton-step mode using the supplied vapor fraction, and
+/// leaves liquid_fraction unchanged as in that routine.
+pub fn rachford_rice_extended(
+    z: &[f64],
+    k: &[f64],
+    state: &mut RachfordRiceState,
+    single_step: bool,
+) -> crate::Result<bool> {
+    if z.is_empty()
+        || z.len() != k.len()
+        || state.liquid.len() != z.len()
+        || state.vapor.len() != z.len()
+        || z.iter().any(|v| !v.is_finite() || *v < 0.)
+        || k.iter().any(|v| !v.is_finite() || *v < 0.)
+        || (z.iter().sum::<f64>() - 1.).abs() > 1e-10
+        || (single_step && !state.vapor_fraction.is_finite())
+    {
+        return Err(crate::Error::InvalidInput(
+            "normalized z, finite nonnegative K and matching RR buffers required",
+        ));
+    }
+    let evaluate = |beta: f64, vapor: bool| {
+        let (mut g, mut dg) = (0., 0.);
+        for (&zi, &ki) in z.iter().zip(k) {
+            let divisor = if vapor {
+                1. - beta + beta * ki
+            } else {
+                beta + (1. - beta) * ki
+            };
+            if divisor == 0. {
+                return None;
+            }
+            g += zi * (ki - 1.) / divisor;
+            let ratio = (ki - 1.) / divisor;
+            dg += zi * (ratio * ratio);
+        }
+        Some((g, if vapor { -dg } else { dg }))
+    };
+    if single_step {
+        let beta = state.vapor_fraction;
+        let (g, dg) = evaluate(beta, true).ok_or(crate::Error::NoPhysicalRoot)?;
+        let beta = beta - g / dg;
+        for (i, (&zi, &ki)) in z.iter().zip(k).enumerate() {
+            let divisor = 1. - beta + beta * ki;
+            state.liquid[i] = (1. - beta) * zi / divisor;
+            state.vapor[i] = beta * zi * ki / divisor;
+        }
+        state.vapor_fraction = state.vapor.iter().sum();
+        for (x, y) in state.liquid.iter_mut().zip(&mut state.vapor) {
+            *x /= 1. - state.vapor_fraction;
+            *y /= state.vapor_fraction;
+        }
+        if !state.vapor_fraction.is_finite()
+            || state
+                .liquid
+                .iter()
+                .chain(&state.vapor)
+                .any(|v| !v.is_finite())
+        {
+            return Err(crate::Error::NotConverged(
+                "non-finite single-step Rachford-Rice result",
+            ));
+        }
+        return Ok(true);
+    }
+    let smallest = k.iter().copied().fold(f64::INFINITY, f64::min);
+    let largest = k.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    let (mut low, mut high) = if smallest < 1. && largest > 1. {
+        if (smallest - 1.).abs() < 10. * f64::EPSILON && (largest - 1.).abs() < 10. * f64::EPSILON {
+            return Ok(false);
+        }
+        (-1. / (largest - 1.), 1. / (1. - smallest))
+    } else {
+        let endpoint = |beta| {
+            z.iter()
+                .zip(k)
+                .map(|(z, k)| z * (k - 1.) / (1. - beta + beta * k))
+                .sum::<f64>()
+        };
+        if !(endpoint(0.) > 0. && endpoint(1.) < 0.) {
+            return Ok(false);
+        }
+        (0., 1.)
+    };
+    for (&zi, &ki) in z.iter().zip(k) {
+        if ki > 1. {
+            low = low.max((ki * zi - 1.) / (ki - 1.));
+        } else if ki < 1. {
+            high = high.min((1. - zi) / (1. - ki));
+        }
+    }
+    let mut vapor = true;
+    if high > 0.5 {
+        let g = z
+            .iter()
+            .zip(k)
+            .map(|(z, k)| z * (k - 1.) / (0.5 + 0.5 * k))
+            .sum::<f64>();
+        if g < 0. {
+            high = 0.5;
+        } else {
+            vapor = false;
+            low = 1. - high;
+            high = 0.5;
+        }
+    }
+    let mut beta = 0.5 * (high + low);
+    state.vapor_fraction = beta;
+    let mut converged = false;
+    for _ in 0..1500 {
+        let Some((g, dg)) = evaluate(beta, vapor) else {
+            return Ok(false);
+        };
+        if (vapor && g > 0.) || (!vapor && g < 0.) {
+            low = beta;
+        } else if (vapor && g < 0.) || (!vapor && g > 0.) {
+            high = beta;
+        }
+        let old = beta;
+        beta -= g / dg;
+        if beta < low || beta > high {
+            beta = 0.5 * (low + high);
+        }
+        state.vapor_fraction = beta;
+        if g.abs() < 100. * f64::EPSILON && (beta - old).abs() < 100. * f64::EPSILON {
+            converged = true;
+            break;
+        }
+    }
+    state.liquid_fraction = if vapor { 1. - beta } else { beta };
+    if !vapor {
+        state.vapor_fraction = 1. - beta;
+    }
+    if !converged {
+        return Ok(false);
+    }
+    for (i, (&zi, &ki)) in z.iter().zip(k).enumerate() {
+        let divisor = if vapor {
+            1. - beta + beta * ki
+        } else {
+            beta + (1. - beta) * ki
+        };
+        state.liquid[i] = zi / divisor;
+        state.vapor[i] = ki * zi / divisor;
+    }
+    Ok(true)
 }
 
 /// Solve a dense row-major linear system in place by partial pivoting.

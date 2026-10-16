@@ -7,6 +7,7 @@ not qualify an entire family.
 
 | Capability | Source | Status |
 |---|---|---|
+| Extended Rachford–Rice and one-step initialization | tp_solver::rr_solve | validated: 698 finite/status comparisons, six non-finite source calls recorded; 2–20 components and negative-flash roots; full flash integration pending |
 | Component/interaction database | fluids/, binaries/, compdatadb.f90, mixdatadb.f90 | native: 109 fluids with compiled numerical constants; all 111 Cp and 191 ci records; default/non-default classical PR/SRK interactions; JSON aliases; other model parameter sets pending |
 | PR, SRK, RK, van der Waals; classic alpha/vdW mixing | cbmix, cbalpha, cubic, cbhelm | validated: 1320 state cases; RK = SRK with RK alpha in the reference |
 | Cubic alpha correlations and parameters | cbalpha, compdatadb | validated alpha initializer/setters: 4232 numerical cases, 80 source terminations recorded; 3240 EOS/derivative cases; all 257 TWU/MC records embedded; explicit UMR/GERG evaluation returns source-unimplemented errors |

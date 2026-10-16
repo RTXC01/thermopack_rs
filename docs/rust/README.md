@@ -57,5 +57,7 @@ The [volume translation notes](volume-translation.md) cover ci polynomials,
 reference-aware constructors, physical volumes and caloric corrections.
 The [beta notes](beta.md) cover quantum covolume factors, full QuantumCubic
 critical-data overrides and the remaining cryogenic solver differences.
+The [extended RR notes](rachford-rice.md) cover source-compatible negative-flash
+bounds, independent phase fractions and one-step initialization.
 Regenerate inventory with
 `python tools/rust_port/inventory.py`.

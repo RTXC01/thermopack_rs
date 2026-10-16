@@ -39,6 +39,8 @@ def load_probe():
     probe.query_translation.restype=None
     probe.query_beta.argtypes=[c_int,c_double,POINTER(c_int),POINTER(c_double),POINTER(c_double),POINTER(c_double)]
     probe.query_beta.restype=None
+    probe.query_rr.argtypes=[c_int,POINTER(c_double),POINTER(c_double),c_int,POINTER(c_double),POINTER(c_double),POINTER(c_double),POINTER(c_double),POINTER(c_int)]
+    probe.query_rr.restype=None
     return probe
 
 
@@ -48,6 +50,19 @@ def main(compiler_directory):
     probe=None
     for line in sys.stdin:
         request=json.loads(line)
+        if request['mode']=='RR':
+            if probe is None: probe=load_probe()
+            n=len(request['feed'])
+            z=(c_double*n)(*request['feed']);k=(c_double*n)(*request['k'])
+            x=(c_double*n)();y=(c_double*n)()
+            beta=c_double(request.get('beta',.5));betal=c_double(.5);status=c_int()
+            probe.query_rr(n,z,k,int(request.get('single_step',False)),byref(beta),byref(betal),x,y,byref(status))
+            values=[1.,beta.value,betal.value,*map(float,x),*map(float,y)] if status.value else [0.]
+            if all(map(math.isfinite,values)):
+                print('THERMOPACK_RESULT='+json.dumps({'values':values}),flush=True)
+            else:
+                print('THERMOPACK_RESULT='+json.dumps({'calculation_error':'non-finite RR output','values':list(map(str,values))}),flush=True)
+            continue
         eos,comps=request['eos'],request['components']
         alpha=request.get('alpha','RK' if eos=='RK' else 'Classic')
         ref=request.get('parameter_reference',request.get('alpha_reference','Default'))

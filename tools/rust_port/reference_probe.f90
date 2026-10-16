@@ -109,3 +109,17 @@ subroutine query_beta(index,t,method,params,values,critical) bind(C,name='query_
     error stop 'reference probe requires a cubic model'
   end select
 end subroutine query_beta
+
+subroutine query_rr(n,z,k,single_step,beta,betaL,x,y,status) bind(C,name='query_rr')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use tp_solver, only: rr_solve
+  implicit none
+  integer(c_int), value :: n,single_step
+  real(c_double), intent(in) :: z(n),k(n)
+  real(c_double), intent(inout) :: beta,betaL,x(n),y(n)
+  integer(c_int), intent(out) :: status
+  logical :: success
+  success=rr_solve(n,z,k,beta,x,y,single_step/=0,betaL)
+  status=0
+  if (success) status=1
+end subroutine query_rr

@@ -43,7 +43,7 @@ fixed-composition estimate, not the true critical point of a mixture.
 `model.ideal_gas_mut(i)` configures owned ideal Cp parameters and H/S reference
 states for component i (zero based). A Cp setter preserves integration constants;
 reference setters recalculate them as in the source. Other models and the global
-database remain independent. `components()` exposes database metadata, while
+database remain independent. `components()` exposes active component metadata, while
 `ideal_gas(i)` exposes the active caloric parameters.
 `Cubic::with_alpha` selects an alpha correlation and parameter reference;
 `set_alpha(i, correlation, coefficients)` sets one component explicitly.

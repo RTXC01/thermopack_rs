@@ -791,9 +791,22 @@ impl Cubic {
             return Err(Error::InvalidInput("temperature outside numerical range"));
         }
         let translation = if self.translation_enabled {
-            let components = (0..n)
-                .map(|i| self.volume_translation(i)?.evaluate(temperature))
-                .collect::<Result<Vec<_>>>()?;
+            // Borrow active coefficients in the hot loop; the public getter
+            // returns a full parameter record, including provenance metadata.
+            let components = match &self.translation_parameters {
+                Some(parameters) => parameters
+                    .iter()
+                    .map(|p| p.evaluate(temperature))
+                    .collect::<Result<Vec<_>>>()?,
+                None => vec![
+                    crate::TranslationValue {
+                        value: 0.,
+                        dt: 0.,
+                        dtt: 0.
+                    };
+                    n
+                ],
+            };
             let mut prepared = crate::translation::PreparedTranslation {
                 c: 0.,
                 ct: 0.,

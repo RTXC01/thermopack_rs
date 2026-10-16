@@ -14,13 +14,41 @@ method/parameters and returns explicit errors for unimplemented evaluation.
 Separately, the public cubic constructor overrides alpha to TWU and enables
 translation for tcPR references. QuantumCubic also changes beta and critical
 data. Full tcPR construction is now qualified separately from the isolated
-alpha kernel; QuantumCubic remains pending. See [alpha.md](alpha.md) and
+alpha kernel; QuantumCubic construction/properties are qualified separately
+while its cryogenic flash grid remains pending. See [beta.md](beta.md), [alpha.md](alpha.md) and
 [volume-translation.md](volume-translation.md) for scope and source probes.
 
 The Python `init_peneloux_volume_translation(reference)` wrapper drops its
 reference argument before calling Fortran, selecting DEFAULT parameters.
 The public cubic constructor does pass its reference. Native APIs preserve
 both behaviors through distinct entry points, with explicit documentation.
+
+## Cryogenic TP returns are not always stable equilibrium states
+
+The exact fork returns a PR H2/NE split at 3 K, 1 kPa, z=0.6/0.4 with
+`Gsplit/(RT)=-22.8596711116`, while the homogeneous liquid feed has
+`Gfeed/(RT)=-26.0314067678`. Chemical-potential residuals are zero, but the
+split has higher Gibbs energy by 3.1717356562 RT. For z=0/0.5/0.5 in HE/H2/NE,
+the corresponding increase is 0.5135988542 RT. The SS path in
+`tp_solver::twoPhaseTPflash` can return immediately on convergence before its
+later Gibbs comparison is reached.
+
+At 80 K, 0.1 MPa, z=0.5/0.3/0.2 in C1/CO2/N2 under QuantumCubic construction,
+the source also returns TwoPhase with a vapor fraction below 1e-12 and a
+vanishing-phase composition that does not close chemical potentials. The PR
+case has a maximum dimensionless residual of 14.5247. SRK/RK exhibit the same
+kind of return. This is a raw phase-output convention/defect, not a valid VLE
+state merely because total H/S or material balance closes.
+
+All five observations are independently recalculated by
+`tools/rust_port/audit_quantum_flash.py` and stored with the exact source
+fingerprints in [quantum_flash_audit.json](../../tests/fixtures/quantum_flash_audit.json).
+The raw cases remain in the reference data and native failure counts.
+Complete source-convention compatibility for these returns remains pending;
+the validated QuantumCubic property kernel does not qualify its entire flash
+surface. Nonmonotonic cryogenic H/S curves also admit multiple closing
+temperatures, so equality to the state used to generate H/S is insufficient
+to establish equality to the source solver's returned branch.
 
 ## Compiled fluid constants differ from JSON
 

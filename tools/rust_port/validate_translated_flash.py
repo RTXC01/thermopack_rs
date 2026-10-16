@@ -40,10 +40,11 @@ def cases():
                                            quality=quality,**options)
 
 
-def validate(compiler_directory):
+def validate(compiler_directory,candidate_cases=None,prefix='translated',generator='tools/rust_port/validate_translated_flash.py'):
     inputs,expected,swappable,errors=[],[],[],[]
+    alternate_temperatures=[]
     with ReferenceProcess(compiler_directory) as oracle:
-        for request in cases():
+        for request in cases() if candidate_cases is None else candidate_cases:
             result=oracle.call(request)
             if 'values' not in result or 'calculation_error' in result:
                 errors.append({'request':request,**result})
@@ -53,17 +54,21 @@ def validate(compiler_directory):
                 data.update(temperature=result['specification'],pressure=result['pressure'])
             inputs.append(encode(data));expected.append(result['values'])
             swappable.append(result['phase_permutation_allowed'])
+            if request['mode'] in ('V_PH','V_PS') and abs(result['values'][0]-request['temperature'])>1e-5:
+                alternate_temperatures.append({'request':request,'returned_temperature':result['values'][0],
+                                               'specification':result['specification'],'pressure':result['pressure']})
     subprocess.run(['cargo','build','--release','--example','parity'],cwd=ROOT,check=True)
     executable=ROOT/'target/release/examples'/('parity.exe' if os.name=='nt' else 'parity')
     process=subprocess.run([str(executable)],input='\n'.join(inputs)+'\n',text=True,capture_output=True,check=True)
     actual=process.stdout.splitlines()
     assert len(actual)==len(expected)
-    failures=[]
+    failures=[];failed_rows=set()
     grouped={'V_TP':[],'V_PH':[],'V_PS':[],'V_SAT':[]}
-    for case,ref,line,can_swap in zip(inputs,expected,actual,swappable):
+    for row_index,(case,ref,line,can_swap) in enumerate(zip(inputs,expected,actual,swappable)):
         mode=case.split('|')[5].split('@')[0]
         grouped[mode].append((case,can_swap,ref))
         if line.startswith('ERROR'):
+            failed_rows.add(row_index)
             failures.append({'case':case,'error':line});continue
         native=list(map(float,line.split(',')))
         assert len(native)==len(ref)
@@ -75,26 +80,32 @@ def validate(compiler_directory):
                 flag_index=0 if mode=='V_TP' else 1
                 tolerance=0. if i==flag_index else 2e-6+2e-7*max(abs(a),abs(b))
             if not abs(a-b)<=tolerance:
+                failed_rows.add(row_index)
                 failures.append({'case':case,'quantity':i,'reference':a,'rust':b,
                                  'source_phase_permutation_allowed':can_swap})
     for mode,rows in grouped.items():
-        output=ROOT/'tests/fixtures'/('translated_'+mode[2:].lower()+'.csv')
+        output=ROOT/'tests/fixtures'/(prefix+'_'+mode[2:].lower()+'.csv')
         with output.open('w',newline='') as handle:
             writer=csv.writer(handle,delimiter=';',lineterminator='\n')
             writer.writerow(['case','phase_permutation_allowed','values...'])
             writer.writerows([[case,int(swap),*values] for case,swap,values in rows])
         mode_errors=[e for e in errors if e['request']['mode']==mode]
         metadata=json.loads((ROOT/'.reference/metadata.json').read_text())
+        mode_failed=sum(inputs[i].split('|')[5].split('@')[0]==mode for i in failed_rows)
         metadata.update({'cases':len(rows),'attempted_cases':len(rows)+len(mode_errors),
                          'reference_errors':mode_errors,'source_closure_scaled_tolerance':1e-8,
                          'absolute_tolerance':2e-6,'relative_tolerance':2e-7,'phase_flag_tolerance':0,
                          'saturation_absolute_tolerances':[1e-6,1e-3,1e-13,1e-11,1e-3],
+                         'native_comparison':{'matched_cases':len(rows)-mode_failed,'failed_cases':mode_failed,
+                             'native_sources_sha256':{p.relative_to(ROOT).as_posix():hashlib.sha256(p.read_bytes().replace(b'\r\n',b'\n')).hexdigest()
+                                                      for p in sorted((ROOT/'rust').rglob('*.rs'))}},
+                         'alternate_temperature_results':[r for r in alternate_temperatures if r['request']['mode']==mode],
                          'fixture_sha256':hashlib.sha256(output.read_bytes()).hexdigest(),
-                         'generator':'tools/rust_port/validate_translated_flash.py'})
+                         'generator':generator})
         output.with_suffix('.metadata.json').write_text(json.dumps(metadata,indent=2)+'\n')
-    (ROOT/'.reference/translated_flash_failures.json').write_text(json.dumps(failures,indent=2)+'\n')
+    (ROOT/'.reference'/(prefix+'_flash_failures.json')).write_text(json.dumps(failures,indent=2)+'\n')
     print(json.dumps({'cases':{mode:len(rows) for mode,rows in grouped.items()},
-                      'reference_errors':len(errors),'failures':len(failures)},indent=2))
+                      'reference_errors':len(errors),'failures':len(failures),'failed_native_cases':len(failed_rows)},indent=2))
     if failures:
         print(json.dumps(failures[:20],indent=2));raise SystemExit(1)
 

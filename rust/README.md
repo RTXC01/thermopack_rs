@@ -54,6 +54,15 @@ quirks and the separate scope of translated/quantum constructor behavior.
 and optional volume translation; tcPR references force TWU and translation as
 in the source constructor. Component ci parameters and enable/disable controls
 are owned by each model. See [volume translation](../docs/rust/volume-translation.md).
+`set_beta(i, Beta::new(...))` configures covolume factors and their derivatives.
+The `QuantumCubic` reference forces quantum beta/TWU/translation and source
+critical-data overrides. Model component records now contain effective critical
+data, independently of the global database. See [beta and QuantumCubic](../docs/rust/beta.md)
+for qualified properties and pending cryogenic flash compatibility.
+`Cubic::quantum(names)` also matches `qcubic`'s combined parameter priorities
+and 2 K minimum. Model-local bounds are available through `temperature_bounds`
+and `set_temperature_bounds`; `caloric_options()` inherits them for per-call
+customization.
 `state.fugacity_derivatives_into` provides analytic T/P/n derivatives into
 caller-owned buffers. See [phase equilibrium conventions](../docs/rust/phase-equilibrium.md),
 including the Single phase fraction sentinel and a known raw ordering mismatch.

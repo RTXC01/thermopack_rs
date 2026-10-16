@@ -16,6 +16,7 @@
 //! # }
 //! ```
 pub mod alpha;
+pub mod beta;
 pub mod caloric;
 pub mod component;
 pub mod cubic;
@@ -27,6 +28,7 @@ pub mod numerics;
 pub mod translation;
 
 pub use alpha::{Alpha, AlphaCorrelation, AlphaValue};
+pub use beta::{Beta, BetaCorrelation, BetaValue};
 pub use caloric::{CaloricFlashOptions, EquilibriumProperties};
 pub use component::{Component, component, components};
 pub use cubic::{

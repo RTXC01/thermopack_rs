@@ -37,6 +37,7 @@ python tools/rust_port/validate_ideal_configuration.py
 python tools/rust_port/validate_alpha.py
 python tools/rust_port/validate_alpha_properties.py
 python tools/rust_port/validate_translation.py
+python tools/rust_port/validate_beta.py
 python tools/rust_port/validate_translated_flash.py
 ```
 
@@ -107,6 +108,12 @@ hashes, compiler, flags and LAPACK revision invalidates stale cached objects.
   72 pure saturation results match; 86 source terminations and 53 nonclosing
   PH results are recorded separately. Native H/S closure and two-phase
   material balances are independently checked in the committed fixture tests.
+* 4036 beta/critical-data parameter and 4512 complete property cases qualify
+  explicit beta settings and full QuantumCubic construction, including analytic
+  derivatives, owned critical/mass overrides and nonzero kij/lij. All attempted
+  source calls are numerical and match. See [beta.md](beta.md). The separate
+  `validate_quantum_flash.py` diagnostic currently reports unresolved numerical
+  and branch differences and is not a passing qualification gate.
 
 Each comparison uses `abs(error) <= atol + rtol * max(abs(reference), abs(rust))`.
 Tolerances are quantity-specific and recorded in fixture metadata and tests.

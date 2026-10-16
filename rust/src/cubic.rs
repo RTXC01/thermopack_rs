@@ -42,16 +42,20 @@ pub enum Phase {
 #[derive(Debug, Clone)]
 pub struct Cubic {
     kind: CubicKind,
-    components: Vec<&'static Component>,
+    components: Vec<Component>,
     ideal_gases: Vec<Result<crate::ideal::IdealGas>>,
     a0: Vec<f64>,
     bi: Vec<f64>,
     alpha: Vec<crate::Alpha>,
+    beta: Vec<crate::Beta>,
+    variable_beta: bool,
     kij: Vec<f64>,
     lij: Vec<f64>,
     nonzero_kij: Vec<(usize, usize, f64)>,
     translation_parameters: Option<Vec<crate::VolumeTranslation>>,
     translation_enabled: bool,
+    pub(crate) caloric_minimum: f64,
+    pub(crate) caloric_maximum: f64,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -126,6 +130,7 @@ pub struct PreparedState<'a> {
     a_partial: Vec<f64>,
     b_partial: Vec<f64>,
     factors: Vec<(f64, f64, f64)>,
+    beta: Option<crate::beta::PreparedBeta>,
     translation: Option<crate::translation::PreparedTranslation>,
 }
 
@@ -277,7 +282,8 @@ impl Cubic {
         for _ in 0..80 {
             let state = self.prepare(t, z)?;
             let f = state.a - (oa / ob) * R * t * state.b;
-            let df = state.at - (oa / ob) * R * state.b;
+            let df =
+                state.at - (oa / ob) * R * (state.b + t * state.beta.as_ref().map_or(0., |b| b.dt));
             let arg = 1.0 - 2.0 * f * state.att / (df * df);
             let mut step = -2.0 * f / (df * (1.0 + if arg > 0.0 { arg.sqrt() } else { 1.0 }));
             step = step.clamp(-0.5 * t, 0.5 * t);
@@ -300,21 +306,53 @@ impl Cubic {
         Self::with_options(kind, names, CubicOptions::default())
     }
 
+    /// Match the qcubic helper: PR, combined parameter priorities and 2 K bound.
+    pub fn quantum(names: &[&str]) -> Result<Self> {
+        let mut model = Self::with_options(
+            CubicKind::PengRobinson,
+            names,
+            CubicOptions {
+                parameter_reference: "QuantumCubic/tcPR/DEFAULT",
+                ..Default::default()
+            },
+        )?;
+        model.caloric_minimum = 2.;
+        Ok(model)
+    }
+
+    pub fn temperature_bounds(&self) -> (f64, f64) {
+        (self.caloric_minimum, self.caloric_maximum)
+    }
+
+    pub fn set_temperature_bounds(&mut self, minimum: f64, maximum: f64) -> Result<()> {
+        positive(minimum, "minimum temperature")?;
+        positive(maximum, "maximum temperature")?;
+        if minimum >= maximum {
+            return Err(Error::InvalidInput(
+                "minimum temperature must be below maximum",
+            ));
+        }
+        self.caloric_minimum = minimum;
+        self.caloric_maximum = maximum;
+        Ok(())
+    }
+
     /// Public cubic initialization, including tcPR's forced TWU/translation.
-    /// QuantumCubic beta/critical-data initialization remains unsupported.
     pub fn with_options(
         kind: CubicKind,
         names: &[&str],
         options: CubicOptions<'_>,
     ) -> Result<Self> {
-        let reference = options.parameter_reference.to_ascii_uppercase();
-        if reference.contains("QUANTUMCUBIC") {
-            return Err(Error::Unsupported(
-                "QuantumCubic beta and critical-data initialization",
-            ));
+        // eoslibinit stores the public constructor reference in len=100.
+        let mut end = options.parameter_reference.len().min(100);
+        while !options.parameter_reference.is_char_boundary(end) {
+            end -= 1;
         }
+        let parameter_reference = &options.parameter_reference[..end];
+        let reference = parameter_reference.to_ascii_uppercase();
+        let quantum = reference.contains("QUANTUMCUBIC");
         let tcpr = reference.contains("TCPR");
-        let requested = if tcpr {
+        let requested = if tcpr || quantum {
             crate::AlphaCorrelation::Twu
         } else {
             options.alpha.unwrap_or(if kind == CubicKind::RedlichKwong {
@@ -327,11 +365,12 @@ impl Cubic {
             kind,
             names,
             requested,
-            options.parameter_reference,
-            options.parameter_reference,
+            parameter_reference,
+            parameter_reference,
+            quantum,
         )?;
-        if tcpr || options.volume_translation {
-            model.enable_volume_translation(options.parameter_reference)?;
+        if tcpr || quantum || options.volume_translation {
+            model.enable_volume_translation(parameter_reference)?;
         }
         Ok(model)
     }
@@ -344,7 +383,7 @@ impl Cubic {
         requested: crate::AlphaCorrelation,
         alpha_reference: &str,
     ) -> Result<Self> {
-        Self::new_with_references(kind, names, requested, alpha_reference, "DEFAULT")
+        Self::new_with_references(kind, names, requested, alpha_reference, "DEFAULT", false)
     }
 
     fn new_with_references(
@@ -353,14 +392,20 @@ impl Cubic {
         requested: crate::AlphaCorrelation,
         alpha_reference: &str,
         parameter_reference: &str,
+        quantum: bool,
     ) -> Result<Self> {
         if names.is_empty() {
             return Err(Error::InvalidInput("at least one component required"));
         }
-        let components: Vec<_> = names
+        let mut components: Vec<_> = names
             .iter()
-            .map(|name| component(name))
+            .map(|name| component(name).copied())
             .collect::<Result<_>>()?;
+        if quantum {
+            for component in &mut components {
+                crate::beta::quantum_component(component);
+            }
+        }
         let (omega_a, omega_b) = omega(kind);
         let ideal_gases = components
             .iter()
@@ -376,12 +421,25 @@ impl Cubic {
             a0: Vec::with_capacity(names.len()),
             bi: Vec::with_capacity(names.len()),
             alpha,
+            variable_beta: quantum,
+            beta: components
+                .iter()
+                .map(|c| {
+                    if quantum {
+                        crate::Beta::quantum(c)
+                    } else {
+                        crate::Beta::default()
+                    }
+                })
+                .collect(),
             kij: vec![0.0; names.len().pow(2)],
             lij: vec![0.0; names.len().pow(2)],
             nonzero_kij: Vec::new(),
             components,
             translation_parameters: None,
             translation_enabled: false,
+            caloric_minimum: 80.,
+            caloric_maximum: 999.,
         };
         for c in &model.components {
             positive(c.critical_temperature, "critical temperature")?;
@@ -488,8 +546,43 @@ impl Cubic {
         Ok(())
     }
     /// Database metadata. Use ideal_gas for this model's active caloric parameters.
-    pub fn components(&self) -> &[&'static Component] {
+    pub fn components(&self) -> &[Component] {
         &self.components
+    }
+
+    pub fn beta(&self, index: usize) -> Result<crate::Beta> {
+        self.beta
+            .get(index)
+            .copied()
+            .ok_or(Error::InvalidInput("component index out of range"))
+    }
+    pub fn set_beta(&mut self, index: usize, beta: crate::Beta) -> Result<()> {
+        crate::Beta::new(beta.correlation, beta.parameters)?;
+        *self
+            .beta
+            .get_mut(index)
+            .ok_or(Error::InvalidInput("component index out of range"))? = beta;
+        self.variable_beta = self
+            .beta
+            .iter()
+            .any(|b| b.correlation != crate::BetaCorrelation::Classic);
+        Ok(())
+    }
+
+    pub(crate) fn pure_component(&self, index: usize) -> Result<Self> {
+        let mut pure = Self::new(self.kind, &[self.components[index].ident])?;
+        pure.components[0] = self.components[index];
+        pure.a0[0] = self.a0[index];
+        pure.bi[0] = self.bi[index];
+        pure.alpha[0] = self.alpha[index];
+        pure.beta[0] = self.beta[index];
+        pure.variable_beta = pure.beta[0].correlation != crate::BetaCorrelation::Classic;
+        pure.ideal_gases[0] = self.ideal_gases[index].clone();
+        pure.set_volume_translation(0, self.volume_translation(index)?)?;
+        pure.translation_enabled = self.translation_enabled;
+        pure.caloric_minimum = self.caloric_minimum;
+        pure.caloric_maximum = self.caloric_maximum;
+        Ok(pure)
     }
 
     /// Active ideal parameters; component indices are zero based.
@@ -616,20 +709,81 @@ impl Cubic {
             a_partial[j] -= composition[i] * pair;
         }
         let mut b = 0.0;
-        let mut b_partial = self.bi.clone();
+        let mut beta = if self.variable_beta {
+            let components = self
+                .beta
+                .iter()
+                .zip(&self.components)
+                .zip(&self.bi)
+                .map(|((beta, component), &base)| {
+                    let value = beta.evaluate(temperature, component.critical_temperature)?;
+                    Ok(crate::BetaValue {
+                        value: base * value.value,
+                        dt: base * value.dt,
+                        dtt: base * value.dtt,
+                    })
+                })
+                .collect::<Result<Vec<_>>>()?;
+            Some(crate::beta::PreparedBeta {
+                partial_t: components.iter().map(|c| c.dt).collect(),
+                components,
+                dt: 0.,
+                dtt: 0.,
+            })
+        } else {
+            None
+        };
+        let mut b_partial: Vec<_> = match &beta {
+            Some(beta) => beta.components.iter().map(|b| b.value).collect(),
+            None => self.bi.clone(),
+        };
         if self.lij.iter().all(|l| *l == 0.0) {
-            b = composition.iter().zip(&self.bi).map(|(x, bi)| x * bi).sum();
+            b = composition
+                .iter()
+                .zip(&b_partial)
+                .map(|(x, bi)| x * bi)
+                .sum();
+            if let Some(beta) = &mut beta {
+                beta.dt = composition
+                    .iter()
+                    .zip(&beta.components)
+                    .map(|(x, b)| x * b.dt)
+                    .sum();
+                beta.dtt = composition
+                    .iter()
+                    .zip(&beta.components)
+                    .map(|(x, b)| x * b.dtt)
+                    .sum();
+            }
         } else {
             for i in 0..n {
                 b_partial[i] = 0.0;
+                let bii = beta.as_ref().map_or(self.bi[i], |b| b.components[i].value);
+                let mut bt_partial = 0.;
+                let mut btt_partial = 0.;
                 for (j, &xj) in composition.iter().enumerate() {
-                    b_partial[i] +=
-                        xj * (1.0 - self.lij[i * n + j]) * (self.bi[i] + self.bi[j]) / 2.0;
+                    let bjj = beta.as_ref().map_or(self.bi[j], |b| b.components[j].value);
+                    b_partial[i] += xj * (1.0 - self.lij[i * n + j]) * (bii + bjj) / 2.0;
+                    if let Some(beta) = &beta {
+                        let weight = xj * (1. - self.lij[i * n + j]) / 2.;
+                        bt_partial += weight * (beta.components[i].dt + beta.components[j].dt);
+                        btt_partial += weight * (beta.components[i].dtt + beta.components[j].dtt);
+                    }
                 }
                 b += composition[i] * b_partial[i];
+                if let Some(beta) = &mut beta {
+                    beta.partial_t[i] = 2. * bt_partial;
+                    beta.dt += composition[i] * bt_partial;
+                    beta.dtt += composition[i] * btt_partial;
+                }
             }
             for bi in &mut b_partial {
                 *bi = 2.0 * *bi - b;
+            }
+            if let Some(beta) = &mut beta {
+                for bit in &mut beta.partial_t {
+                    *bit -= beta.dt;
+                }
             }
         }
         positive(b, "mixture covolume")?;
@@ -666,6 +820,7 @@ impl Cubic {
             a_partial,
             b_partial,
             factors,
+            beta,
             translation,
         })
     }
@@ -716,15 +871,28 @@ impl PreparedState<'_> {
             let bi = self.b_partial[i];
             let di = 2.0 * self.a_partial[i];
             let pi = pressure_n(i);
-            let fnt =
+            let mut fnt =
                 -(2.0 * ai_t - di / t) * integral / rt - (self.at - self.a / t) * ib * bi / rt;
+            if let Some(beta) = &self.beta {
+                let bt = beta.dt;
+                let bit = beta.partial_t[i];
+                fnt += (bt + bit) / free + bi * bt / (free * free)
+                    - (di * ib * bt + self.a * ibb * bt * bi + self.a * ib * bit) / rt;
+            }
             dt[i] = fnt + pi * p.dt / (rt * p.dv) + 1.0 / t;
             dp[i] = -pi / (rt * p.dv) - 1.0 / p.value;
             for j in 0..n {
                 let bj = self.b_partial[j];
                 let dj = 2.0 * self.a_partial[j];
-                let bij =
-                    (1.0 - self.model.lij[i * n + j]) * (self.model.bi[i] + self.model.bi[j]) / 2.0;
+                let bii = self
+                    .beta
+                    .as_ref()
+                    .map_or(self.model.bi[i], |b| b.components[i].value);
+                let bjj = self
+                    .beta
+                    .as_ref()
+                    .map_or(self.model.bi[j], |b| b.components[j].value);
+                let bij = (1.0 - self.model.lij[i * n + j]) * (bii + bjj) / 2.0;
                 let bnn = 2.0 * bij - bi - bj;
                 let dnn =
                     2.0 * (1.0 - self.model.kij[i * n + j]) * self.factors[i].0 * self.factors[j].0;
@@ -880,6 +1048,7 @@ impl PreparedState<'_> {
         volume + self.translation.as_ref().map_or(0., |c| c.c)
     }
 
+    #[inline]
     fn volume_check(&self, volume: f64) -> Result<()> {
         if volume.is_finite() && volume > 0. && self.eos_volume(volume) > self.b {
             Ok(())
@@ -888,6 +1057,7 @@ impl PreparedState<'_> {
         }
     }
 
+    #[inline]
     pub fn pressure(&self, volume: f64) -> Result<Pressure> {
         self.volume_check(volume)?;
         let mut pressure = self.eos_pressure(self.eos_volume(volume))?;
@@ -897,6 +1067,7 @@ impl PreparedState<'_> {
         Ok(pressure)
     }
 
+    #[inline]
     fn eos_pressure(&self, volume: f64) -> Result<Pressure> {
         if !volume.is_finite() || volume <= self.b {
             return Err(Error::InvalidInput("EOS volume must exceed covolume"));
@@ -904,9 +1075,13 @@ impl PreparedState<'_> {
         let (d1, d2) = self.model.kind.deltas();
         let denom = (volume + d1 * self.b) * (volume + d2 * self.b);
         let free = volume - self.b;
+        let beta_dt = self.beta.as_ref().map_or(0., |beta| {
+            let denom_b = (d1 + d2) * volume + 2. * d1 * d2 * self.b;
+            (R * self.temperature / (free * free) + self.a * denom_b / (denom * denom)) * beta.dt
+        });
         Ok(Pressure {
             value: R * self.temperature / free - self.a / denom,
-            dt: R / free - self.at / denom,
+            dt: R / free - self.at / denom + beta_dt,
             dv: -R * self.temperature / (free * free)
                 + self.a * (2.0 * volume + (d1 + d2) * self.b) / (denom * denom),
         })
@@ -939,6 +1114,20 @@ impl PreparedState<'_> {
             cv,
             cp: cv - self.temperature * pressure.dt.powi(2) / pressure.dv - R,
         };
+        if let Some(beta) = &self.beta {
+            let t = self.temperature;
+            let rt = R * t;
+            let free = volume - self.b;
+            let (_, ib, ibb) = self.attraction_integral_derivatives(volume);
+            let ab = rt / free - self.a * ib;
+            residual.enthalpy -= t * ab * beta.dt;
+            residual.entropy -= ab * beta.dt;
+            residual.cv -= t
+                * (2. * (R / free - self.at * ib) * beta.dt
+                    + (rt / (free * free) - self.a * ibb) * beta.dt * beta.dt
+                    + ab * beta.dtt);
+            residual.cp = residual.cv - t * pressure.dt * pressure.dt / pressure.dv - R;
+        }
         if let Some(shift) = &self.translation {
             let t = self.temperature;
             residual.compressibility = pressure.value * actual_volume / (R * t);

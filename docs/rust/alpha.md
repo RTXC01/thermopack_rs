@@ -65,8 +65,10 @@ This alpha initializer is distinct from the public `eoslibinit::init_cubic`
 constructor. That constructor forces TWU and volume translation when its
 reference contains tcPR; QuantumCubic also changes critical data and beta.
 Complete tcPR construction is qualified separately in the
-[volume translation comparisons](volume-translation.md). QuantumCubic and
-language-interface compatibility remain pending. The alpha probe deliberately
+[volume translation comparisons](volume-translation.md). QuantumCubic
+construction/properties are qualified in [beta.md](beta.md); its expanded
+cryogenic flash grid and language-interface compatibility remain pending.
+The alpha probe deliberately
 isolates the initializer; its results alone do not qualify translated/quantum
 models. All original default-model fixtures continue to run alongside these
 additional cases.

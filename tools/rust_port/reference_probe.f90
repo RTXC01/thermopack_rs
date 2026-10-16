@@ -81,3 +81,31 @@ subroutine query_translation(index,t,enabled,kind,params,values,temp_dep) bind(C
   temp_dep=0
   if (dependent) temp_dep=1
 end subroutine query_translation
+
+subroutine query_beta(index,t,method,params,values,critical) bind(C,name='query_beta')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use thermopack_var, only: get_active_eos,get_active_comps,base_eos_param
+  use cubic_eos, only: cb_eos,cbBetaQuantumIdx
+  use cbBeta, only: cbCalcBetaTerm
+  use compdata, only: gendata_pointer
+  implicit none
+  integer(c_int), value :: index
+  real(c_double), value :: t
+  integer(c_int), intent(out) :: method
+  real(c_double), intent(out) :: params(2),values(3),critical(3)
+  class(base_eos_param), pointer :: active
+  type(gendata_pointer), pointer :: comps(:)
+  active=>get_active_eos()
+  comps=>get_active_comps()
+  select type(eos=>active)
+  class is(cb_eos)
+    method=eos%single(index)%betaMethod
+    params=0.0
+    if (method==cbBetaQuantumIdx) params=eos%single(index)%betaParams(1:2)
+    call cbCalcBetaTerm(size(eos%single),eos,t)
+    values=[eos%single(index)%beta,eos%single(index)%dbetadT,eos%single(index)%d2betadT2]
+    critical=[comps(index)%p_comp%tc,comps(index)%p_comp%pc,comps(index)%p_comp%mw]
+  class default
+    error stop 'reference probe requires a cubic model'
+  end select
+end subroutine query_beta

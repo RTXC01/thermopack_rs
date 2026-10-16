@@ -133,7 +133,11 @@ impl Cubic {
                 let k = (c.critical_pressure / p)
                     * (5.373 * (1.0 + c.acentric_factor) * (1.0 - c.critical_temperature / t))
                         .exp();
-                positive(k, "Wilson K outside finite positive range")?;
+                if !k.is_finite() || k < 0. {
+                    return Err(Error::InvalidInput(
+                        "Wilson K outside finite nonnegative range",
+                    ));
+                }
                 Ok(k)
             })
             .collect()
@@ -180,6 +184,11 @@ impl Cubic {
             if c.ident == "HE" {
                 k[i] = (226970.0 / p) * (5.373 * (1.0 - 5.19 / t)).exp();
             }
+        }
+        // A Wilson estimate can underflow to zero at valid low temperatures.
+        // Keep this numerical seed positive; the public estimate retains zero.
+        for value in &mut k {
+            *value = value.clamp(1e-300, 1e300);
         }
         let liquid = self.stability_trial(t, p, z, &feed.phi, &k, Phase::Liquid, options)?;
         let vapor = self.stability_trial(t, p, z, &feed.phi, &k, Phase::Vapor, options)?;
@@ -381,7 +390,7 @@ impl Cubic {
             let mut x: Vec<_> = z
                 .iter()
                 .zip(&k)
-                .map(|(z, k)| z / (1.0 + beta * (k - 1.0)))
+                .map(|(z, k)| z / ((1.0 - beta) + beta * k))
                 .collect();
             let mut y: Vec<_> = x.iter().zip(&k).map(|(x, k)| x * k).collect();
             normalize(&mut x)?;

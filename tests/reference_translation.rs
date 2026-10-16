@@ -1,50 +1,6 @@
-use thermopack_rs::{Cubic, CubicKind, CubicOptions, Phase, TranslationKind, VolumeTranslation};
-
-fn fixture_model(fields: &[&str]) -> Cubic {
-    let kind = match fields[0] {
-        "PR" => CubicKind::PengRobinson,
-        "SRK" => CubicKind::SoaveRedlichKwong,
-        "RK" => CubicKind::RedlichKwong,
-        "VDW" => CubicKind::VanDerWaals,
-        _ => panic!("model"),
-    };
-    let config: Vec<_> = fields[5].split('@').collect();
-    let mut model = Cubic::with_options(
-        kind,
-        &fields[1].split(',').collect::<Vec<_>>(),
-        CubicOptions {
-            alpha: Some(thermopack_rs::AlphaCorrelation::from_name(config[1]).unwrap()),
-            parameter_reference: config[2],
-            volume_translation: config[3] == "1",
-        },
-    )
-    .unwrap();
-    for operation in &config[4..] {
-        let data: Vec<_> = operation.split(':').collect();
-        match data[0] {
-            "init" => model.init_peneloux_volume_translation(data[1]).unwrap(),
-            "disable" => model.disable_volume_translation(),
-            "set" => {
-                let coefficients = data[3]
-                    .split(',')
-                    .map(|v| v.parse().unwrap())
-                    .collect::<Vec<f64>>();
-                model
-                    .set_volume_translation(
-                        data[1].parse().unwrap(),
-                        VolumeTranslation::new(
-                            TranslationKind::from_code(data[2].parse().unwrap()).unwrap(),
-                            coefficients.try_into().unwrap(),
-                        )
-                        .unwrap(),
-                    )
-                    .unwrap();
-            }
-            _ => panic!("operation"),
-        }
-    }
-    model
-}
+mod support;
+use support::fixture_model;
+use thermopack_rs::{Phase, TranslationKind};
 
 #[test]
 fn translation_parameters_match_source_database_and_polynomials() {

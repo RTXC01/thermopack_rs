@@ -52,5 +52,6 @@ jobs:
       - run: python tools/rust_port/validate_alpha.py
       - run: python tools/rust_port/validate_alpha_properties.py
       - run: python tools/rust_port/validate_translation.py
+      - run: python tools/rust_port/validate_beta.py
       - run: python tools/rust_port/validate_translated_flash.py
       - run: python tools/rust_port/verify_fixtures.py

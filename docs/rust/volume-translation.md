@@ -4,8 +4,9 @@
 parameter references for alpha, ci and classical binary interactions.
 As in `eoslibinit::init_cubic`, a reference containing tcPR forces TWU alpha
 and enables Peneloux translation even if the caller's flags request otherwise.
-QuantumCubic changes beta and critical data as well; that complete model
-remains unsupported and returns an explicit error.
+QuantumCubic changes beta and critical data as well; its constructor and
+properties are qualified separately in [beta.md](beta.md). Expanded cryogenic
+flash qualification remains pending.
 
 `enable_volume_translation(reference)` selects the compiled ci record or
 the source Rackett-factor fallback. `init_peneloux_volume_translation(ref)`

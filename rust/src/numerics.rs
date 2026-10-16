@@ -101,7 +101,10 @@ pub fn rachford_rice(z: &[f64], k: &[f64]) -> crate::Result<f64> {
         let mut f = 0.0;
         let mut df = 0.0;
         for (&zi, &ki) in z.iter().zip(k) {
-            let ratio = (ki - 1.0) / (1.0 + beta * (ki - 1.0));
+            if zi == 0. {
+                continue;
+            }
+            let ratio = (ki - 1.0) / ((1.0 - beta) + beta * ki);
             f += zi * ratio;
             df -= zi * ratio * ratio;
         }

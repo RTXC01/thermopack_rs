@@ -166,10 +166,19 @@ impl Cubic {
         })
     }
 
+    /// Caloric defaults owned by this model. Explicit per-call options override them.
+    pub fn caloric_options(&self) -> CaloricFlashOptions {
+        CaloricFlashOptions {
+            minimum_temperature: self.caloric_minimum,
+            maximum_temperature: self.caloric_maximum,
+            ..Default::default()
+        }
+    }
+
     /// Recover T and phase split from P (Pa), normalized z, H (J/mol).
-    /// Default temperature bounds follow the source: 80 to 999 K.
+    /// Model bounds are normally 80 to 999 K; quantum() defaults to 2 to 999 K.
     pub fn ph_flash(&self, p: f64, z: &[f64], enthalpy: f64) -> Result<FlashResult> {
-        self.ph_flash_with_options(p, z, enthalpy, CaloricFlashOptions::default())
+        self.ph_flash_with_options(p, z, enthalpy, self.caloric_options())
     }
 
     pub fn ph_flash_with_options(
@@ -184,7 +193,7 @@ impl Cubic {
 
     /// Recover T and phase split from P (Pa), normalized z, S (J/(mol K)).
     pub fn ps_flash(&self, p: f64, z: &[f64], entropy: f64) -> Result<FlashResult> {
-        self.ps_flash_with_options(p, z, entropy, CaloricFlashOptions::default())
+        self.ps_flash_with_options(p, z, entropy, self.caloric_options())
     }
 
     pub fn ps_flash_with_options(
@@ -376,17 +385,7 @@ impl Cubic {
         mut options: CaloricFlashOptions,
         index: usize,
     ) -> Result<FlashResult> {
-        let mut pure = Cubic::new(self.kind(), &[self.components()[index].ident])?;
-        let alpha = self.alpha(index)?;
-        pure.set_alpha(
-            0,
-            alpha.correlation,
-            &alpha.parameters[..alpha.correlation.parameter_count()],
-        )?;
-        if self.volume_translation_enabled() {
-            pure.set_volume_translation(0, self.volume_translation(index)?)?;
-            pure.set_volume_translation_enabled(true);
-        }
+        let pure = self.pure_component(index)?;
         let critical = pure.pseudo_critical(&[1.0])?;
         let mut phase = FlashPhase::Single;
         if p < critical.pressure {
@@ -499,14 +498,25 @@ where
     let mut residual = mode.value(&properties) - target;
     let mut low = initial;
     let mut high = initial;
-    let mut step = (0.1 * initial).max(5.0);
+    let mut step = 0.1 * initial;
     let direction = if residual > 0.0 { -1.0 } else { 1.0 };
     let mut bracketed = false;
     for _ in 0..32 {
         if residual.abs() <= options.scaled_tolerance * mode.scale(flash.temperature) {
             return Ok(flash);
         }
-        let next = (flash.temperature + direction * step)
+        // Resolve cryogenic turning points before expanding the bracket.
+        // An absolute multi-kelvin step can jump over both roots of H(T).
+        let bounded_step = if direction < 0. {
+            step.min(0.3 * flash.temperature)
+        } else {
+            step
+        };
+        let bounded_step = mode
+            .slope(&properties, flash.temperature)
+            .map(|slope| bounded_step.min(1.25 * (residual / slope).abs()))
+            .unwrap_or(bounded_step);
+        let next = (flash.temperature + direction * bounded_step)
             .clamp(options.minimum_temperature, options.maximum_temperature);
         if next == flash.temperature {
             return Err(Error::InvalidInput(

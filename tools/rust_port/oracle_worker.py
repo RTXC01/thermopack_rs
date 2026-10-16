@@ -37,6 +37,8 @@ def load_probe():
     probe.initialize_alpha.restype=None
     probe.query_translation.argtypes=[c_int,c_double,POINTER(c_int),POINTER(c_int),POINTER(c_double),POINTER(c_double),POINTER(c_int)]
     probe.query_translation.restype=None
+    probe.query_beta.argtypes=[c_int,c_double,POINTER(c_int),POINTER(c_double),POINTER(c_double),POINTER(c_double)]
+    probe.query_beta.restype=None
     return probe
 
 
@@ -50,14 +52,19 @@ def main(compiler_directory):
         alpha=request.get('alpha','RK' if eos=='RK' else 'Classic')
         ref=request.get('parameter_reference',request.get('alpha_reference','Default'))
         shift=request.get('volume_shift',False)
-        key=(eos,comps,alpha,ref,shift,'alpha_kernel' if request['mode'] in ('ALPHA','ALPHA_PROPERTIES') else 'public')
+        quantum_helper=request.get('quantum_helper',False)
+        key=(eos,comps,alpha,ref,shift,quantum_helper,'alpha_kernel' if request['mode'] in ('ALPHA','ALPHA_PROPERTIES') else 'public')
         if previous!=key:
             # ALPHA qualifies tpInitAlphaCorr separately from eoslibinit's
             # forced tcPR translation / QuantumCubic critical-data overrides.
             alpha_mode=request['mode'] in ('ALPHA','ALPHA_PROPERTIES')
             base_ref=('tcPR' if 'BUTANAL' in comps.split(',') else 'Default') if alpha_mode else ref
-            model=cubic(comps,"SRK" if eos=="RK" else eos,
-                        alpha='Classic' if alpha_mode else alpha,parameter_reference=base_ref,volume_shift=shift)
+            if quantum_helper:
+                from thermopack.quantum_cubic import qcubic
+                model=qcubic(comps)
+            else:
+                model=cubic(comps,"SRK" if eos=="RK" else eos,
+                            alpha='Classic' if alpha_mode else alpha,parameter_reference=base_ref,volume_shift=shift)
             previous=key
         extra={}
         if request['mode'].startswith('V_'):
@@ -68,10 +75,27 @@ def main(compiler_directory):
                     model.set_ci(operation[1]+1,*operation[3],ci_type=operation[2])
                 elif operation[0]=='disable':
                     model.disable_volume_translation()
+                elif operation[0]=='beta':
+                    model.set_beta_corr(operation[1]+1,operation[2],operation[3])
+                elif operation[0] in ('kij','lij'):
+                    getattr(model,'set_'+operation[0])(operation[1]+1,operation[2]+1,operation[3])
+                elif operation[0]=='bounds':
+                    model.set_tmin(operation[1]);model.set_tmax(operation[2])
                 else:
                     raise ValueError('unknown translation operation')
                 previous=None
-        if request['mode']=='V_CI':
+        if request['mode']=='V_BETA':
+            if probe is None:
+                probe=load_probe()
+            model.activate()
+            values=[]
+            for index in range(model.nc):
+                method=c_int()
+                params=(c_double*2)();derivatives=(c_double*3)();critical=(c_double*3)()
+                probe.query_beta(index+1,request['temperature'],byref(method),params,derivatives,critical)
+                values.extend([method.value,*map(float,params),*map(float,derivatives),*map(float,critical)])
+            swappable=False
+        elif request['mode']=='V_CI':
             if probe is None:
                 probe=load_probe()
             model.activate()
@@ -184,11 +208,26 @@ def main(compiler_directory):
             values=[float(t),float(p),float(vl),float(vv),float((hv-hl)/(t*(vv-vl)))]
             swappable=False
             extra={'pressure':float(p)}
-        elif request['mode'] in ('TP','V_TP'):
+        elif request['mode'] in ('TP','V_TP','V_TP_AUDIT'):
             result=model.two_phase_tpflash(request['temperature'],request['pressure'],request['feed'])
             values=[int(result.phase),float(result.betaV),float(result.betaL),
                     *map(float,result.x),*map(float,result.y)]
             swappable=phase_permutation_allowed(model,result)
+            if request['mode']=='V_TP_AUDIT':
+                t,p,z=request['temperature'],request['pressure'],request['feed']
+                def gibbs(x,phase):
+                    phi=model.thermo(t,p,x,phase,ophase=True)[0]
+                    return sum(xi*(math.log(xi)+fi) for xi,fi in zip(x,phi) if xi>0)
+                feed_g=gibbs(z,model.MINGIBBSPH)
+                if result.phase==model.TWOPH:
+                    split_g=result.betaL*gibbs(result.x,model.LIQPH)+result.betaV*gibbs(result.y,model.VAPPH)
+                    l=model.thermo(t,p,result.x,model.LIQPH)[0]
+                    v=model.thermo(t,p,result.y,model.VAPPH)[0]
+                    residual=[math.log(yi/xi)+vi-li for xi,yi,vi,li,zi in zip(result.x,result.y,v,l,z) if zi>0 and xi>0 and yi>0]
+                    balance=max(abs(result.betaL*xi+result.betaV*yi-zi) for xi,yi,zi in zip(result.x,result.y,z))
+                    extra={'audit':{'feed_gibbs_rt':float(feed_g),'split_gibbs_rt':float(split_g),
+                           'gibbs_increase_rt':float(split_g-feed_g),'chemical_potential_residual':residual,
+                           'max_chemical_potential_residual':max(map(abs,residual)),'max_material_balance_residual':float(balance)}}
         elif request['mode'] in ('PH','PS','V_PH','V_PS'):
             mode=request['mode'][-2:]
             t,z=request['temperature'],request['feed']

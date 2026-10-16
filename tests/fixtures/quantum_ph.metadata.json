@@ -1,0 +1,6591 @@
+{
+  "baseline": "d68c794",
+  "compiler": "GNU Fortran (MinGW-W64 x86_64-ucrt-posix-seh, built by Brecht Sanders) 14.3.0",
+  "flags": [
+    "-O3",
+    "-cpp",
+    "-fdefault-real-8",
+    "-fdefault-double-8",
+    "-frecursive",
+    "-fopenmp",
+    "-fallow-argument-mismatch",
+    "-ffree-line-length-none"
+  ],
+  "lapack_commit": "3c351aad417ae1ad8552bc742a6f039d6a298f2c",
+  "library_sha256": "7ae70182c38e69812d6b563731e0d2b58cb795022ff48d57276d268dffa1c566",
+  "sources": {
+    "numconstants": "81b2771fa060b08c6dc551a32eafcb61b91f139d1864644fc25ca7d89ab4f330",
+    "stringmod": "0c2459ae3cd3a0c227b15107337d66d8c79ced4eb868ce69dd8bb5bd4af352e2",
+    "quadratures": "158894a2caa55fb4781275fb720862d0be19b03df13fba29ab21346f4d684820",
+    "thermopack_constants": "9046988b81e338f895ee05189087bbdd89a10759774e1f8021cb198ef2dc9b86",
+    "error": "5c275dd4808c6ad373c826ce5ddcab3e02e73410859afc4f4dac800a528c5706",
+    "parameters": "d7c3a50c4745afac77fc5fa031d49cab1571e24af6c8bb15878c2cada2bfdd2f",
+    "hyperdual_mod": "41b121f1b66d45325ec9f87937c95101e88bccbaac75f2d7cad06e95f32a411e",
+    "linear_numerics": "ce49eeef25d1c3e5ae0f27f26f3537b6cced8e8c0e9ab113ae8194bbd917527f",
+    "optimizer": "7648d0d88a30163e36462015db91dd189702d8c389eb3c3cb617d522d4111355",
+    "nonlinear_solvers": "693ac124cb25aa12c805ce09f8ec553087b0789dcfacaf28b79112cf1f31e063",
+    "utilities": "77d315d2eadaecf47d24ca2d92d671b86c9515672afaba369a7b8c3d6cf6981e",
+    "apparent_composition": "3536e3eab063855aefc6dab1621746f74bd7e31f28ad9f25bce74d164442c377",
+    "solid_correlation_datadb": "013f25ec37dac3fe647e00c84fef5525c0f3c6dd718a7364290e05f0c273ae82",
+    "compdata": "ce941b7b3266ec2260e1f8f9635fd3fd383e772f1b8f704c11175523451e7047",
+    "association_var": "10ecb2dac187bb8500b522bbc6aebf522a79e888baa8e04bf8a2aeb1851c5cfc",
+    "multipol_var": "2f9bf2a453b03cd3f7b784f74ba6a1b358d58906581dc2171f37366adaf00006",
+    "thermopack_var": "1e75d96aebc50ee5e9d63d63034625b46fd6fa352ffb18dd0f62bd9544627801",
+    "hyperdual_utility": "6924c70a6821989595276279d56da82a86f647830bde52d96c069dd68ce62589",
+    "fmt": "b94b7b91a454511fa5446b8f84604cc593fa5aa2d0e17dd9e154b8bee48eaafa",
+    "eosdata": "5347e25c79f23cb3752ba692bd2be2ce5b94ab3382fec1a6c379a4e5adfd804c",
+    "assocschemeutils": "06352929c097aa2864b646565e9dc591fb08d60a4d2824eb47f56820a74174ec",
+    "unifacdata": "225d321b1fe3818c20ecfcc56ca565a817a99877198c1848843204631d3c1d8a",
+    "unifac": "dd0d41c70800dc5a8a3c5c3c58b8de9b467167bc8a4c3e34484cbe93dd4dacf0",
+    "cubic_eos": "5331b361c38f23636b746d8b93446662944bce17aa676d7d43a815c8dfe82530",
+    "compdatadb": "c54497d27f95539576545cdf9ba78bfcf4159749b60dccaa709be286682148a2",
+    "compdata_init": "cd85a3e560ac24cfc7318ae4d8ab3bd491282330264f878c6a71a276fcbb31ac",
+    "volume_shift": "0de6b71bbf9f8833d335bb9b1c5619f7225cc2f17cc8a055dc9e662745edf6bd",
+    "multiparameter_base": "228e9bad560f4ee6f8d6ff9e6aab057c887df5a82d030357d461e0e7cfa13399",
+    "multiparameter_c3": "025f3e94c7abca6a1ea08e3c1a4b5cfdc972629e5879109e523199437097be44",
+    "multiparameter_para_h2": "579951c3fa36fff2e97a8bfeabe615927deb65f631082690a66452d458bbb250",
+    "multiparameter_ortho_h2": "f65855b3b2438454b2117d3e8f19eba6a67279a4139ac2485fb08ef8710a6974",
+    "multiparameter_normal_h2": "385e1d177b6def4f0cf637318380d2fc00738f1b9f7b6eb28ca956cbba073b92",
+    "multiparameter_r134a": "17740e7f977376bafd39faeac6c1d71e4467e783a8d9c3e33f8d9fcdaac007a5",
+    "multiparameter_lj": "035bae279e62dcdb7b42b358dfb3c17562bd7a8ddd178a3092ac75f0b34342cf",
+    "mbwrdata": "64f67102fbb97a0c6bd241a6430f05d00fcb5772892d62f28d7f0e2e41f82675",
+    "mbwr": "783f624958e3c1228f8433ee00965fc99f170364250d876bcd0b5d9484b4579a",
+    "mbwr_additional": "a57ea631169f2ba51282fb326038e22433cfb1dcc242e28a6debc042b4d4ec3c",
+    "pets": "2f7a472ad252f0952aa49f5491dd3c7795106c080c36079b9bea33926ab70b9c",
+    "pc_saft_datadb": "24667d3bf38092d05329762ae21ce1d829a90f0da5cf5491ebf0598dd71a7ef6",
+    "pc_saft_parameters": "39cb10930ae3f2b0f705b8ef47fd703113b0104601f0c699f053c9d1f6ae4fab",
+    "eos_parameters": "eb7b41483e973f4701008861ffd1e47e0e5a7549fe40ac34eca8c417a8f27ea8",
+    "mixdatadb": "a208994066d699b441362ca9c078dc6965c6020c29c6fe334562a97fb2df1aaa",
+    "cbalpha": "40475a554d43f8e0e2b5137460c60b7ee7fa1706b59cc1df6454c12b0c410b02",
+    "cbbeta": "f9ac7e9e686c79affc2c12ff17db5693332f294e9df8df25ec4a2d0938c085ec",
+    "excess_gibbs": "91db5a4da578e85def8b6c7c4a384ac3e8dc3370faaba29d40c12191198152b5",
+    "wong_sandler": "310e1df96f792d62a4b4c8c488a5c9501bb802853d273b7c4b1dc27e5112b208",
+    "cbmix": "14a973e85f0a768715e7896125e070c0888082c407391f60e4d4ad598dc22e7f",
+    "cbhelm": "a092ae02bbfb0f39ec227ac936366fb4394b403dc24d782206bc7bd49a28cd4b",
+    "cubic": "4fc1c75b5083500754436076a2472478a99463fffe8d578f0560baee095ea606",
+    "idealh2": "e02374dec47754a196b3102de89210df5a4c01d18a1203bf24468716b129bade",
+    "ideal": "4abeed45be71e58aebc14473b15cbf90df2c260b3152dc68e09183c148cb2fc2",
+    "cpa_parameters": "8eca97665cf0c22281bfbc0ef156022be3be0bbedf1d3f0236571ab892ac1a6b",
+    "cbselect": "4840cd70d733cfd61638b6fb59e7d0069074b71121d17977c5ec33f7fd5fbc0c",
+    "hardsphere_bmcsl": "aaa5be55f77fb1def8d15962c1e7df2d353f3b0cfd6fd47d0739ffca3620d301",
+    "pc_saft_nonassoc": "a2512afe7ad8da09c7737ab955be209734d773822a24ca4c34cd508cc9aa0db4",
+    "saftvrmie_options": "5d4b9891ea470f49dd5c4d5d624e901de4894d6642221b5a23c1ae6fd2c5b9e4",
+    "saftvrmie_datadb": "5673b761a3698429dff898135fba4675c8ce000408898ac70106f6688d119842",
+    "saftvrmie_parameters": "9f9522f18419781b75ca699240e9327d9836186922a64f033c4b30241e4fbac9",
+    "saftvrmie_containers": "ecd4aa67a916f260006c5ec87d58bc48bd08a3fe808d0cdc5ab17095a0c56447",
+    "saftvrmie_utils": "3073a53eb1e4ca53d0c99215cff5bb0374c6111f17950be79c8ff0ef738af193",
+    "saftvrmie_hardsphere": "69eadfad516eaf43bd4635b5cf9c19a794cfb862795ab3b1ea554bac3c516add",
+    "saftvrmie_dispersion": "9970200beba5b09c40675c8d815795c9e53f6cfb015264bd8323a471d2dfcb8a",
+    "saftvrmie_chain": "313951dcb61c081aee2edeabf5ad08b827475f02af3b056b3d660234039f6253",
+    "saftvrmie_association": "9ba1a54816cb0fc2eef93faa5101e953c41c30c3310926f1d376c7c0160dc8c3",
+    "saftvrmie_interface": "6bc6d39e595b7fda87a5b4ca69f4b589dd699c410c7ea8d3e10adc191b700cc6",
+    "hardsphere_wca": "568bdef8f6f16f5ff636b369e3824d1a9aea4393ccce9cc59ae0980d878e4819",
+    "lj_splined": "21b26d0e68b20281fc91b6f93d587fb7562d40036e364481e4e4384cd8cdefae",
+    "saft_globals": "cd491377b6e647ca1c8da737bd5be6761f3e994859ed9052840fa0acfb6948b9",
+    "saft_rdf": "80cd38594817aea99c75402d7e6669a1eca5d834a42428e3e091712c78d4963e",
+    "saft_association": "df3a5f9b6e871d005427fcfaf167989256395e55017110227ca0f1c8181dd5b6",
+    "multipol": "b227a20226ceb793e13c6153f3e678f2cfd0dbfa2463a93f3da012a60ae23f3a",
+    "saft_interface": "df8725cb15f2bb2b2a54898989ba1af7ae59c49dd578120a85b18d95ae471750",
+    "extcsp": "b452c5397da6e45de151caa10bbc35529742448148ad989ae43c5e71c737cc70",
+    "leekesler": "6dfcf59b3188e174f48403e435f8253dac1add0a95bdcee169a24d9c5c3f7af8",
+    "multiparameter_idealmix": "43adb5de94054eea91a54a241a4a71eb0b6b2ae1757f13d9c8d462113fb79f9f",
+    "co2_gibbs": "8b2351c798fb1b4f89a7f7e3b0ef1af34859bc65477a354b3ed0628ccdad6829",
+    "h2o_gibbs": "a12fc215f7a41fdd1d019c654b2fc4f2a0f87cac83fa4e505f7e15fe25198d0e",
+    "single_component": "329ed5bec79c4fa4e5b66ccd51c3ba28819eda6b67537477bda453e7a8ab60ba",
+    "eos_container": "cc9c69a832a85a6338a7b21d6c3372ede4cde1b2cebe971a0d2b432fad2ac8fa",
+    "single_phase": "02c00dbf65e25e014ce3d7bce8ba626435b8f928dd1d380bf22718a2d0592790",
+    "eostv": "306093cddf7098985eb729d463c966a7dfb230009c722249842c3e320b3ab7a5",
+    "eos": "befee3261d285fdcfa2c83b0cb9ab8b235ad311147d6d42c53f07fa5d26ece23",
+    "puresaturation": "70efebbb25d9659b5921770ba15d484b66df79d34502d8787c4cb790302f5888",
+    "thermo_utils": "7fa5c3db69531986d9928ce0271b36765c94080862224355cce987c1ba010eae",
+    "critical": "8ff578626a8512de7ec8c5b0b34631632e6f02662d8e0981f5a08b7e46ae3e58",
+    "stability": "e82e20c659b339477a9116648b07f03aa78090792903b68385fcbb95e18901c7",
+    "saturation": "c3841bfe67898ad420044a3191a07d7b6ff1c5e16e8c52a31900133eec1d1ea8",
+    "solideos": "2b0a45599d7faed4f166e03e630d5b8a9620f2de996d8517db0a2feb7d2787de",
+    "vls": "3ecc60a8b527374c1a6903a6f4b6b5785b0e2228c1c52da4258e0eb9367d41f8",
+    "tuning": "ea7ad3173d0e1a19f3175319dfb4536a0c9e496904babe9bdc7c259b752acb89",
+    "tp_solver": "9826e826da68e5a7058ec57b3d17e5442bfd4db628679a3bd00d15e271efbb0f",
+    "state_functions": "2ecbac8dffc1094f2350fbcbb5a0b7efa47b28c193007428751e01fa88dd6fa3",
+    "saturation_curve": "3129cc1e181bb3e67fb11000164265e1783fa3d9d0d7fa48deb898241e198406",
+    "saturation_tv": "fd1ee2d47482fc212815b2ae26fb510d11ddef704077e515940b0809e0b42887",
+    "multi_phase_envelope_tv": "0fb3a57447e34bb610c960f7476037db1031d84c1fa514f9229e6644fc13a607",
+    "solid_saturation": "75bd97d719d7d57ddefc3622b479612e941072499381cd316fa645fb4a552fa6",
+    "saturation_point_locators": "daa38b0ff695031b3d1f3e00ba354f16eed2d21e2434ea9ca22cf202df5d8bd0",
+    "joule_thompson_inversion": "e285640f5558ea4973202c0abacbf005db919c7f89da883e583251f6ad35a93e",
+    "ph_solver": "00d134e44f95c6c5521d59d86f627fb95710c3f0e176cbfe801e6ffcee7f5754",
+    "ps_solver": "34d11b86595713aba761e27163bfb8dfbcab4fe15a18a51e92b7df6be0de2c56",
+    "uv_solver": "efbd86537a6578b8f318daaaa4d0bb37cb9540ffef90392585f10838d9b4bbd6",
+    "sv_solver": "1f51cf123ff8fcbe264e1cc9d1142c70545331a8a4eab12ad49225fa49302b75",
+    "spinodal": "ae12a892a1c1f34845ba81750cdb47d93a801b3ef06df2647787163b4a58f80f",
+    "mut_solver": "6ddbb514d5d6e241b0a03478a17641decb496d10f65557838ff59132af6c3bc1",
+    "isolines": "660e6d90c2e92d4315302d1fa5b5dc62316b283a0af4d59ab32d86c93eb40d2c",
+    "binaryplot": "bc8ff596e437a41e18585a9bd67faa40cfda6a13c09cf36b65219a0f4091f622",
+    "speed_of_sound": "85fb9206528061cbdcce58c20cf824ed7455a7c5ee1f0a539a42cbd76a7f133f",
+    "saftvrmie_testing": "931b50a23a6384d10ceeb32184ae7618bc4a2e4d04fd4efd0cd321e22fc33d85",
+    "hydrate": "dffef9c31c571a3b365e72923c01812eb2edfc39f2aa36c36b6b8f81bb3653ab",
+    "hydrate_curves": "1d5a48516803bb81e64d6dd3a3d79723abf0700356ae0d662b09efcff1725731",
+    "consistency": "1ed20d6dd79e6474d237ff5795cefde81c11e4223911a30a3d6d222377f8daf8",
+    "eoslibinit": "7df67e296f5b79105714fecc897c80ab0cb1bd2844a18b01027877da87351258",
+    "complexmodelinit": "6ffae447c3e2be271d9720f3b5217bebf669fa879cf9291be7f5d0a407a96b41",
+    "external": "e57f6391c43791ae80fde558f66d9c39ed40b3d3b27859579fc11d3ef0c97f9d"
+  },
+  "cases": 675,
+  "attempted_cases": 846,
+  "reference_errors": [
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "HE",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -6212.141623565271,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "O-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 8.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -7622.169131563485,
+      "pressure": 1000000.0,
+      "returned_temperature": 15.849827124102829,
+      "returned_property": -7622.169130079979,
+      "residual": 1.48350591189228e-06
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -7343552.43597716,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -7343550.3148658,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -7343531.03096495,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 8.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -7239610.685385129,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 8.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -7239608.594312988,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 8.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -7239589.571932795,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 20.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -6989137.545828621,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 20.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -6990115.44904232,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 20.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -6990100.771940348,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 40.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -6573401.288158783,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 40.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -6573415.397756239,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 40.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -6573561.274193683,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 80.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -5732820.32134864,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 80.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -5732826.094056014,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 80.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -5732877.325794718,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 300.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": 53355.4171720358,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 300.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": 53355.54559811708,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 300.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": 53356.99556029254,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -8377435.686473574,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -8377433.561281618,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -8377414.240258372,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 8.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -8273493.906613995,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 8.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -8273491.811994959,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 8.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -8273472.757011416,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 20.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -8021270.000225895,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 20.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -8022240.709039614,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 20.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -8022226.123730912,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 40.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -7453220.715792462,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 40.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -7453234.746963238,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 40.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -7453379.459175141,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 80.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -6033015.403070817,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 80.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -6033021.13588685,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 80.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -6033071.981269311,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 300.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": 53098.51717485742,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 300.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": 53098.65905377798,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 300.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": 53100.230973781,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "HE,NE",
+        "feed": [
+          0.4,
+          0.6
+        ],
+        "temperature": 3.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -7143.653557834148,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "HE,NE",
+        "feed": [
+          0.4,
+          0.6
+        ],
+        "temperature": 20.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -6833.754729327346,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "H2,NE",
+        "feed": [
+          0.6,
+          0.4
+        ],
+        "temperature": 3.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "reference_error": {
+        "exit_code": 1,
+        "output": [
+          " tp_solver::twoPhaseTPflash: (mod_newton_search) g_solution > g_feed!",
+          " g_solution,g_feed,g_tolerance =   -4.1473258630893346       -5.0755782343182148        2.2204460492503131E-015",
+          " Temperature =    12.244521862901420",
+          " Pressure =    100000.00000000000",
+          " Composition =   0.59999999999999998       0.40000000000000002",
+          "#0  0xcb95b41a",
+          "#1  0xcbaf77a4",
+          "#2  0xcbd5e960",
+          "#3  0xcbdbb7da",
+          "#4  0xcbb0ca51",
+          "#5  0xcbdbe613",
+          "#6  0x19284790",
+          "#7  0x1928449f",
+          "#8  0x19284351",
+          "#9  0xf6163ec5",
+          "#10  0xf616297a",
+          "#11  0xf6162584",
+          "#12  0xec3b26fd",
+          "#13  0xec3b2158",
+          "#14  0xec3b3685",
+          "#15  0xec42b8ab",
+          "#16  0xec42b775",
+          "#17  0xec414247",
+          "#18  0xec408efb",
+          "#19  0xec44263f",
+          "#20  0xec441c79",
+          "#21  0xec442ca8",
+          "#22  0xec46b541",
+          "#23  0xec46b5e6",
+          "#24  0xec46c4c6",
+          "#25  0xec46c277",
+          "#26  0xec46c96a",
+          "#27  0xcdfd122f",
+          "#28  0x218d7123",
+          "#29  0x21e5cc90",
+          "#30  0xffffffff",
+          " Unknown error"
+        ]
+      }
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "H2,NE",
+        "feed": [
+          0.6,
+          0.4
+        ],
+        "temperature": 8.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "reference_error": {
+        "exit_code": 1,
+        "output": [
+          " tp_solver::twoPhaseTPflash: (mod_newton_search) g_solution > g_feed!",
+          " g_solution,g_feed,g_tolerance =   -3.6572414899475985       -4.4397145470213886        2.2204460492503131E-015",
+          " Temperature =    13.073088605669884",
+          " Pressure =    100000.00000000000",
+          " Composition =   0.59999999999999998       0.40000000000000002",
+          "#0  0xcb87b41a",
+          "#1  0xcbaf77a4",
+          "#2  0xcbd5e960",
+          "#3  0xcbdbb7da",
+          "#4  0xcbb0ca51",
+          "#5  0xcbdbe613",
+          "#6  0x19284790",
+          "#7  0x1928449f",
+          "#8  0x19284351",
+          "#9  0xf6163ec5",
+          "#10  0xf616297a",
+          "#11  0xf6162584",
+          "#12  0xec3b26fd",
+          "#13  0xec3b2158",
+          "#14  0xec3b3685",
+          "#15  0xec42b8ab",
+          "#16  0xec42b775",
+          "#17  0xec414247",
+          "#18  0xec408efb",
+          "#19  0xec44263f",
+          "#20  0xec441c79",
+          "#21  0xec442ca8",
+          "#22  0xec46b541",
+          "#23  0xec46b5e6",
+          "#24  0xec46c4c6",
+          "#25  0xec46c277",
+          "#26  0xec46c96a",
+          "#27  0xcdfd122f",
+          "#28  0x218d7123",
+          "#29  0x21e5cc90",
+          "#30  0xffffffff",
+          " Unknown error"
+        ]
+      }
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "HE,C1",
+        "feed": [
+          0.1,
+          0.9
+        ],
+        "temperature": 3.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -86913.244566001,
+      "pressure": 1000.0,
+      "returned_temperature": 0.5,
+      "returned_property": -86348.5290294198,
+      "residual": 564.7155365811923
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "HE,C1",
+        "feed": [
+          0.1,
+          0.9
+        ],
+        "temperature": 3.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -86920.32823267492,
+      "pressure": 100000.0,
+      "returned_temperature": 0.5,
+      "returned_property": -86345.3841786093,
+      "residual": 574.9440540656215
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "HE,C1",
+        "feed": [
+          0.1,
+          0.9
+        ],
+        "temperature": 3.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -86892.26480822609,
+      "pressure": 1000000.0,
+      "returned_temperature": 0.5,
+      "returned_property": -86316.79462608903,
+      "residual": 575.4701821370545
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "HE,C1",
+        "feed": [
+          0.1,
+          0.9
+        ],
+        "temperature": 8.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -86502.05392255442,
+      "pressure": 1000.0,
+      "returned_temperature": 0.5,
+      "returned_property": -86348.5290294198,
+      "residual": 153.5248931346141
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "HE,C1",
+        "feed": [
+          0.1,
+          0.9
+        ],
+        "temperature": 8.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -86500.18074107291,
+      "pressure": 100000.0,
+      "returned_temperature": 0.5,
+      "returned_property": -86345.3841786093,
+      "residual": 154.79656246361264
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "HE,C1",
+        "feed": [
+          0.1,
+          0.9
+        ],
+        "temperature": 8.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -86482.37337585521,
+      "pressure": 1000000.0,
+      "returned_temperature": 0.5,
+      "returned_property": -86316.79462608903,
+      "residual": 165.5787497661804
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "HE,H2,NE",
+        "feed": [
+          0.0,
+          0.5,
+          0.5
+        ],
+        "temperature": 3.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "reference_error": {
+        "exit_code": 1,
+        "output": [
+          " tp_solver::twoPhaseTPflash: (mod_newton_search) g_solution > g_feed!",
+          " g_solution,g_feed,g_tolerance =   -4.3312649957272384       -4.6733844913272140        2.2204460492503131E-015",
+          " Temperature =    13.336148368858620",
+          " Pressure =    100000.00000000000",
+          " Composition =    0.0000000000000000       0.50000000000000000       0.50000000000000000",
+          "#0  0xcb95b41a",
+          "#1  0xcbaf77a4",
+          "#2  0xcbd5e960",
+          "#3  0xcbdbb7da",
+          "#4  0xcbb0ca51",
+          "#5  0xcbdbe613",
+          "#6  0x19284790",
+          "#7  0x1928449f",
+          "#8  0x19284351",
+          "#9  0xf6163ec5",
+          "#10  0xf616297a",
+          "#11  0xf6162584",
+          "#12  0xec3b26fd",
+          "#13  0xec3b2158",
+          "#14  0xec3b3685",
+          "#15  0xec42b8ab",
+          "#16  0xec42b775",
+          "#17  0xec414247",
+          "#18  0xec408efb",
+          "#19  0xec44263f",
+          "#20  0xec441c79",
+          "#21  0xec442ca8",
+          "#22  0xec46b541",
+          "#23  0xec46b5e6",
+          "#24  0xec46c4c6",
+          "#25  0xec46c277",
+          "#26  0xec46c96a",
+          "#27  0xcdfd122f",
+          "#28  0x218d7123",
+          "#29  0x21e5cc90",
+          "#30  0xffffffff",
+          " Unknown error"
+        ]
+      }
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "C1,CO2,N2",
+        "feed": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "temperature": 3.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -179545.5339947284,
+      "pressure": 1000.0,
+      "returned_temperature": 0.5,
+      "returned_property": -178806.56939668782,
+      "residual": 738.9645980405912
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "C1,CO2,N2",
+        "feed": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "temperature": 3.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -179542.53105557238,
+      "pressure": 100000.0,
+      "returned_temperature": 0.5,
+      "returned_property": -178803.56614953958,
+      "residual": 738.9649060328084
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "C1,CO2,N2",
+        "feed": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "temperature": 3.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -179515.2315986021,
+      "pressure": 1000000.0,
+      "returned_temperature": 0.5,
+      "returned_property": -178776.26390235737,
+      "residual": 738.9676962447411
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "C1,CO2,N2",
+        "feed": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "temperature": 8.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "reference_error": {
+        "exit_code": 1,
+        "output": [
+          " Using classic alpha corr for C1",
+          " Alpha: TWU",
+          " EOS PR",
+          " corr_idx          10",
+          " Reference: QuantumCubic",
+          " Using classic alpha corr for CO2",
+          " Alpha: TWU",
+          " EOS PR",
+          " corr_idx          10",
+          " Reference: QuantumCubic",
+          " Using classic alpha corr for N2",
+          " Alpha: TWU",
+          " EOS PR",
+          " corr_idx          10",
+          " Reference: QuantumCubic",
+          " Using default database (Cubic kij) kij entry for the binary: C1,CO2",
+          " Using default database (Cubic kij) kij entry for the binary: C1,N2",
+          " Using default database (Cubic kij) kij entry for the binary: CO2,N2",
+          " tp_solver::twoPhaseTPflash: (mod_newton_search) g_solution > g_feed!",
+          " g_solution,g_feed,g_tolerance =   -102.49813434661557       -172.53973895631862        2.2204460492503131E-015",
+          " Temperature =    8.0000000000000000",
+          " Pressure =    1000.0000000000000",
+          " Composition =   0.50000000000000000       0.29999999999999999       0.20000000000000001",
+          "#0  0xcb81b41a",
+          "#1  0xcbaf77a4",
+          "#2  0xcbd5e960",
+          "#3  0x19284790",
+          "#4  0x1928449f",
+          "#5  0x19284351",
+          "#6  0xf6163ec5",
+          "#7  0xf616297a",
+          "#8  0xf6162584",
+          "#9  0xec3b26fd",
+          "#10  0xec3b2158",
+          "#11  0xec3b3685",
+          "#12  0xec42b8ab",
+          "#13  0xec42b775",
+          "#14  0xec414247",
+          "#15  0xec408efb",
+          "#16  0xec44263f",
+          "#17  0xec441c79",
+          "#18  0xec442ca8",
+          "#19  0xec46b541",
+          "#20  0xec46b5e6",
+          "#21  0xec46c4c6",
+          "#22  0xec46c277",
+          "#23  0xec46c96a",
+          "#24  0xcdfd122f",
+          "#25  0x218d7123",
+          "#26  0x21e5cc90",
+          "#27  0xffffffff",
+          " Unknown error"
+        ]
+      }
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "C1,CO2,N2",
+        "feed": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "temperature": 8.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -178999.18135696359,
+      "pressure": 100000.0,
+      "returned_temperature": 0.5,
+      "returned_property": -178803.56614953958,
+      "residual": 195.615207424009
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "C1,CO2,N2",
+        "feed": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "temperature": 8.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -178971.89437394435,
+      "pressure": 1000000.0,
+      "returned_temperature": 0.5,
+      "returned_property": -178776.26390235737,
+      "residual": 195.63047158697736
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "C1,CO2,N2",
+        "feed": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "temperature": 20.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "reference_error": {
+        "exit_code": 1,
+        "output": [
+          " Using classic alpha corr for C1",
+          " Alpha: TWU",
+          " EOS PR",
+          " corr_idx          10",
+          " Reference: QuantumCubic",
+          " Using classic alpha corr for CO2",
+          " Alpha: TWU",
+          " EOS PR",
+          " corr_idx          10",
+          " Reference: QuantumCubic",
+          " Using classic alpha corr for N2",
+          " Alpha: TWU",
+          " EOS PR",
+          " corr_idx          10",
+          " Reference: QuantumCubic",
+          " Using default database (Cubic kij) kij entry for the binary: C1,CO2",
+          " Using default database (Cubic kij) kij entry for the binary: C1,N2",
+          " Using default database (Cubic kij) kij entry for the binary: CO2,N2",
+          " tp_solver::twoPhaseTPflash: (mod_newton_search) g_solution > g_feed!",
+          " g_solution,g_feed,g_tolerance =   -35.846882904617530       -56.251416289151408        2.2204460492503131E-015",
+          " Temperature =    20.000000000000000",
+          " Pressure =    1000.0000000000000",
+          " Composition =   0.50000000000000000       0.29999999999999999       0.20000000000000001",
+          "#0  0xcb87b41a",
+          "#1  0xcbaf77a4",
+          "#2  0xcbd5e960",
+          "#3  0x19284790",
+          "#4  0x1928449f",
+          "#5  0x19284351",
+          "#6  0xf6163ec5",
+          "#7  0xf616297a",
+          "#8  0xf6162584",
+          "#9  0xec3b26fd",
+          "#10  0xec3b2158",
+          "#11  0xec3b3685",
+          "#12  0xec42b8ab",
+          "#13  0xec42b775",
+          "#14  0xec414247",
+          "#15  0xec408efb",
+          "#16  0xec44263f",
+          "#17  0xec441c79",
+          "#18  0xec442ca8",
+          "#19  0xec46b541",
+          "#20  0xec46b5e6",
+          "#21  0xec46c4c6",
+          "#22  0xec46c277",
+          "#23  0xec46c96a",
+          "#24  0xcdfd122f",
+          "#25  0x218d7123",
+          "#26  0x21e5cc90",
+          "#27  0xffffffff",
+          " Unknown error"
+        ]
+      }
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "C1,CO2,N2",
+        "feed": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "temperature": 40.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "reference_error": {
+        "exit_code": 1,
+        "output": [
+          " Using classic alpha corr for C1",
+          " Alpha: TWU",
+          " EOS PR",
+          " corr_idx          10",
+          " Reference: QuantumCubic",
+          " Using classic alpha corr for CO2",
+          " Alpha: TWU",
+          " EOS PR",
+          " corr_idx          10",
+          " Reference: QuantumCubic",
+          " Using classic alpha corr for N2",
+          " Alpha: TWU",
+          " EOS PR",
+          " corr_idx          10",
+          " Reference: QuantumCubic",
+          " Using default database (Cubic kij) kij entry for the binary: C1,CO2",
+          " Using default database (Cubic kij) kij entry for the binary: C1,N2",
+          " Using default database (Cubic kij) kij entry for the binary: CO2,N2",
+          " (T,P):    40.000000000000000        1000.0000000000000",
+          " Z:  0.50000000000000000       0.29999999999999999       0.20000000000000001",
+          " Exitflag:            1",
+          " beta:   0.55278546734717882",
+          " betaL:   0.44721453265282118",
+          " X:   0.31304912880110103       0.67081898752358782        1.6131883675311251E-002",
+          " Y:   0.65124700526858026        5.6633484113168441E-020  0.34875299473141969",
+          " g two phase:   -14.818397419999974",
+          "#0  0xcb87b41a",
+          "#1  0xcbaf77a4",
+          "#2  0xcbd5c385",
+          "#3  0xcbd5e6d4",
+          "#4  0x19284790",
+          "#5  0x1928449f",
+          "#6  0x19284351",
+          "#7  0xf6163ec5",
+          "#8  0xf616297a",
+          "#9  0xf6162584",
+          "#10  0xec3b26fd",
+          "#11  0xec3b2158",
+          "#12  0xec3b3685",
+          "#13  0xec42b8ab",
+          "#14  0xec42b775",
+          "#15  0xec414247",
+          "#16  0xec408efb",
+          "#17  0xec44263f",
+          "#18  0xec441c79",
+          "#19  0xec442ca8",
+          "#20  0xec46b541",
+          "#21  0xec46b5e6",
+          "#22  0xec46c4c6",
+          "#23  0xec46c277",
+          "#24  0xec46c96a",
+          "#25  0xcdfd122f",
+          "#26  0x218d7123",
+          "#27  0x21e5cc90",
+          "#28  0xffffffff",
+          " tp_solver::twoPhaseTPflash: The nonlinear solver did not converge"
+        ]
+      }
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "C1,CO2,N2",
+        "feed": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "temperature": 80.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -173443.26751409468,
+      "pressure": 100000.0,
+      "returned_temperature": 80.00000016672719,
+      "returned_property": -173443.26750488108,
+      "residual": 9.213603334501386e-06
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "C1,CO2,N2",
+        "feed": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "temperature": 80.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -174311.69496376032,
+      "pressure": 1000000.0,
+      "returned_temperature": 80.00000046692509,
+      "returned_property": -174311.6949361175,
+      "residual": 2.764281816780567e-05
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -8061.046485547797,
+      "pressure": 1000000.0,
+      "returned_temperature": 2.999999979724553,
+      "returned_property": -8061.046485862011,
+      "residual": -3.142140485579148e-07
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "P-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -9063.957335567029,
+      "pressure": 1000000.0,
+      "returned_temperature": 2.999999930530776,
+      "returned_property": -9063.957336648837,
+      "residual": -1.0818075679708272e-06
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -7343657.228811497,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -7343655.311141535,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -7343637.876301457,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 8.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -7239692.979857467,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 8.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -7239691.0983547205,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 8.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -7239673.977730263,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 20.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -6989137.553012272,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 20.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -6990161.074744671,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 20.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -6990148.822760633,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 40.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -6573401.284983923,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 40.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -6573415.085587715,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 40.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -6573558.769320479,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 80.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -5732820.315485934,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 80.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -5732825.511709449,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 80.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -5732871.88306584,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 300.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": 53355.42132231938,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 300.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": 53355.95931675839,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 300.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": 53361.01536981441,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -8377539.716992523,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -8377537.795652006,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -8377520.327408251,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 8.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -8273575.500754221,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 8.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -8273573.616203676,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 8.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -8273556.467423903,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 20.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -8021270.007271992,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 20.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -8022285.711095555,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 20.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -8022273.567964549,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 40.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -7453220.712562371,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 40.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -7453234.429224803,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 40.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -7453376.893330178,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 80.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -6033015.397190976,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 80.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -6033020.551865246,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 80.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -6033066.525163828,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 300.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": 53098.5213187194,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 300.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": 53099.07212762895,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 300.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": 53104.244110259264,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "H2,NE",
+        "feed": [
+          0.6,
+          0.4
+        ],
+        "temperature": 3.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "reference_error": {
+        "exit_code": 1,
+        "output": [
+          " Using classic alpha corr for H2",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " Using classic alpha corr for NE",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " tp_solver::twoPhaseTPflash: (mod_newton_search) g_solution > g_feed!",
+          " g_solution,g_feed,g_tolerance =   -23.490436588932809       -32.433164868815929        2.2204460492503131E-015",
+          " Temperature =    3.0000000000000000",
+          " Pressure =    1000.0000000000000",
+          " Composition =   0.59999999999999998       0.40000000000000002",
+          "#0  0xcb95b41a",
+          "#1  0xcbaf77a4",
+          "#2  0xcbd5e960",
+          "#3  0x19284790",
+          "#4  0x1928449f",
+          "#5  0x19284351",
+          "#6  0xf6163ec5",
+          "#7  0xf616297a",
+          "#8  0xf6162584",
+          "#9  0xec3b26fd",
+          "#10  0xec3b2158",
+          "#11  0xec3b3685",
+          "#12  0xec42b8ab",
+          "#13  0xec42b775",
+          "#14  0xec414247",
+          "#15  0xec408efb",
+          "#16  0xec44263f",
+          "#17  0xec441c79",
+          "#18  0xec442ca8",
+          "#19  0xec46b541",
+          "#20  0xec46b5e6",
+          "#21  0xec46c4c6",
+          "#22  0xec46c277",
+          "#23  0xec46c96a",
+          "#24  0xcdfd122f",
+          "#25  0x218d7123",
+          "#26  0x21e5cc90",
+          "#27  0xffffffff",
+          " Unknown error"
+        ]
+      }
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "H2,NE",
+        "feed": [
+          0.6,
+          0.4
+        ],
+        "temperature": 8.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "reference_error": {
+        "exit_code": 1,
+        "output": [
+          " Using classic alpha corr for H2",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " Using classic alpha corr for NE",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " tp_solver::twoPhaseTPflash: (mod_newton_search) g_solution > g_feed!",
+          " g_solution,g_feed,g_tolerance =   -6.0050087710622941       -6.7068659531554999        2.2204460492503131E-015",
+          " Temperature =    8.0000000000000000",
+          " Pressure =    1000.0000000000000",
+          " Composition =   0.59999999999999998       0.40000000000000002",
+          "#0  0xcb81b41a",
+          "#1  0xcbaf77a4",
+          "#2  0xcbd5e960",
+          "#3  0x19284790",
+          "#4  0x1928449f",
+          "#5  0x19284351",
+          "#6  0xf6163ec5",
+          "#7  0xf616297a",
+          "#8  0xf6162584",
+          "#9  0xec3b26fd",
+          "#10  0xec3b2158",
+          "#11  0xec3b3685",
+          "#12  0xec42b8ab",
+          "#13  0xec42b775",
+          "#14  0xec414247",
+          "#15  0xec408efb",
+          "#16  0xec44263f",
+          "#17  0xec441c79",
+          "#18  0xec442ca8",
+          "#19  0xec46b541",
+          "#20  0xec46b5e6",
+          "#21  0xec46c4c6",
+          "#22  0xec46c277",
+          "#23  0xec46c96a",
+          "#24  0xcdfd122f",
+          "#25  0x218d7123",
+          "#26  0x21e5cc90",
+          "#27  0xffffffff",
+          " Unknown error"
+        ]
+      }
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "HE,C1",
+        "feed": [
+          0.1,
+          0.9
+        ],
+        "temperature": 3.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -87633.2559474175,
+      "pressure": 1000.0,
+      "returned_temperature": 0.5,
+      "returned_property": -87051.15163937659,
+      "residual": 582.1043080409145
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "HE,C1",
+        "feed": [
+          0.1,
+          0.9
+        ],
+        "temperature": 3.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -87638.47352427116,
+      "pressure": 100000.0,
+      "returned_temperature": 0.5,
+      "returned_property": -87048.22279119524,
+      "residual": 590.2507330759254
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "HE,C1",
+        "feed": [
+          0.1,
+          0.9
+        ],
+        "temperature": 3.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -87612.35361815966,
+      "pressure": 1000000.0,
+      "returned_temperature": 0.5,
+      "returned_property": -87021.59689883124,
+      "residual": 590.7567193284194
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "HE,C1",
+        "feed": [
+          0.1,
+          0.9
+        ],
+        "temperature": 8.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -87159.23459850173,
+      "pressure": 1000.0,
+      "returned_temperature": 0.5,
+      "returned_property": -87051.15163937659,
+      "residual": 108.08295912513859
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "HE,C1",
+        "feed": [
+          0.1,
+          0.9
+        ],
+        "temperature": 8.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -87157.48088533588,
+      "pressure": 100000.0,
+      "returned_temperature": 0.5,
+      "returned_property": -87048.22279119524,
+      "residual": 109.25809414064861
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "HE,C1",
+        "feed": [
+          0.1,
+          0.9
+        ],
+        "temperature": 8.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -87141.26294801747,
+      "pressure": 1000000.0,
+      "returned_temperature": 0.5,
+      "returned_property": -87021.59689883124,
+      "residual": 119.66604918622761
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "HE,H2,NE",
+        "feed": [
+          0.0,
+          0.5,
+          0.5
+        ],
+        "temperature": 3.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "reference_error": {
+        "exit_code": 1,
+        "output": [
+          " Using classic alpha corr for HE",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " Using classic alpha corr for H2",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " Using classic alpha corr for NE",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " tp_solver::twoPhaseTPflash: (mod_newton_search) g_solution > g_feed!",
+          " g_solution,g_feed,g_tolerance =   -29.351131708634540       -35.672722646697380        2.2204460492503131E-015",
+          " Temperature =    3.0000000000000000",
+          " Pressure =    1000.0000000000000",
+          " Composition =    0.0000000000000000       0.50000000000000000       0.50000000000000000",
+          "#0  0xcb81b41a",
+          "#1  0xcbaf77a4",
+          "#2  0xcbd5e960",
+          "#3  0x19284790",
+          "#4  0x1928449f",
+          "#5  0x19284351",
+          "#6  0xf6163ec5",
+          "#7  0xf616297a",
+          "#8  0xf6162584",
+          "#9  0xec3b26fd",
+          "#10  0xec3b2158",
+          "#11  0xec3b3685",
+          "#12  0xec42b8ab",
+          "#13  0xec42b775",
+          "#14  0xec414247",
+          "#15  0xec408efb",
+          "#16  0xec44263f",
+          "#17  0xec441c79",
+          "#18  0xec442ca8",
+          "#19  0xec46b541",
+          "#20  0xec46b5e6",
+          "#21  0xec46c4c6",
+          "#22  0xec46c277",
+          "#23  0xec46c96a",
+          "#24  0xcdfd122f",
+          "#25  0x218d7123",
+          "#26  0x21e5cc90",
+          "#27  0xffffffff",
+          " Unknown error"
+        ]
+      }
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "HE,H2,NE",
+        "feed": [
+          0.0,
+          0.5,
+          0.5
+        ],
+        "temperature": 8.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "reference_error": {
+        "exit_code": 1,
+        "output": [
+          " Using classic alpha corr for HE",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " Using classic alpha corr for H2",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " Using classic alpha corr for NE",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " tp_solver::twoPhaseTPflash: (mod_newton_search) g_solution > g_feed!",
+          " g_solution,g_feed,g_tolerance =   -7.5047455954073623       -7.7946379846734732        2.2204460492503131E-015",
+          " Temperature =    8.0000000000000000",
+          " Pressure =    1000.0000000000000",
+          " Composition =    0.0000000000000000       0.50000000000000000       0.50000000000000000",
+          "#0  0xcb87b41a",
+          "#1  0xcbaf77a4",
+          "#2  0xcbd5e960",
+          "#3  0x19284790",
+          "#4  0x1928449f",
+          "#5  0x19284351",
+          "#6  0xf6163ec5",
+          "#7  0xf616297a",
+          "#8  0xf6162584",
+          "#9  0xec3b26fd",
+          "#10  0xec3b2158",
+          "#11  0xec3b3685",
+          "#12  0xec42b8ab",
+          "#13  0xec42b775",
+          "#14  0xec414247",
+          "#15  0xec408efb",
+          "#16  0xec44263f",
+          "#17  0xec441c79",
+          "#18  0xec442ca8",
+          "#19  0xec46b541",
+          "#20  0xec46b5e6",
+          "#21  0xec46c4c6",
+          "#22  0xec46c277",
+          "#23  0xec46c96a",
+          "#24  0xcdfd122f",
+          "#25  0x218d7123",
+          "#26  0x21e5cc90",
+          "#27  0xffffffff",
+          " Unknown error"
+        ]
+      }
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "C1,CO2,N2",
+        "feed": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "temperature": 3.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -180527.24330770396,
+      "pressure": 1000.0,
+      "returned_temperature": 0.5,
+      "returned_property": -179810.03633639612,
+      "residual": 717.2069713078381
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "C1,CO2,N2",
+        "feed": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "temperature": 3.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -180524.4932083363,
+      "pressure": 100000.0,
+      "returned_temperature": 0.5,
+      "returned_property": -179807.2858375165,
+      "residual": 717.2073708197859
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "C1,CO2,N2",
+        "feed": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "temperature": 3.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -180499.49229007625,
+      "pressure": 1000000.0,
+      "returned_temperature": 0.5,
+      "returned_property": -179782.2813016795,
+      "residual": 717.2109883967496
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "C1,CO2,N2",
+        "feed": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "temperature": 8.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "reference_error": {
+        "exit_code": 1,
+        "output": [
+          " Using classic alpha corr for C1",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " Using classic alpha corr for CO2",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " Using classic alpha corr for N2",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " Using default database (Cubic kij) kij entry for the binary: C1,CO2",
+          " Using default database (Cubic kij) kij entry for the binary: C1,N2",
+          " Using default database (Cubic kij) kij entry for the binary: CO2,N2",
+          " tp_solver::twoPhaseTPflash: (mod_newton_search) g_solution > g_feed!",
+          " g_solution,g_feed,g_tolerance =   -108.10470043498117       -182.82004590734851        2.2204460492503131E-015",
+          " Temperature =    8.0000000000000000",
+          " Pressure =    1000.0000000000000",
+          " Composition =   0.50000000000000000       0.29999999999999999       0.20000000000000001",
+          "#0  0xcb9eb41a",
+          "#1  0xcbb877a4",
+          "#2  0xcbdee960",
+          "#3  0x19284790",
+          "#4  0x1928449f",
+          "#5  0x19284351",
+          "#6  0xf6163ec5",
+          "#7  0xf616297a",
+          "#8  0xf6162584",
+          "#9  0xec3b26fd",
+          "#10  0xec3b2158",
+          "#11  0xec3b3685",
+          "#12  0xec42b8ab",
+          "#13  0xec42b775",
+          "#14  0xec414247",
+          "#15  0xec408efb",
+          "#16  0xec44263f",
+          "#17  0xec441c79",
+          "#18  0xec442ca8",
+          "#19  0xec46b541",
+          "#20  0xec46b5e6",
+          "#21  0xec46c4c6",
+          "#22  0xec46c277",
+          "#23  0xec46c96a",
+          "#24  0xcdfd122f",
+          "#25  0x218d7123",
+          "#26  0x21e5cc90",
+          "#27  0xffffffff",
+          " Unknown error"
+        ]
+      }
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "C1,CO2,N2",
+        "feed": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "temperature": 8.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -179900.35891744535,
+      "pressure": 100000.0,
+      "returned_temperature": 0.5,
+      "returned_property": -179807.2858375165,
+      "residual": 93.07307992884307
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "C1,CO2,N2",
+        "feed": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "temperature": 8.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -179875.37386827858,
+      "pressure": 1000000.0,
+      "returned_temperature": 0.5,
+      "returned_property": -179782.2813016795,
+      "residual": 93.09256659907987
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "C1,CO2,N2",
+        "feed": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "temperature": 20.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "reference_error": {
+        "exit_code": 1,
+        "output": [
+          " Using classic alpha corr for C1",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " Using classic alpha corr for CO2",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " Using classic alpha corr for N2",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " Using default database (Cubic kij) kij entry for the binary: C1,CO2",
+          " Using default database (Cubic kij) kij entry for the binary: C1,N2",
+          " Using default database (Cubic kij) kij entry for the binary: CO2,N2",
+          " tp_solver::twoPhaseTPflash: (mod_newton_search) g_solution > g_feed!",
+          " g_solution,g_feed,g_tolerance =   -42.153908989479007       -59.264643359181193        2.2204460492503131E-015",
+          " Temperature =    20.000000000000000",
+          " Pressure =    1000.0000000000000",
+          " Composition =   0.50000000000000000       0.29999999999999999       0.20000000000000001",
+          "#0  0xcb9eb41a",
+          "#1  0xcbb877a4",
+          "#2  0xcbdee960",
+          "#3  0x19284790",
+          "#4  0x1928449f",
+          "#5  0x19284351",
+          "#6  0xf6163ec5",
+          "#7  0xf616297a",
+          "#8  0xf6162584",
+          "#9  0xec3b26fd",
+          "#10  0xec3b2158",
+          "#11  0xec3b3685",
+          "#12  0xec42b8ab",
+          "#13  0xec42b775",
+          "#14  0xec414247",
+          "#15  0xec408efb",
+          "#16  0xec44263f",
+          "#17  0xec441c79",
+          "#18  0xec442ca8",
+          "#19  0xec46b541",
+          "#20  0xec46b5e6",
+          "#21  0xec46c4c6",
+          "#22  0xec46c277",
+          "#23  0xec46c96a",
+          "#24  0xcdfd122f",
+          "#25  0x218d7123",
+          "#26  0x21e5cc90",
+          "#27  0xffffffff",
+          " Unknown error"
+        ]
+      }
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "C1,CO2,N2",
+        "feed": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "temperature": 40.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "reference_error": {
+        "exit_code": 1,
+        "output": [
+          " Using classic alpha corr for C1",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " Using classic alpha corr for CO2",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " Using classic alpha corr for N2",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " Using default database (Cubic kij) kij entry for the binary: C1,CO2",
+          " Using default database (Cubic kij) kij entry for the binary: C1,N2",
+          " Using default database (Cubic kij) kij entry for the binary: CO2,N2",
+          " (T,P):    40.000000000000000        1000.0000000000000",
+          " Z:  0.50000000000000000       0.29999999999999999       0.20000000000000001",
+          " Exitflag:            1",
+          " beta:   0.55878278251627678",
+          " betaL:   0.44121721748372322",
+          " X:   0.31024044721872829       0.67993720125182366        9.8223515294480600E-003",
+          " Y:   0.64983493494928779        7.2831054065388180E-021  0.35016506505071210",
+          " g two phase:   -15.445514273044850",
+          "#0  0xcbb0b41a",
+          "#1  0xcb0277a4",
+          "#2  0xcb28c385",
+          "#3  0xcb28e6d4",
+          "#4  0x19284790",
+          "#5  0x1928449f",
+          "#6  0x19284351",
+          "#7  0xf6163ec5",
+          "#8  0xf616297a",
+          "#9  0xf6162584",
+          "#10  0xec3b26fd",
+          "#11  0xec3b2158",
+          "#12  0xec3b3685",
+          "#13  0xec42b8ab",
+          "#14  0xec42b775",
+          "#15  0xec414247",
+          "#16  0xec408efb",
+          "#17  0xec44263f",
+          "#18  0xec441c79",
+          "#19  0xec442ca8",
+          "#20  0xec46b541",
+          "#21  0xec46b5e6",
+          "#22  0xec46c4c6",
+          "#23  0xec46c277",
+          "#24  0xec46c96a",
+          "#25  0xcdfd122f",
+          "#26  0x218d7123",
+          "#27  0x21e5cc90",
+          "#28  0xffffffff",
+          " tp_solver::twoPhaseTPflash: The nonlinear solver did not converge"
+        ]
+      }
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -8061.046485547797,
+      "pressure": 1000000.0,
+      "returned_temperature": 2.999999979724553,
+      "returned_property": -8061.046485862011,
+      "residual": -3.142140485579148e-07
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "P-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -9063.957335567029,
+      "pressure": 1000000.0,
+      "returned_temperature": 2.999999930530776,
+      "returned_property": -9063.957336648837,
+      "residual": -1.0818075679708272e-06
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -7343657.228811497,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -7343655.311141535,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -7343637.876301457,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 8.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -7239692.979857467,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 8.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -7239691.0983547205,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 8.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -7239673.977730263,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 20.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -6989137.553012272,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 20.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -6990161.074744671,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 20.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -6990148.822760633,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 40.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -6573401.284983923,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 40.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -6573415.085587715,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 40.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -6573558.769320479,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 80.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -5732820.315485934,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 80.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -5732825.511709449,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 80.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -5732871.88306584,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 300.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": 53355.42132231938,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 300.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": 53355.95931675839,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "N-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 300.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": 53361.01536981441,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -8377539.716992523,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -8377537.795652006,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -8377520.327408251,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 8.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -8273575.500754221,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 8.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -8273573.616203676,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 8.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -8273556.467423903,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 20.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -8021270.007271992,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 20.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -8022285.711095555,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 20.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -8022273.567964549,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 40.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -7453220.712562371,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 40.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -7453234.429224803,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 40.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -7453376.893330178,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 80.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -6033015.397190976,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 80.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -6033020.551865246,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 80.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": -6033066.525163828,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 300.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": 53098.5213187194,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 300.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": 53099.07212762895,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "E-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 300.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "PH flash calculation failed",
+      "specification": 53104.244110259264,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "H2,NE",
+        "feed": [
+          0.6,
+          0.4
+        ],
+        "temperature": 3.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "reference_error": {
+        "exit_code": 1,
+        "output": [
+          " Using classic alpha corr for H2",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " Using classic alpha corr for NE",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " tp_solver::twoPhaseTPflash: (mod_newton_search) g_solution > g_feed!",
+          " g_solution,g_feed,g_tolerance =   -23.490436588932809       -32.433164868815929        2.2204460492503131E-015",
+          " Temperature =    3.0000000000000000",
+          " Pressure =    1000.0000000000000",
+          " Composition =   0.59999999999999998       0.40000000000000002",
+          "#0  0xcb9eb41a",
+          "#1  0xcbb877a4",
+          "#2  0xcbdee960",
+          "#3  0x19284790",
+          "#4  0x1928449f",
+          "#5  0x19284351",
+          "#6  0xf6163ec5",
+          "#7  0xf616297a",
+          "#8  0xf6162584",
+          "#9  0xec3b26fd",
+          "#10  0xec3b2158",
+          "#11  0xec3b3685",
+          "#12  0xec42b8ab",
+          "#13  0xec42b775",
+          "#14  0xec414247",
+          "#15  0xec408efb",
+          "#16  0xec44263f",
+          "#17  0xec441c79",
+          "#18  0xec442ca8",
+          "#19  0xec46b541",
+          "#20  0xec46b5e6",
+          "#21  0xec46c4c6",
+          "#22  0xec46c277",
+          "#23  0xec46c96a",
+          "#24  0xcdfd122f",
+          "#25  0x218d7123",
+          "#26  0x21e5cc90",
+          "#27  0xffffffff",
+          " Unknown error"
+        ]
+      }
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "H2,NE",
+        "feed": [
+          0.6,
+          0.4
+        ],
+        "temperature": 8.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "reference_error": {
+        "exit_code": 1,
+        "output": [
+          " Using classic alpha corr for H2",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " Using classic alpha corr for NE",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " tp_solver::twoPhaseTPflash: (mod_newton_search) g_solution > g_feed!",
+          " g_solution,g_feed,g_tolerance =   -6.0050087710622941       -6.7068659531554999        2.2204460492503131E-015",
+          " Temperature =    8.0000000000000000",
+          " Pressure =    1000.0000000000000",
+          " Composition =   0.59999999999999998       0.40000000000000002",
+          "#0  0xcb9eb41a",
+          "#1  0xcbb877a4",
+          "#2  0xcbdee960",
+          "#3  0x19284790",
+          "#4  0x1928449f",
+          "#5  0x19284351",
+          "#6  0xf6163ec5",
+          "#7  0xf616297a",
+          "#8  0xf6162584",
+          "#9  0xec3b26fd",
+          "#10  0xec3b2158",
+          "#11  0xec3b3685",
+          "#12  0xec42b8ab",
+          "#13  0xec42b775",
+          "#14  0xec414247",
+          "#15  0xec408efb",
+          "#16  0xec44263f",
+          "#17  0xec441c79",
+          "#18  0xec442ca8",
+          "#19  0xec46b541",
+          "#20  0xec46b5e6",
+          "#21  0xec46c4c6",
+          "#22  0xec46c277",
+          "#23  0xec46c96a",
+          "#24  0xcdfd122f",
+          "#25  0x218d7123",
+          "#26  0x21e5cc90",
+          "#27  0xffffffff",
+          " Unknown error"
+        ]
+      }
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "HE,C1",
+        "feed": [
+          0.1,
+          0.9
+        ],
+        "temperature": 3.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -87633.2559474175,
+      "pressure": 1000.0,
+      "returned_temperature": 0.5,
+      "returned_property": -87051.15163937659,
+      "residual": 582.1043080409145
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "HE,C1",
+        "feed": [
+          0.1,
+          0.9
+        ],
+        "temperature": 3.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -87638.47352427116,
+      "pressure": 100000.0,
+      "returned_temperature": 0.5,
+      "returned_property": -87048.22279119524,
+      "residual": 590.2507330759254
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "HE,C1",
+        "feed": [
+          0.1,
+          0.9
+        ],
+        "temperature": 3.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -87612.35361815966,
+      "pressure": 1000000.0,
+      "returned_temperature": 0.5,
+      "returned_property": -87021.59689883124,
+      "residual": 590.7567193284194
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "HE,C1",
+        "feed": [
+          0.1,
+          0.9
+        ],
+        "temperature": 8.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -87159.23459850173,
+      "pressure": 1000.0,
+      "returned_temperature": 0.5,
+      "returned_property": -87051.15163937659,
+      "residual": 108.08295912513859
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "HE,C1",
+        "feed": [
+          0.1,
+          0.9
+        ],
+        "temperature": 8.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -87157.48088533588,
+      "pressure": 100000.0,
+      "returned_temperature": 0.5,
+      "returned_property": -87048.22279119524,
+      "residual": 109.25809414064861
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "HE,C1",
+        "feed": [
+          0.1,
+          0.9
+        ],
+        "temperature": 8.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -87141.26294801747,
+      "pressure": 1000000.0,
+      "returned_temperature": 0.5,
+      "returned_property": -87021.59689883124,
+      "residual": 119.66604918622761
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "HE,H2,NE",
+        "feed": [
+          0.0,
+          0.5,
+          0.5
+        ],
+        "temperature": 3.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "reference_error": {
+        "exit_code": 1,
+        "output": [
+          " Using classic alpha corr for HE",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " Using classic alpha corr for H2",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " Using classic alpha corr for NE",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " tp_solver::twoPhaseTPflash: (mod_newton_search) g_solution > g_feed!",
+          " g_solution,g_feed,g_tolerance =   -29.351131708634540       -35.672722646697380        2.2204460492503131E-015",
+          " Temperature =    3.0000000000000000",
+          " Pressure =    1000.0000000000000",
+          " Composition =    0.0000000000000000       0.50000000000000000       0.50000000000000000",
+          "#0  0xcb9eb41a",
+          "#1  0xcbb877a4",
+          "#2  0xcbdee960",
+          "#3  0x19284790",
+          "#4  0x1928449f",
+          "#5  0x19284351",
+          "#6  0xf6163ec5",
+          "#7  0xf616297a",
+          "#8  0xf6162584",
+          "#9  0xec3b26fd",
+          "#10  0xec3b2158",
+          "#11  0xec3b3685",
+          "#12  0xec42b8ab",
+          "#13  0xec42b775",
+          "#14  0xec414247",
+          "#15  0xec408efb",
+          "#16  0xec44263f",
+          "#17  0xec441c79",
+          "#18  0xec442ca8",
+          "#19  0xec46b541",
+          "#20  0xec46b5e6",
+          "#21  0xec46c4c6",
+          "#22  0xec46c277",
+          "#23  0xec46c96a",
+          "#24  0xcdfd122f",
+          "#25  0x218d7123",
+          "#26  0x21e5cc90",
+          "#27  0xffffffff",
+          " Unknown error"
+        ]
+      }
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "HE,H2,NE",
+        "feed": [
+          0.0,
+          0.5,
+          0.5
+        ],
+        "temperature": 8.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "reference_error": {
+        "exit_code": 1,
+        "output": [
+          " Using classic alpha corr for HE",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " Using classic alpha corr for H2",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " Using classic alpha corr for NE",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " tp_solver::twoPhaseTPflash: (mod_newton_search) g_solution > g_feed!",
+          " g_solution,g_feed,g_tolerance =   -7.5047455954073623       -7.7946379846734732        2.2204460492503131E-015",
+          " Temperature =    8.0000000000000000",
+          " Pressure =    1000.0000000000000",
+          " Composition =    0.0000000000000000       0.50000000000000000       0.50000000000000000",
+          "#0  0xcb9eb41a",
+          "#1  0xcbb877a4",
+          "#2  0xcbdee960",
+          "#3  0x19284790",
+          "#4  0x1928449f",
+          "#5  0x19284351",
+          "#6  0xf6163ec5",
+          "#7  0xf616297a",
+          "#8  0xf6162584",
+          "#9  0xec3b26fd",
+          "#10  0xec3b2158",
+          "#11  0xec3b3685",
+          "#12  0xec42b8ab",
+          "#13  0xec42b775",
+          "#14  0xec414247",
+          "#15  0xec408efb",
+          "#16  0xec44263f",
+          "#17  0xec441c79",
+          "#18  0xec442ca8",
+          "#19  0xec46b541",
+          "#20  0xec46b5e6",
+          "#21  0xec46c4c6",
+          "#22  0xec46c277",
+          "#23  0xec46c96a",
+          "#24  0xcdfd122f",
+          "#25  0x218d7123",
+          "#26  0x21e5cc90",
+          "#27  0xffffffff",
+          " Unknown error"
+        ]
+      }
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "C1,CO2,N2",
+        "feed": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "temperature": 3.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -180527.24330770396,
+      "pressure": 1000.0,
+      "returned_temperature": 0.5,
+      "returned_property": -179810.03633639612,
+      "residual": 717.2069713078381
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "C1,CO2,N2",
+        "feed": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "temperature": 3.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -180524.4932083363,
+      "pressure": 100000.0,
+      "returned_temperature": 0.5,
+      "returned_property": -179807.2858375165,
+      "residual": 717.2073708197859
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "C1,CO2,N2",
+        "feed": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "temperature": 3.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -180499.49229007625,
+      "pressure": 1000000.0,
+      "returned_temperature": 0.5,
+      "returned_property": -179782.2813016795,
+      "residual": 717.2109883967496
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "C1,CO2,N2",
+        "feed": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "temperature": 8.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "reference_error": {
+        "exit_code": 1,
+        "output": [
+          " Using classic alpha corr for C1",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " Using classic alpha corr for CO2",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " Using classic alpha corr for N2",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " Using default database (Cubic kij) kij entry for the binary: C1,CO2",
+          " Using default database (Cubic kij) kij entry for the binary: C1,N2",
+          " Using default database (Cubic kij) kij entry for the binary: CO2,N2",
+          " tp_solver::twoPhaseTPflash: (mod_newton_search) g_solution > g_feed!",
+          " g_solution,g_feed,g_tolerance =   -108.10470043498117       -182.82004590734851        2.2204460492503131E-015",
+          " Temperature =    8.0000000000000000",
+          " Pressure =    1000.0000000000000",
+          " Composition =   0.50000000000000000       0.29999999999999999       0.20000000000000001",
+          "#0  0xcb9eb41a",
+          "#1  0xcbb877a4",
+          "#2  0xcbdee960",
+          "#3  0x19284790",
+          "#4  0x1928449f",
+          "#5  0x19284351",
+          "#6  0xf6163ec5",
+          "#7  0xf616297a",
+          "#8  0xf6162584",
+          "#9  0xec3b26fd",
+          "#10  0xec3b2158",
+          "#11  0xec3b3685",
+          "#12  0xec42b8ab",
+          "#13  0xec42b775",
+          "#14  0xec414247",
+          "#15  0xec408efb",
+          "#16  0xec44263f",
+          "#17  0xec441c79",
+          "#18  0xec442ca8",
+          "#19  0xec46b541",
+          "#20  0xec46b5e6",
+          "#21  0xec46c4c6",
+          "#22  0xec46c277",
+          "#23  0xec46c96a",
+          "#24  0xcdfd122f",
+          "#25  0x218d7123",
+          "#26  0x21e5cc90",
+          "#27  0xffffffff",
+          " Unknown error"
+        ]
+      }
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "C1,CO2,N2",
+        "feed": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "temperature": 8.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -179900.35891744535,
+      "pressure": 100000.0,
+      "returned_temperature": 0.5,
+      "returned_property": -179807.2858375165,
+      "residual": 93.07307992884307
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "C1,CO2,N2",
+        "feed": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "temperature": 8.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "calculation_error": "returned state does not close caloric specification",
+      "specification": -179875.37386827858,
+      "pressure": 1000000.0,
+      "returned_temperature": 0.5,
+      "returned_property": -179782.2813016795,
+      "residual": 93.09256659907987
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "C1,CO2,N2",
+        "feed": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "temperature": 20.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "reference_error": {
+        "exit_code": 1,
+        "output": [
+          " Using classic alpha corr for C1",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " Using classic alpha corr for CO2",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " Using classic alpha corr for N2",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " Using default database (Cubic kij) kij entry for the binary: C1,CO2",
+          " Using default database (Cubic kij) kij entry for the binary: C1,N2",
+          " Using default database (Cubic kij) kij entry for the binary: CO2,N2",
+          " tp_solver::twoPhaseTPflash: (mod_newton_search) g_solution > g_feed!",
+          " g_solution,g_feed,g_tolerance =   -42.153908989479007       -59.264643359181193        2.2204460492503131E-015",
+          " Temperature =    20.000000000000000",
+          " Pressure =    1000.0000000000000",
+          " Composition =   0.50000000000000000       0.29999999999999999       0.20000000000000001",
+          "#0  0xcb9eb41a",
+          "#1  0xcbb877a4",
+          "#2  0xcbdee960",
+          "#3  0x19284790",
+          "#4  0x1928449f",
+          "#5  0x19284351",
+          "#6  0xf6163ec5",
+          "#7  0xf616297a",
+          "#8  0xf6162584",
+          "#9  0xec3b26fd",
+          "#10  0xec3b2158",
+          "#11  0xec3b3685",
+          "#12  0xec42b8ab",
+          "#13  0xec42b775",
+          "#14  0xec414247",
+          "#15  0xec408efb",
+          "#16  0xec44263f",
+          "#17  0xec441c79",
+          "#18  0xec442ca8",
+          "#19  0xec46b541",
+          "#20  0xec46b5e6",
+          "#21  0xec46c4c6",
+          "#22  0xec46c277",
+          "#23  0xec46c96a",
+          "#24  0xcdfd122f",
+          "#25  0x218d7123",
+          "#26  0x21e5cc90",
+          "#27  0xffffffff",
+          " Unknown error"
+        ]
+      }
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "C1,CO2,N2",
+        "feed": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "temperature": 40.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "reference_error": {
+        "exit_code": 1,
+        "output": [
+          " Using classic alpha corr for C1",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " Using classic alpha corr for CO2",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " Using classic alpha corr for N2",
+          " Alpha: TWU",
+          " EOS SRK",
+          " corr_idx           9",
+          " Reference: QuantumCubic",
+          " Using default database (Cubic kij) kij entry for the binary: C1,CO2",
+          " Using default database (Cubic kij) kij entry for the binary: C1,N2",
+          " Using default database (Cubic kij) kij entry for the binary: CO2,N2",
+          " (T,P):    40.000000000000000        1000.0000000000000",
+          " Z:  0.50000000000000000       0.29999999999999999       0.20000000000000001",
+          " Exitflag:            1",
+          " beta:   0.55878278251627678",
+          " betaL:   0.44121721748372322",
+          " X:   0.31024044721872829       0.67993720125182366        9.8223515294480600E-003",
+          " Y:   0.64983493494928779        7.2831054065388180E-021  0.35016506505071210",
+          " g two phase:   -15.445514273044850",
+          "#0  0xcb9eb41a",
+          "#1  0xcbb877a4",
+          "#2  0xcbdec385",
+          "#3  0xcbdee6d4",
+          "#4  0x19284790",
+          "#5  0x1928449f",
+          "#6  0x19284351",
+          "#7  0xf6163ec5",
+          "#8  0xf616297a",
+          "#9  0xf6162584",
+          "#10  0xec3b26fd",
+          "#11  0xec3b2158",
+          "#12  0xec3b3685",
+          "#13  0xec42b8ab",
+          "#14  0xec42b775",
+          "#15  0xec414247",
+          "#16  0xec408efb",
+          "#17  0xec44263f",
+          "#18  0xec441c79",
+          "#19  0xec442ca8",
+          "#20  0xec46b541",
+          "#21  0xec46b5e6",
+          "#22  0xec46c4c6",
+          "#23  0xec46c277",
+          "#24  0xec46c96a",
+          "#25  0xcdfd122f",
+          "#26  0x218d7123",
+          "#27  0x21e5cc90",
+          "#28  0xffffffff",
+          " tp_solver::twoPhaseTPflash: The nonlinear solver did not converge"
+        ]
+      }
+    }
+  ],
+  "source_closure_scaled_tolerance": 1e-08,
+  "absolute_tolerance": 2e-06,
+  "relative_tolerance": 2e-07,
+  "phase_flag_tolerance": 0,
+  "saturation_absolute_tolerances": [
+    1e-06,
+    0.001,
+    1e-13,
+    1e-11,
+    0.001
+  ],
+  "native_comparison": {
+    "matched_cases": 638,
+    "failed_cases": 37,
+    "native_sources_sha256": {
+      "rust/benches/cubic.rs": "506c81f78af2daecc81c3b6902a36945a5f133a5c48c3355f27327ad2950eed0",
+      "rust/examples/cubic.rs": "22a37961aaa5e8c2dad9c00bf59a2eaa813cd835bf150c7ac7dc877597d0dbef",
+      "rust/examples/parity.rs": "d06d551c8a15b1c81f52a2c890bb2622c752d63b3fdc5b9f4cf0e8c27ae90ac6",
+      "rust/src/alpha.rs": "5b53eadba0bd58038e962f64903e52ba48edab6990350aa2e2914c4890bfda9a",
+      "rust/src/beta.rs": "a8220e72d613644ad77564df0379a08c5463267f7fafa6e1a2a0289ec45b74fa",
+      "rust/src/caloric.rs": "02c01bb82e489e2c8ddf61b2230fcdc9b46ea587523c7311b8c11f0db7d89da2",
+      "rust/src/component.rs": "c8467c692b5ff50a46870b7499f131b117e3685d751183e279982cd032eb1645",
+      "rust/src/cubic.rs": "c497f4a68e9eb85f5179a9ddba65324afb2fbdad67816689b143a6004a979ce5",
+      "rust/src/data.rs": "8081eb62e01eb3653a0bb1f41be8cd79d38756be07f33770c6aa7e43954ec12a",
+      "rust/src/error.rs": "5621c03915ebb6154ebbef42e00f4c121af2a398131ffabb542b4794106316e3",
+      "rust/src/flash.rs": "4e5d16d1cd261959848e2a2f15518bc27e500a595fc37231b937dc292cb50895",
+      "rust/src/hydrogen.rs": "05e1a4d1801fb12bbad0bd4915393d572319e7217c98b95b9de9e81ec600e794",
+      "rust/src/ideal.rs": "3ca1ddedf7d9b063b2636984ffab2ce46bdd8855ba448cc26b0483f4e46e9d30",
+      "rust/src/lib.rs": "9c4d4cbcdd79d320be8df6fbba60ac4bda1a2529239344644558ea9eed6855c7",
+      "rust/src/numerics.rs": "2192a79b56a69327bdc463e591ba29169205a1b54b58e0c03aae01aef1468201",
+      "rust/src/translation.rs": "8e9889468085287c3cf1506edc6a98815fdaf03ac29f9920c197dfb6328b6902"
+    },
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)"
+  },
+  "alternate_temperature_results": [
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "NE",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 14.041038127083395,
+      "specification": -7751.497795891095,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "NE",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 14.058324152018926,
+      "specification": -7749.751293221468,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "NE",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 14.215322191045736,
+      "specification": -7733.87431208972,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 10.92765064099827,
+      "specification": -7854.011076298206,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 20.3422717151185,
+      "specification": -7851.077845901087,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 24.1986846375844,
+      "specification": -7824.4253049382605,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 8.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 10.92765064099827,
+      "specification": -7985.221234957781,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 8.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 15.39216074374879,
+      "specification": -7982.463201028136,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 8.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 15.781895913167803,
+      "specification": -7957.393800781551,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "D2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 13.766587768907291,
+      "specification": -6815.340333775627,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "D2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 23.63393206902975,
+      "specification": -6812.632516730782,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "D2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 29.508068057949515,
+      "specification": -6788.022651063338,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "D2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 8.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 13.766587768907291,
+      "specification": -7049.436470450114,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "D2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 8.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 19.73978014095733,
+      "specification": -7046.971383790129,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "D2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 8.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 20.0311691708694,
+      "specification": -7024.564269371678,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "O-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 10.939659043422003,
+      "specification": -7519.089346784211,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "O-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 20.351757523890385,
+      "specification": -7516.07157352335,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "O-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 24.271285705709865,
+      "specification": -7488.650231442728,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "O-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 8.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 10.939659043422003,
+      "specification": -7650.865989612738,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "O-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 8.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 15.462646615994146,
+      "specification": -7648.021794065491,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "P-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 10.867684498871833,
+      "specification": -8857.755183812882,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "P-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 20.24102657702161,
+      "specification": -8854.708317989114,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "P-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 23.980025043094514,
+      "specification": -8827.022795769675,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "P-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 8.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 10.867684498871833,
+      "specification": -8987.359277623898,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "P-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 8.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 15.19172768306378,
+      "specification": -8984.488096516525,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "P-H2",
+        "feed": [
+          1.0
+        ],
+        "temperature": 8.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 15.579892740020046,
+      "specification": -8958.38983538957,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "HE,NE",
+        "feed": [
+          0.4,
+          0.6
+        ],
+        "temperature": 3.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 8.003938291237288,
+      "specification": -7105.002964772133,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "HE,NE",
+        "feed": [
+          0.4,
+          0.6
+        ],
+        "temperature": 3.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 8.442241537646872,
+      "specification": -7125.18123667994,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "H2,NE",
+        "feed": [
+          0.6,
+          0.4
+        ],
+        "temperature": 3.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 3.1200762388599133,
+      "specification": -7507.2744064357385,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "H2,NE",
+        "feed": [
+          0.6,
+          0.4
+        ],
+        "temperature": 3.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 18.607950349210952,
+      "specification": -7788.204907798761,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "H2,NE",
+        "feed": [
+          0.6,
+          0.4
+        ],
+        "temperature": 8.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 11.32781732452747,
+      "specification": -7896.5822849503875,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "HE,H2,NE",
+        "feed": [
+          0.0,
+          0.5,
+          0.5
+        ],
+        "temperature": 3.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 5.8987627730297785,
+      "specification": -7547.978304678298,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "HE,H2,NE",
+        "feed": [
+          0.0,
+          0.5,
+          0.5
+        ],
+        "temperature": 3.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 17.904837476657622,
+      "specification": -7779.149808513921,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "HE,H2,NE",
+        "feed": [
+          0.0,
+          0.5,
+          0.5
+        ],
+        "temperature": 8.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 6.837248074607684,
+      "specification": -7530.188364742049,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "HE,H2,NE",
+        "feed": [
+          0.0,
+          0.5,
+          0.5
+        ],
+        "temperature": 8.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 10.37435555166834,
+      "specification": -7900.925038525333,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "PR",
+        "components": "HE,H2,NE",
+        "feed": [
+          0.0,
+          0.5,
+          0.5
+        ],
+        "temperature": 8.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 10.545471273591222,
+      "specification": -7881.388464709776,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "NE",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 12.899398868563743,
+      "specification": -7803.20798175687,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "NE",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 12.916421381760296,
+      "specification": -7801.455796017743,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "NE",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 13.071070494902777,
+      "specification": -7785.527283815711,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "HE,NE",
+        "feed": [
+          0.4,
+          0.6
+        ],
+        "temperature": 8.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 2.845809132045128,
+      "specification": -7133.876252972728,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "HE,NE",
+        "feed": [
+          0.4,
+          0.6
+        ],
+        "temperature": 8.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 1.5251777098358703,
+      "specification": -7136.317791352833,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "HE,NE",
+        "feed": [
+          0.4,
+          0.6
+        ],
+        "temperature": 8.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 3.684167286769492,
+      "specification": -7157.411252830627,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "H2,NE",
+        "feed": [
+          0.6,
+          0.4
+        ],
+        "temperature": 3.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 6.159897666930208,
+      "specification": -7973.119557262169,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "HE,H2,NE",
+        "feed": [
+          0.0,
+          0.5,
+          0.5
+        ],
+        "temperature": 8.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 2.9543965719856184,
+      "specification": -7944.038244416784,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "SRK",
+        "components": "HE,H2,NE",
+        "feed": [
+          0.0,
+          0.5,
+          0.5
+        ],
+        "temperature": 8.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 3.1356975287240134,
+      "specification": -7924.702864342211,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "NE",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 12.899398868563743,
+      "specification": -7803.20798175687,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "NE",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 12.916421381760296,
+      "specification": -7801.455796017743,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "NE",
+        "feed": [
+          1.0
+        ],
+        "temperature": 3.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 13.071070494902777,
+      "specification": -7785.527283815711,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "HE,NE",
+        "feed": [
+          0.4,
+          0.6
+        ],
+        "temperature": 8.0,
+        "pressure": 1000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 2.845809132045128,
+      "specification": -7133.876252972728,
+      "pressure": 1000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "HE,NE",
+        "feed": [
+          0.4,
+          0.6
+        ],
+        "temperature": 8.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 1.5251777098358703,
+      "specification": -7136.317791352833,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "HE,NE",
+        "feed": [
+          0.4,
+          0.6
+        ],
+        "temperature": 8.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 3.684167286769492,
+      "specification": -7157.411252830627,
+      "pressure": 1000000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "H2,NE",
+        "feed": [
+          0.6,
+          0.4
+        ],
+        "temperature": 3.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 6.159897666930208,
+      "specification": -7973.119557262169,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "HE,H2,NE",
+        "feed": [
+          0.0,
+          0.5,
+          0.5
+        ],
+        "temperature": 8.0,
+        "pressure": 100000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 2.9543965719856184,
+      "specification": -7944.038244416784,
+      "pressure": 100000.0
+    },
+    {
+      "request": {
+        "mode": "V_PH",
+        "eos": "RK",
+        "components": "HE,H2,NE",
+        "feed": [
+          0.0,
+          0.5,
+          0.5
+        ],
+        "temperature": 8.0,
+        "pressure": 1000000.0,
+        "parameter_reference": "QuantumCubic",
+        "operations": [
+          [
+            "bounds",
+            0.5,
+            999.0
+          ]
+        ]
+      },
+      "returned_temperature": 3.1356975287240134,
+      "specification": -7924.702864342211,
+      "pressure": 1000000.0
+    }
+  ],
+  "fixture_sha256": "3e0817d8b020c8f32cb258b1c4ae90f0f38fc0a9c45cccde9ed495d39af8e3c7",
+  "generator": "tools/rust_port/validate_quantum_flash.py"
+}

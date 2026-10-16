@@ -55,5 +55,7 @@ The [alpha notes](alpha.md) describe temperature correlations, setters,
 reference selection and the boundary between alpha and translated/quantum models.
 The [volume translation notes](volume-translation.md) cover ci polynomials,
 reference-aware constructors, physical volumes and caloric corrections.
+The [beta notes](beta.md) cover quantum covolume factors, full QuantumCubic
+critical-data overrides and the remaining cryogenic solver differences.
 Regenerate inventory with
 `python tools/rust_port/inventory.py`.

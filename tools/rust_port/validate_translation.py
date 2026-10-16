@@ -73,9 +73,13 @@ def encode(request):
     name='V_'+request['phase'] if request['mode']=='V_PROP' else request['mode']
     config='@'.join([name,request.get('alpha','RK' if request['eos']=='RK' else 'Classic'),
                      request.get('parameter_reference','Default'),'1' if request.get('volume_shift') else '0'])
+    if request.get('quantum_helper'):
+        config+='@qhelper'
     for op in request.get('operations',[]):
         if op[0]=='set':
             config+='@set:'+str(op[1])+':'+str(op[2])+':'+','.join(map(str,op[3]))
+        elif op[0]=='beta':
+            config+='@beta:'+str(op[1])+':'+op[2]+':'+','.join(map(str,op[3]))
         else:
             config+='@'+':'.join(map(str,op))
     return '|'.join([request['eos'],request['components'],str(request['temperature']),str(request.get('pressure',0.)),

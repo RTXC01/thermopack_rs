@@ -7,20 +7,52 @@ fn translated_model(
     components: &str,
     config: &[&str],
 ) -> thermopack_rs::Result<Cubic> {
-    let mut model = Cubic::with_options(
-        kind,
-        &components.split(',').collect::<Vec<_>>(),
-        thermopack_rs::CubicOptions {
-            alpha: Some(thermopack_rs::AlphaCorrelation::from_name(config[1])?),
-            parameter_reference: config[2],
-            volume_translation: config[3] == "1",
-        },
-    )?;
+    let mut model = if config.contains(&"qhelper") {
+        Cubic::quantum(&components.split(',').collect::<Vec<_>>())?
+    } else {
+        Cubic::with_options(
+            kind,
+            &components.split(',').collect::<Vec<_>>(),
+            thermopack_rs::CubicOptions {
+                alpha: Some(thermopack_rs::AlphaCorrelation::from_name(config[1])?),
+                parameter_reference: config[2],
+                volume_translation: config[3] == "1",
+            },
+        )?
+    };
     for operation in &config[4..] {
         let data: Vec<_> = operation.split(':').collect();
         match data[0] {
             "init" => model.init_peneloux_volume_translation(data[1])?,
             "disable" => model.disable_volume_translation(),
+            "bounds" => {} // Applied to native caloric options below.
+            "qhelper" => {}
+            "kij" => model.set_kij(
+                data[1].parse().unwrap(),
+                data[2].parse().unwrap(),
+                data[3].parse().unwrap(),
+            )?,
+            "lij" => model.set_lij(
+                data[1].parse().unwrap(),
+                data[2].parse().unwrap(),
+                data[3].parse().unwrap(),
+            )?,
+            "beta" => {
+                let params = data[3]
+                    .split(',')
+                    .map(str::parse)
+                    .collect::<Result<Vec<f64>, _>>()
+                    .map_err(|_| thermopack_rs::Error::InvalidInput("beta parameters"))?;
+                model.set_beta(
+                    data[1].parse().unwrap(),
+                    thermopack_rs::Beta::new(
+                        thermopack_rs::BetaCorrelation::from_name(data[2])?,
+                        params.try_into().map_err(|_| {
+                            thermopack_rs::Error::InvalidInput("two beta parameters")
+                        })?,
+                    )?,
+                )?;
+            }
             "set" => {
                 let coefficients = data[3]
                     .split(',')
@@ -201,6 +233,38 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         let t: f64 = fields[2].parse()?;
+        if property_config[0] == "V_BETA" {
+            let mut values = Vec::new();
+            for (i, component) in model.components().iter().enumerate() {
+                let beta = model.beta(i)?;
+                let value = beta.evaluate(t, component.critical_temperature)?;
+                values.push(beta.correlation as i32 as f64);
+                values.extend(
+                    if beta.correlation == thermopack_rs::BetaCorrelation::Classic {
+                        [0.; 2]
+                    } else {
+                        beta.parameters
+                    },
+                );
+                values.extend([
+                    value.value,
+                    value.dt,
+                    value.dtt,
+                    component.critical_temperature,
+                    component.critical_pressure,
+                    component.molar_mass,
+                ]);
+            }
+            println!(
+                "{}",
+                values
+                    .iter()
+                    .map(|v| format!("{v:.17e}"))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            );
+            continue;
+        }
         if property_config[0] == "V_CI" {
             let mut values = Vec::new();
             for i in 0..model.components().len() {
@@ -280,10 +344,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .map(str::parse)
             .collect::<Result<_, _>>()?;
         if matches!(property_config[0], "PH" | "PS" | "V_PH" | "V_PS") {
+            let mut options = model.caloric_options();
+            for operation in &property_config[1..] {
+                if let Some(bounds) = operation.strip_prefix("bounds:") {
+                    let data: Vec<_> = bounds.split(':').collect();
+                    options.minimum_temperature = data[0].parse()?;
+                    options.maximum_temperature = data[1].parse()?;
+                }
+            }
             let result = if property_config[0].ends_with("PH") {
-                model.ph_flash(p, &x, t)
+                model.ph_flash_with_options(p, &x, t, options)
             } else {
-                model.ps_flash(p, &x, t)
+                model.ps_flash_with_options(p, &x, t, options)
             };
             match result {
                 Ok(flash) => {
@@ -319,7 +391,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             continue;
         }
-        if fields[5] == "EQ" {
+        if matches!(property_config[0], "EQ" | "V_EQ") {
             match model
                 .tp_flash(t, p, &x)
                 .and_then(|f| Ok((f.phase, model.equilibrium_properties(&f)?)))

@@ -171,17 +171,21 @@ fn translation_configuration_and_complete_cubic_constructor() {
         tcpr.alpha(0).unwrap().correlation,
         thermopack_rs::AlphaCorrelation::Twu
     );
-    assert!(
-        Cubic::with_options(
-            CubicKind::PengRobinson,
-            &["HE"],
-            CubicOptions {
-                parameter_reference: "QuantumCubic",
-                ..Default::default()
-            }
-        )
-        .is_err()
+    let quantum = Cubic::with_options(
+        CubicKind::PengRobinson,
+        &["HE"],
+        CubicOptions {
+            parameter_reference: "QuantumCubic",
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert!(quantum.volume_translation_enabled());
+    assert_eq!(
+        quantum.beta(0).unwrap().correlation,
+        thermopack_rs::BetaCorrelation::Quantum
     );
+    assert_eq!(quantum.components()[0].critical_temperature, 5.1953);
 }
 
 #[test]

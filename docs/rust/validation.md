@@ -35,6 +35,7 @@ python tools/rust_port/validate_caloric.py
 python tools/rust_port/validate_isochoric.py
 python tools/rust_port/validate_pets.py
 python tools/rust_port/validate_pets_equilibrium.py
+python tools/rust_port/validate_pets_flash.py
 python tools/rust_port/benchmark_isochoric.py --compiler /path/to/gfortran --preflight-only
 python tools/rust_port/benchmark_isochoric.py --compiler /path/to/gfortran --tcpr --preflight-only
 python tools/rust_port/validate_ideal.py
@@ -156,6 +157,10 @@ hashes, compiler, flags and LAPACK revision invalidates stale cached objects.
   and branch differences and is not a passing qualification gate.
 
 Each comparison uses `abs(error) <= atol + rtol * max(abs(reference), abs(rust))`.
+The [PeTS flash qualification](pets-flash.md) adds 923 finite/closing TP/PH/PS
+states from 1035 source attempts, retaining 112 failed/nonclosing calls.
+Saturated endpoints use an explicit physical-state comparison convention;
+metadata preserves the original phase flags and arrays for every finite result.
 The [PeTS qualification](pets.md) adds 588 full states (56 quantities each)
 and 16 vector-potential cases. All attempted source calls are finite. Independent
 tests verify extensive and mixed derivatives, caloric/mechanical identities,

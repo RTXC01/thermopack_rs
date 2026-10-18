@@ -107,7 +107,58 @@ def main(compiler_directory):
                 previous=key
             if probe is None:probe=load_probe()
             model.activate();sigma,eps=request.get('parameters',[3.42e-10,136.])
-            if request['mode'] in ('PETS_VOLUME_BASELINE','PETS_VOLUME','PETS_CRITICAL','PETS_SAT','PETS_SAT_T'):
+            if request['mode'] in ('PETS_TP','PETS_PH','PETS_PS'):
+                from types import SimpleNamespace
+                probe.set_pets_parameters(sigma,eps)
+                model.set_tmin(request.get('minimum_temperature',1.))
+                model.set_tmax(request.get('maximum_temperature',2000.))
+                try:
+                    t,p=request['temperature'],request['pressure']
+                    if 'quality' in request:
+                        p=model.bubble_pressure(t,[1.])[0]
+                        seed=SimpleNamespace(T=t,p=p,z=[1.],x=[1.],y=[1.],betaV=request['quality'],
+                                             betaL=1.-request['quality'],phase=model.TWOPH)
+                    else:seed=model.two_phase_tpflash(t,p,[1.])
+                    target=None
+                    with warnings.catch_warnings(record=True) as messages:
+                        warnings.simplefilter('always')
+                        if request['mode']=='PETS_TP':result=seed
+                        else:
+                            method='enthalpy' if request['mode']=='PETS_PH' else 'entropy'
+                            target=overall(model,seed,method)
+                            result=getattr(model,'two_phase_phflash' if method=='enthalpy' else 'two_phase_psflash')(
+                                p,[1.],target,temp=t*request.get('guess_factor',1.2) if request.get('guessed',True) else None)
+                    raw=[float(result.T),float(result.p),int(result.phase),float(result.betaV),float(result.betaL),
+                         *map(float,result.x),*map(float,result.y)]
+                    two=result.phase==model.TWOPH
+                    if two:
+                        vl=model.specific_volume(result.T,p,[1.],model.LIQPH)[0]
+                        vv=model.specific_volume(result.T,p,[1.],model.VAPPH)[0]
+                        phase_volumes=[vl,vv]
+                    else:
+                        v=model.specific_volume(result.T,p,[1.],model.LIQPH if result.phase==model.SINGLEPH else result.phase)[0]
+                        vl,vv=v,v;phase_volumes=[v]
+                    closure=[model.pressure_tv(result.T,v,[1.],dpdv=True) for v in phase_volumes]
+                    h=overall(model,result,'enthalpy');s=overall(model,result,'entropy')
+                    actual=h if request['mode']=='PETS_PH' else s
+                    scaled_error=0. if target is None else (actual-target)/(8.31446261815324*(result.T if request['mode']=='PETS_PH' else 1.))
+                    canonical_two=two and 1e-8 < result.betaV < 1.-1e-8
+                    overall_v=result.betaL*vl+result.betaV*vv if two else vl
+                    values=[float(result.T),p,float(canonical_two),float(result.betaV) if canonical_two else 0.,
+                            float(vl if canonical_two else overall_v),float(vv if canonical_two else overall_v),float(h),float(s)]
+                    extra=dict(specification=target,raw_result=raw,scaled_specification_error=scaled_error,
+                               pressure_closure=[dict(pressure=float(a),dv=float(b)) for a,b in closure],
+                               warnings=[str(m.message) for m in messages])
+                    if not all(map(math.isfinite,values)) or abs(scaled_error)>1e-6 or any(
+                            not math.isfinite(a) or not math.isfinite(b) or abs(a-p)>1e8*sys.float_info.epsilon*p or b>=0. for a,b in closure):
+                        print('THERMOPACK_RESULT='+json.dumps(dict(calculation_error='source flash fails finite/stable pressure or caloric closure',
+                              values=list(map(str,values)),**extra)),flush=True);continue
+                    print('THERMOPACK_RESULT='+json.dumps(dict(values=values,**extra)),flush=True);continue
+                except Exception as error:
+                    if str(error) not in ('PH flash calculation failed','PS flash calculation failed','bubble_pressure calculation failed'):
+                        raise
+                    print('THERMOPACK_RESULT='+json.dumps(dict(calculation_error=str(error))),flush=True);continue
+            elif request['mode'] in ('PETS_VOLUME_BASELINE','PETS_VOLUME','PETS_CRITICAL','PETS_SAT','PETS_SAT_T'):
                 probe.set_pets_parameters(sigma,eps)
                 try:
                     if request['mode']=='PETS_CRITICAL':

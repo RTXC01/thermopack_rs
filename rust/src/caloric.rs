@@ -64,7 +64,7 @@ impl Default for CaloricFlashOptions {
 }
 
 #[derive(Clone, Copy)]
-enum Mode {
+pub(crate) enum Mode {
     Enthalpy,
     Entropy,
 }
@@ -503,7 +503,7 @@ fn phase_caloric(state: &PreparedState<'_>, volume: f64) -> Result<(f64, f64, f6
     ))
 }
 
-fn solve_scalar<F>(
+pub(crate) fn solve_scalar<F>(
     target: f64,
     mode: Mode,
     initial: f64,

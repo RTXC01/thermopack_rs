@@ -97,6 +97,49 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let model = thermopack_rs::Pets::with_parameters(parameters[0], parameters[1])?;
             let result = (|| -> thermopack_rs::Result<Vec<f64>> {
                 let config: Vec<_> = fields[5].split('@').collect();
+                if matches!(config[0], "PETS_TP" | "PETS_PH" | "PETS_PS") {
+                    let t = fields[2].parse().unwrap();
+                    let p = fields[3].parse().unwrap();
+                    let options = thermopack_rs::CaloricFlashOptions {
+                        temperature_guess: if config[2] == "none" {
+                            None
+                        } else {
+                            Some(config[2].parse().unwrap())
+                        },
+                        minimum_temperature: 1.,
+                        maximum_temperature: 2000.,
+                        ..Default::default()
+                    };
+                    let flash = match config[0] {
+                        "PETS_TP" => model.tp_flash(t, p)?,
+                        "PETS_PH" => {
+                            model.ph_flash_with_options(p, config[1].parse().unwrap(), options)?
+                        }
+                        _ => model.ps_flash_with_options(p, config[1].parse().unwrap(), options)?,
+                    };
+                    let state = model.equilibrium_properties(&flash)?;
+                    let two = flash.phase == thermopack_rs::FlashPhase::TwoPhase
+                        && flash.vapor_fraction > 1e-8
+                        && flash.vapor_fraction < 1. - 1e-8;
+                    return Ok(vec![
+                        flash.temperature,
+                        p,
+                        f64::from(two),
+                        if two { flash.vapor_fraction } else { 0. },
+                        if two {
+                            flash.liquid_volume.unwrap()
+                        } else {
+                            state.volume
+                        },
+                        if two {
+                            flash.vapor_volume.unwrap()
+                        } else {
+                            state.volume
+                        },
+                        state.enthalpy,
+                        state.entropy,
+                    ]);
+                }
                 if config[0] == "PETS_CRITICAL" {
                     let c = model.critical_point()?;
                     return Ok(vec![c.temperature, c.pressure, c.volume, c.compressibility]);

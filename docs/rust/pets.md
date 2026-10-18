@@ -95,7 +95,8 @@ cancellation-sensitive cases. The original source remains unmodified.
 This qualifies the PeTS Helmholtz/TV, potential, correction and virial paths.
 Pressure roots and pure critical/saturation calculations now have separate
 [equilibrium qualification](pets-equilibrium.md), including source last-iterate
-compatibility and strict pressure closure. Flash solvers, other inherited SAFT
+compatibility and strict pressure closure. [Pure TP/PH/PS flashes](pets-flash.md)
+also have separate qualification. Fixed-volume flashes, other inherited SAFT
 utilities, higher derivatives and language bindings remain pending. This does
 not establish a complete PeTS interface replacement or a complete ThermoPack
 replacement.

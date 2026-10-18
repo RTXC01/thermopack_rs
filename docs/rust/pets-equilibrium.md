@@ -90,8 +90,9 @@ Fixture metadata records exact-source/probe hashes and quantity-specific
 absolute tolerances with 2e-7 relative tolerance. The source and native EOS
 kernel remain independent implementations. The original Fortran files are
 unmodified. Broad critical degeneracy, complete source trajectory/phase-flag
-fidelity, flash solvers and the remaining inherited SAFT interfaces remain
-pending. No pressure-root or saturation speedup is claimed yet; the separate
+fidelity, fixed-volume flashes and the remaining inherited SAFT interfaces remain
+pending. [Pure TP/PH/PS flashes](pets-flash.md) have separate qualification.
+No pressure-root or saturation speedup is claimed yet; the separate
 [kernel benchmark](pets.md) measures the TV derivative path only.
 
 ```

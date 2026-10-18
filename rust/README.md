@@ -19,7 +19,9 @@ total volume and mole number, and returns extensive caloric quantities. See
 [PeTS scope and qualification](../docs/rust/pets.md) for derivatives, sound,
 potentials and virials. [PeTS equilibrium](../docs/rust/pets-equilibrium.md)
 adds reusable pressure-root branches, critical points, pure saturation and
-explicit source last-iterate compatibility; flash integration remains pending.
+explicit source last-iterate compatibility. [PeTS flashes](../docs/rust/pets-flash.md)
+add pure TP/PH/PS, specified saturation quality and molar equilibrium properties.
+PeTS fixed-volume flashes and remaining inherited interfaces are pending.
 
 Temperatures: K; pressures: Pa; volumes: m3/mol; energies: J/mol;
 compositions: normalized mole fractions. Root selection is explicit. A

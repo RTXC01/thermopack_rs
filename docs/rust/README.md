@@ -72,5 +72,7 @@ LJ correction, source-order virials, temperature preparation and remaining
 higher-level interfaces.
 The [PeTS equilibrium notes](pets-equilibrium.md) cover source-compatible volume
 iteration, strict pressure roots, critical scaling and pure coexistence.
+The [PeTS flash notes](pets-flash.md) cover pure TP/PH/PS, specified quality,
+equilibrium caloric properties and explicit endpoint comparison conventions.
 Regenerate inventory with
 `python tools/rust_port/inventory.py`.

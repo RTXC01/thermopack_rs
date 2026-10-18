@@ -478,20 +478,21 @@ impl PetsEquilibrium<'_> {
         match phase {
             Phase::Liquid => Ok(roots[0]),
             Phase::Vapor => Ok(roots[roots.len() - 1]),
-            Phase::MinimumGibbs => {
-                let mut result = roots[0];
-                let mut best = f64::INFINITY;
-                for v in roots {
-                    let a = self.prepared.residual_density(1. / v)?.value;
-                    let g = a + p * v / (R * self.prepared.t) - v.ln();
-                    if g < best {
-                        best = g;
-                        result = v;
-                    }
-                }
-                Ok(result)
+            Phase::MinimumGibbs => self.minimum_gibbs_volume(p, &roots),
+        }
+    }
+    pub(super) fn minimum_gibbs_volume(&self, p: f64, roots: &[f64]) -> Result<f64> {
+        let mut result = roots[0];
+        let mut best = f64::INFINITY;
+        for &v in roots {
+            let a = self.prepared.residual_density(1. / v)?.value;
+            let g = a + p * v / (R * self.prepared.t) - v.ln();
+            if g < best {
+                best = g;
+                result = v;
             }
         }
+        Ok(result)
     }
     pub fn saturation_pressure(&self) -> Result<Saturation> {
         let s = &self.prepared;

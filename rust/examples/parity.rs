@@ -27,6 +27,7 @@ fn translated_model(
             "disable" => model.disable_volume_translation(),
             "bounds" => {} // Applied to native caloric options below.
             "qhelper" => {}
+            "rr" => {} // RR iteration inputs, handled after model construction.
             "kij" => model.set_kij(
                 data[1].parse().unwrap(),
                 data[2].parse().unwrap(),
@@ -375,6 +376,60 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .split(',')
             .map(str::parse)
             .collect::<Result<_, _>>()?;
+        if property_config[0] == "V_RR" {
+            let inputs: Vec<_> = property_config
+                .iter()
+                .find(|v| v.starts_with("rr:"))
+                .ok_or("missing RR inputs")?
+                .split(':')
+                .collect();
+            let k = inputs[1]
+                .split(',')
+                .map(str::parse)
+                .collect::<Result<Vec<f64>, _>>()?;
+            let mut state = thermopack_rs::RachfordRiceIteration::new(x.len());
+            state.split.vapor_fraction = inputs[2].parse()?;
+            match model.rr_successive_substitution_iteration(
+                t,
+                p,
+                &x,
+                &k,
+                &mut state,
+                inputs[3] == "1",
+            ) {
+                Ok(()) => {
+                    let mut values =
+                        vec![f64::from(state.converged), f64::from(state.has_solution)];
+                    if state.has_solution {
+                        values.extend([
+                            state.split.vapor_fraction,
+                            state.split.liquid_fraction,
+                            state.gibbs,
+                        ]);
+                        values.extend(
+                            state
+                                .split
+                                .liquid
+                                .iter()
+                                .chain(&state.split.vapor)
+                                .chain(&state.equilibrium_ratios)
+                                .chain(&state.liquid_ln_fugacity)
+                                .chain(&state.vapor_ln_fugacity),
+                        );
+                    }
+                    println!(
+                        "{}",
+                        values
+                            .iter()
+                            .map(|v| format!("{v:.17e}"))
+                            .collect::<Vec<_>>()
+                            .join(",")
+                    );
+                }
+                Err(error) => println!("ERROR: {error}"),
+            }
+            continue;
+        }
         if matches!(property_config[0], "PH" | "PS" | "V_PH" | "V_PS") {
             let mut options = model.caloric_options();
             for operation in &property_config[1..] {

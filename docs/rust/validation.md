@@ -39,6 +39,7 @@ python tools/rust_port/validate_alpha_properties.py
 python tools/rust_port/validate_translation.py
 python tools/rust_port/validate_beta.py
 python tools/rust_port/validate_rr.py
+python tools/rust_port/validate_rr_iteration.py
 python tools/rust_port/validate_translated_flash.py
 ```
 
@@ -60,7 +61,11 @@ hashes, compiler, flags and LAPACK revision invalidates stale cached objects.
   match; six non-finite source updates are recorded. See
   [extended RR conventions](rachford-rice.md). This does not qualify full flash
   convergence or source output fields left undefined on a failed RR solve.
-
+* 2170 LV RR substitution attempts: 2110 finite source results/statuses match
+  both flags, fractions, phase compositions, K updates, log fugacity and Gibbs
+  energy. Sixty non-finite source one-step calls are recorded. All four
+  convergence/RR-status combinations are covered. Full TP restart/Newton and
+  optional non-vapor phaseY paths remain pending.
 * 1320 cubic states: PR, SRK, SRK with RK alpha, vdW; six pure fluids and five
   mixtures, 200/300/500 K, 1 kPa through 20 MPa, liquid/vapor requests, zero
   mole-fraction components and nonzero binary interactions.

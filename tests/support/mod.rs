@@ -30,6 +30,7 @@ pub fn fixture_model(fields: &[&str]) -> Cubic {
             "disable" => model.disable_volume_translation(),
             "bounds" => {} // Applied by the caloric fixture driver.
             "qhelper" => {}
+            "rr" => {} // Inputs to the standalone RR iteration fixture.
             "beta" => {
                 let params: Vec<f64> = data[3].split(',').map(|v| v.parse().unwrap()).collect();
                 model

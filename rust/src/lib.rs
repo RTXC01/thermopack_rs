@@ -36,7 +36,9 @@ pub use cubic::{
     Saturation,
 };
 pub use error::{Error, Result};
-pub use flash::{FlashOptions, FlashPhase, FlashResult, Stability, StabilityTrial};
+pub use flash::{
+    FlashOptions, FlashPhase, FlashResult, RachfordRiceIteration, Stability, StabilityTrial,
+};
 pub use ideal::{EntropyReference, IdealGas, IdealProperties};
 pub use translation::{TranslationKind, TranslationValue, VolumeTranslation};
 

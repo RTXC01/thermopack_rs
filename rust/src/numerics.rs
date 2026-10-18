@@ -139,7 +139,7 @@ pub fn rachford_rice(z: &[f64], k: &[f64]) -> crate::Result<f64> {
 }
 
 /// Workspace/results for the fork's extended Rachford-Rice solver.
-/// Fractions may lie outside [0,1] during negative-flash initialization.
+/// Fractions may lie outside `[0,1]` during negative-flash initialization.
 #[derive(Debug, Clone)]
 pub struct RachfordRiceState {
     pub vapor_fraction: f64,
@@ -160,7 +160,7 @@ impl RachfordRiceState {
 
 /// Port of tp_solver::rr_solve, including extended bounds and the liquid-
 /// fraction formulation near a vapor endpoint. True means an RR result was
-/// obtained, not thermodynamic stability or fractions inside [0,1].
+/// obtained, not thermodynamic stability or fractions inside `[0,1]`.
 ///
 /// False preserves arrays not written by the source's failure path. Their
 /// contents must not be interpreted as a new solution. `single_step` performs

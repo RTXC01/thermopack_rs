@@ -68,6 +68,37 @@ pub struct FlashResult {
     pub fugacity_residual: f64,
 }
 
+/// Reusable outputs of the fork's RR successive-substitution iteration.
+/// A phase split is usable only when `has_solution` is true. `converged`
+/// reproduces the source flag; it does not establish thermodynamic stability.
+#[derive(Debug, Clone)]
+pub struct RachfordRiceIteration {
+    pub split: numerics::RachfordRiceState,
+    pub equilibrium_ratios: Vec<f64>,
+    pub liquid_ln_fugacity: Vec<f64>,
+    pub vapor_ln_fugacity: Vec<f64>,
+    /// Dimensionless mixture Gibbs energy, omitting common ideal reference terms.
+    /// Evaluated before the final converged RR update, as in the source.
+    pub gibbs: f64,
+    pub converged: bool,
+    pub has_solution: bool,
+    composition: Vec<f64>,
+}
+impl RachfordRiceIteration {
+    pub fn new(components: usize) -> Self {
+        Self {
+            split: numerics::RachfordRiceState::new(components),
+            equilibrium_ratios: vec![0.; components],
+            liquid_ln_fugacity: vec![0.; components],
+            vapor_ln_fugacity: vec![0.; components],
+            gibbs: 0.,
+            converged: false,
+            has_solution: false,
+            composition: vec![0.; components],
+        }
+    }
+}
+
 struct Evaluation {
     phi: Vec<f64>,
     dn: Vec<f64>,
@@ -123,6 +154,89 @@ fn gibbs(x: &[f64], phi: &[f64]) -> f64 {
 }
 
 impl Cubic {
+    /// Port of `tp_solver::rr_successive_substitution_iteration` for an LV split.
+    /// Extended RR fractions are allowed during initialization. Failed RR paths
+    /// preserve untouched workspace fields; inspect `has_solution` before use.
+    /// The source's relative K tolerance is fixed at 1e6 machine epsilons.
+    /// `single_step` selects its one-Newton-step ("sloppy") RR mode.
+    pub fn rr_successive_substitution_iteration(
+        &self,
+        t: f64,
+        p: f64,
+        z: &[f64],
+        k: &[f64],
+        state: &mut RachfordRiceIteration,
+        single_step: bool,
+    ) -> Result<()> {
+        state.converged = false;
+        state.has_solution = false;
+        positive(p, "pressure")?;
+        positive(t, "temperature")?;
+        let n = self.components().len();
+        if z.len() != n
+            || state.equilibrium_ratios.len() != n
+            || state.liquid_ln_fugacity.len() != n
+            || state.vapor_ln_fugacity.len() != n
+        {
+            return Err(Error::InvalidInput(
+                "matching RR iteration buffers required",
+            ));
+        }
+        if !numerics::rachford_rice_extended(z, k, &mut state.split, single_step)? {
+            return Ok(());
+        }
+        // eos::thermo normalizes its input even when cancellation in extended
+        // RR leaves a small sum error. Keep raw RR compositions in the result.
+        state.composition.copy_from_slice(&state.split.liquid);
+        normalize(&mut state.composition)?;
+        let liquid = self.prepare(t, &state.composition)?;
+        let liquid_volume = liquid.volume(p, Phase::Liquid)?;
+        liquid.ln_fugacity_tp_into(p, liquid_volume, &mut state.liquid_ln_fugacity)?;
+        state.composition.copy_from_slice(&state.split.vapor);
+        normalize(&mut state.composition)?;
+        let vapor = self.prepare(t, &state.composition)?;
+        let vapor_volume = vapor.volume(p, Phase::Vapor)?;
+        vapor.ln_fugacity_tp_into(p, vapor_volume, &mut state.vapor_ln_fugacity)?;
+        state.gibbs = 0.;
+        let beta = state.split.vapor_fraction;
+        let mut error = 0.0_f64;
+        for (i, (&zi, &ki)) in z.iter().zip(k).enumerate() {
+            let x = state.split.liquid[i];
+            let y = state.split.vapor[i];
+            if zi > 0. {
+                if y != 0. {
+                    state.gibbs += beta * (y * (y.ln() + state.vapor_ln_fugacity[i]));
+                }
+                if x != 0. {
+                    state.gibbs += (1. - beta) * (x * (x.ln() + state.liquid_ln_fugacity[i]));
+                }
+            }
+            let updated = (state.liquid_ln_fugacity[i] - state.vapor_ln_fugacity[i]).exp();
+            state.equilibrium_ratios[i] = updated;
+            error = error.max((updated - ki).abs() / ki);
+        }
+        if !state.gibbs.is_finite() || state.equilibrium_ratios.iter().any(|v| !v.is_finite()) {
+            return Err(Error::NotConverged("non-finite RR substitution result"));
+        }
+        state.has_solution = true;
+        if error < 1e6 * f64::EPSILON {
+            state.has_solution = numerics::rachford_rice_extended(
+                z,
+                &state.equilibrium_ratios,
+                &mut state.split,
+                single_step,
+            )?;
+            if (0. ..=1.).contains(&state.split.vapor_fraction) {
+                // The source sets this flag even if the final RR call fails.
+                // Expose both flags so a caller can detect that distinction.
+                state.converged = true;
+            } else {
+                state.has_solution = false;
+            }
+        }
+        Ok(())
+    }
+
     /// Wilson equilibrium estimates and their standard critical-data formula.
     pub fn wilson_k(&self, t: f64, p: f64) -> Result<Vec<f64>> {
         positive(t, "temperature")?;

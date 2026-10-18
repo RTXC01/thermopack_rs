@@ -29,6 +29,32 @@ fractions/compositions use the stored absolute/relative tolerances. Independent
 checks cover negative fractions, material balance, buffer reuse and a liquid
 fraction below machine resolution at a vapor endpoint.
 
-This kernel is groundwork for reproducing source flash initialization and
-convergence paths. It has not yet replaced the optimized physical RR helper in
-the native TP solver; the 82 cryogenic flash differences remain pending.
+`Cubic::rr_successive_substitution_iteration` couples this kernel to LV log
+fugacity evaluations and updates K, following the source routine of the same
+name. `RachfordRiceIteration::new(n)` owns the split, K and fugacity buffers.
+Each call uses the supplied K input; copy `equilibrium_ratios` into the next
+input to iterate. Its fixed convergence tolerance is 1e6 machine epsilons in
+relative K change. One-step RR is also supported. The source's optional
+non-vapor `phaseY` argument is not yet exposed.
+
+The two returned flags must be interpreted separately. The source can report
+`converged=true` while `has_solution=false` if its final RR call rejects a
+trivial K solution. Only use split fields when `has_solution` is true. Neither
+flag establishes stability. Gibbs energy and log fugacity describe the split
+before the final converged RR update, matching the source's evaluation order.
+For fugacity evaluations only, temporary compositions are normalized exactly
+as `eos::thermo` does. Returned raw RR compositions remain unchanged; extended
+fractions near a trivial K solution can amplify cancellation in their sums.
+
+The linked reference qualifies 2110 finite values/statuses from 2170 attempts
+across all four cubic kinds, default/tcPR/QuantumCubic construction, six feeds,
+zero feed components, extended/one-step RR, no-root and converged cases.
+Both flags are compared exactly, covering all four combinations. Numerical
+fields use 1e-9 absolute plus 2e-8 relative tolerance. Sixty source one-step
+calls with non-finite values are recorded separately. Native repeated-update
+tests independently check material balance and equality of chemical potentials.
+
+These routines are groundwork for reproducing complete source flash
+initialization and convergence paths. They have not yet replaced the optimized
+physical RR helper in the native TP solver; the 82 cryogenic flash differences
+remain pending.

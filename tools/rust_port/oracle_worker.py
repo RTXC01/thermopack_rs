@@ -41,6 +41,9 @@ def load_probe():
     probe.query_beta.restype=None
     probe.query_rr.argtypes=[c_int,POINTER(c_double),POINTER(c_double),c_int,POINTER(c_double),POINTER(c_double),POINTER(c_double),POINTER(c_double),POINTER(c_int)]
     probe.query_rr.restype=None
+    probe.query_rr_iteration.argtypes=[c_int,c_double,c_double,POINTER(c_double),POINTER(c_double),c_int,
+                                      *([POINTER(c_double)]*8),POINTER(c_int)]
+    probe.query_rr_iteration.restype=None
     return probe
 
 
@@ -99,7 +102,28 @@ def main(compiler_directory):
                 else:
                     raise ValueError('unknown translation operation')
                 previous=None
-        if request['mode']=='V_BETA':
+        if request['mode']=='V_RR':
+            if probe is None: probe=load_probe()
+            model.activate()
+            n=model.nc
+            z=(c_double*n)(*request['feed']);k=(c_double*n)(*request['k'])
+            x=(c_double*n)();y=(c_double*n)();kout=(c_double*n)()
+            fugl=(c_double*n)();fugv=(c_double*n)()
+            beta=c_double(request.get('beta',.5));betal=c_double(.5);g=c_double()
+            flags=(c_int*2)()
+            probe.query_rr_iteration(n,request['temperature'],request['pressure'],z,k,
+                                     int(request.get('single_step',False)),byref(beta),byref(betal),
+                                     x,y,kout,fugl,fugv,byref(g),flags)
+            values=list(map(float,flags))
+            if flags[1]:
+                values.extend([beta.value,betal.value,g.value,*map(float,x),*map(float,y),
+                               *map(float,kout),*map(float,fugl),*map(float,fugv)])
+            if not all(map(math.isfinite,values)):
+                print('THERMOPACK_RESULT='+json.dumps({'calculation_error':'non-finite RR iteration output',
+                      'values':list(map(str,values))}),flush=True)
+                continue
+            swappable=False
+        elif request['mode']=='V_BETA':
             if probe is None:
                 probe=load_probe()
             model.activate()

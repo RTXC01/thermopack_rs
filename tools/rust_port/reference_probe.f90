@@ -123,3 +123,23 @@ subroutine query_rr(n,z,k,single_step,beta,betaL,x,y,status) bind(C,name='query_
   status=0
   if (success) status=1
 end subroutine query_rr
+
+subroutine query_rr_iteration(n,t,p,z,k,single_step,beta,betaL,x,y,kout,fugl,fugv,g,flags) &
+    bind(C,name='query_rr_iteration')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use tp_solver, only: rr_successive_substitution_iteration
+  use thermopack_var, only: nc
+  implicit none
+  integer(c_int), value :: n,single_step
+  real(c_double), value :: t,p
+  real(c_double), intent(in) :: z(n),k(n)
+  real(c_double), intent(inout) :: beta,betaL,x(n),y(n),kout(n),fugl(n),fugv(n),g
+  integer(c_int), intent(out) :: flags(2)
+  logical :: converged,success
+  if (n/=nc) error stop 'reference RR iteration component mismatch'
+  call rr_successive_substitution_iteration(t,p,z,k,single_step/=0,x,y,beta,kout,fugl,fugv, &
+       g,converged,success,betaL)
+  flags=0
+  if (converged) flags(1)=1
+  if (success) flags(2)=1
+end subroutine query_rr_iteration

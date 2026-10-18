@@ -1,6 +1,10 @@
 //! Small numerical kernels with bounded work. Caller-owned RR buffers avoid
 //! allocations during repeated solves.
 
+#[path = "symmetric.rs"]
+mod symmetric;
+pub use symmetric::solve_symmetric_in_place;
+
 /// Real roots of x^3 + a*x^2 + b*x + c, sorted in ascending order.
 /// Unused entries are NaN. Returns the number of distinct roots.
 pub fn cubic_roots(a: f64, b: f64, c: f64) -> ([f64; 3], usize) {

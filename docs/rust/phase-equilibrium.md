@@ -111,10 +111,14 @@ the native comparator and recheck all 2894 source snapshots. It returns failure
 while any raw differences remain and does not rewrite the source CSV files.
 Native tests qualify all classical/translated snapshots and independently
 exercise the two stationary cryogenic splits and the vanishing-phase stopping
-criterion. The compatibility path currently reuses native stability trials and
-a general pivoted linear solve in place of the fork's LAPACK symmetric solve;
-full optimizer/stability trajectory equivalence and failed-source behavior
-remain pending. This method has not yet been benchmarked.
+criterion. The compatibility path currently reuses native stability trials.
+Its direct Newton direction now uses the native upper Bunch–Kaufman solve,
+qualified against pinned LAPACK DSYTF2/DSYTRS2. Replacing the earlier general
+pivoted solve did not resolve the three ghost-composition differences; the
+diagnostic records the current outputs. The native symmetric kernel remains
+unblocked at all sizes, while the source can choose blocked factorization for
+large systems. Full optimizer/stability trajectory equivalence and failed-source
+behavior remain pending. This method has not yet been benchmarked.
 
 ## PH/PS and equilibrium caloric properties
 

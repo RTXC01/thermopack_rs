@@ -330,6 +330,8 @@ fn source_newton(
             }
             Ok((g, gradient, hessian))
         };
+    let mut pivots = vec![0; n];
+    let mut symmetric_work = vec![0.; n];
     for iteration in 1..=1000 {
         let (old_g, gradient, mut hessian) = evaluate_amounts(&vapor, &liquid, true)?;
         let mut step: Vec<_> = gradient.iter().map(|g| -g).collect();
@@ -341,8 +343,12 @@ fn source_newton(
             };
         } else {
             let original = hessian.clone();
-            if numerics::solve_linear_in_place(&mut hessian, &mut step).is_err()
-                || step.iter().zip(&gradient).map(|(s, g)| s * g).sum::<f64>() >= 0.
+            if !numerics::solve_symmetric_in_place(
+                &mut hessian,
+                &mut step,
+                &mut pivots,
+                &mut symmetric_work,
+            )? || step.iter().zip(&gradient).map(|(s, g)| s * g).sum::<f64>() >= 0.
             {
                 step = source_modified_direction(&original, &gradient)?;
             }

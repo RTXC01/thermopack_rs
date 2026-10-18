@@ -40,6 +40,7 @@ python tools/rust_port/validate_translation.py
 python tools/rust_port/validate_beta.py
 python tools/rust_port/validate_rr.py
 python tools/rust_port/validate_rr_iteration.py
+python tools/rust_port/validate_symmetric.py
 python tools/rust_port/validate_translated_flash.py
 ```
 
@@ -57,6 +58,10 @@ hashes, compiler, flags and LAPACK revision invalidates stale cached objects.
 
 ## Qualified cases
 
+* 226 upper symmetric indefinite systems match pinned LAPACK factorization,
+  signed pivots, solutions and singularity status, with no source failures.
+  Native tests independently verify componentwise backward error and untouched
+  lower-triangle entries. See [symmetric solver](symmetric-solver.md).
 * 704 extended/one-step Rachford–Rice attempts: 698 finite source results/statuses
   match; six non-finite source updates are recorded. See
   [extended RR conventions](rachford-rice.md). This does not qualify full flash

@@ -143,3 +143,21 @@ subroutine query_rr_iteration(n,t,p,z,k,single_step,beta,betaL,x,y,kout,fugl,fug
   if (converged) flags(1)=1
   if (success) flags(2)=1
 end subroutine query_rr_iteration
+
+subroutine query_symmetric(n,a,b,ipiv,status) bind(C,name='query_symmetric')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  implicit none
+  integer(c_int), value :: n
+  real(c_double), intent(inout) :: a(n*n),b(n)
+  integer(c_int), intent(out) :: ipiv(n),status
+  real(c_double) :: matrix(n,n),work(n)
+  integer :: info
+  matrix=transpose(reshape(a,[n,n]))
+  call dsytf2('U',n,matrix,n,ipiv,info)
+  status=0
+  if (info==0) then
+    call dsytrs2('U',n,1,matrix,n,ipiv,b,n,work,info)
+    if (info==0) status=1
+  endif
+  a=reshape(transpose(matrix),[n*n])
+end subroutine query_symmetric

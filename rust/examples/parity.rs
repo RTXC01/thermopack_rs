@@ -85,6 +85,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if fields.len() != 6 {
             return Err("expected six fields".into());
         }
+        if fields[5] == "SYMMETRIC" {
+            let mut a: Vec<f64> = fields[1]
+                .split(',')
+                .map(str::parse)
+                .collect::<Result<_, _>>()?;
+            let mut b: Vec<f64> = fields[2]
+                .split(',')
+                .map(str::parse)
+                .collect::<Result<_, _>>()?;
+            let mut pivots = vec![0; b.len()];
+            let mut work = vec![0.; b.len()];
+            match thermopack_rs::numerics::solve_symmetric_in_place(
+                &mut a,
+                &mut b,
+                &mut pivots,
+                &mut work,
+            ) {
+                Ok(success) => {
+                    print!("{}", usize::from(success));
+                    for value in pivots {
+                        print!(",{value}");
+                    }
+                    for value in a.iter().chain(&b) {
+                        print!(",{value:.17e}");
+                    }
+                    println!();
+                }
+                Err(error) => println!("ERROR: {error}"),
+            }
+            continue;
+        }
         if fields[5] == "RR" {
             let z: Vec<f64> = fields[1]
                 .split(',')

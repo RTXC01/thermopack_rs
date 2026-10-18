@@ -78,3 +78,9 @@ See [validation](../docs/rust/validation.md),
 solids/hydrates and existing language-interface compatibility remain pending.
 
 Regenerate data with `python tools/rust_port/generate_data.py`.
+
+The native upper symmetric-indefinite solver is derived from pinned LAPACK
+DSYTF2/DSYTRS2 and reference BLAS algorithms. Its BSD-3-Clause notices and terms
+are retained in [LAPACK-LICENSE](LAPACK-LICENSE); ThermoPack-derived code retains
+Apache-2.0 attribution. See [symmetric-solver notes](../docs/rust/symmetric-solver.md)
+for workspace requirements and qualification scope.

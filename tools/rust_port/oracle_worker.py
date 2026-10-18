@@ -44,6 +44,8 @@ def load_probe():
     probe.query_rr_iteration.argtypes=[c_int,c_double,c_double,POINTER(c_double),POINTER(c_double),c_int,
                                       *([POINTER(c_double)]*8),POINTER(c_int)]
     probe.query_rr_iteration.restype=None
+    probe.query_symmetric.argtypes=[c_int,POINTER(c_double),POINTER(c_double),POINTER(c_int),POINTER(c_int)]
+    probe.query_symmetric.restype=None
     return probe
 
 
@@ -53,6 +55,19 @@ def main(compiler_directory):
     probe=None
     for line in sys.stdin:
         request=json.loads(line)
+        if request['mode']=='SYMMETRIC':
+            if probe is None: probe=load_probe()
+            n=len(request['rhs'])
+            a=(c_double*(n*n))(*request['matrix']);b=(c_double*n)(*request['rhs'])
+            pivots=(c_int*n)();status=c_int()
+            probe.query_symmetric(n,a,b,pivots,byref(status))
+            values=[float(status.value),*map(float,pivots),*map(float,a),*map(float,b)]
+            if all(map(math.isfinite,values)):
+                print('THERMOPACK_RESULT='+json.dumps({'values':values}),flush=True)
+            else:
+                print('THERMOPACK_RESULT='+json.dumps({'calculation_error':'non-finite symmetric factor/solution',
+                      'values':list(map(str,values))}),flush=True)
+            continue
         if request['mode']=='RR':
             if probe is None: probe=load_probe()
             n=len(request['feed'])

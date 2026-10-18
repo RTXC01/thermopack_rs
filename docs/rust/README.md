@@ -59,5 +59,7 @@ The [beta notes](beta.md) cover quantum covolume factors, full QuantumCubic
 critical-data overrides and the remaining cryogenic solver differences.
 The [extended RR notes](rachford-rice.md) cover source-compatible negative-flash
 bounds, independent phase fractions and one-step initialization.
+The [symmetric-solver notes](symmetric-solver.md) cover the native upper
+Bunch–Kaufman port, caller-owned buffers and pinned LAPACK qualification.
 Regenerate inventory with
 `python tools/rust_port/inventory.py`.

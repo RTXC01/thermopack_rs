@@ -5294,9 +5294,9 @@
     "native_sources_sha256": {
       "rust/benches/cubic.rs": "506c81f78af2daecc81c3b6902a36945a5f133a5c48c3355f27327ad2950eed0",
       "rust/examples/cubic.rs": "22a37961aaa5e8c2dad9c00bf59a2eaa813cd835bf150c7ac7dc877597d0dbef",
-      "rust/examples/parity.rs": "436a5c230c75686ce6679d3dedc9701e5f484b8f90372157a7b906a9550e2686",
+      "rust/examples/parity.rs": "59cbab4d64d18ede5e95f7b62062d00248c3f5b443486cd9fa77851f585141e7",
       "rust/src/alpha.rs": "5b53eadba0bd58038e962f64903e52ba48edab6990350aa2e2914c4890bfda9a",
-      "rust/src/baseline_flash.rs": "a62303bf58d6c4b1c7d5709fb0a256fa85e6c2df63ab472a9532b5cb49a2a7d2",
+      "rust/src/baseline_flash.rs": "042c5beec3e49305616e1a946e2d04595514efa8c28dbc77ab1cb39f540fb790",
       "rust/src/beta.rs": "a8220e72d613644ad77564df0379a08c5463267f7fafa6e1a2a0289ec45b74fa",
       "rust/src/caloric.rs": "02c01bb82e489e2c8ddf61b2230fcdc9b46ea587523c7311b8c11f0db7d89da2",
       "rust/src/component.rs": "c8467c692b5ff50a46870b7499f131b117e3685d751183e279982cd032eb1645",
@@ -5307,7 +5307,8 @@
       "rust/src/hydrogen.rs": "05e1a4d1801fb12bbad0bd4915393d572319e7217c98b95b9de9e81ec600e794",
       "rust/src/ideal.rs": "3ca1ddedf7d9b063b2636984ffab2ce46bdd8855ba448cc26b0483f4e46e9d30",
       "rust/src/lib.rs": "e03d2fdee9cff2da6537fd6de32cd7ffd3610e887e687838f96b8fa0dde0813c",
-      "rust/src/numerics.rs": "ec59a045caf097325604eddb9f3b508cb488014462c65598a9fdd8e88a852d32",
+      "rust/src/numerics.rs": "300820893b95fd0338bab6264b34c0fff2c6ec8b844db4e5d14aefabc4e231b5",
+      "rust/src/symmetric.rs": "b70a011dac29d0c4ace4af245a1beea2780c9aae7a3e30de2167b9b4b84208b8",
       "rust/src/translation.rs": "8e9889468085287c3cf1506edc6a98815fdaf03ac29f9920c197dfb6328b6902"
     },
     "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)"

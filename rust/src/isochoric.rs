@@ -185,6 +185,24 @@ impl Cubic {
             .and_then(|s| s.pressure(volume))
             .map(|p| p.value)
             .unwrap_or(0.);
+        let mut homogeneous_seed =
+            if homop >= options.minimum_pressure && homop <= options.maximum_pressure {
+                self.tp_flash_with_options(homogeneous, homop, z, options.tp)
+                    .ok()
+            } else {
+                None
+            };
+        // A closing stable TV solution already determines the homogeneous
+        // equilibrium. Avoid an unnecessary coupled solve and rechecking TP.
+        if let Some(flash) = &homogeneous_seed
+            && flash.phase != FlashPhase::TwoPhase
+            && let Ok(properties) = self.equilibrium_properties_impl(flash, false)
+            && (spec.closure(&properties) - target).abs()
+                <= options.scaled_tolerance * spec.scale(homogeneous) * 10.
+            && (properties.volume - volume).abs() <= options.scaled_tolerance * volume * 10.
+        {
+            return Ok(homogeneous_seed.take().unwrap());
+        }
         let mut seeds = vec![(
             initial,
             Some(
@@ -195,7 +213,12 @@ impl Cubic {
             ),
         )];
         if homop >= options.minimum_pressure && homop <= options.maximum_pressure {
-            seeds.insert(0, (homogeneous, Some(homop)));
+            // Honor caller guesses before falling back to a homogeneous TV
+            // estimate, which can be far from a separated equilibrium state.
+            let position = usize::from(
+                options.temperature_guess.is_some() || options.pressure_guess.is_some(),
+            );
+            seeds.insert(position, (homogeneous, Some(homop)));
         }
         // Coexistence seeds include targets whose hypothetical homogeneous
         // state lies inside a negative-pressure loop, including pure latent.
@@ -216,6 +239,7 @@ impl Cubic {
                 (0.1 * critical.pressure).clamp(options.minimum_pressure, options.maximum_pressure),
             ),
         ));
+        let mut single_phase_seeds = Vec::new();
         for (t, p) in seeds {
             let p = if let Some(p) = p {
                 p
@@ -227,11 +251,22 @@ impl Cubic {
             } else {
                 continue;
             };
-            if let Ok(seed) = self.tp_flash_with_options(t, p, z, options.tp)
-                && let Ok(candidate) = coupled(self, z, target, volume, spec, seed, options)
-                && let Ok(result) = accept(self, candidate, target, volume, spec, options)
-            {
-                return Ok(result);
+            let seed = if t == homogeneous && p == homop && homogeneous_seed.is_some() {
+                Ok(homogeneous_seed.take().unwrap())
+            } else {
+                self.tp_flash_with_options(t, p, z, options.tp)
+            };
+            if let Ok(seed) = seed {
+                if seed.phase != FlashPhase::TwoPhase {
+                    // Try finite phase amounts before following a homogeneous
+                    // root far from the independently solved TV specification.
+                    // Retain every such seed for a final fallback below.
+                    single_phase_seeds.push(seed);
+                } else if let Ok(candidate) = coupled(self, z, target, volume, spec, seed, options)
+                    && let Ok(result) = accept(self, candidate, target, volume, spec, options)
+                {
+                    return Ok(result);
+                }
             }
             // Pure TP cannot determine quality. A finite amount initializer
             // also lets the coupled mixture equations find a separated state.
@@ -276,6 +311,13 @@ impl Cubic {
                 return Ok(result);
             }
         }
+        for seed in single_phase_seeds {
+            if let Ok(candidate) = coupled(self, z, target, volume, spec, seed, options)
+                && let Ok(result) = accept(self, candidate, target, volume, spec, options)
+            {
+                return Ok(result);
+            }
+        }
         Err(Error::NotConverged(
             "UV/SV coupled phase and caloric equations",
         ))
@@ -293,10 +335,15 @@ fn evaluate(
     target: f64,
     volume: f64,
     spec: Spec,
+    linearize: bool,
 ) -> Result<Evaluation> {
     let n = z.len();
     let dim = if amounts.is_some() { n + 2 } else { 2 };
-    let mut matrix = vec![0.; dim * dim];
+    let mut matrix = if linearize {
+        vec![0.; dim * dim]
+    } else {
+        Vec::new()
+    };
     let mut residual = vec![0.; dim];
     let mut flash = FlashResult {
         temperature: t,
@@ -331,33 +378,42 @@ fn evaluate(
         let mut fv = vec![0.; n];
         liquid.ln_fugacity_tp_into(p, vl, &mut fl)?;
         vapor.ln_fugacity_tp_into(p, vv, &mut fv)?;
-        let mut dtl = vec![0.; n];
-        let mut dtv = vec![0.; n];
-        let mut dpl = vec![0.; n];
-        let mut dpv = vec![0.; n];
-        let mut dnl = vec![0.; n * n];
-        let mut dnv = vec![0.; n * n];
-        liquid.fugacity_derivatives_into(vl, &mut dtl, &mut dpl, &mut dnl)?;
-        vapor.fugacity_derivatives_into(vv, &mut dtv, &mut dpv, &mut dnv)?;
         for i in 0..n {
             if z[i] > 0. {
                 residual[i] = y[i].max(f64::EPSILON.powi(5)).ln()
                     - x[i].max(f64::EPSILON.powi(5)).ln()
                     + fv[i]
                     - fl[i];
-                matrix[i * dim + n] = t * (dtv[i] - dtl[i]);
-                matrix[n * dim + i] = matrix[i * dim + n];
-                matrix[i * dim + n + 1] = p * (dpv[i] - dpl[i]);
-                matrix[(n + 1) * dim + i] = matrix[i * dim + n + 1];
-                for j in 0..n {
-                    if z[j] > 0. {
-                        matrix[i * dim + j] =
-                            (dnv[i * n + j] - 1.) / bv + (dnl[i * n + j] - 1.) / bl;
+            }
+        }
+        if pl.dv == 0. || pv.dv == 0. {
+            return Err(Error::InvalidInput("singular volume derivative"));
+        }
+        if linearize {
+            let mut dtl = vec![0.; n];
+            let mut dtv = vec![0.; n];
+            let mut dpl = vec![0.; n];
+            let mut dpv = vec![0.; n];
+            let mut dnl = vec![0.; n * n];
+            let mut dnv = vec![0.; n * n];
+            liquid.fugacity_derivatives_into(vl, &mut dtl, &mut dpl, &mut dnl)?;
+            vapor.fugacity_derivatives_into(vv, &mut dtv, &mut dpv, &mut dnv)?;
+            for i in 0..n {
+                if z[i] > 0. {
+                    matrix[i * dim + n] = t * (dtv[i] - dtl[i]);
+                    matrix[n * dim + i] = matrix[i * dim + n];
+                    matrix[i * dim + n + 1] = p * (dpv[i] - dpl[i]);
+                    matrix[(n + 1) * dim + i] = matrix[i * dim + n + 1];
+                    for j in 0..n {
+                        if z[j] > 0. {
+                            matrix[i * dim + j] =
+                                (dnv[i * n + j] - 1.) / bv + (dnl[i * n + j] - 1.) / bl;
+                        }
                     }
+                    matrix[i * dim + i] += 1. / amounts.vapor[i] + 1. / amounts.liquid[i];
+                } else {
+                    matrix[i * dim + i] = 1.;
                 }
-                matrix[i * dim + i] += 1. / amounts.vapor[i] + 1. / amounts.liquid[i];
-            } else {
-                matrix[i * dim + i] = 1.;
             }
         }
         flash.phase = FlashPhase::TwoPhase;
@@ -406,10 +462,12 @@ fn evaluate(
         Spec::Entropy => (target - s) / R,
     };
     residual[ip] = p * (v - volume) / (R * t);
-    matrix[it * dim + it] = -cp / R;
-    matrix[it * dim + ip] = p * vt / R;
-    matrix[ip * dim + it] = p * vt / R;
-    matrix[ip * dim + ip] = p * p * vp / (R * t);
+    if linearize {
+        matrix[it * dim + it] = -cp / R;
+        matrix[it * dim + ip] = p * vt / R;
+        matrix[ip * dim + it] = p * vt / R;
+        matrix[ip * dim + ip] = p * p * vp / (R * t);
+    }
     let value = match spec {
         Spec::Energy => h - p * v,
         Spec::Entropy => s,
@@ -455,7 +513,18 @@ fn coupled(
         None
     };
     for iteration in 0..options.max_iterations {
-        let mut current = evaluate(model, t, p, z, amounts.as_ref(), root, target, volume, spec)?;
+        let mut current = evaluate(
+            model,
+            t,
+            p,
+            z,
+            amounts.as_ref(),
+            root,
+            target,
+            volume,
+            spec,
+            true,
+        )?;
         let error = current.residual.iter().map(|f| f.abs()).fold(0., f64::max);
         if error <= options.scaled_tolerance && current.closure <= options.scaled_tolerance * 10. {
             current.flash.iterations = iteration + 1;
@@ -540,6 +609,7 @@ fn coupled(
                 target,
                 volume,
                 spec,
+                false,
             ) && candidate.residual.iter().map(|f| f * f).sum::<f64>() < norm
             {
                 t = next_t;
@@ -565,7 +635,8 @@ fn accept(
     spec: Spec,
     options: VolumeFlashOptions,
 ) -> Result<FlashResult> {
-    let props = model.equilibrium_properties(&candidate)?;
+    // Closure checks do not need equilibrium Cp or its redistribution solve.
+    let props = model.equilibrium_properties_impl(&candidate, false)?;
     if (spec.closure(&props) - target).abs()
         > options.scaled_tolerance * spec.scale(candidate.temperature) * 10.
         || (props.volume - volume).abs() > options.scaled_tolerance * volume * 10.
@@ -591,7 +662,7 @@ fn accept(
         &candidate.feed,
         options.tp,
     )?;
-    let stable_props = model.equilibrium_properties(&stable)?;
+    let stable_props = model.equilibrium_properties_impl(&stable, false)?;
     // TP and the coupled solve have independent stopping criteria. Retain
     // the tightly closed UV/SV result; TP only verifies its equilibrium
     // branch at the precision supported by its chemical-potential solve.

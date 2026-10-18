@@ -105,3 +105,7 @@ recover equilibrium with pure latent quality and absent feed components.
 T/P guesses. See [isochoric qualification](../docs/rust/isochoric.md) for the
 409 finite source flash comparisons, 141 TV comparisons, canonical single-phase
 output conventions and remaining source trajectory/cryogenic limits.
+Native-loop [UV/SV measurements](../docs/rust/isochoric.md#native-loop-measurements)
+include common source-generated specifications and per-state parity checks;
+the qualified default/tcPR workloads show UV speedups of about 27x and SV
+speedups of 2.52x/2.34x. These are workload-specific measurements.

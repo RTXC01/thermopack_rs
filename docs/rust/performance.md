@@ -1,6 +1,8 @@
 # Native cubic and flash benchmarks
 
 Fluid acoustic workloads have separate current [measurements and scope](sound.md#native-loop-measurements).
+Fixed-volume caloric flashes have separate [UV/SV measurements](isochoric.md#native-loop-measurements),
+including the initial SV performance gap and its measured optimization.
 
 Local measurements for the recorded source versions. See [benchmark.json](benchmark.json) for
 machine/compiler details, reference hashes and individual samples. Full tcPR

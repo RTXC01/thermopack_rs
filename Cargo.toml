@@ -28,6 +28,11 @@ name = "sound"
 path = "rust/benches/sound.rs"
 harness = false
 
+[[bench]]
+name = "isochoric"
+path = "rust/benches/isochoric.rs"
+harness = false
+
 [profile.release]
 lto = "thin"
 codegen-units = 1

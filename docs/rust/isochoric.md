@@ -36,10 +36,16 @@ balance, retain trace amounts by updating the smaller phase amount, and use
 bounded residual-reducing backtracking. Pure latent states retain a quality
 unknown; a TP flash cannot determine their quality.
 
-Initialization tries a homogeneous TV caloric solve, ordinary TP states and
-finite phase-amount seeds. Fixed-composition saturation estimates are computed
-only when an earlier seed has failed. Final U/S and V closure is independently
-checked. For mixtures, a strict TP flash verifies the equilibrium branch and
+Initialization first solves the homogeneous TV caloric specification and checks
+its TP stability. A closing homogeneous equilibrium returns immediately.
+Separated-state searches honor supplied T/P guesses and reuse the computed TP
+seed. Finite phase amounts are tried before pursuing homogeneous roots;
+homogeneous coupled seeds remain available as a final fallback. Fixed-composition
+saturation estimates are computed only when an earlier seed has failed.
+Line-search trials evaluate residuals without constructing unused fugacity
+Hessians. Final closure checks skip the unused equilibrium-Cp response solve.
+Final U/S and V closure is independently checked. For mixtures, a strict TP
+flash verifies the equilibrium branch and
 Gibbs energy. Its stopping tolerance is separate from the coupled residual's
 default 1e-12 tolerance: the tighter UV/SV state is retained after verification.
 The implementation uses physical caloric derivatives, including the corrected
@@ -72,7 +78,8 @@ P/U/S, including cryogenic QuantumCubic and custom quintic ci, quantum beta
 and interactions. Independent finite differences check Cv, S_T=Cv/T and
 S_V=P_T with temperature-dependent beta and ci. Broad cryogenic UV/SV,
 critical degeneracy, complete source retry/output fidelity and other model
-families remain pending. No UV/SV speedup has yet been measured.
+families remain pending. Native-loop performance measurements below qualify
+specific workloads only.
 
 Reproduce after building the exact-source library and probe:
 
@@ -80,3 +87,61 @@ Reproduce after building the exact-source library and probe:
 python tools/rust_port/validate_isochoric.py --compiler-directory /path/to/compiler/bin
 cargo test --test isochoric
 ```
+
+## Native-loop measurements
+
+`benchmark_isochoric.py` compares 100 PR methane/ethane/propane states at
+0.5/0.3/0.2, 1 MPa and 180–259.2 K, for default and tcPR construction.
+Fortran generates all U/S/V specifications and both programs read exactly the
+same inputs. Before timing, all 200 UV/SV returned states must match T/P,
+two-phase flags, fractions and composition arrays at the qualification
+tolerances; each program independently verifies caloric and volume closure.
+Each measured sample runs 2000 calls per mode. Reported timings are medians
+of five samples after a discarded warm-up, with T/P/quality checksums compared
+on every sample. Timed loops contain no Python, ctypes, data generation or I/O.
+
+UV uses wrapper-default zero T/P and phase arrays in Fortran and native default
+initialization in Rust. SV uses the same perturbed T/P guesses (0.9*T, 1.2*P).
+The low-level source SV dispatcher also receives TP phase arrays; Rust computes
+its own. These are the available API entry points, and the additional source
+initialization information must be considered when interpreting SV timings.
+
+| Construction and flash | Fortran microseconds/state | Rust microseconds/state | Speedup |
+|---|---:|---:|---:|
+| Default UV | 5986 | 216 | 27.68x |
+| Default SV | 486 | 193 | 2.52x |
+| tcPR UV | 7835 | 288 | 27.23x |
+| tcPR SV | 635 | 271 | 2.34x |
+
+Maximum differences across the 400 final preflight comparisons are below
+6.1e-8 K and 0.0028 Pa; phase flags agree exactly, and phase fraction/composition
+differences are below 4.4e-10. These checks compare canonical homogeneous
+outputs as described above. They do not qualify raw source single-phase flags.
+
+The [initial report](benchmark-isochoric-before.json) records the first Rust
+implementation: 274 microseconds for UV and 1156 microseconds for SV, compared
+with 6152 and 501 microseconds in Fortran. SV was initially slower. Per-state
+profiling identified 100-step homogeneous attempts before successful short
+two-phase solves and redundant solves after a stable TV state had already
+been found. The initialization and derivative changes described above address
+those costs without relaxing convergence tolerances or dropping fallback seeds.
+The final default Rust UV time is 21% lower and SV time is 83% lower than the
+initial implementation in these local measurements.
+
+Final [default measurements](benchmark-isochoric.json) and
+[tcPR measurements](benchmark-isochoric-tcpr.json) retain individual samples,
+input values, maximum preflight differences, compiler/CPU details and source
+fingerprints. The driver rejects source or Cargo-input changes during a run.
+Other feeds, EOS families, critical states and larger mixtures need their own
+measurements; these results do not establish a library-wide speedup.
+
+```
+python tools/rust_port/benchmark_isochoric.py --compiler /path/to/gfortran
+python tools/rust_port/benchmark_isochoric.py --compiler /path/to/gfortran --tcpr
+cargo bench --bench isochoric
+```
+
+For per-state native profiling, add `-- --profile` to the Cargo command.
+The comparison driver supplies `--inputs` to use the common source-generated
+specifications; a standalone Cargo command prepares native specifications
+outside the timers.

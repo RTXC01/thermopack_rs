@@ -93,6 +93,14 @@ impl Cubic {
     /// Properties of the equilibrium result, including the change of phase
     /// amounts/compositions in the equilibrium heat capacity.
     pub fn equilibrium_properties(&self, flash: &FlashResult) -> Result<EquilibriumProperties> {
+        self.equilibrium_properties_impl(flash, true)
+    }
+
+    fn equilibrium_properties_impl(
+        &self,
+        flash: &FlashResult,
+        heat_capacity: bool,
+    ) -> Result<EquilibriumProperties> {
         let t = flash.temperature;
         let p = flash.pressure;
         positive(p, "pressure")?;
@@ -105,7 +113,7 @@ impl Cubic {
                 enthalpy: h,
                 entropy: s,
                 internal_energy: h - p * v,
-                heat_capacity: if cp.is_finite() && cp > 0.0 {
+                heat_capacity: if heat_capacity && cp.is_finite() && cp > 0.0 {
                     Some(cp)
                 } else {
                     None
@@ -129,7 +137,7 @@ impl Cubic {
             .feed
             .iter()
             .enumerate()
-            .filter(|(_, z)| **z > 0.0)
+            .filter(|(_, z)| heat_capacity && **z > 0.0)
             .map(|(i, _)| i)
             .collect();
         let capacity = if active.len() > 1 && beta > 0.0 && beta < 1.0 {

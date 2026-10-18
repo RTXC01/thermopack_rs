@@ -6,6 +6,8 @@ including the initial SV performance gap and its measured optimization.
 The pure-fluid [PeTS Helmholtz kernel measurements](pets.md) cover all ten
 first/second-order quantities: 30.07x including temperature preparation and
 49.90x with reusable preparation on the recorded workload.
+The [PeTS pressure-root measurements](pets-root-performance.md) separately
+show the fresh strict branch-discovery gap and prepared-isotherm timings.
 
 Local measurements for the recorded source versions. See [benchmark.json](benchmark.json) for
 machine/compiler details, reference hashes and individual samples. Full tcPR

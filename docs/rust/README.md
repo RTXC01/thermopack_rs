@@ -76,5 +76,7 @@ The [PeTS flash notes](pets-flash.md) cover pure TP/PH/PS, specified quality,
 equilibrium caloric properties and explicit endpoint comparison conventions.
 The [PeTS fixed-volume notes](pets-isochoric.md) cover equilibrium TV states,
 analytic Cv with phase redistribution, pure UV/SV and their qualification.
+The [PeTS root measurements](pets-root-performance.md) distinguish fresh,
+prepared and source-iteration paths and identify branch-discovery overhead.
 Regenerate inventory with
 `python tools/rust_port/inventory.py`.

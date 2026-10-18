@@ -8,6 +8,9 @@ first/second-order quantities: 30.07x including temperature preparation and
 49.90x with reusable preparation on the recorded workload.
 The [PeTS pressure-root measurements](pets-root-performance.md) separately
 show the fresh strict branch-discovery gap and prepared-isotherm timings.
+Density-only root evaluation and cached branch data reduce fresh Rust root
+times by about 1.9–2.1x on those recorded states, with unchanged sampling and
+parity tolerances; the cold vapor path remains roughly tied with the source.
 
 Local measurements for the recorded source versions. See [benchmark.json](benchmark.json) for
 machine/compiler details, reference hashes and individual samples. Full tcPR

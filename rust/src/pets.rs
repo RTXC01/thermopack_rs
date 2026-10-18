@@ -98,6 +98,7 @@ pub struct PreparedPets<'a> {
     packing_t: f64,
     packing_tt: f64,
     q: f64,
+    dispersion_factor: f64,
 }
 
 impl Pets {
@@ -148,6 +149,7 @@ impl Pets {
         let packing_tt = packing / diameter.value.powi(2)
             * (6. * diameter.dt.powi(2) + 3. * diameter.value * diameter.dtt);
         let q = self.epsilon_k / t;
+        let dispersion_factor = -PI * NA * self.sigma.powi(3);
         if [
             diameter.value,
             diameter.dt,
@@ -156,6 +158,7 @@ impl Pets {
             packing_t,
             packing_tt,
             q,
+            dispersion_factor,
         ]
         .iter()
         .any(|v| !v.is_finite())
@@ -171,6 +174,7 @@ impl Pets {
             packing_t,
             packing_tt,
             q,
+            dispersion_factor,
         })
     }
     pub fn diameter(&self, t: f64) -> Result<PetsDiameter> {
@@ -293,6 +297,39 @@ impl Pets {
 }
 
 impl PreparedPets<'_> {
+    // Pressure-root work needs only density derivatives. Avoid computing and
+    // validating the unused temperature/mixed derivatives at every grid node.
+    // The public full Helmholtz kernel retains its complete derivative checks.
+    fn pressure_density_derivatives(&self, rho: f64) -> (f64, f64, f64) {
+        let e = rho * self.packing;
+        let free = 1. - e;
+        let hs_e = 2. * (e - 2.) / (e - 1.).powi(3);
+        let hs_ee = 2. * (5. - 2. * e) / (e - 1.).powi(4);
+        let (i1, i1e, i1ee) = polynomial(e, &A);
+        let (i2, i2e, i2ee) = polynomial(e, &B);
+        let o = (8. * e - 2. * e * e) / free.powi(4);
+        let c = 1. / (1. + o);
+        let oe = (-4. * e * e + 20. * e + 8.) / free.powi(5);
+        let oee = ((-8. * e + 20.) * free + 5. * (-4. * e * e + 20. * e + 8.)) / free.powi(6);
+        let ce = -oe * c * c;
+        let cee = 2. * ce * ce / c - oee * c * c;
+        let d = c * i2;
+        let de = ce * i2 + c * i2e;
+        let dee = cee * i2 + 2. * ce * i2e + c * i2ee;
+        let q = self.q;
+        let w = 2. * i1 * q + d * q * q;
+        let we = 2. * i1e * q + de * q * q;
+        let wee = 2. * i1ee * q + dee * q * q;
+        let wr = we * self.packing;
+        let wrr = wee * self.packing * self.packing;
+        let hs_r = hs_e * self.packing;
+        let dispersion_r = self.dispersion_factor * (w + rho * wr);
+        (
+            hs_r + dispersion_r,
+            hs_ee * self.packing * self.packing + self.dispersion_factor * (2. * wr + rho * wrr),
+            hs_r.abs() + dispersion_r.abs(),
+        )
+    }
     // The source finite-volume third virial estimate loses many digits to
     // cancellation. Preserve its operation order in this compatibility path.
     fn source_virial_density_derivatives(&self, rho: f64) -> (f64, f64) {
@@ -392,7 +429,7 @@ impl PreparedPets<'_> {
         let wrr = wee * self.packing * self.packing;
         let wrt = wee * et * self.packing + we * self.packing_t + weq * self.packing * qt;
         let wtt = wee * et * et + we * ett + 2. * weq * et * qt + 2. * d * qt * qt + wq * qtt;
-        let factor = -PI * NA * self.model.sigma.powi(3);
+        let factor = self.dispersion_factor;
         let dispersion = DensityHelmholtz {
             value: factor * rho * w,
             dt: factor * rho * wt,

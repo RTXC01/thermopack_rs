@@ -36,8 +36,40 @@ struct ReducedCritical {
 pub struct PetsEquilibrium<'a> {
     prepared: PreparedPets<'a>,
     boundaries: Vec<f64>,
+    intervals: Vec<StableInterval>,
 }
 static CRITICAL: OnceLock<Result<ReducedCritical>> = OnceLock::new();
+static SPINODAL_GRID: OnceLock<Result<Vec<f64>>> = OnceLock::new();
+
+#[derive(Debug, Clone, Copy)]
+struct StableInterval {
+    low: f64,
+    high: f64,
+    low_pressure: f64,
+    high_pressure: f64,
+    roundoff: f64,
+}
+
+fn spinodal_grid() -> Result<&'static [f64]> {
+    SPINODAL_GRID
+        .get_or_init(|| {
+            let critical = reduced_critical()?;
+            let mut grid = Vec::with_capacity(390);
+            grid.push(0.);
+            grid.push(critical.eta);
+            for i in 0..=128 {
+                grid.push(10_f64.powf(-14. + 13. * i as f64 / 128.));
+            }
+            for i in 1..=256 {
+                grid.push(0.75 * i as f64 / 256.);
+            }
+            grid.sort_by(f64::total_cmp);
+            grid.dedup();
+            Ok(grid)
+        })
+        .as_deref()
+        .map_err(Clone::clone)
+}
 
 // Taylor coefficients in packing fraction, through fourth order. Fixed-size
 // scalar arithmetic supplies analytic density derivatives for critical work.
@@ -269,38 +301,22 @@ impl Pets {
 impl<'a> PreparedPets<'a> {
     fn pressure_eta(&self, eta: f64) -> Result<(f64, f64, f64)> {
         let rho = eta / self.packing;
-        let contributions = self.contributions(rho)?;
-        let a = contributions.total;
+        let (ar, arr, absolute_ar) = self.pressure_density_derivatives(rho);
         let rt = R * self.t;
-        let pressure = rt * rho * (1. + rho * a.drho);
-        let derivative = rt / self.packing * (1. + 2. * rho * a.drho + rho * rho * a.drhorho);
-        let scale = rt
-            * rho
-            * (1.
-                + rho
-                    * (contributions.hard_sphere.drho.abs() + contributions.dispersion.drho.abs()));
+        let pressure = rt * rho * (1. + rho * ar);
+        let derivative = rt / self.packing * (1. + 2. * rho * ar + rho * rho * arr);
+        let scale = rt * rho * (1. + rho * absolute_ar);
         if [pressure, derivative, scale].iter().any(|x| !x.is_finite()) {
             return Err(Error::InvalidInput("non-finite PeTS density pressure"));
         }
         Ok((pressure, derivative, scale))
     }
     pub fn equilibrium(&self) -> Result<PetsEquilibrium<'a>> {
-        let critical = reduced_critical()?;
-        let mut grid = Vec::with_capacity(390);
-        grid.push(0.);
-        grid.push(critical.eta);
-        for i in 0..=128 {
-            grid.push(10_f64.powf(-14. + 13. * i as f64 / 128.));
-        }
-        for i in 1..=256 {
-            grid.push(0.75 * i as f64 / 256.);
-        }
-        grid.sort_by(f64::total_cmp);
-        grid.dedup();
+        let grid = spinodal_grid()?;
         let mut boundaries = vec![0.];
         let mut left = grid[0];
         let mut derivative = self.pressure_eta(left)?.1;
-        for right in grid.into_iter().skip(1) {
+        for &right in grid.iter().skip(1) {
             let next = self.pressure_eta(right)?.1;
             if (derivative < 0.) != (next < 0.) {
                 let (mut lo, mut hi) = (left, right);
@@ -322,9 +338,26 @@ impl<'a> PreparedPets<'a> {
             derivative = next;
         }
         boundaries.push(0.75);
+        let mut intervals = Vec::with_capacity(3);
+        for pair in boundaries.windows(2) {
+            let (low, high) = (pair[0], pair[1]);
+            if self.pressure_eta(low + (high - low) * 0.5)?.1 < 0. {
+                continue;
+            }
+            let (low_pressure, _, low_scale) = self.pressure_eta(low)?;
+            let (high_pressure, _, high_scale) = self.pressure_eta(high)?;
+            intervals.push(StableInterval {
+                low,
+                high,
+                low_pressure,
+                high_pressure,
+                roundoff: 32. * f64::EPSILON * low_scale.max(high_scale),
+            });
+        }
         Ok(PetsEquilibrium {
             prepared: *self,
             boundaries,
+            intervals,
         })
     }
     pub fn volume(&self, p: f64, phase: Phase) -> Result<f64> {
@@ -449,18 +482,13 @@ impl PetsEquilibrium<'_> {
         }
         let mut roots = Vec::new();
         let s = &self.prepared;
-        for interval in self.boundaries.windows(2) {
-            let (lo, hi) = (interval[0], interval[1]);
-            if s.pressure_eta(lo + (hi - lo) * 0.5)?.1 < 0. {
+        for interval in &self.intervals {
+            if p < interval.low_pressure - interval.roundoff
+                || p > interval.high_pressure + interval.roundoff
+            {
                 continue;
             }
-            let (pl, _, sl) = s.pressure_eta(lo)?;
-            let (ph, _, sh) = s.pressure_eta(hi)?;
-            let tolerance = 32. * f64::EPSILON * sl.max(sh);
-            if p < pl - tolerance || p > ph + tolerance {
-                continue;
-            }
-            let e = self.root_eta(p, lo, hi)?;
+            let e = self.root_eta(p, interval.low, interval.high)?;
             let v = s.packing / e;
             if v.is_finite() && v > 0. {
                 roots.push(v);
@@ -571,5 +599,35 @@ impl PetsEquilibrium<'_> {
             };
         }
         Err(Error::NotConverged("PeTS saturation pressure"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pressure_only_kernel_matches_complete_density_derivatives() {
+        for (sigma, eps) in [
+            (3.42e-10, 136.),
+            (2.9e-10, 100.),
+            (4.1e-10, 240.),
+            (3.8e-10, 170.),
+        ] {
+            let model = Pets::with_parameters(sigma, eps).unwrap();
+            for tr in [0.02, 0.05, 0.1, 0.3, 0.5, 0.8, 1., 1.089, 1.1, 1.5, 3., 10.] {
+                let prepared = model.prepare(tr * eps).unwrap();
+                for eta in [
+                    0., 1e-14, 1e-10, 1e-5, 0.01, 0.1, 0.15, 0.25, 0.5, 0.7, 0.75,
+                ] {
+                    let rho = eta / prepared.packing;
+                    let (ar, arr, scale) = prepared.pressure_density_derivatives(rho);
+                    let full = prepared.contributions(rho).unwrap();
+                    assert!((ar - full.total.drho).abs() <= 8. * f64::EPSILON * scale);
+                    let rrscale = full.hard_sphere.drhorho.abs() + full.dispersion.drhorho.abs();
+                    assert!((arr - full.total.drhorho).abs() <= 8. * f64::EPSILON * rrscale);
+                }
+            }
+        }
     }
 }

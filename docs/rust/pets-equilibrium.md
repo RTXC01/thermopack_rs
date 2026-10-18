@@ -22,8 +22,11 @@ The admissible packing interval for pressure-root work is [0,0.75], following
 the source SAFT solver's upper bound. The raw TV kernel remains available up
 to packing fraction one. Spinodal discovery combines logarithmic dilute and
 linear dense sampling, includes the critical packing fraction to resolve
-near-critical loops, and refines derivative sign changes. Root refinement uses
-bracketed Newton steps on stable intervals and a pressure roundoff bound that
+near-critical loops, and refines derivative sign changes. Root work evaluates
+only the required density derivatives. The fixed sorted grid is shared
+immutably; spinodals and stable interval pressure bounds remain specific to
+each prepared isotherm. Full TV derivative checks remain in the full kernel.
+Refinement uses bracketed Newton steps on stable intervals and a pressure roundoff bound that
 includes cancellation between hard-sphere and dispersion derivatives. This
 is a numerical search over the represented branches, not a proof of complete
 root isolation for every unphysical low-temperature extrapolation.

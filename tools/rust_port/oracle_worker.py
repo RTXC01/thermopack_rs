@@ -107,7 +107,67 @@ def main(compiler_directory):
                 previous=key
             if probe is None:probe=load_probe()
             model.activate();sigma,eps=request.get('parameters',[3.42e-10,136.])
-            if request['mode'] in ('PETS_TP','PETS_PH','PETS_PS'):
+            if request['mode'] in ('PETS_UV','PETS_SV'):
+                from types import SimpleNamespace
+                probe.set_pets_parameters(sigma,eps)
+                model.set_tmin(request.get('minimum_temperature',1.))
+                model.set_tmax(request.get('maximum_temperature',2000.))
+                try:
+                    t,p=request['temperature'],request['pressure']
+                    if 'quality' in request:
+                        p=model.bubble_pressure(t,[1.])[0]
+                        seed=SimpleNamespace(T=t,p=p,z=[1.],x=[1.],y=[1.],betaV=request['quality'],
+                                             betaL=1.-request['quality'],phase=model.TWOPH)
+                    else:seed=model.two_phase_tpflash(t,p,[1.])
+                    volume=overall(model,seed,'specific_volume')
+                    entropy=overall(model,seed,'entropy')
+                    energy=overall(model,seed,'enthalpy')-p*volume
+                    target=energy if request['mode']=='PETS_UV' else entropy
+                    guess_t=t*request.get('guess_factor',1.2)
+                    guess_p=p*request.get('pressure_factor',.8)
+                    if request['mode']=='PETS_UV':
+                        result=model.two_phase_uvflash([1.],energy,volume,
+                            temp=guess_t if request.get('guessed',True) else None,
+                            press=guess_p if request.get('guessed',True) else None)
+                        status=0
+                    else:
+                        tv,pv,bv,bl=c_double(guess_t),c_double(guess_p),c_double(seed.betaV),c_double(seed.betaL)
+                        zv=(c_double*1)(1.);xv=(c_double*1)(*seed.x);yv=(c_double*1)(*seed.y)
+                        sv,vv=c_double(entropy),c_double(volume);phase=c_int(seed.phase);code=c_int()
+                        probe.query_sv(1,byref(tv),byref(pv),zv,byref(bv),byref(bl),xv,yv,
+                                       byref(sv),byref(vv),byref(phase),byref(code))
+                        status=code.value
+                        result=SimpleNamespace(T=tv.value,p=pv.value,z=[1.],x=list(xv),y=list(yv),
+                                               betaV=bv.value,betaL=bl.value,phase=phase.value)
+                    raw=[float(result.T),float(result.p),int(result.phase),float(result.betaV),float(result.betaL),
+                         *map(float,result.x),*map(float,result.y)]
+                    two=result.phase==model.TWOPH
+                    actual_v=overall(model,result,'specific_volume')
+                    h=overall(model,result,'enthalpy');s=overall(model,result,'entropy');u=h-result.p*actual_v
+                    caloric_error=((u if request['mode']=='PETS_UV' else s)-target)/(8.31446261815324*(result.T if request['mode']=='PETS_UV' else 1.))
+                    volume_error=(actual_v-volume)/volume
+                    phases=[model.LIQPH,model.VAPPH] if two else [model.LIQPH if result.phase==model.SINGLEPH else result.phase]
+                    closure=[]
+                    for phase_id in phases:
+                        v=model.specific_volume(result.T,result.p,[1.],phase_id)[0]
+                        a,b=model.pressure_tv(result.T,v,[1.],dpdv=True)
+                        closure.append(dict(pressure=float(a),dv=float(b)))
+                    canonical_two=two and 1e-8 < result.betaV < 1.-1e-8
+                    values=[float(result.T),float(result.p),float(canonical_two),float(result.betaV) if canonical_two else 0.,
+                            float(actual_v),float(u),float(s),float(h)]
+                    extra=dict(specification=target,volume=volume,raw_result=raw,status=status,
+                               scaled_specification_error=caloric_error,relative_volume_error=volume_error,pressure_closure=closure,
+                               temperature_guess=guess_t if request.get('guessed',True) or request['mode']=='PETS_SV' else None,
+                               pressure_guess=guess_p if request.get('guessed',True) or request['mode']=='PETS_SV' else None)
+                    if status!=0 or not all(map(math.isfinite,values+[caloric_error,volume_error])) or abs(caloric_error)>1e-7 or abs(volume_error)>1e-7 or any(
+                            not math.isfinite(c['pressure']) or not math.isfinite(c['dv']) or abs(c['pressure']-result.p)>1e8*sys.float_info.epsilon*result.p or c['dv']>=0. for c in closure):
+                        print('THERMOPACK_RESULT='+json.dumps(dict(calculation_error='source volume flash fails status, finite/stable pressure or U/S/V closure',
+                              values=list(map(str,values)),**extra)),flush=True);continue
+                    print('THERMOPACK_RESULT='+json.dumps(dict(values=values,**extra)),flush=True);continue
+                except Exception as error:
+                    if str(error) not in ('bubble_pressure calculation failed',):raise
+                    print('THERMOPACK_RESULT='+json.dumps(dict(calculation_error=str(error))),flush=True);continue
+            elif request['mode'] in ('PETS_TP','PETS_PH','PETS_PS'):
                 from types import SimpleNamespace
                 probe.set_pets_parameters(sigma,eps)
                 model.set_tmin(request.get('minimum_temperature',1.))

@@ -44,6 +44,7 @@ pub use equilibrium::{PetsEquilibrium, PetsVolumeIteration, PureCriticalPoint};
 
 #[path = "pets_flash.rs"]
 mod flash;
+pub use flash::PetsEquilibriumTv;
 
 /// Pure-argon PeTS parameters and owned ideal-gas reference state.
 #[derive(Debug, Clone)]

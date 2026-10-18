@@ -74,5 +74,7 @@ The [PeTS equilibrium notes](pets-equilibrium.md) cover source-compatible volume
 iteration, strict pressure roots, critical scaling and pure coexistence.
 The [PeTS flash notes](pets-flash.md) cover pure TP/PH/PS, specified quality,
 equilibrium caloric properties and explicit endpoint comparison conventions.
+The [PeTS fixed-volume notes](pets-isochoric.md) cover equilibrium TV states,
+analytic Cv with phase redistribution, pure UV/SV and their qualification.
 Regenerate inventory with
 `python tools/rust_port/inventory.py`.

@@ -36,6 +36,7 @@ python tools/rust_port/validate_isochoric.py
 python tools/rust_port/validate_pets.py
 python tools/rust_port/validate_pets_equilibrium.py
 python tools/rust_port/validate_pets_flash.py
+python tools/rust_port/validate_pets_isochoric.py
 python tools/rust_port/benchmark_isochoric.py --compiler /path/to/gfortran --preflight-only
 python tools/rust_port/benchmark_isochoric.py --compiler /path/to/gfortran --tcpr --preflight-only
 python tools/rust_port/validate_ideal.py
@@ -161,6 +162,10 @@ The [PeTS flash qualification](pets-flash.md) adds 923 finite/closing TP/PH/PS
 states from 1035 source attempts, retaining 112 failed/nonclosing calls.
 Saturated endpoints use an explicit physical-state comparison convention;
 metadata preserves the original phase flags and arrays for every finite result.
+The [PeTS UV/SV qualification](pets-isochoric.md) adds 399 finite/closing states
+from 666 source calls; 260 source terminations and seven unqualified returns
+are retained. Native tests also verify analytic equilibrium Cv against fixed-V
+differences of both U and S, homogeneous/latent recovery and caloric setters.
 The [PeTS qualification](pets.md) adds 588 full states (56 quantities each)
 and 16 vector-potential cases. All attempted source calls are finite. Independent
 tests verify extensive and mixed derivatives, caloric/mechanical identities,

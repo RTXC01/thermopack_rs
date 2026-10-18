@@ -19,6 +19,10 @@ use super::*;
 use crate::caloric::{Mode, solve_scalar};
 use crate::{CaloricFlashOptions, EquilibriumProperties, FlashPhase, FlashResult, Phase};
 
+#[path = "pets_isochoric.rs"]
+mod isochoric;
+pub use isochoric::PetsEquilibriumTv;
+
 fn homogeneous(t: f64, p: f64, v: f64, phase: FlashPhase) -> FlashResult {
     let vapor = phase == FlashPhase::Vapor;
     FlashResult {

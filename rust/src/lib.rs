@@ -46,8 +46,8 @@ pub use flash::{
 pub use helmholtz::{DensityHelmholtz, PureHelmholtz, PurePressure};
 pub use ideal::{EntropyReference, IdealGas, IdealProperties};
 pub use pets::{
-    Pets, PetsContributions, PetsDiameter, PetsEquilibrium, PetsTvProperties, PetsVolumeIteration,
-    PreparedPets, PureCriticalPoint,
+    Pets, PetsContributions, PetsDiameter, PetsEquilibrium, PetsEquilibriumTv, PetsTvProperties,
+    PetsVolumeIteration, PreparedPets, PureCriticalPoint,
 };
 pub use translation::{TranslationKind, TranslationValue, VolumeTranslation};
 

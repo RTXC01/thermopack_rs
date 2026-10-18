@@ -77,7 +77,8 @@ and invalid options. Caloric setter tests also exercise owned nondefault Cp
 and H/S references. Fixtures use 2e-7 relative tolerance with absolute
 tolerances documented per quantity. No new flash performance claim is made.
 The earlier [TV kernel benchmark](pets.md) does not measure these solvers.
-PeTS UV/SV, complete inherited interfaces and broad critical/low-temperature
+PeTS [UV/SV and equilibrium TV](pets-isochoric.md) have separate qualification.
+Complete inherited interfaces and broad critical/low-temperature
 degeneracy remain pending; the full library migration is still in progress.
 
 ```

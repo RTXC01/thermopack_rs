@@ -97,6 +97,47 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let model = thermopack_rs::Pets::with_parameters(parameters[0], parameters[1])?;
             let result = (|| -> thermopack_rs::Result<Vec<f64>> {
                 let config: Vec<_> = fields[5].split('@').collect();
+                if matches!(config[0], "PETS_UV" | "PETS_SV") {
+                    let target = fields[2].parse().unwrap();
+                    let volume = fields[3].parse().unwrap();
+                    let options = thermopack_rs::VolumeFlashOptions {
+                        temperature_guess: if config[1] == "none" {
+                            None
+                        } else {
+                            Some(config[1].parse().unwrap())
+                        },
+                        pressure_guess: if config[2] == "none" {
+                            None
+                        } else {
+                            Some(config[2].parse().unwrap())
+                        },
+                        minimum_temperature: 1.,
+                        maximum_temperature: 2000.,
+                        minimum_pressure: 1e-12,
+                        maximum_pressure: 1e10,
+                        ..Default::default()
+                    };
+                    let flash = if config[0] == "PETS_UV" {
+                        model.uv_flash_with_options(target, volume, options)?
+                    } else {
+                        model.sv_flash_with_options(target, volume, options)?
+                    };
+                    let state = model.equilibrium_tv(flash.temperature, volume)?;
+                    let two = flash.phase == thermopack_rs::FlashPhase::TwoPhase
+                        && flash.vapor_fraction > 1e-8
+                        && flash.vapor_fraction < 1. - 1e-8;
+                    let props = state.properties;
+                    return Ok(vec![
+                        flash.temperature,
+                        flash.pressure,
+                        f64::from(two),
+                        if two { flash.vapor_fraction } else { 0. },
+                        props.volume,
+                        props.internal_energy,
+                        props.entropy,
+                        props.enthalpy,
+                    ]);
+                }
                 if matches!(config[0], "PETS_TP" | "PETS_PH" | "PETS_PS") {
                     let t = fields[2].parse().unwrap();
                     let p = fields[3].parse().unwrap();

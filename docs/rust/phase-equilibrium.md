@@ -78,6 +78,44 @@ Python exceptions fail validation rather than being classified as Fortran
 failures. Native input validation, material/fugacity closure and zero/trace
 component regressions are also tested independently of fixtures.
 
+## Fork-order TP compatibility
+
+`Cubic::baseline_tp_flash(T,P,z)` follows the fork's Wilson initialization,
+successive substitution with extended RR, two-eigenvalue extrapolation every
+fifth iteration, Gibbs-based extrapolation rejection, stability restart and
+Newton transition. Its Newton path retains separate liquid/vapor amounts to
+preserve the smaller phase, the source's amount limiter, two line-search
+reductions and relative Gibbs-change stopping at 300 machine epsilons. It
+includes the source's Gill–Murray modified LDL direction when the direct
+linear solution is singular or is not a descent direction.
+
+This compatibility method reproduces source early-return behavior: a converged
+SS split may have higher Gibbs energy than the feed. Its Newton path can return
+a vanishing phase with unclosed chemical potentials because Gibbs change has
+become unresolvable. `fugacity_residual` reports an independent final check;
+these results must not be described as stable equilibrium. The stricter
+`tp_flash` method retains its chemical-potential/Gibbs acceptance tests.
+
+Against the complete frozen TP snapshots, raw ordering, both fractions and
+both composition arrays match 1043/1043 classical and 1130/1130 translated
+cases, including the phase permutation discussed above. The quantum grid
+matches 718/721. Three C1/CO2/N2 cases at 80 K and 0.1 MPa return the source's
+vanishing vapor branch (fraction around 1e-22), but ghost-vapor compositions
+still differ by up to 3e-5. Their raw composition tolerance remains 2e-7
+absolute plus 2e-7 relative, with phase flags exact; no phase exchange is
+allowed. All three differences remain recorded in
+`tests/fixtures/baseline_tp_differences.json`.
+
+Run `python tools/rust_port/validate_baseline_tp.py` without Fortran to rebuild
+the native comparator and recheck all 2894 source snapshots. It returns failure
+while any raw differences remain and does not rewrite the source CSV files.
+Native tests qualify all classical/translated snapshots and independently
+exercise the two stationary cryogenic splits and the vanishing-phase stopping
+criterion. The compatibility path currently reuses native stability trials and
+a general pivoted linear solve in place of the fork's LAPACK symmetric solve;
+full optimizer/stability trajectory equivalence and failed-source behavior
+remain pending. This method has not yet been benchmarked.
+
 ## PH/PS and equilibrium caloric properties
 
 `ph_flash(P,z,H)` and `ps_flash(P,z,S)` recover temperature and the phase split,

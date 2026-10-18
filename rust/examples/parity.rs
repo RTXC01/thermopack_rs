@@ -462,8 +462,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             continue;
         }
-        if matches!(property_config[0], "TP" | "V_TP") {
-            match model.tp_flash(t, p, &x) {
+        if matches!(
+            property_config[0],
+            "TP" | "V_TP" | "TP_BASELINE" | "V_TP_BASELINE"
+        ) {
+            let result = if property_config[0].ends_with("BASELINE") {
+                model.baseline_tp_flash(t, p, &x)
+            } else {
+                model.tp_flash(t, p, &x)
+            };
+            match result {
                 Ok(flash) => {
                     print!(
                         "{},{:.17e},{:.17e}",

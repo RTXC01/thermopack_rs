@@ -1,0 +1,139 @@
+{
+  "summary": {
+    "tp_flash": {
+      "matched_cases": 1043,
+      "failed_cases": 0
+    },
+    "translated_tp": {
+      "matched_cases": 1130,
+      "failed_cases": 0
+    },
+    "quantum_tp": {
+      "matched_cases": 718,
+      "failed_cases": 3
+    }
+  },
+  "failures": [
+    {
+      "group": "quantum_tp",
+      "case": "PR|C1,CO2,N2|80.0|100000.0|0.5,0.3,0.2|V_TP_BASELINE@Classic@QuantumCubic@0@bounds:0.5:999.0",
+      "quantities": [
+        6,
+        7,
+        8
+      ],
+      "reference": [
+        0.0,
+        7.556008633828007e-22,
+        1.0,
+        0.5,
+        0.3,
+        0.2,
+        0.028946909855376297,
+        0.5347424803475505,
+        0.43631060979707315
+      ],
+      "rust": [
+        0.0,
+        7.557199182706167e-22,
+        1.0,
+        0.5,
+        0.3,
+        0.2,
+        0.02894228384346638,
+        0.5347180966230862,
+        0.43633961953344724
+      ]
+    },
+    {
+      "group": "quantum_tp",
+      "case": "SRK|C1,CO2,N2|80.0|100000.0|0.5,0.3,0.2|V_TP_BASELINE@Classic@QuantumCubic@0@bounds:0.5:999.0",
+      "quantities": [
+        6,
+        8
+      ],
+      "reference": [
+        0.0,
+        2.360636368287806e-22,
+        1.0,
+        0.5,
+        0.3,
+        0.2,
+        0.05759623805135415,
+        1.814625387937471e-09,
+        0.9424037601340205
+      ],
+      "rust": [
+        0.0,
+        2.3594609740079765e-22,
+        1.0,
+        0.5,
+        0.3,
+        0.2,
+        0.05762493032026262,
+        1.8151514090249672e-09,
+        0.9423750678645859
+      ]
+    },
+    {
+      "group": "quantum_tp",
+      "case": "RK|C1,CO2,N2|80.0|100000.0|0.5,0.3,0.2|V_TP_BASELINE@RK@QuantumCubic@0@bounds:0.5:999.0",
+      "quantities": [
+        6,
+        8
+      ],
+      "reference": [
+        0.0,
+        2.360636368287806e-22,
+        1.0,
+        0.5,
+        0.3,
+        0.2,
+        0.05759623805135415,
+        1.814625387937471e-09,
+        0.9424037601340205
+      ],
+      "rust": [
+        0.0,
+        2.3594609740079765e-22,
+        1.0,
+        0.5,
+        0.3,
+        0.2,
+        0.05762493032026262,
+        1.8151514090249672e-09,
+        0.9423750678645859
+      ]
+    }
+  ],
+  "source_fixture_sha256": {
+    "tp_flash": "4f170614d40043a9404d6a9f54692bde9ab0afc37966717f2eab5cd2da04c00b",
+    "translated_tp": "4effa374242c312e5746dea37b218ed777bf9e68292e783444cbad064cf9c465",
+    "quantum_tp": "470ea02c99e95234f930bbe80f8726c16f5ecdfd121bf635501333c9f8f6dce9"
+  },
+  "absolute_tolerance": 2e-07,
+  "relative_tolerance": 2e-07,
+  "phase_flag_tolerance": 0,
+  "phase_permutation_allowed": false,
+  "native_sources_sha256": {
+    "rust/benches/cubic.rs": "506c81f78af2daecc81c3b6902a36945a5f133a5c48c3355f27327ad2950eed0",
+    "rust/examples/cubic.rs": "22a37961aaa5e8c2dad9c00bf59a2eaa813cd835bf150c7ac7dc877597d0dbef",
+    "rust/examples/parity.rs": "436a5c230c75686ce6679d3dedc9701e5f484b8f90372157a7b906a9550e2686",
+    "rust/src/alpha.rs": "5b53eadba0bd58038e962f64903e52ba48edab6990350aa2e2914c4890bfda9a",
+    "rust/src/baseline_flash.rs": "a62303bf58d6c4b1c7d5709fb0a256fa85e6c2df63ab472a9532b5cb49a2a7d2",
+    "rust/src/beta.rs": "a8220e72d613644ad77564df0379a08c5463267f7fafa6e1a2a0289ec45b74fa",
+    "rust/src/caloric.rs": "02c01bb82e489e2c8ddf61b2230fcdc9b46ea587523c7311b8c11f0db7d89da2",
+    "rust/src/component.rs": "c8467c692b5ff50a46870b7499f131b117e3685d751183e279982cd032eb1645",
+    "rust/src/cubic.rs": "c732ab2eb3c04dc152bc97cd27e6c08bd30043cbcc877ee70de89c8e8a3aae24",
+    "rust/src/data.rs": "8081eb62e01eb3653a0bb1f41be8cd79d38756be07f33770c6aa7e43954ec12a",
+    "rust/src/error.rs": "5621c03915ebb6154ebbef42e00f4c121af2a398131ffabb542b4794106316e3",
+    "rust/src/flash.rs": "f609e42b7fa6dc02173df1a306c122a36c820c9c0ce441d3c70df146db262d5c",
+    "rust/src/hydrogen.rs": "05e1a4d1801fb12bbad0bd4915393d572319e7217c98b95b9de9e81ec600e794",
+    "rust/src/ideal.rs": "3ca1ddedf7d9b063b2636984ffab2ce46bdd8855ba448cc26b0483f4e46e9d30",
+    "rust/src/lib.rs": "e03d2fdee9cff2da6537fd6de32cd7ffd3610e887e687838f96b8fa0dde0813c",
+    "rust/src/numerics.rs": "ec59a045caf097325604eddb9f3b508cb488014462c65598a9fdd8e88a852d32",
+    "rust/src/translation.rs": "8e9889468085287c3cf1506edc6a98815fdaf03ac29f9920c197dfb6328b6902"
+  },
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+  "generator": "tools/rust_port/validate_baseline_tp.py"
+}

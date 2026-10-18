@@ -54,7 +54,10 @@ fields use 1e-9 absolute plus 2e-8 relative tolerance. Sixty source one-step
 calls with non-finite values are recorded separately. Native repeated-update
 tests independently check material balance and equality of chemical potentials.
 
-These routines are groundwork for reproducing complete source flash
-initialization and convergence paths. They have not yet replaced the optimized
-physical RR helper in the native TP solver; the 82 cryogenic flash differences
-remain pending.
+These routines are integrated into `baseline_tp_flash`; see
+[fork-order TP qualification](phase-equilibrium.md#fork-order-tp-compatibility).
+The stricter `tp_flash` retains its optimized physical RR helper and its
+chemical-potential/Gibbs acceptance criteria. Its 82-case cryogenic TP/PH/PS
+diagnostic remains pending; the baseline TP method separately resolves the
+two stationary cryogenic splits and classical phase permutation, while three
+ghost-vapor composition differences remain recorded.

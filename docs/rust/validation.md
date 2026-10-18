@@ -66,6 +66,11 @@ hashes, compiler, flags and LAPACK revision invalidates stale cached objects.
   energy. Sixty non-finite source one-step calls are recorded. All four
   convergence/RR-status combinations are covered. Full TP restart/Newton and
   optional non-vapor phaseY paths remain pending.
+* `baseline_tp_flash` matches raw ordering, both fractions and composition
+  arrays for all 2173 classical/translated TP snapshots and 718/721 quantum
+  snapshots. `validate_baseline_tp.py` rechecks every frozen result and currently
+  returns failure for three vanishing-vapor composition differences. See
+  [fork-order TP qualification](phase-equilibrium.md#fork-order-tp-compatibility).
 * 1320 cubic states: PR, SRK, SRK with RK alpha, vdW; six pure fluids and five
   mixtures, 200/300/500 K, 1 kPa through 20 MPa, liquid/vapor requests, zero
   mole-fraction components and nonzero binary interactions.

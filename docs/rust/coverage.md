@@ -7,8 +7,9 @@ not qualify an entire family.
 
 | Capability | Source | Status |
 |---|---|---|
-| Extended Rachford–Rice and one-step initialization | tp_solver::rr_solve | validated: 698 finite/status comparisons, six non-finite source calls recorded; 2–20 components and negative-flash roots; full flash integration pending |
-| LV RR successive-substitution iteration | tp_solver::rr_successive_substitution_iteration | validated: 2110 finite results/statuses including all four convergence/RR flag combinations; 60 non-finite source calls recorded; complete TP iteration/restart path and optional non-vapor phaseY pending |
+| Extended Rachford–Rice and one-step initialization | tp_solver::rr_solve | validated: 698 finite/status comparisons, six non-finite source calls recorded; 2–20 components and negative-flash roots; integrated into baseline TP compatibility |
+| LV RR successive-substitution iteration | tp_solver::rr_successive_substitution_iteration | validated: 2110 finite results/statuses including all four convergence/RR flag combinations; 60 non-finite source calls recorded; integrated into baseline TP; full trajectory fidelity and optional non-vapor phaseY pending |
+| Fork-order TP compatibility | tp_solver::twoPhaseTPflash, mod_newton_search; optimizer | native baseline_tp_flash: raw phase ordering/fractions/compositions match all 1043 classical and 1130 translated snapshots, plus 718/721 quantum snapshots; three ghost-vapor composition differences retained; reuses native stability search and general pivoted linear solve, so complete source path fidelity remains pending |
 | Component/interaction database | fluids/, binaries/, compdatadb.f90, mixdatadb.f90 | native: 109 fluids with compiled numerical constants; all 111 Cp and 191 ci records; default/non-default classical PR/SRK interactions; JSON aliases; other model parameter sets pending |
 | PR, SRK, RK, van der Waals; classic alpha/vdW mixing | cbmix, cbalpha, cubic, cbhelm | validated: 1320 state cases; RK = SRK with RK alpha in the reference |
 | Cubic alpha correlations and parameters | cbalpha, compdatadb | validated alpha initializer/setters: 4232 numerical cases, 80 source terminations recorded; 3240 EOS/derivative cases; all 257 TWU/MC records embedded; explicit UMR/GERG evaluation returns source-unimplemented errors |

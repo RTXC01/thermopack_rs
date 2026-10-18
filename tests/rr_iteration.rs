@@ -125,3 +125,30 @@ fn repeated_updates_close_material_and_chemical_potentials() {
         assert!(!state.has_solution && !state.converged);
     }
 }
+
+#[test]
+fn resizing_public_outputs_does_not_resize_the_owned_iteration_workspace() {
+    let model = Cubic::new(CubicKind::PengRobinson, &["C1", "C2", "C3"]).unwrap();
+    let mut state = RachfordRiceIteration::new(2);
+    for buffer in [
+        &mut state.split.liquid,
+        &mut state.split.vapor,
+        &mut state.equilibrium_ratios,
+        &mut state.liquid_ln_fugacity,
+        &mut state.vapor_ln_fugacity,
+    ] {
+        buffer.resize(3, 0.);
+    }
+    assert!(
+        model
+            .rr_successive_substitution_iteration(
+                180.,
+                1e6,
+                &[0.5, 0.3, 0.2],
+                &[4., 0.2, 0.2],
+                &mut state,
+                false
+            )
+            .is_err()
+    );
+}

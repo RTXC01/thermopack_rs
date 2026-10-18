@@ -4,6 +4,9 @@
 use crate::error::positive;
 use crate::{Cubic, Error, Phase, Result, numerics};
 
+#[path = "baseline_flash.rs"]
+mod baseline;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
 pub enum FlashPhase {
@@ -177,6 +180,7 @@ impl Cubic {
             || state.equilibrium_ratios.len() != n
             || state.liquid_ln_fugacity.len() != n
             || state.vapor_ln_fugacity.len() != n
+            || state.composition.len() != n
         {
             return Err(Error::InvalidInput(
                 "matching RR iteration buffers required",

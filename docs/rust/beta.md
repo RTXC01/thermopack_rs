@@ -108,7 +108,14 @@ continued solver development; the property qualification above does not imply
 that all QuantumCubic flashes are interchangeable with the fork.
 The retained single-reference grid contains 2161 finite/closing source returns
 and 305 recorded source failures. Current native comparisons leave 82 cases
-unresolved: 5 TP, 37 PH and 40 PS. The 36 pure saturation cases all match.
+unresolved for the stricter `tp_flash` and existing caloric APIs: 5 TP, 37 PH
+and 40 PS. The 36 pure saturation cases all match.
+
+The separate `baseline_tp_flash` method now matches 718/721 raw TP snapshots,
+including the two higher-Gibbs stationary source splits. Three vanishing-vapor
+compositions still differ; the diagnostic preserves those differences. This
+method is not yet used inside PH/PS. See
+[fork-order TP qualification](phase-equilibrium.md#fork-order-tp-compatibility).
 
 `validate_quantum_flash.py` records successful and failed native comparisons
 separately, with source fingerprints, and returns nonzero while differences

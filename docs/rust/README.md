@@ -61,5 +61,7 @@ The [extended RR notes](rachford-rice.md) cover source-compatible negative-flash
 bounds, independent phase fractions and one-step initialization.
 The [symmetric-solver notes](symmetric-solver.md) cover the native upper
 Bunch–Kaufman port, caller-owned buffers and pinned LAPACK qualification.
+The [equilibrium-response notes](equilibrium-response.md) cover analytic
+volume/caloric T/P derivatives, phase redistribution and source Cp conventions.
 Regenerate inventory with
 `python tools/rust_port/inventory.py`.

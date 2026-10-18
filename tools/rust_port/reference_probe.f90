@@ -161,3 +161,23 @@ subroutine query_symmetric(n,a,b,ipiv,status) bind(C,name='query_symmetric')
   endif
   a=reshape(transpose(matrix),[n*n])
 end subroutine query_symmetric
+
+subroutine query_response(n,t,p,z,bv,bl,x,y,phase,values) bind(C,name='query_response')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use state_functions, only: dhdt_twoPhase,dvdt_twoPhase,dvdp_twoPhase
+  use eos, only: enthalpy,specificVolume
+  implicit none
+  integer(c_int), value :: n,phase
+  real(c_double), value :: t,p,bv,bl
+  real(c_double), intent(in) :: z(n),x(n),y(n)
+  real(c_double), intent(out) :: values(3)
+  real(c_double) :: h,v
+  if (phase==0) then
+    values(1)=dhdt_twoPhase(t,p,z,bv,bl,x,y)
+    values(2)=dvdt_twoPhase(t,p,z,bv,bl,x,y)
+    values(3)=dvdp_twoPhase(t,p,z,bv,bl,x,y)
+  else
+    call enthalpy(t,p,z,phase,h,dhdt=values(1))
+    call specificVolume(t,p,z,phase,v,dvdt=values(2),dvdp=values(3))
+  endif
+end subroutine query_response

@@ -46,6 +46,9 @@ def load_probe():
     probe.query_rr_iteration.restype=None
     probe.query_symmetric.argtypes=[c_int,POINTER(c_double),POINTER(c_double),POINTER(c_int),POINTER(c_int)]
     probe.query_symmetric.restype=None
+    probe.query_response.argtypes=[c_int,c_double,c_double,POINTER(c_double),c_double,c_double,
+                                   POINTER(c_double),POINTER(c_double),c_int,POINTER(c_double)]
+    probe.query_response.restype=None
     return probe
 
 
@@ -117,7 +120,21 @@ def main(compiler_directory):
                 else:
                     raise ValueError('unknown translation operation')
                 previous=None
-        if request['mode']=='V_RR':
+        if request['mode']=='V_RESP':
+            if probe is None:probe=load_probe()
+            t,p,z=request['temperature'],request['pressure'],request['feed']
+            result=model.two_phase_tpflash(t,p,z)
+            n=model.nc;feed=(c_double*n)(*z);x=(c_double*n)(*result.x);y=(c_double*n)(*result.y)
+            derivatives=(c_double*3)()
+            model.activate()
+            probe.query_response(n,t,p,feed,result.betaV,result.betaL,x,y,result.phase,derivatives)
+            values=[float(result.phase),*map(float,derivatives)]
+            if not all(map(math.isfinite,values)):
+                print('THERMOPACK_RESULT='+json.dumps({'calculation_error':'non-finite equilibrium response',
+                      'values':list(map(str,values))}),flush=True)
+                continue
+            swappable=False
+        elif request['mode']=='V_RR':
             if probe is None: probe=load_probe()
             model.activate()
             n=model.nc

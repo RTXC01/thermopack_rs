@@ -18,6 +18,10 @@ use crate::{
     Cubic, Error, FlashOptions, FlashPhase, FlashResult, Phase, PreparedState, R, Result, numerics,
 };
 
+#[path = "response.rs"]
+mod response;
+pub use response::EquilibriumResponse;
+
 #[derive(Debug, Clone, Copy)]
 pub struct EquilibriumProperties {
     pub volume: f64,

@@ -56,5 +56,6 @@ jobs:
       - run: python tools/rust_port/validate_rr.py
       - run: python tools/rust_port/validate_rr_iteration.py
       - run: python tools/rust_port/validate_symmetric.py
+      - run: python tools/rust_port/validate_response.py
       - run: python tools/rust_port/validate_translated_flash.py
       - run: python tools/rust_port/verify_fixtures.py

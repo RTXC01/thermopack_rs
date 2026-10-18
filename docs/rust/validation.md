@@ -41,6 +41,7 @@ python tools/rust_port/validate_beta.py
 python tools/rust_port/validate_rr.py
 python tools/rust_port/validate_rr_iteration.py
 python tools/rust_port/validate_symmetric.py
+python tools/rust_port/validate_response.py
 python tools/rust_port/validate_translated_flash.py
 ```
 
@@ -58,6 +59,11 @@ hashes, compiler, flags and LAPACK revision invalidates stale cached objects.
 
 ## Qualified cases
 
+* 441 equilibrium TP-response attempts: 435 finite results match phase, reported
+  Cp, dV/dT and dV/dP; six source terminations are recorded. Independent native
+  finite differences in 72 classical/translated states check physical Cp,
+  volume T/P derivatives, internal-energy T/P derivatives and Maxwell symmetry.
+  See [equilibrium response](equilibrium-response.md).
 * 226 upper symmetric indefinite systems match pinned LAPACK factorization,
   signed pivots, solutions and singularity status, with no source failures.
   Native tests independently verify componentwise backward error and untouched

@@ -407,6 +407,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .split(',')
             .map(str::parse)
             .collect::<Result<_, _>>()?;
+        if property_config[0] == "V_RESP" {
+            match model.baseline_tp_flash(t, p, &x).and_then(|f| {
+                let r = model.baseline_equilibrium_response(&f)?.ok_or(
+                    thermopack_rs::Error::NotConverged("undefined equilibrium TP response"),
+                )?;
+                Ok((f.phase, r))
+            }) {
+                Ok((phase, r)) => println!(
+                    "{},{:.17e},{:.17e},{:.17e}",
+                    phase as i32, r.heat_capacity, r.volume_dt, r.volume_dp
+                ),
+                Err(e) => println!("ERROR: {e}"),
+            }
+            continue;
+        }
         if property_config[0] == "V_RR" {
             let inputs: Vec<_> = property_config
                 .iter()

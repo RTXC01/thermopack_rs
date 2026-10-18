@@ -33,6 +33,8 @@ python tools/rust_port/validate_flash.py
 python tools/rust_port/validate_initialization.py
 python tools/rust_port/validate_caloric.py
 python tools/rust_port/validate_isochoric.py
+python tools/rust_port/benchmark_isochoric.py --compiler /path/to/gfortran --preflight-only
+python tools/rust_port/benchmark_isochoric.py --compiler /path/to/gfortran --tcpr --preflight-only
 python tools/rust_port/validate_ideal.py
 python tools/rust_port/validate_ideal_configuration.py
 python tools/rust_port/validate_alpha.py

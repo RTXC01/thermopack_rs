@@ -182,8 +182,8 @@ impl Cubic {
         }
         let homop = self
             .prepare(homogeneous, z)
-            .and_then(|s| s.pressure(volume))
-            .map(|p| p.value)
+            .and_then(|s| s.caloric_tv(volume))
+            .map(|p| p.pressure)
             .unwrap_or(0.);
         let mut homogeneous_seed =
             if homop >= options.minimum_pressure && homop <= options.maximum_pressure {
@@ -475,6 +475,14 @@ fn evaluate(
     let closure = ((value - target) / spec.scale(t))
         .abs()
         .max(((v - volume) / volume).abs());
+    // f64::max ignores NaN operands. Validate explicitly before using its
+    // reduction as a convergence test, including the residual-only path.
+    if !closure.is_finite()
+        || residual.iter().any(|value| !value.is_finite())
+        || [h, s, v, cp, vt, vp].iter().any(|value| !value.is_finite())
+    {
+        return Err(Error::NotConverged("non-finite UV/SV phase properties"));
+    }
     Ok(Evaluation {
         residual,
         matrix,
@@ -637,8 +645,10 @@ fn accept(
 ) -> Result<FlashResult> {
     // Closure checks do not need equilibrium Cp or its redistribution solve.
     let props = model.equilibrium_properties_impl(&candidate, false)?;
-    if (spec.closure(&props) - target).abs()
-        > options.scaled_tolerance * spec.scale(candidate.temperature) * 10.
+    if !spec.closure(&props).is_finite()
+        || !props.volume.is_finite()
+        || (spec.closure(&props) - target).abs()
+            > options.scaled_tolerance * spec.scale(candidate.temperature) * 10.
         || (props.volume - volume).abs() > options.scaled_tolerance * volume * 10.
     {
         return Err(Error::NotConverged(
@@ -668,8 +678,10 @@ fn accept(
     // branch at the precision supported by its chemical-potential solve.
     let stability_tolerance =
         (options.scaled_tolerance * 10.).max(options.tp.fugacity_tolerance * 100.);
-    if (spec.closure(&stable_props) - target).abs()
-        > stability_tolerance * spec.scale(candidate.temperature)
+    if !spec.closure(&stable_props).is_finite()
+        || !stable_props.volume.is_finite()
+        || (spec.closure(&stable_props) - target).abs()
+            > stability_tolerance * spec.scale(candidate.temperature)
         || (stable_props.volume - volume).abs() > stability_tolerance * volume
     {
         return Err(Error::NotConverged("UV/SV phase stability closure"));

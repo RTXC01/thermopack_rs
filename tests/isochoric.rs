@@ -314,3 +314,72 @@ fn tv_caloric_derivatives_include_translation_and_covolume_temperature_terms() {
         }
     }
 }
+
+#[test]
+fn nonfinite_caloric_correlations_cannot_report_volume_flash_convergence() {
+    for components in [&["C1"][..], &["C1", "C2", "C3"][..]] {
+        let mut model = Cubic::new(CubicKind::PengRobinson, components).unwrap();
+        let z = if components.len() == 1 {
+            vec![1.]
+        } else {
+            vec![0.5, 0.3, 0.2]
+        };
+        let properties = model
+            .equilibrium_properties(&model.tp_flash(200., 1e6, &z).unwrap())
+            .unwrap();
+        // Exercise both NaN from a degenerate DIPPR oscillator and infinity
+        // from overflowing polynomial integrals, using finite coefficients.
+        for (correlation, coefficients) in [(7, &[0.; 5][..]), (4, &[1e308][..])] {
+            model
+                .ideal_gas_mut(0)
+                .unwrap()
+                .set_heat_capacity(correlation, coefficients)
+                .unwrap();
+            assert!(
+                !model
+                    .ideal_gas(0)
+                    .unwrap()
+                    .properties(200., 1e5)
+                    .unwrap()
+                    .enthalpy
+                    .is_finite()
+            );
+            assert!(model.prepare(200., &z).unwrap().caloric_tv(1e-3).is_err());
+            // The original bug returned success at the hypothetical homogeneous
+            // pressure, with a NaN caloric residual hidden by f64::max.
+            for (u, s, v) in [
+                (0., 0., 1e-3),
+                (
+                    properties.internal_energy,
+                    properties.entropy,
+                    properties.volume,
+                ),
+            ] {
+                assert!(model.uv_flash(&z, u, v).is_err());
+                assert!(model.sv_flash(&z, s, v).is_err());
+            }
+        }
+    }
+}
+
+#[test]
+fn finite_energy_and_entropy_do_not_hide_a_nan_heat_capacity() {
+    let mut model = Cubic::new(CubicKind::PengRobinson, &["C1"]).unwrap();
+    model
+        .ideal_gas_mut(0)
+        .unwrap()
+        .set_heat_capacity(7, &[30., 1., 1e308, 0., 1.])
+        .unwrap();
+    let ideal = model.ideal_gas(0).unwrap().properties(200., 1e5).unwrap();
+    assert!(ideal.enthalpy.is_finite() && ideal.entropy.is_finite());
+    assert!(ideal.enthalpy_dt.is_nan());
+    let state = model.prepare(200., &[1.]).unwrap();
+    let v = 1e-3;
+    let p = state.pressure(v).unwrap().value;
+    let u = state.enthalpy(v).unwrap() - p * v;
+    let s = state.entropy(v).unwrap();
+    assert!(u.is_finite() && s.is_finite());
+    assert!(state.caloric_tv(v).is_err());
+    assert!(model.uv_flash(&[1.], u, v).is_err());
+    assert!(model.sv_flash(&[1.], s, v).is_err());
+}

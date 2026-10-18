@@ -15,6 +15,9 @@ are available through `volume_flash_options()` and the `_with_options` methods.
 They inherit model temperature bounds, use 10 Pa–100 MPa pressure bounds by
 default, and accept optional positive T/P guesses. Search bounds limit every
 coupled step. Failed convergence returns an error.
+Non-finite caloric values or derivatives also return an error, including
+degenerate custom Cp correlations whose coefficients are individually finite.
+NaN residuals cannot satisfy the convergence or final closure tests.
 
 ```rust
 use thermopack_rs::{Cubic, CubicKind};
@@ -90,6 +93,9 @@ cargo test --test isochoric
 
 ## Native-loop measurements
 
+These measurements record library commit `1e6baee`; the reports retain the
+complete source fingerprints for that version.
+
 `benchmark_isochoric.py` compares 100 PR methane/ethane/propane states at
 0.5/0.3/0.2, 1 MPa and 180–259.2 K, for default and tcPR construction.
 Fortran generates all U/S/V specifications and both programs read exactly the
@@ -138,6 +144,7 @@ measurements; these results do not establish a library-wide speedup.
 ```
 python tools/rust_port/benchmark_isochoric.py --compiler /path/to/gfortran
 python tools/rust_port/benchmark_isochoric.py --compiler /path/to/gfortran --tcpr
+python tools/rust_port/benchmark_isochoric.py --compiler /path/to/gfortran --preflight-only
 cargo bench --bench isochoric
 ```
 

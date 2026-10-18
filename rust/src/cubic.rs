@@ -1020,11 +1020,18 @@ impl PreparedState<'_> {
         let s = ideal.entropy + R * ((v - self.b).ln() - (R * t / 1e5).ln()) + self.at * integral
             - ab * beta_t
             + pressure.value * translation_t;
+        let cv = ideal.enthalpy_dt - R + self.residual_cv_tv(volume)?;
+        if [pressure.value, u, s, cv]
+            .iter()
+            .any(|value| !value.is_finite())
+        {
+            return Err(Error::InvalidInput("non-finite TV caloric properties"));
+        }
         Ok(TvProperties {
             pressure: pressure.value,
             internal_energy: u,
             entropy: s,
-            heat_capacity_v: ideal.enthalpy_dt - R + self.residual_cv_tv(volume)?,
+            heat_capacity_v: cv,
         })
     }
 

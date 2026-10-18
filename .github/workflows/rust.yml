@@ -59,5 +59,7 @@ jobs:
       - run: python tools/rust_port/validate_response.py
       - run: python tools/rust_port/validate_sound.py
       - run: python tools/rust_port/validate_isochoric.py
+      - run: python tools/rust_port/benchmark_isochoric.py --compiler /usr/bin/gfortran-13 --preflight-only
+      - run: python tools/rust_port/benchmark_isochoric.py --compiler /usr/bin/gfortran-13 --tcpr --preflight-only
       - run: python tools/rust_port/validate_translated_flash.py
       - run: python tools/rust_port/verify_fixtures.py

@@ -14,7 +14,7 @@ def fingerprints(paths):
     return {p.relative_to(ROOT).as_posix():hashlib.sha256(p.read_bytes().replace(b'\r\n',b'\n')).hexdigest() for p in paths}
 
 
-def benchmark(compiler,repeats,tcpr,output):
+def benchmark(compiler,repeats,tcpr,output,preflight_only=False):
     if repeats<1:raise ValueError('At least one measured repetition required')
     compiler=Path(compiler).resolve();env=dict(os.environ);env['PATH']=str(compiler.parent)+os.pathsep+env['PATH']
     out=ROOT/'.reference';exe=out/('benchmark_isochoric.exe' if os.name=='nt' else 'benchmark_isochoric')
@@ -45,6 +45,13 @@ def benchmark(compiler,repeats,tcpr,output):
             tolerance=0. if i==2 else ([2e-5,.5,0.,2e-7,2e-7]+[2e-7]*6)[i]+2e-7*max(abs(a),abs(b))
             assert math.isfinite(a) and math.isfinite(b) and abs(a-b)<=tolerance,(case,i,a,b,tolerance)
             maxima[i]=max(maxima[i],abs(a-b))
+    if preflight_only:
+        assert native_hashes==fingerprints(sorted((ROOT/'rust').rglob('*.rs'))),'Native sources changed during preflight'
+        assert benchmark_hashes==fingerprints(benchmark_paths),'Benchmark sources changed during preflight'
+        assert cargo_hashes==fingerprints(cargo_paths),'Cargo inputs changed during preflight'
+        print(json.dumps(dict(preflight_cases=len(expected),parameter_reference=ref,
+                             maximum_absolute_differences=maxima),indent=2))
+        return
     samples={};checksums={}
     for i in range(repeats+1):
         reference=parse(run_reference('time'),('uv,','sv,'));rust=parse(run_rust(),('uv,','sv,'))
@@ -77,4 +84,5 @@ def benchmark(compiler,repeats,tcpr,output):
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('--compiler',required=True);parser.add_argument('--repeats',type=int,default=5)
     parser.add_argument('--tcpr',action='store_true');parser.add_argument('--output')
-    args=parser.parse_args();benchmark(args.compiler,args.repeats,args.tcpr,args.output)
+    parser.add_argument('--preflight-only',action='store_true',help='Check all states and closure without timing or replacing measurement reports')
+    args=parser.parse_args();benchmark(args.compiler,args.repeats,args.tcpr,args.output,args.preflight_only)

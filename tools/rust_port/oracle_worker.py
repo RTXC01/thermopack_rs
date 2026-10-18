@@ -51,6 +51,10 @@ def load_probe():
     probe.query_response.restype=None
     probe.query_sv.argtypes=[c_int,*([POINTER(c_double)]*9),POINTER(c_int),POINTER(c_int)]
     probe.query_sv.restype=None
+    probe.query_pets.argtypes=[*([c_double]*5),POINTER(c_double)]
+    probe.query_pets.restype=None
+    probe.query_pets_potential.argtypes=[c_int,POINTER(c_double),c_double,c_double,POINTER(c_double),POINTER(c_double)]
+    probe.query_pets_potential.restype=None
     return probe
 
 
@@ -85,6 +89,25 @@ def main(compiler_directory):
                 print('THERMOPACK_RESULT='+json.dumps({'values':values}),flush=True)
             else:
                 print('THERMOPACK_RESULT='+json.dumps({'calculation_error':'non-finite RR output','values':list(map(str,values))}),flush=True)
+            continue
+        if request['mode'].startswith('PETS_'):
+            if previous!=('PETS',):
+                from thermopack.pets import pets
+                model=pets();previous=('PETS',)
+            if probe is None:probe=load_probe()
+            model.activate();sigma,eps=request.get('parameters',[3.42e-10,136.])
+            if request['mode']=='PETS_CORE':
+                output=(c_double*56)()
+                probe.query_pets(request['temperature'],request['volume'],request['moles'],sigma,eps,output)
+                values=list(map(float,output))
+            elif request['mode']=='PETS_POTENTIAL':
+                n=len(request['distances']);r=(c_double*n)(*request['distances']);out=(c_double*n)();force=(c_double*n)()
+                probe.query_pets_potential(n,r,sigma,eps,out,force)
+                values=[*map(float,out),*map(float,force)]
+            else:raise ValueError('unknown PeTS mode')
+            if not all(map(math.isfinite,values)):
+                print('THERMOPACK_RESULT='+json.dumps({'calculation_error':'non-finite PeTS output','values':list(map(str,values))}),flush=True)
+            else:print('THERMOPACK_RESULT='+json.dumps({'values':values}),flush=True)
             continue
         eos,comps=request['eos'],request['components']
         alpha=request.get('alpha','RK' if eos=='RK' else 'Classic')

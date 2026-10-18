@@ -33,6 +33,11 @@ name = "isochoric"
 path = "rust/benches/isochoric.rs"
 harness = false
 
+[[bench]]
+name = "pets"
+path = "rust/benches/pets.rs"
+harness = false
+
 [profile.release]
 lto = "thin"
 codegen-units = 1

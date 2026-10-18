@@ -22,9 +22,11 @@ pub mod component;
 pub mod cubic;
 mod error;
 pub mod flash;
+pub mod helmholtz;
 mod hydrogen;
 pub mod ideal;
 pub mod numerics;
+pub mod pets;
 pub mod translation;
 
 pub use alpha::{Alpha, AlphaCorrelation, AlphaValue};
@@ -41,7 +43,9 @@ pub use error::{Error, Result};
 pub use flash::{
     FlashOptions, FlashPhase, FlashResult, RachfordRiceIteration, Stability, StabilityTrial,
 };
+pub use helmholtz::{DensityHelmholtz, PureHelmholtz, PurePressure};
 pub use ideal::{EntropyReference, IdealGas, IdealProperties};
+pub use pets::{Pets, PetsContributions, PetsDiameter, PetsTvProperties, PreparedPets};
 pub use translation::{TranslationKind, TranslationValue, VolumeTranslation};
 
 /// Gas constant [J/(mol K)], using the exact expression from ThermoPack.

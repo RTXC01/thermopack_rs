@@ -89,6 +89,74 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if fields.len() != 6 {
             return Err("expected six fields".into());
         }
+        if fields[0] == "PETS" {
+            let parameters: Vec<f64> = fields[1]
+                .split(',')
+                .map(str::parse)
+                .collect::<Result<_, _>>()?;
+            let model = thermopack_rs::Pets::with_parameters(parameters[0], parameters[1])?;
+            let result = (|| -> thermopack_rs::Result<Vec<f64>> {
+                if fields[5] == "PETS_POTENTIAL" {
+                    let r: Vec<f64> = fields[2].split(',').map(|v| v.parse().unwrap()).collect();
+                    let mut values = vec![0.; r.len()];
+                    let mut forces = vec![0.; r.len()];
+                    model.potential_into(&r, &mut values, Some(&mut forces))?;
+                    values.extend(forces);
+                    return Ok(values);
+                }
+                let t = fields[2].parse().unwrap();
+                let v = fields[3].parse().unwrap();
+                let n = fields[4].parse().unwrap();
+                let prepared = model.prepare(t)?;
+                let diameter = prepared.diameter();
+                let a = prepared.contributions(n / v)?;
+                let f = prepared.residual_helmholtz(v, n)?;
+                let c = model.lj_truncation_correction(t, v, n)?;
+                let p = prepared.caloric_tv(v, n)?;
+                let mut values = vec![diameter.value, diameter.dt, diameter.dtt];
+                for a in [a.total, a.hard_sphere, a.dispersion] {
+                    values.extend([a.value, a.dt, a.drho, a.dtt, a.dtrho, a.drhorho]);
+                }
+                for f in [f, c] {
+                    values.extend([
+                        f.value, f.dt, f.dv, f.dn, f.dtt, f.dtv, f.dtn, f.dvv, f.dvn, f.dnn,
+                    ]);
+                }
+                values.extend([
+                    p.pressure.value,
+                    p.pressure.dt,
+                    p.pressure.dv,
+                    p.pressure.dn,
+                    p.internal_energy,
+                    p.entropy,
+                    p.helmholtz_energy,
+                    p.enthalpy,
+                    p.heat_capacity_v,
+                    p.chemical_potential,
+                ]);
+                let (b, c) = model.baseline_virial_coefficients(t)?;
+                values.extend([
+                    prepared.baseline_speed_of_sound_tv(v, n)?,
+                    b,
+                    c,
+                    p.ln_fugacity_coefficient.unwrap_or(0.),
+                    p.heat_capacity_p.unwrap_or(f64::NAN),
+                ]);
+                Ok(values)
+            })();
+            match result {
+                Ok(values) => println!(
+                    "{}",
+                    values
+                        .iter()
+                        .map(|v| format!("{v:.17e}"))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                ),
+                Err(error) => println!("ERROR: {error}"),
+            }
+            continue;
+        }
         if fields[5] == "SYMMETRIC" {
             let mut a: Vec<f64> = fields[1]
                 .split(',')

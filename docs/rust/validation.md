@@ -33,6 +33,7 @@ python tools/rust_port/validate_flash.py
 python tools/rust_port/validate_initialization.py
 python tools/rust_port/validate_caloric.py
 python tools/rust_port/validate_isochoric.py
+python tools/rust_port/validate_pets.py
 python tools/rust_port/benchmark_isochoric.py --compiler /path/to/gfortran --preflight-only
 python tools/rust_port/benchmark_isochoric.py --compiler /path/to/gfortran --tcpr --preflight-only
 python tools/rust_port/validate_ideal.py
@@ -154,6 +155,10 @@ hashes, compiler, flags and LAPACK revision invalidates stale cached objects.
   and branch differences and is not a passing qualification gate.
 
 Each comparison uses `abs(error) <= atol + rtol * max(abs(reference), abs(rust))`.
+The [PeTS qualification](pets.md) adds 588 full states (56 quantities each)
+and 16 vector-potential cases. All attempted source calls are finite. Independent
+tests verify extensive and mixed derivatives, caloric/mechanical identities,
+constant-entropy sound, constant-pressure Cp and analytic virial limits.
 The [UV/SV and direct TV qualification](isochoric.md) adds 409 finite source
 flash results and 141 TV property results. Metadata retains 137 failed source
 calls. Native tests independently check U/S/V closure, component balance,

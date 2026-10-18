@@ -67,5 +67,8 @@ The [sound notes](sound.md) cover fluid SV acoustics, extensive TV inputs,
 physical/source conventions and native-loop benchmark results.
 The [isochoric notes](isochoric.md) cover direct TV caloric properties, coupled
 UV/SV equations, pure latent quality and qualified source comparison scope.
+The [PeTS notes](pets.md) cover the pure-fluid Helmholtz/TV kernel, potential,
+LJ correction, source-order virials, temperature preparation and remaining
+higher-level interfaces.
 Regenerate inventory with
 `python tools/rust_port/inventory.py`.

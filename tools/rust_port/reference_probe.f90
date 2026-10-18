@@ -193,3 +193,71 @@ subroutine query_sv(n,t,p,z,bv,bl,x,y,s,v,phase,status) bind(C,name='query_sv')
   integer(c_int), intent(out) :: status
   call twoPhaseSVflash(t,p,z,bv,bl,x,y,s,v,phase,status)
 end subroutine query_sv
+
+subroutine query_pets(t,v,n,sigma,eps,values) bind(C,name='query_pets')
+  use, intrinsic :: iso_c_binding, only: c_double
+  use thermopack_var, only: get_active_eos,base_eos_param
+  use pets, only: PETS_eos,calc_delta_Ac_LJ
+  use saft_interface, only: pets_set_pure_params
+  use eostv, only: pressure,internal_energy_tv,entropy_tv,free_energy_tv,enthalpy_tv,chemical_potential_tv, &
+       virial_coefficients,thermo_tvp,enthalpy_tvp
+  use speed_of_sound, only: speed_of_sound_TV
+  implicit none
+  real(c_double), value :: t,v,n,sigma,eps
+  real(c_double), intent(out) :: values(56)
+  real(c_double) :: nn(1),h_tvp
+  class(base_eos_param), pointer :: active
+  nn=[n]
+  call pets_set_pure_params(1,[sigma,eps])
+  active=>get_active_eos()
+  select type(eos=>active)
+  class is(PETS_eos)
+    call eos%calc_d_pets(t,values(1:1),values(2:2),values(3:3))
+    call eos%alpha_PETS(n/v,t,nn,alp=values(4),alp_T=values(5),alp_rho=values(6), &
+         alp_TT=values(7),alp_rhoT=values(8),alp_rhorho=values(9))
+    call eos%alpha_pets_hs(n/v,t,nn,alp=values(10),alp_T=values(11),alp_rho=values(12), &
+         alp_TT=values(13),alp_rhoT=values(14),alp_rhorho=values(15))
+    call eos%alpha_disp(n/v,t,nn,alp=values(16),alp_T=values(17),alp_rho=values(18), &
+         alp_TT=values(19),alp_rhoT=values(20),alp_rhorho=values(21))
+    call eos%F_PETS_TVn(t,v,nn,F=values(22),F_T=values(23),F_V=values(24),F_n=values(25:25), &
+         F_TT=values(26),F_TV=values(27),F_Tn=values(28:28),F_VV=values(29),F_Vn=values(30:30), &
+         F_nn=values(31:31))
+  class default
+    error stop 'PeTS probe requires active PeTS model'
+  end select
+  call calc_delta_Ac_LJ(1,t,v,nn,sigma,eps,a=values(32),a_T=values(33),a_V=values(34), &
+       a_n=values(35:35),a_TT=values(36),a_TV=values(37),a_Tn=values(38:38), &
+       a_VV=values(39),a_Vn=values(40:40),a_nn=values(41:41))
+  values(42)=pressure(t,v,nn,dpdt=values(43),dpdv=values(44),dpdn=values(45:45))
+  call internal_energy_tv(t,v,nn,values(46),dudt=values(50))
+  call entropy_tv(t,v,nn,values(47))
+  call free_energy_tv(t,v,nn,values(48))
+  call enthalpy_tv(t,v,nn,values(49))
+  call chemical_potential_tv(t,v,nn,values(51:51))
+  values(52)=speed_of_sound_TV(t,v,nn)
+  call virial_coefficients(t,[1.0_c_double],values(53),values(54))
+  values(55)=0.0
+  if (values(42)>0.0) call thermo_tvp(t,v,nn,values(55:55))
+  call enthalpy_tvp(t,v,nn,h_tvp,dhdt=values(56))
+end subroutine query_pets
+
+subroutine query_pets_potential(n,r,sigma,eps,values,forces) bind(C,name='query_pets_potential')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use thermopack_var, only: get_active_eos,base_eos_param
+  use pets, only: PETS_eos
+  use saft_interface, only: pets_set_pure_params
+  implicit none
+  integer(c_int), value :: n
+  real(c_double), value :: sigma,eps
+  real(c_double), intent(in) :: r(n)
+  real(c_double), intent(out) :: values(n),forces(n)
+  class(base_eos_param), pointer :: active
+  call pets_set_pure_params(1,[sigma,eps])
+  active=>get_active_eos()
+  select type(eos=>active)
+  class is(PETS_eos)
+    call eos%calc_potential_pets(n,r,values,forces)
+  class default
+    error stop 'PeTS potential probe requires active PeTS model'
+  end select
+end subroutine query_pets_potential

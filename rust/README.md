@@ -13,6 +13,11 @@ The crate has no runtime dependencies or Fortran calls. `Cubic::new` embeds the
 fork's fluid and default PR/SRK interaction database. `prepare` validates and
 caches T/composition parameters. Pressure scans, roots, residual properties and
 fugacity into caller-owned buffers allocate no memory after preparation.
+`Pets::new()` provides the pure-argon PeTS Helmholtz/TV kernel; its
+`prepare(T)` caches temperature terms for repeated densities. PeTS accepts
+total volume and mole number, and returns extensive caloric quantities. See
+[PeTS scope and qualification](../docs/rust/pets.md) for derivatives, sound,
+potentials, virials and pending roots/phase-equilibrium interfaces.
 
 Temperatures: K; pressures: Pa; volumes: m3/mol; energies: J/mol;
 compositions: normalized mole fractions. Root selection is explicit. A

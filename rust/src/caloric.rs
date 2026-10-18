@@ -22,6 +22,9 @@ use crate::{
 mod response;
 pub use response::EquilibriumResponse;
 
+#[path = "acoustic.rs"]
+mod acoustic;
+
 #[derive(Debug, Clone, Copy)]
 pub struct EquilibriumProperties {
     pub volume: f64,

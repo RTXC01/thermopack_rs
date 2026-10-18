@@ -30,7 +30,10 @@ pub fn fixture_model(fields: &[&str]) -> Cubic {
             "disable" => model.disable_volume_translation(),
             "bounds" => {} // Applied by the caloric fixture driver.
             "qhelper" => {}
-            "rr" => {} // Inputs to the standalone RR iteration fixture.
+            "rr" => {}      // Inputs to the standalone RR iteration fixture.
+            "quality" => {} // Pure coexistence acoustic fixture input.
+            "roots" => {}   // Optional acoustic phase-root overrides.
+            "amount" => {}  // Extensive TV acoustic input.
             "beta" => {
                 let params: Vec<f64> = data[3].split(',').map(|v| v.parse().unwrap()).collect();
                 model

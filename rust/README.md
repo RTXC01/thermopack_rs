@@ -90,3 +90,10 @@ derivatives, including phase redistribution. `baseline_equilibrium_response`
 retains the fork's reported Cp conventions. Pure latent states have no
 independent TP response. See [equilibrium-response notes](../docs/rust/equilibrium-response.md)
 for derived U/Cv/isentropic identities and qualification limits.
+
+`equilibrium_speed_of_sound(&flash)` includes thermal/mechanical/compositional
+phase redistribution, including pure coexistence. `speed_of_sound_tv(T,V,n)`
+accepts total volume and mole numbers for a single-phase TV evaluation.
+The corresponding `baseline_...` methods preserve source caloric and fallback
+conventions; `..._with_phases` supports fluid-root overrides. See
+[sound qualification and benchmarks](../docs/rust/sound.md).

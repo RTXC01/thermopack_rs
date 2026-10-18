@@ -1,5 +1,7 @@
 # Native cubic and flash benchmarks
 
+Fluid acoustic workloads have separate current [measurements and scope](sound.md#native-loop-measurements).
+
 Local measurements for the recorded source versions. See [benchmark.json](benchmark.json) for
 machine/compiler details, reference hashes and individual samples. Full tcPR
 construction has its own [report](benchmark-tcpr.json). These

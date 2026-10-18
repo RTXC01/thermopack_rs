@@ -63,5 +63,7 @@ The [symmetric-solver notes](symmetric-solver.md) cover the native upper
 Bunch–Kaufman port, caller-owned buffers and pinned LAPACK qualification.
 The [equilibrium-response notes](equilibrium-response.md) cover analytic
 volume/caloric T/P derivatives, phase redistribution and source Cp conventions.
+The [sound notes](sound.md) cover fluid SV acoustics, extensive TV inputs,
+physical/source conventions and native-loop benchmark results.
 Regenerate inventory with
 `python tools/rust_port/inventory.py`.

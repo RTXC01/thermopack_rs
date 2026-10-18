@@ -27,7 +27,10 @@ fn translated_model(
             "disable" => model.disable_volume_translation(),
             "bounds" => {} // Applied to native caloric options below.
             "qhelper" => {}
-            "rr" => {} // RR iteration inputs, handled after model construction.
+            "rr" => {}      // RR iteration inputs, handled after model construction.
+            "quality" => {} // Explicit pure two-phase acoustic state.
+            "roots" => {}   // Optional fluid acoustic phase-root overrides.
+            "amount" => {}  // Total moles in an extensive TV acoustic input.
             "kij" => model.set_kij(
                 data[1].parse().unwrap(),
                 data[2].parse().unwrap(),
@@ -407,6 +410,62 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .split(',')
             .map(str::parse)
             .collect::<Result<_, _>>()?;
+        if property_config[0] == "V_SOUND_TV" {
+            let amount: f64 = property_config
+                .iter()
+                .find(|op| op.starts_with("amount:"))
+                .map(|op| op.split(':').nth(1).unwrap().parse().unwrap())
+                .unwrap_or(1.);
+            let moles: Vec<_> = x.iter().map(|z| z * amount).collect();
+            match model.baseline_speed_of_sound_tv(t, p * amount, &moles) {
+                Ok(value) => println!("{value:.17e}"),
+                Err(error) => println!("ERROR: {error}"),
+            }
+            continue;
+        }
+        if property_config[0] == "V_SOUND" {
+            let flash = if let Some(quality) =
+                property_config.iter().find(|op| op.starts_with("quality:"))
+            {
+                let bv: f64 = quality.split(':').nth(1).unwrap().parse()?;
+                Ok(thermopack_rs::FlashResult {
+                    temperature: t,
+                    pressure: p,
+                    feed: x.clone(),
+                    phase: thermopack_rs::FlashPhase::TwoPhase,
+                    liquid: x.clone(),
+                    vapor: x.clone(),
+                    vapor_fraction: bv,
+                    liquid_fraction: 1. - bv,
+                    liquid_volume: None,
+                    vapor_volume: None,
+                    iterations: 0,
+                    fugacity_residual: 0.,
+                })
+            } else {
+                model.baseline_tp_flash(t, p, &x)
+            };
+            let mut roots = [Phase::Liquid, Phase::Vapor];
+            if let Some(data) = property_config.iter().find(|op| op.starts_with("roots:")) {
+                for (root, label) in roots.iter_mut().zip(data.split(':').skip(1)) {
+                    *root = if label == "L" {
+                        Phase::Liquid
+                    } else {
+                        Phase::Vapor
+                    };
+                }
+            }
+            match flash.and_then(|f| {
+                Ok((
+                    f.phase,
+                    model.baseline_equilibrium_speed_of_sound_with_phases(&f, roots)?,
+                ))
+            }) {
+                Ok((phase, value)) => println!("{},{value:.17e}", phase as i32),
+                Err(error) => println!("ERROR: {error}"),
+            }
+            continue;
+        }
         if property_config[0] == "V_RESP" {
             match model.baseline_tp_flash(t, p, &x).and_then(|f| {
                 let r = model.baseline_equilibrium_response(&f)?.ok_or(

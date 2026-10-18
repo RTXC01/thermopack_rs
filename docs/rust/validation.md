@@ -42,6 +42,7 @@ python tools/rust_port/validate_rr.py
 python tools/rust_port/validate_rr_iteration.py
 python tools/rust_port/validate_symmetric.py
 python tools/rust_port/validate_response.py
+python tools/rust_port/validate_sound.py
 python tools/rust_port/validate_translated_flash.py
 ```
 
@@ -59,6 +60,13 @@ hashes, compiler, flags and LAPACK revision invalidates stale cached objects.
 
 ## Qualified cases
 
+* 2088 fluid acoustic attempts: 817 equilibrium and 1258 TV results match;
+  13 source TP terminations are recorded. Pure qualities include zero/one
+  endpoints, and root overrides exercise supplied liquid/liquid and vapor/vapor
+  evaluations. TV cases include 29 nonpositive-pressure states, 10 with positive
+  source sound speed, and total-mole scaling. Independent constant-entropy
+  finite differences check physical mixture/pure acoustic responses. See
+  [sound conventions and measurements](sound.md).
 * 441 equilibrium TP-response attempts: 435 finite results match phase, reported
   Cp, dV/dT and dV/dP; six source terminations are recorded. Independent native
   finite differences in 72 classical/translated states check physical Cp,

@@ -23,6 +23,11 @@ name = "cubic"
 path = "rust/benches/cubic.rs"
 harness = false
 
+[[bench]]
+name = "sound"
+path = "rust/benches/sound.rs"
+harness = false
+
 [profile.release]
 lto = "thin"
 codegen-units = 1

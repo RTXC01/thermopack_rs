@@ -1017,16 +1017,42 @@ impl PreparedState<'_> {
 
     /// Single-phase equilibrium sound speed [m/s].
     pub fn speed_of_sound(&self, volume: f64) -> Result<f64> {
-        let (cp, cv) = self.heat_capacities(volume)?;
+        let cv = self.ideal(1e5)?.enthalpy_dt - R + self.residual_cv_tv(volume)?;
         let mass: f64 = self
             .composition
             .iter()
             .zip(&self.model.components)
             .map(|(x, c)| x * c.molar_mass * 1e-3)
             .sum();
-        let squared = -volume * volume * self.pressure(volume)?.dv * cp / (cv * mass);
+        let pressure = self.pressure(volume)?;
+        let squared =
+            -volume * volume * (pressure.dv - self.temperature * pressure.dt.powi(2) / cv) / mass;
         positive(squared, "sound speed squared")?;
         Ok(squared.sqrt())
+    }
+
+    /// Source TV sound speed, retaining reported H2/vdW Cv and zero on an
+    /// invalid isentropic stiffness. Uses molar volume, independent of total n.
+    pub fn baseline_speed_of_sound(&self, volume: f64) -> Result<f64> {
+        let mut cv = self.ideal(1e5)?.cp - R + self.residual_cv_tv(volume)?;
+        if self.model.kind == CubicKind::VanDerWaals {
+            let eos_volume = self.eos_volume(volume);
+            cv += 2. * self.a * self.temperature / (1000. * eos_volume * eos_volume)
+                - 2. * self.a / (self.temperature * eos_volume);
+        }
+        let pressure = self.pressure(volume)?;
+        let derivative = pressure.dv - self.temperature * pressure.dt * pressure.dt / cv;
+        if derivative < 0. {
+            let mass: f64 = self
+                .composition
+                .iter()
+                .zip(&self.model.components)
+                .map(|(x, c)| x * c.molar_mass * 1e-3)
+                .sum();
+            Ok((-volume * volume * derivative / mass).sqrt())
+        } else {
+            Ok(0.)
+        }
     }
     pub fn temperature(&self) -> f64 {
         self.temperature
@@ -1109,6 +1135,39 @@ impl PreparedState<'_> {
         }
     }
 
+    // Untranslated Cv and A_b for temperature-dependent covolume. Shared by
+    // TP caloric properties and the TV sound path, including negative P.
+    fn eos_thermal_terms(&self, volume: f64, integral: f64) -> (f64, f64) {
+        let t = self.temperature;
+        let mut cv = t * self.att * integral;
+        let mut ab = 0.;
+        if let Some(beta) = &self.beta {
+            let rt = R * t;
+            let free = volume - self.b;
+            let (_, ib, ibb) = self.attraction_integral_derivatives(volume);
+            ab = rt / free - self.a * ib;
+            cv -= t
+                * (2. * (R / free - self.at * ib) * beta.dt
+                    + (rt / (free * free) - self.a * ibb) * beta.dt * beta.dt
+                    + ab * beta.dtt);
+        }
+        (cv, ab)
+    }
+
+    fn residual_cv_tv(&self, actual_volume: f64) -> Result<f64> {
+        self.volume_check(actual_volume)?;
+        let volume = self.eos_volume(actual_volume);
+        let (mut cv, _) = self.eos_thermal_terms(volume, self.attraction_integral(volume));
+        if let Some(shift) = &self.translation {
+            let pressure = self.eos_pressure(volume)?;
+            let t = self.temperature;
+            cv += 2. * t * pressure.dt * shift.ct
+                + t * pressure.dv * shift.ct * shift.ct
+                + pressure.value * t * shift.ctt;
+        }
+        Ok(cv)
+    }
+
     pub fn residual(&self, volume: f64) -> Result<Residual> {
         self.volume_check(volume)?;
         let actual_volume = volume;
@@ -1117,7 +1176,7 @@ impl PreparedState<'_> {
         positive(pressure.value, "pressure for T-P residual properties")?;
         let z = pressure.value * volume / (R * self.temperature);
         let integral = self.attraction_integral(volume);
-        let cv = self.temperature * self.att * integral;
+        let (cv, beta_ab) = self.eos_thermal_terms(volume, integral);
         let mut residual = Residual {
             compressibility: z,
             helmholtz_tv: -R * self.temperature * (-self.b / volume).ln_1p() - self.a * integral,
@@ -1129,17 +1188,8 @@ impl PreparedState<'_> {
         };
         if let Some(beta) = &self.beta {
             let t = self.temperature;
-            let rt = R * t;
-            let free = volume - self.b;
-            let (_, ib, ibb) = self.attraction_integral_derivatives(volume);
-            let ab = rt / free - self.a * ib;
-            residual.enthalpy -= t * ab * beta.dt;
-            residual.entropy -= ab * beta.dt;
-            residual.cv -= t
-                * (2. * (R / free - self.at * ib) * beta.dt
-                    + (rt / (free * free) - self.a * ibb) * beta.dt * beta.dt
-                    + ab * beta.dtt);
-            residual.cp = residual.cv - t * pressure.dt * pressure.dt / pressure.dv - R;
+            residual.enthalpy -= t * beta_ab * beta.dt;
+            residual.entropy -= beta_ab * beta.dt;
         }
         if let Some(shift) = &self.translation {
             let t = self.temperature;

@@ -5,8 +5,9 @@ at fixed P, and dV/dP at fixed T. Phase amount and composition changes are
 included. `EquilibriumResponse` provides derived Cv, the isentropic volume
 pressure derivative, and internal-energy T/P derivatives. Pass the temperature
 and pressure of the evaluated flash to those identities. These derivatives are
-foundations for UV/SV flashes and equilibrium sound speed; those solvers are
-not yet implemented by this change.
+foundations for UV/SV flashes. The separate [sound implementation](sound.md)
+uses the full SV matrix to also handle pure coexistence; UV/SV flashes remain
+pending.
 
 The response assumes a converged equilibrium split; it does not establish
 stability. For a pure two-phase state, T and P are constrained to coexistence,

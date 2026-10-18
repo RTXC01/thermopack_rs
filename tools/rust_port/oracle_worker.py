@@ -120,7 +120,39 @@ def main(compiler_directory):
                 else:
                     raise ValueError('unknown translation operation')
                 previous=None
-        if request['mode']=='V_RESP':
+        if request['mode']=='V_SOUND_TV':
+            t,z=request['temperature'],request['feed']
+            v=request.get('volume')
+            if v is None:
+                v=model.specific_volume(t,request['pressure'],z,model.LIQPH if request['phase']=='L' else model.VAPPH)[0]
+            amount=request.get('amount',1.)
+            values=[float(model.speed_of_sound_tv(t,v*amount,[zi*amount for zi in z]))]
+            extra={'volume':v,'pressure':float(model.pressure_tv(t,v,z)[0])}
+            swappable=False
+        elif request['mode']=='V_SOUND':
+            t,p,z=request['temperature'],request['pressure'],request['feed']
+            if 'quality' in request:
+                from types import SimpleNamespace
+                p=model.bubble_pressure(t,z)[0]
+                result=SimpleNamespace(x=z,y=z,betaV=request['quality'],betaL=1.-request['quality'],phase=model.TWOPH)
+                extra={'pressure':p}
+            else:
+                result=model.two_phase_tpflash(t,p,z)
+            if 'roots' in request:
+                model.activate();n=model.nc
+                tv,pv,bv,blv=c_double(t),c_double(p),c_double(result.betaV),c_double(result.betaL)
+                xv=(c_double*n)(*result.x);yv=(c_double*n)(*result.y);zv=(c_double*n)(*z);phase=c_int(result.phase)
+                codes={'L':model.LIQPH,'V':model.VAPPH}
+                roots=(c_int*2)(*[codes[root] for root in reversed(request['roots'])])
+                routine=model.s_sos_sound_velocity_2ph
+                routine.argtypes=[POINTER(c_double)]*7+[POINTER(c_int),POINTER(c_int)]
+                routine.restype=c_double
+                sound=routine(byref(tv),byref(pv),xv,yv,zv,byref(bv),byref(blv),byref(phase),roots)
+            else:
+                sound=model.speed_of_sound(t,p,result.x,result.y,z,result.betaV,result.betaL,result.phase)
+            values=[float(result.phase),float(sound)]
+            swappable=False
+        elif request['mode']=='V_RESP':
             if probe is None:probe=load_probe()
             t,p,z=request['temperature'],request['pressure'],request['feed']
             result=model.two_phase_tpflash(t,p,z)

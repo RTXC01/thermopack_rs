@@ -70,5 +70,7 @@ UV/SV equations, pure latent quality and qualified source comparison scope.
 The [PeTS notes](pets.md) cover the pure-fluid Helmholtz/TV kernel, potential,
 LJ correction, source-order virials, temperature preparation and remaining
 higher-level interfaces.
+The [PeTS equilibrium notes](pets-equilibrium.md) cover source-compatible volume
+iteration, strict pressure roots, critical scaling and pure coexistence.
 Regenerate inventory with
 `python tools/rust_port/inventory.py`.

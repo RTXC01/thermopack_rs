@@ -45,7 +45,10 @@ pub use flash::{
 };
 pub use helmholtz::{DensityHelmholtz, PureHelmholtz, PurePressure};
 pub use ideal::{EntropyReference, IdealGas, IdealProperties};
-pub use pets::{Pets, PetsContributions, PetsDiameter, PetsTvProperties, PreparedPets};
+pub use pets::{
+    Pets, PetsContributions, PetsDiameter, PetsEquilibrium, PetsTvProperties, PetsVolumeIteration,
+    PreparedPets, PureCriticalPoint,
+};
 pub use translation::{TranslationKind, TranslationValue, VolumeTranslation};
 
 /// Gas constant [J/(mol K)], using the exact expression from ThermoPack.

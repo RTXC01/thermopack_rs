@@ -30,7 +30,8 @@ not qualify an entire family.
 | SAFT-VR Mie / VRQ Mie | saftvrmie* | pending |
 | Multiparameter and ideal mixtures | multiparameter* | pending |
 | MBWR, CSP, Lee-Kesler | mbwr*, extcsp, leekesler | pending |
-| PeTS Helmholtz and homogeneous TV | pets, eostv, speed_of_sound | validated: 588 states with 56 outputs and 16 vector-potential cases, no failed source calls; full first/second pure derivatives, TV caloric/mechanical/fugacity/sound properties, LJ correction, source-order and analytic virials, default/custom parameters; TP roots, saturation/critical/flash and other inherited SAFT interfaces pending |
+| PeTS Helmholtz and homogeneous TV | pets, eostv, speed_of_sound | validated: 588 states with 56 outputs and 16 vector-potential cases, no failed source calls; full first/second pure derivatives, TV caloric/mechanical/fugacity/sound properties, LJ correction, source-order and analytic virials, default/custom parameters; higher derivatives and other inherited SAFT interfaces pending |
+| PeTS pure pressure roots and coexistence | saft_interface, critical, saturation | validated subset: all 294 finite raw last iterates, 237 independently pressure-closing stable roots, three critical points and 36 saturation/inverse states; 57 unclosed/unstable source root returns retained; default/custom parameter scaling, strict/source iteration APIs and analytic critical-density derivatives; broad degeneracy, complete source trajectory/flag fidelity and PeTS flash solvers pending |
 | LJ spline BH/WCA/UV | lj_splined, hardsphere_wca | pending |
 | Solids, melting/sublimation, hydrates | solideos, *_gibbs, solid*, hydrate* | pending |
 | DFT/FMT, quadratures, hyperdual utilities | fmt, saft_rdf, quadratures, hyperdual* | pending |

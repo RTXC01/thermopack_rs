@@ -93,10 +93,12 @@ virial C uses 1e-11 m6/mol2 absolute tolerance without widening it for the
 cancellation-sensitive cases. The original source remains unmodified.
 
 This qualifies the PeTS Helmholtz/TV, potential, correction and virial paths.
-TP volume roots, phase selection, critical/saturation calculations, flashes,
-other inherited SAFT utilities, higher derivatives and language bindings remain
-pending. It does not establish a complete PeTS interface replacement or a
-complete ThermoPack replacement.
+Pressure roots and pure critical/saturation calculations now have separate
+[equilibrium qualification](pets-equilibrium.md), including source last-iterate
+compatibility and strict pressure closure. Flash solvers, other inherited SAFT
+utilities, higher derivatives and language bindings remain pending. This does
+not establish a complete PeTS interface replacement or a complete ThermoPack
+replacement.
 
 Reproduce after building the exact-source library and probe:
 
@@ -107,6 +109,7 @@ python tools/rust_port/benchmark_pets.py --compiler /path/to/gfortran
 ```
 
 The native-loop [benchmark report](benchmark-pets.json) records the full
+kernel implementation committed as `f653b85`. It measures the
 ten-quantity Helmholtz kernel at 300 K, one mole and 1000 total volumes from
 5e-5 to 1.049e-3 m3. All 1000 state outputs are compared before timing, then
 one million evaluations per sample compare all ten accumulated checksums.

@@ -55,6 +55,10 @@ def load_probe():
     probe.query_pets.restype=None
     probe.query_pets_potential.argtypes=[c_int,POINTER(c_double),c_double,c_double,POINTER(c_double),POINTER(c_double)]
     probe.query_pets_potential.restype=None
+    probe.set_pets_parameters.argtypes=[c_double,c_double]
+    probe.set_pets_parameters.restype=None
+    probe.query_pets_volume.argtypes=[*([c_double]*4),c_int,POINTER(c_double)]
+    probe.query_pets_volume.restype=None
     return probe
 
 
@@ -91,12 +95,51 @@ def main(compiler_directory):
                 print('THERMOPACK_RESULT='+json.dumps({'calculation_error':'non-finite RR output','values':list(map(str,values))}),flush=True)
             continue
         if request['mode'].startswith('PETS_'):
-            if previous!=('PETS',):
+            sigma,eps=request.get('parameters',[3.42e-10,136.])
+            key=('PETS',sigma,eps,request.get('redefine_critical',False))
+            if previous!=key:
                 from thermopack.pets import pets
-                model=pets();previous=('PETS',)
+                model=pets()
+                if probe is None:probe=load_probe()
+                model.activate();probe.set_pets_parameters(sigma,eps)
+                if request.get('redefine_critical',False):
+                    model.redefine_critical_parameters(Tc_initials=[1.1*eps],vc_initials=[math.pi/6.*sigma**3*6.02214076e23/.15])
+                previous=key
             if probe is None:probe=load_probe()
             model.activate();sigma,eps=request.get('parameters',[3.42e-10,136.])
-            if request['mode']=='PETS_CORE':
+            if request['mode'] in ('PETS_VOLUME_BASELINE','PETS_VOLUME','PETS_CRITICAL','PETS_SAT','PETS_SAT_T'):
+                probe.set_pets_parameters(sigma,eps)
+                try:
+                    if request['mode']=='PETS_CRITICAL':
+                        guess_t=1.1*eps;guess_v=math.pi/6.*sigma**3*6.02214076e23/.15
+                        t,v,p=model.critical([1.],temp=guess_t,v=guess_v,tol=1e-9)
+                        values=[t,p,v,p*v/(8.31446261815324*t)]
+                    elif request['mode']=='PETS_VOLUME_BASELINE':
+                        output=(c_double*4)();phase=model.LIQPH if request['phase']=='L' else model.VAPPH
+                        probe.query_pets_volume(request['temperature'],request['pressure'],sigma,eps,phase,output)
+                        values=list(map(float,output))
+                    elif request['mode']=='PETS_VOLUME':
+                        t,p=request['temperature'],request['pressure'];phase=model.LIQPH if request['phase']=='L' else model.VAPPH
+                        v,vt,vp=model.specific_volume(t,p,[1.],phase,dvdt=True,dvdp=True)
+                        actual,pv=model.pressure_tv(t,v,[1.],dpdv=True)
+                        if abs(actual-p)>=1e8*sys.float_info.epsilon*p or pv>=0.:
+                            print('THERMOPACK_RESULT='+json.dumps({'calculation_error':'source volume is mechanically unstable' if pv>=0. else 'source volume fails pressure closure',
+                                  'volume':float(v),'returned_pressure':float(actual),'pressure_dv':float(pv)}),flush=True);continue
+                        values=[float(v),float(vt),float(vp)]
+                    else:
+                        if request['mode']=='PETS_SAT':
+                            t=request['temperature'];p=model.bubble_pressure(t,[1.])[0]
+                        else:
+                            p=request['pressure'];t=model.bubble_temperature(p,[1.])[0]
+                        vl=model.specific_volume(t,p,[1.],model.LIQPH)[0]
+                        vv=model.specific_volume(t,p,[1.],model.VAPPH)[0]
+                        hl=model.enthalpy(t,p,[1.],model.LIQPH)[0];hv=model.enthalpy(t,p,[1.],model.VAPPH)[0]
+                        values=[float(t),float(p),float(vl),float(vv),float((hv-hl)/(t*(vv-vl)))]
+                except Exception as error:
+                    if str(error) not in ('critical calculation failed','bubble_pressure calculation failed','bubble_temperature calculation failed'):
+                        raise
+                    print('THERMOPACK_RESULT='+json.dumps({'calculation_error':str(error)}),flush=True);continue
+            elif request['mode']=='PETS_CORE':
                 output=(c_double*56)()
                 probe.query_pets(request['temperature'],request['volume'],request['moles'],sigma,eps,output)
                 values=list(map(float,output))

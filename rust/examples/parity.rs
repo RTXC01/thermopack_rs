@@ -96,6 +96,45 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .collect::<Result<_, _>>()?;
             let model = thermopack_rs::Pets::with_parameters(parameters[0], parameters[1])?;
             let result = (|| -> thermopack_rs::Result<Vec<f64>> {
+                let config: Vec<_> = fields[5].split('@').collect();
+                if config[0] == "PETS_CRITICAL" {
+                    let c = model.critical_point()?;
+                    return Ok(vec![c.temperature, c.pressure, c.volume, c.compressibility]);
+                }
+                if config[0] == "PETS_VOLUME_BASELINE" || config[0] == "PETS_VOLUME" {
+                    let t = fields[2].parse().unwrap();
+                    let p = fields[3].parse().unwrap();
+                    let phase = if config[1] == "L" {
+                        Phase::Liquid
+                    } else {
+                        Phase::Vapor
+                    };
+                    let v = if config[0] == "PETS_VOLUME_BASELINE" {
+                        model.baseline_volume_iteration(t, p, phase)?.volume
+                    } else {
+                        model.volume(t, p, phase)?
+                    };
+                    let state = model.pressure_tv(t, v, 1.)?;
+                    return Ok(if config[0] == "PETS_VOLUME_BASELINE" {
+                        vec![v, state.value, state.dt, state.dv]
+                    } else {
+                        vec![v, -state.dt / state.dv, 1. / state.dv]
+                    });
+                }
+                if config[0] == "PETS_SAT" || config[0] == "PETS_SAT_T" {
+                    let sat = if config[0] == "PETS_SAT" {
+                        model.saturation_pressure(fields[2].parse().unwrap())?
+                    } else {
+                        model.saturation_temperature(fields[3].parse().unwrap())?
+                    };
+                    return Ok(vec![
+                        sat.temperature,
+                        sat.pressure,
+                        sat.liquid_volume,
+                        sat.vapor_volume,
+                        sat.dpdt,
+                    ]);
+                }
                 if fields[5] == "PETS_POTENTIAL" {
                     let r: Vec<f64> = fields[2].split(',').map(|v| v.parse().unwrap()).collect();
                     let mut values = vec![0.; r.len()];

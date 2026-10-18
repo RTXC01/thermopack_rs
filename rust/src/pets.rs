@@ -38,6 +38,10 @@ const B: [f64; 7] = [
     -353.2743581,
 ];
 
+#[path = "pets_equilibrium.rs"]
+mod equilibrium;
+pub use equilibrium::{PetsEquilibrium, PetsVolumeIteration, PureCriticalPoint};
+
 /// Pure-argon PeTS parameters and owned ideal-gas reference state.
 #[derive(Debug, Clone)]
 pub struct Pets {

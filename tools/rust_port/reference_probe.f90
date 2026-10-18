@@ -261,3 +261,33 @@ subroutine query_pets_potential(n,r,sigma,eps,values,forces) bind(C,name='query_
     error stop 'PeTS potential probe requires active PeTS model'
   end select
 end subroutine query_pets_potential
+
+subroutine set_pets_parameters(sigma,eps) bind(C,name='set_pets_parameters')
+  use, intrinsic :: iso_c_binding, only: c_double
+  use saft_interface, only: pets_set_pure_params
+  implicit none
+  real(c_double), value :: sigma,eps
+  call pets_set_pure_params(1,[sigma,eps])
+end subroutine set_pets_parameters
+
+subroutine query_pets_volume(t,p,sigma,eps,phase,values) bind(C,name='query_pets_volume')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use thermopack_var, only: get_active_eos,base_eos_param
+  use pets, only: PETS_eos
+  use saft_interface, only: pets_set_pure_params,pc_saft_nonassoc_volume_solver
+  use eostv, only: pressure
+  implicit none
+  real(c_double), value :: t,p,sigma,eps
+  integer(c_int), value :: phase
+  real(c_double), intent(out) :: values(4)
+  class(base_eos_param), pointer :: active
+  call pets_set_pure_params(1,[sigma,eps])
+  active=>get_active_eos()
+  select type(eos=>active)
+  class is(PETS_eos)
+    call pc_saft_nonassoc_volume_solver(1,eos,t,p,[1.0_c_double],phase,values(1))
+  class default
+    error stop 'PeTS volume probe requires active PeTS model'
+  end select
+  values(2)=pressure(t,values(1),[1.0_c_double],dpdt=values(3),dpdv=values(4))
+end subroutine query_pets_volume

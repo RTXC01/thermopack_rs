@@ -31,6 +31,7 @@ fn translated_model(
             "quality" => {} // Explicit pure two-phase acoustic state.
             "roots" => {}   // Optional fluid acoustic phase-root overrides.
             "amount" => {}  // Total moles in an extensive TV acoustic input.
+            "guess" => {}   // UV/SV temperature and pressure guesses.
             "kij" => model.set_kij(
                 data[1].parse().unwrap(),
                 data[2].parse().unwrap(),
@@ -410,6 +411,53 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .split(',')
             .map(str::parse)
             .collect::<Result<_, _>>()?;
+        if property_config[0] == "V_CALORIC_TV" {
+            match model.prepare(t, &x).and_then(|state| state.caloric_tv(p)) {
+                Ok(value) => println!(
+                    "{:.17e},{:.17e},{:.17e}",
+                    value.pressure, value.internal_energy, value.entropy
+                ),
+                Err(error) => println!("ERROR: {error}"),
+            }
+            continue;
+        }
+        if matches!(property_config[0], "V_UV" | "V_SV") {
+            let mut options = model.volume_flash_options();
+            if let Some(guess) = property_config.iter().find(|op| op.starts_with("guess:")) {
+                let values: Vec<_> = guess.split(':').collect();
+                options.temperature_guess = Some(values[1].parse()?);
+                options.pressure_guess = Some(values[2].parse()?);
+            }
+            let result = if property_config[0] == "V_UV" {
+                model.uv_flash_with_options(&x, t, p, options)
+            } else {
+                model.sv_flash_with_options(&x, t, p, options)
+            };
+            match result {
+                Ok(flash) => {
+                    let two = flash.phase == thermopack_rs::FlashPhase::TwoPhase;
+                    let mut values = vec![
+                        flash.temperature,
+                        flash.pressure,
+                        f64::from(two),
+                        if two { flash.vapor_fraction } else { 0. },
+                        if two { flash.liquid_fraction } else { 1. },
+                    ];
+                    values.extend(if two { flash.liquid } else { x.clone() });
+                    values.extend(if two { flash.vapor } else { vec![0.; x.len()] });
+                    println!(
+                        "{}",
+                        values
+                            .iter()
+                            .map(|v| format!("{v:.17e}"))
+                            .collect::<Vec<_>>()
+                            .join(",")
+                    );
+                }
+                Err(error) => println!("ERROR: {error}"),
+            }
+            continue;
+        }
         if property_config[0] == "V_SOUND_TV" {
             let amount: f64 = property_config
                 .iter()

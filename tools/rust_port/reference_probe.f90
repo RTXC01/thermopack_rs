@@ -181,3 +181,15 @@ subroutine query_response(n,t,p,z,bv,bl,x,y,phase,values) bind(C,name='query_res
     call specificVolume(t,p,z,phase,v,dvdt=values(2),dvdp=values(3))
   endif
 end subroutine query_response
+
+subroutine query_sv(n,t,p,z,bv,bl,x,y,s,v,phase,status) bind(C,name='query_sv')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use sv_solver, only: twoPhaseSVflash
+  implicit none
+  integer(c_int), value :: n
+  real(c_double), intent(inout) :: t,p,bv,bl,x(n),y(n)
+  real(c_double), intent(in) :: z(n),s,v
+  integer(c_int), intent(inout) :: phase
+  integer(c_int), intent(out) :: status
+  call twoPhaseSVflash(t,p,z,bv,bl,x,y,s,v,phase,status)
+end subroutine query_sv

@@ -49,6 +49,8 @@ def load_probe():
     probe.query_response.argtypes=[c_int,c_double,c_double,POINTER(c_double),c_double,c_double,
                                    POINTER(c_double),POINTER(c_double),c_int,POINTER(c_double)]
     probe.query_response.restype=None
+    probe.query_sv.argtypes=[c_int,*([POINTER(c_double)]*9),POINTER(c_int),POINTER(c_int)]
+    probe.query_sv.restype=None
     return probe
 
 
@@ -120,7 +122,62 @@ def main(compiler_directory):
                 else:
                     raise ValueError('unknown translation operation')
                 previous=None
-        if request['mode']=='V_SOUND_TV':
+        if request['mode']=='V_CALORIC_TV':
+            t,v,z=request['temperature'],request['volume'],request['feed']
+            values=[float(model.pressure_tv(t,v,z)[0]),float(model.internal_energy_tv(t,v,z)[0]),
+                    float(model.entropy_tv(t,v,z)[0])]
+            extra={'volume':v}
+            swappable=False
+        elif request['mode'] in ('V_UV','V_SV'):
+            from types import SimpleNamespace
+            t,p,z=request['temperature'],request['pressure'],request['feed']
+            if 'quality' in request:
+                p=model.bubble_pressure(t,z)[0]
+                seed=SimpleNamespace(T=t,p=p,z=z,x=z,y=z,betaV=request['quality'],
+                                     betaL=1.-request['quality'],phase=model.TWOPH)
+            else:
+                seed=model.two_phase_tpflash(t,p,z)
+            v=overall(model,seed,'specific_volume')
+            s=overall(model,seed,'entropy')
+            u=overall(model,seed,'enthalpy')-p*v
+            spec=s if request['mode']=='V_SV' else u
+            guess_t=t*request.get('guess_factor',.9)
+            guess_p=p*request.get('pressure_factor',1.2)
+            if request['mode']=='V_UV':
+                result=model.two_phase_uvflash(z,u,v,
+                    temp=guess_t if request.get('guessed',False) else None,
+                    press=guess_p if request.get('guessed',False) else None)
+                status=0
+            else:
+                if probe is None:probe=load_probe()
+                model.activate();n=model.nc
+                tv,pv,bv,bl=c_double(guess_t),c_double(guess_p),c_double(seed.betaV),c_double(seed.betaL)
+                zv=(c_double*n)(*z);xv=(c_double*n)(*seed.x);yv=(c_double*n)(*seed.y)
+                sv,vv=c_double(s),c_double(v);phase=c_int(seed.phase);code=c_int()
+                probe.query_sv(n,byref(tv),byref(pv),zv,byref(bv),byref(bl),xv,yv,
+                               byref(sv),byref(vv),byref(phase),byref(code))
+                status=code.value
+                result=SimpleNamespace(T=tv.value,p=pv.value,z=z,x=list(xv),y=list(yv),
+                                       betaV=bv.value,betaL=bl.value,phase=phase.value)
+            raw=[float(result.T),float(result.p),int(result.phase),float(result.betaV),float(result.betaL),
+                 *map(float,result.x),*map(float,result.y)]
+            actual_v=overall(model,result,'specific_volume')
+            actual=overall(model,result,'entropy') if request['mode']=='V_SV' else overall(model,result,'enthalpy')-result.p*actual_v
+            two=result.phase==model.TWOPH
+            values=[float(result.T),float(result.p),float(two),
+                    float(result.betaV) if two else 0.,float(result.betaL) if two else 1.,
+                    *map(float,result.x if two else z),*map(float,result.y if two else [0.]*len(z))]
+            extra={'specification':spec,'volume':v,'raw_result':raw,'status':status,
+                   'scaled_specification_error':(actual-spec)/(8.31446261815324*(result.T if request['mode']=='V_UV' else 1.)),
+                   'relative_volume_error':(actual_v-v)/v,
+                   'temperature_guess':guess_t if request['mode']=='V_SV' or request.get('guessed') else None,
+                   'pressure_guess':guess_p if request['mode']=='V_SV' or request.get('guessed') else None}
+            if status!=0 or not all(map(math.isfinite,values)):
+                print('THERMOPACK_RESULT='+json.dumps({'calculation_error':'non-finite volume flash or nonzero status',
+                      'values':list(map(str,values)),**extra}),flush=True)
+                continue
+            swappable=phase_permutation_allowed(model,result)
+        elif request['mode']=='V_SOUND_TV':
             t,z=request['temperature'],request['feed']
             v=request.get('volume')
             if v is None:

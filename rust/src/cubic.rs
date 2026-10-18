@@ -97,6 +97,19 @@ pub struct Residual {
     pub cp: f64,
 }
 
+/// Molar caloric properties at fixed T,V, independently of pressure sign.
+#[derive(Debug, Clone, Copy)]
+pub struct TvProperties {
+    /// Pressure (Pa), including negative homogeneous values.
+    pub pressure: f64,
+    /// Molar internal energy [J/mol].
+    pub internal_energy: f64,
+    /// Molar entropy [J/(mol K)].
+    pub entropy: f64,
+    /// Physical derivative dU/dT at fixed volume [J/(mol K)].
+    pub heat_capacity_v: f64,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Saturation {
     pub temperature: f64,
@@ -988,6 +1001,31 @@ impl PreparedState<'_> {
 
     pub fn entropy(&self, volume: f64) -> Result<f64> {
         Ok(self.ideal(self.pressure(volume)?.value)?.entropy + self.residual(volume)?.entropy)
+    }
+
+    /// Molar U (J/mol), S (J/(mol K)), Cv and pressure at the supplied molar
+    /// volume. Heat capacities differentiate actual native caloric values.
+    pub fn caloric_tv(&self, volume: f64) -> Result<TvProperties> {
+        self.volume_check(volume)?;
+        let v = self.eos_volume(volume);
+        let t = self.temperature;
+        let ideal = self.ideal(1e5)?;
+        let pressure = self.eos_pressure(v)?;
+        let integral = self.attraction_integral(v);
+        let (_, ab) = self.eos_thermal_terms(v, integral);
+        let beta_t = self.beta.as_ref().map_or(0., |b| b.dt);
+        let translation_t = self.translation.as_ref().map_or(0., |c| c.ct);
+        let u = ideal.enthalpy - R * t + (t * self.at - self.a) * integral - t * ab * beta_t
+            + pressure.value * t * translation_t;
+        let s = ideal.entropy + R * ((v - self.b).ln() - (R * t / 1e5).ln()) + self.at * integral
+            - ab * beta_t
+            + pressure.value * translation_t;
+        Ok(TvProperties {
+            pressure: pressure.value,
+            internal_energy: u,
+            entropy: s,
+            heat_capacity_v: ideal.enthalpy_dt - R + self.residual_cv_tv(volume)?,
+        })
     }
 
     /// Single-phase heat capacities (Cp, Cv) [J/(mol K)].

@@ -25,6 +25,10 @@ pub use response::EquilibriumResponse;
 #[path = "acoustic.rs"]
 mod acoustic;
 
+#[path = "isochoric.rs"]
+mod isochoric;
+pub use isochoric::VolumeFlashOptions;
+
 #[derive(Debug, Clone, Copy)]
 pub struct EquilibriumProperties {
     pub volume: f64,

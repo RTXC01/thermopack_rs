@@ -34,6 +34,7 @@ pub fn fixture_model(fields: &[&str]) -> Cubic {
             "quality" => {} // Pure coexistence acoustic fixture input.
             "roots" => {}   // Optional acoustic phase-root overrides.
             "amount" => {}  // Extensive TV acoustic input.
+            "guess" => {}   // UV/SV initial T/P values.
             "beta" => {
                 let params: Vec<f64> = data[3].split(',').map(|v| v.parse().unwrap()).collect();
                 model

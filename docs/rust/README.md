@@ -65,5 +65,7 @@ The [equilibrium-response notes](equilibrium-response.md) cover analytic
 volume/caloric T/P derivatives, phase redistribution and source Cp conventions.
 The [sound notes](sound.md) cover fluid SV acoustics, extensive TV inputs,
 physical/source conventions and native-loop benchmark results.
+The [isochoric notes](isochoric.md) cover direct TV caloric properties, coupled
+UV/SV equations, pure latent quality and qualified source comparison scope.
 Regenerate inventory with
 `python tools/rust_port/inventory.py`.

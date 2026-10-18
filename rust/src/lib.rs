@@ -29,11 +29,13 @@ pub mod translation;
 
 pub use alpha::{Alpha, AlphaCorrelation, AlphaValue};
 pub use beta::{Beta, BetaCorrelation, BetaValue};
-pub use caloric::{CaloricFlashOptions, EquilibriumProperties, EquilibriumResponse};
+pub use caloric::{
+    CaloricFlashOptions, EquilibriumProperties, EquilibriumResponse, VolumeFlashOptions,
+};
 pub use component::{Component, component, components};
 pub use cubic::{
     Cubic, CubicKind, CubicOptions, Phase, PreparedState, Pressure, PseudoCritical, Residual,
-    Saturation,
+    Saturation, TvProperties,
 };
 pub use error::{Error, Result};
 pub use flash::{

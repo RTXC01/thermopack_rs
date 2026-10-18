@@ -32,6 +32,7 @@ python tools/rust_port/validate_derivatives.py
 python tools/rust_port/validate_flash.py
 python tools/rust_port/validate_initialization.py
 python tools/rust_port/validate_caloric.py
+python tools/rust_port/validate_isochoric.py
 python tools/rust_port/validate_ideal.py
 python tools/rust_port/validate_ideal_configuration.py
 python tools/rust_port/validate_alpha.py
@@ -151,6 +152,12 @@ hashes, compiler, flags and LAPACK revision invalidates stale cached objects.
   and branch differences and is not a passing qualification gate.
 
 Each comparison uses `abs(error) <= atol + rtol * max(abs(reference), abs(rust))`.
+The [UV/SV and direct TV qualification](isochoric.md) adds 409 finite source
+flash results and 141 TV property results. Metadata retains 137 failed source
+calls. Native tests independently check U/S/V closure, component balance,
+chemical equilibrium and caloric derivatives; single-phase comparison
+canonicalization and remaining raw output limits are explicit.
+
 Tolerances are quantity-specific and recorded in fixture metadata and tests.
 They are not a promise of bitwise identity across compilers or all states.
 The vdW baseline derivative defect is preserved by an explicit compatibility

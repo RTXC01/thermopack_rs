@@ -74,7 +74,7 @@ See [numerical differences](../docs/rust/baseline-defects.md).
 
 See [validation](../docs/rust/validation.md),
 [benchmarks](../docs/rust/performance.md) and the
-[migration design](../docs/rust/README.md). SAFT, UV/SV/mu-T flashes, phase envelopes,
+[migration design](../docs/rust/README.md). SAFT, mu-T flashes, phase envelopes,
 solids/hydrates and existing language-interface compatibility remain pending.
 
 Regenerate data with `python tools/rust_port/generate_data.py`.
@@ -97,3 +97,11 @@ accepts total volume and mole numbers for a single-phase TV evaluation.
 The corresponding `baseline_...` methods preserve source caloric and fallback
 conventions; `..._with_phases` supports fluid-root overrides. See
 [sound qualification and benchmarks](../docs/rust/sound.md).
+
+`state.caloric_tv(v)` evaluates molar P, U, S and physical Cv, including
+homogeneous negative-pressure states. `uv_flash(z,U,V)` and `sv_flash(z,S,V)`
+recover equilibrium with pure latent quality and absent feed components.
+`volume_flash_options()` supplies model-local temperature bounds and optional
+T/P guesses. See [isochoric qualification](../docs/rust/isochoric.md) for the
+409 finite source flash comparisons, 141 TV comparisons, canonical single-phase
+output conventions and remaining source trajectory/cryogenic limits.

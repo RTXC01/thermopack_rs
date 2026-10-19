@@ -172,6 +172,11 @@ source results. Original entropy response signs and raw mole-response residues
 are compared explicitly; the source-snapshot executable uses process-main
 context to match the oracle's Windows CRT math behavior. Physical finite-
 difference checks run on normal test workers.
+The [MBWR equilibrium qualification](mbwr-equilibrium.md) adds 65 metadata rows,
+49 independently solved original-pressure critical points, and 3406 closed/stable
+source density iterates that belong to native bounded root sets. Fifty unqualified
+source returns and 60 requested-phase selection differences are retained. This
+qualifies root membership, not full source phase-selection or trajectory fidelity.
 The [PeTS flash qualification](pets-flash.md) adds 923 finite/closing TP/PH/PS
 states from 1035 source attempts, retaining 112 failed/nonclosing calls.
 Saturated endpoints use an explicit physical-state comparison convention;

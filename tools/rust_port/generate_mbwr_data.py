@@ -4,6 +4,7 @@ import json
 import re
 import ast
 from pathlib import Path
+from generate_data import compiled_components
 ROOT=Path(__file__).resolve().parents[2]
 
 
@@ -75,10 +76,17 @@ def generate():
         if family=='triple': values.append(0.)
         lines.append('('+('0' if family=='triple' else family)+','+json.dumps(identifier)+','+repr(values)+'),')
     lines.append('];')
+    general,_=compiled_components(ROOT/'src/compdatadb.f90')
+    lines.append('pub(super) const COMPONENT_CRITICAL_SEEDS: &[(&str, [f64;2])] = &[')
+    for identifier in sorted({r['identifier'] for r in data if r['identifier'] in general}):
+        c=general[identifier]
+        rho=c['Pc']/(c['Zc']*8.31446261815324*c['Tc'])
+        lines.append('('+json.dumps(identifier)+','+repr([c['Tc'],rho])+'),')
+    lines.append('];')
     lines+=source_helmholtz_function()
     path=ROOT/'rust/src/mbwr_data.rs'
     path.write_text('\n'.join(lines)+'\n')
-    inputs=[ROOT/'src/mbwrdata.f90',ROOT/'src/mbwr.f90']
+    inputs=[ROOT/'src/mbwrdata.f90',ROOT/'src/mbwr.f90',ROOT/'src/compdatadb.f90']
     (ROOT/'docs/rust/mbwr-data.json').write_text(json.dumps(dict(generator='tools/rust_port/generate_mbwr_data.py',records=65,
         mbwr19_records=54,mbwr32_records=11,source_sha256={p.relative_to(ROOT).as_posix():hashlib.sha256(p.read_bytes().replace(b'\r\n',b'\n')).hexdigest() for p in inputs},
         order='original mbwrcx declaration/array order; new(kind,identifier) selects first matching record, including three MBWR32 methane fits'),indent=2)+'\n')

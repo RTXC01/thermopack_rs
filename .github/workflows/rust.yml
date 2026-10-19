@@ -27,8 +27,10 @@ jobs:
         env:
           RUSTDOCFLAGS: '-D warnings'
       - run: python tools/rust_port/generate_data.py
+      - run: python tools/rust_port/generate_mbwr_data.py
+      - run: cargo fmt --all
       - run: python tools/rust_port/inventory.py
-      - run: git diff --exit-code -- rust/src/data.rs docs/rust/inventory.json
+      - run: git diff --exit-code -- rust/src/data.rs rust/src/mbwr_data.rs docs/rust/mbwr-data.json docs/rust/inventory.json
 
   source-parity:
     runs-on: ubuntu-24.04
@@ -65,6 +67,7 @@ jobs:
       - run: python tools/rust_port/validate_pets_isochoric.py
       - run: python tools/rust_port/validate_mbwr.py
       - run: python tools/rust_port/validate_mbwr_properties.py
+      - run: python tools/rust_port/validate_mbwr_equilibrium.py
       - run: python tools/rust_port/benchmark_pets_roots.py --compiler /usr/bin/gfortran-13 --preflight-only
       - run: python tools/rust_port/benchmark_isochoric.py --compiler /usr/bin/gfortran-13 --preflight-only
       - run: python tools/rust_port/benchmark_isochoric.py --compiler /usr/bin/gfortran-13 --tcpr --preflight-only

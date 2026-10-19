@@ -83,9 +83,10 @@ Physical responses are independently checked by local pressure-root finite
 differences for every fit, including all T/P/n derivatives of H/S/Z/ln(phi),
 G_T=-S, G_P=V-nRT/P, H-TS=G, G=nRT*ln(phi), extensive scaling and perfect-gas
 limits. A custom singular EOS tests retained values/optional responses.
-These tests do not qualify a general density solver: their local Newton helper
-is test-only. Full density iteration, ideal/full caloric properties, critical
-and flash/CSP integration remain pending. No new speedup is claimed here.
+Their local Newton helper is test-only. Bounded physical density roots and
+critical points have separate [equilibrium qualification](mbwr-equilibrium.md).
+Source density-iteration fidelity, ideal/full caloric properties and flash/CSP
+integration remain pending. No new speedup is claimed here.
 
 ```
 python tools/rust_port/validate_mbwr_properties.py --compiler-directory /path/to/compiler/bin

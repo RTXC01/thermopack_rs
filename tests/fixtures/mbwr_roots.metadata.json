@@ -1,0 +1,3072 @@
+{
+  "baseline": "d68c794",
+  "compiler": "GNU Fortran (MinGW-W64 x86_64-ucrt-posix-seh, built by Brecht Sanders) 14.3.0",
+  "flags": [
+    "-O3",
+    "-cpp",
+    "-fdefault-real-8",
+    "-fdefault-double-8",
+    "-frecursive",
+    "-fopenmp",
+    "-fallow-argument-mismatch",
+    "-ffree-line-length-none"
+  ],
+  "lapack_commit": "3c351aad417ae1ad8552bc742a6f039d6a298f2c",
+  "library_sha256": "7ae70182c38e69812d6b563731e0d2b58cb795022ff48d57276d268dffa1c566",
+  "sources": {
+    "numconstants": "81b2771fa060b08c6dc551a32eafcb61b91f139d1864644fc25ca7d89ab4f330",
+    "stringmod": "0c2459ae3cd3a0c227b15107337d66d8c79ced4eb868ce69dd8bb5bd4af352e2",
+    "quadratures": "158894a2caa55fb4781275fb720862d0be19b03df13fba29ab21346f4d684820",
+    "thermopack_constants": "9046988b81e338f895ee05189087bbdd89a10759774e1f8021cb198ef2dc9b86",
+    "error": "5c275dd4808c6ad373c826ce5ddcab3e02e73410859afc4f4dac800a528c5706",
+    "parameters": "d7c3a50c4745afac77fc5fa031d49cab1571e24af6c8bb15878c2cada2bfdd2f",
+    "hyperdual_mod": "41b121f1b66d45325ec9f87937c95101e88bccbaac75f2d7cad06e95f32a411e",
+    "linear_numerics": "ce49eeef25d1c3e5ae0f27f26f3537b6cced8e8c0e9ab113ae8194bbd917527f",
+    "optimizer": "7648d0d88a30163e36462015db91dd189702d8c389eb3c3cb617d522d4111355",
+    "nonlinear_solvers": "693ac124cb25aa12c805ce09f8ec553087b0789dcfacaf28b79112cf1f31e063",
+    "utilities": "77d315d2eadaecf47d24ca2d92d671b86c9515672afaba369a7b8c3d6cf6981e",
+    "apparent_composition": "3536e3eab063855aefc6dab1621746f74bd7e31f28ad9f25bce74d164442c377",
+    "solid_correlation_datadb": "013f25ec37dac3fe647e00c84fef5525c0f3c6dd718a7364290e05f0c273ae82",
+    "compdata": "ce941b7b3266ec2260e1f8f9635fd3fd383e772f1b8f704c11175523451e7047",
+    "association_var": "10ecb2dac187bb8500b522bbc6aebf522a79e888baa8e04bf8a2aeb1851c5cfc",
+    "multipol_var": "2f9bf2a453b03cd3f7b784f74ba6a1b358d58906581dc2171f37366adaf00006",
+    "thermopack_var": "1e75d96aebc50ee5e9d63d63034625b46fd6fa352ffb18dd0f62bd9544627801",
+    "hyperdual_utility": "6924c70a6821989595276279d56da82a86f647830bde52d96c069dd68ce62589",
+    "fmt": "b94b7b91a454511fa5446b8f84604cc593fa5aa2d0e17dd9e154b8bee48eaafa",
+    "eosdata": "5347e25c79f23cb3752ba692bd2be2ce5b94ab3382fec1a6c379a4e5adfd804c",
+    "assocschemeutils": "06352929c097aa2864b646565e9dc591fb08d60a4d2824eb47f56820a74174ec",
+    "unifacdata": "225d321b1fe3818c20ecfcc56ca565a817a99877198c1848843204631d3c1d8a",
+    "unifac": "dd0d41c70800dc5a8a3c5c3c58b8de9b467167bc8a4c3e34484cbe93dd4dacf0",
+    "cubic_eos": "5331b361c38f23636b746d8b93446662944bce17aa676d7d43a815c8dfe82530",
+    "compdatadb": "c54497d27f95539576545cdf9ba78bfcf4159749b60dccaa709be286682148a2",
+    "compdata_init": "cd85a3e560ac24cfc7318ae4d8ab3bd491282330264f878c6a71a276fcbb31ac",
+    "volume_shift": "0de6b71bbf9f8833d335bb9b1c5619f7225cc2f17cc8a055dc9e662745edf6bd",
+    "multiparameter_base": "228e9bad560f4ee6f8d6ff9e6aab057c887df5a82d030357d461e0e7cfa13399",
+    "multiparameter_c3": "025f3e94c7abca6a1ea08e3c1a4b5cfdc972629e5879109e523199437097be44",
+    "multiparameter_para_h2": "579951c3fa36fff2e97a8bfeabe615927deb65f631082690a66452d458bbb250",
+    "multiparameter_ortho_h2": "f65855b3b2438454b2117d3e8f19eba6a67279a4139ac2485fb08ef8710a6974",
+    "multiparameter_normal_h2": "385e1d177b6def4f0cf637318380d2fc00738f1b9f7b6eb28ca956cbba073b92",
+    "multiparameter_r134a": "17740e7f977376bafd39faeac6c1d71e4467e783a8d9c3e33f8d9fcdaac007a5",
+    "multiparameter_lj": "035bae279e62dcdb7b42b358dfb3c17562bd7a8ddd178a3092ac75f0b34342cf",
+    "mbwrdata": "64f67102fbb97a0c6bd241a6430f05d00fcb5772892d62f28d7f0e2e41f82675",
+    "mbwr": "783f624958e3c1228f8433ee00965fc99f170364250d876bcd0b5d9484b4579a",
+    "mbwr_additional": "a57ea631169f2ba51282fb326038e22433cfb1dcc242e28a6debc042b4d4ec3c",
+    "pets": "2f7a472ad252f0952aa49f5491dd3c7795106c080c36079b9bea33926ab70b9c",
+    "pc_saft_datadb": "24667d3bf38092d05329762ae21ce1d829a90f0da5cf5491ebf0598dd71a7ef6",
+    "pc_saft_parameters": "39cb10930ae3f2b0f705b8ef47fd703113b0104601f0c699f053c9d1f6ae4fab",
+    "eos_parameters": "eb7b41483e973f4701008861ffd1e47e0e5a7549fe40ac34eca8c417a8f27ea8",
+    "mixdatadb": "a208994066d699b441362ca9c078dc6965c6020c29c6fe334562a97fb2df1aaa",
+    "cbalpha": "40475a554d43f8e0e2b5137460c60b7ee7fa1706b59cc1df6454c12b0c410b02",
+    "cbbeta": "f9ac7e9e686c79affc2c12ff17db5693332f294e9df8df25ec4a2d0938c085ec",
+    "excess_gibbs": "91db5a4da578e85def8b6c7c4a384ac3e8dc3370faaba29d40c12191198152b5",
+    "wong_sandler": "310e1df96f792d62a4b4c8c488a5c9501bb802853d273b7c4b1dc27e5112b208",
+    "cbmix": "14a973e85f0a768715e7896125e070c0888082c407391f60e4d4ad598dc22e7f",
+    "cbhelm": "a092ae02bbfb0f39ec227ac936366fb4394b403dc24d782206bc7bd49a28cd4b",
+    "cubic": "4fc1c75b5083500754436076a2472478a99463fffe8d578f0560baee095ea606",
+    "idealh2": "e02374dec47754a196b3102de89210df5a4c01d18a1203bf24468716b129bade",
+    "ideal": "4abeed45be71e58aebc14473b15cbf90df2c260b3152dc68e09183c148cb2fc2",
+    "cpa_parameters": "8eca97665cf0c22281bfbc0ef156022be3be0bbedf1d3f0236571ab892ac1a6b",
+    "cbselect": "4840cd70d733cfd61638b6fb59e7d0069074b71121d17977c5ec33f7fd5fbc0c",
+    "hardsphere_bmcsl": "aaa5be55f77fb1def8d15962c1e7df2d353f3b0cfd6fd47d0739ffca3620d301",
+    "pc_saft_nonassoc": "a2512afe7ad8da09c7737ab955be209734d773822a24ca4c34cd508cc9aa0db4",
+    "saftvrmie_options": "5d4b9891ea470f49dd5c4d5d624e901de4894d6642221b5a23c1ae6fd2c5b9e4",
+    "saftvrmie_datadb": "5673b761a3698429dff898135fba4675c8ce000408898ac70106f6688d119842",
+    "saftvrmie_parameters": "9f9522f18419781b75ca699240e9327d9836186922a64f033c4b30241e4fbac9",
+    "saftvrmie_containers": "ecd4aa67a916f260006c5ec87d58bc48bd08a3fe808d0cdc5ab17095a0c56447",
+    "saftvrmie_utils": "3073a53eb1e4ca53d0c99215cff5bb0374c6111f17950be79c8ff0ef738af193",
+    "saftvrmie_hardsphere": "69eadfad516eaf43bd4635b5cf9c19a794cfb862795ab3b1ea554bac3c516add",
+    "saftvrmie_dispersion": "9970200beba5b09c40675c8d815795c9e53f6cfb015264bd8323a471d2dfcb8a",
+    "saftvrmie_chain": "313951dcb61c081aee2edeabf5ad08b827475f02af3b056b3d660234039f6253",
+    "saftvrmie_association": "9ba1a54816cb0fc2eef93faa5101e953c41c30c3310926f1d376c7c0160dc8c3",
+    "saftvrmie_interface": "6bc6d39e595b7fda87a5b4ca69f4b589dd699c410c7ea8d3e10adc191b700cc6",
+    "hardsphere_wca": "568bdef8f6f16f5ff636b369e3824d1a9aea4393ccce9cc59ae0980d878e4819",
+    "lj_splined": "21b26d0e68b20281fc91b6f93d587fb7562d40036e364481e4e4384cd8cdefae",
+    "saft_globals": "cd491377b6e647ca1c8da737bd5be6761f3e994859ed9052840fa0acfb6948b9",
+    "saft_rdf": "80cd38594817aea99c75402d7e6669a1eca5d834a42428e3e091712c78d4963e",
+    "saft_association": "df3a5f9b6e871d005427fcfaf167989256395e55017110227ca0f1c8181dd5b6",
+    "multipol": "b227a20226ceb793e13c6153f3e678f2cfd0dbfa2463a93f3da012a60ae23f3a",
+    "saft_interface": "df8725cb15f2bb2b2a54898989ba1af7ae59c49dd578120a85b18d95ae471750",
+    "extcsp": "b452c5397da6e45de151caa10bbc35529742448148ad989ae43c5e71c737cc70",
+    "leekesler": "6dfcf59b3188e174f48403e435f8253dac1add0a95bdcee169a24d9c5c3f7af8",
+    "multiparameter_idealmix": "43adb5de94054eea91a54a241a4a71eb0b6b2ae1757f13d9c8d462113fb79f9f",
+    "co2_gibbs": "8b2351c798fb1b4f89a7f7e3b0ef1af34859bc65477a354b3ed0628ccdad6829",
+    "h2o_gibbs": "a12fc215f7a41fdd1d019c654b2fc4f2a0f87cac83fa4e505f7e15fe25198d0e",
+    "single_component": "329ed5bec79c4fa4e5b66ccd51c3ba28819eda6b67537477bda453e7a8ab60ba",
+    "eos_container": "cc9c69a832a85a6338a7b21d6c3372ede4cde1b2cebe971a0d2b432fad2ac8fa",
+    "single_phase": "02c00dbf65e25e014ce3d7bce8ba626435b8f928dd1d380bf22718a2d0592790",
+    "eostv": "306093cddf7098985eb729d463c966a7dfb230009c722249842c3e320b3ab7a5",
+    "eos": "befee3261d285fdcfa2c83b0cb9ab8b235ad311147d6d42c53f07fa5d26ece23",
+    "puresaturation": "70efebbb25d9659b5921770ba15d484b66df79d34502d8787c4cb790302f5888",
+    "thermo_utils": "7fa5c3db69531986d9928ce0271b36765c94080862224355cce987c1ba010eae",
+    "critical": "8ff578626a8512de7ec8c5b0b34631632e6f02662d8e0981f5a08b7e46ae3e58",
+    "stability": "e82e20c659b339477a9116648b07f03aa78090792903b68385fcbb95e18901c7",
+    "saturation": "c3841bfe67898ad420044a3191a07d7b6ff1c5e16e8c52a31900133eec1d1ea8",
+    "solideos": "2b0a45599d7faed4f166e03e630d5b8a9620f2de996d8517db0a2feb7d2787de",
+    "vls": "3ecc60a8b527374c1a6903a6f4b6b5785b0e2228c1c52da4258e0eb9367d41f8",
+    "tuning": "ea7ad3173d0e1a19f3175319dfb4536a0c9e496904babe9bdc7c259b752acb89",
+    "tp_solver": "9826e826da68e5a7058ec57b3d17e5442bfd4db628679a3bd00d15e271efbb0f",
+    "state_functions": "2ecbac8dffc1094f2350fbcbb5a0b7efa47b28c193007428751e01fa88dd6fa3",
+    "saturation_curve": "3129cc1e181bb3e67fb11000164265e1783fa3d9d0d7fa48deb898241e198406",
+    "saturation_tv": "fd1ee2d47482fc212815b2ae26fb510d11ddef704077e515940b0809e0b42887",
+    "multi_phase_envelope_tv": "0fb3a57447e34bb610c960f7476037db1031d84c1fa514f9229e6644fc13a607",
+    "solid_saturation": "75bd97d719d7d57ddefc3622b479612e941072499381cd316fa645fb4a552fa6",
+    "saturation_point_locators": "daa38b0ff695031b3d1f3e00ba354f16eed2d21e2434ea9ca22cf202df5d8bd0",
+    "joule_thompson_inversion": "e285640f5558ea4973202c0abacbf005db919c7f89da883e583251f6ad35a93e",
+    "ph_solver": "00d134e44f95c6c5521d59d86f627fb95710c3f0e176cbfe801e6ffcee7f5754",
+    "ps_solver": "34d11b86595713aba761e27163bfb8dfbcab4fe15a18a51e92b7df6be0de2c56",
+    "uv_solver": "efbd86537a6578b8f318daaaa4d0bb37cb9540ffef90392585f10838d9b4bbd6",
+    "sv_solver": "1f51cf123ff8fcbe264e1cc9d1142c70545331a8a4eab12ad49225fa49302b75",
+    "spinodal": "ae12a892a1c1f34845ba81750cdb47d93a801b3ef06df2647787163b4a58f80f",
+    "mut_solver": "6ddbb514d5d6e241b0a03478a17641decb496d10f65557838ff59132af6c3bc1",
+    "isolines": "660e6d90c2e92d4315302d1fa5b5dc62316b283a0af4d59ab32d86c93eb40d2c",
+    "binaryplot": "bc8ff596e437a41e18585a9bd67faa40cfda6a13c09cf36b65219a0f4091f622",
+    "speed_of_sound": "85fb9206528061cbdcce58c20cf824ed7455a7c5ee1f0a539a42cbd76a7f133f",
+    "saftvrmie_testing": "931b50a23a6384d10ceeb32184ae7618bc4a2e4d04fd4efd0cd321e22fc33d85",
+    "hydrate": "dffef9c31c571a3b365e72923c01812eb2edfc39f2aa36c36b6b8f81bb3653ab",
+    "hydrate_curves": "1d5a48516803bb81e64d6dd3a3d79723abf0700356ae0d662b09efcff1725731",
+    "consistency": "1ed20d6dd79e6474d237ff5795cefde81c11e4223911a30a3d6d222377f8daf8",
+    "eoslibinit": "7df67e296f5b79105714fecc897c80ab0cb1bd2844a18b01027877da87351258",
+    "complexmodelinit": "6ffae447c3e2be271d9720f3b5217bebf669fa879cf9291be7f5d0a407a96b41",
+    "external": "e57f6391c43791ae80fde558f66d9c39ed40b3d3b27859579fc11d3ef0c97f9d"
+  },
+  "cases": 3406,
+  "probe": {
+    "source_sha256": "ea0a5f1a9cad89885392fc636241ae594085f468fdfddebbefa2dc8e6be71d19",
+    "library_sha256": "7ae70182c38e69812d6b563731e0d2b58cb795022ff48d57276d268dffa1c566",
+    "probe_sha256": "63d9ae85b525f9badf88a1496a29ecba98fdff1c05555ccaca50cdb5f75f4697",
+    "compiler": "GNU Fortran (MinGW-W64 x86_64-ucrt-posix-seh, built by Brecht Sanders) 14.3.0",
+    "flags": [
+      "-O3",
+      "-fdefault-real-8",
+      "-fdefault-double-8",
+      "-frecursive"
+    ]
+  },
+  "generator": "tools/rust_port/validate_mbwr_equilibrium.py",
+  "fixture_sha256": "1c24fd186c17459a32c5366081db960ac3e4f0778fe7e7c6b54096162e731030",
+  "quantities": [
+    "density",
+    "phase_in",
+    "phase_found",
+    "pressure",
+    "pressure_rho"
+  ],
+  "reference_errors": [],
+  "unavailable_records": [
+    {
+      "record": "mbwrcx12",
+      "reason": "no compiled source acentric factor"
+    },
+    {
+      "record": "mbwrcx21",
+      "reason": "no compiled source acentric factor"
+    },
+    {
+      "record": "mbwrcx23",
+      "reason": "no compiled source acentric factor"
+    },
+    {
+      "record": "mbwrcx24",
+      "reason": "no compiled source acentric factor"
+    },
+    {
+      "record": "mbwrcx25",
+      "reason": "no compiled source acentric factor"
+    },
+    {
+      "record": "mbwrcx26",
+      "reason": "no compiled source acentric factor"
+    },
+    {
+      "record": "mbwrcx27",
+      "reason": "no compiled source acentric factor"
+    },
+    {
+      "record": "mbwrcx33",
+      "reason": "no compiled source acentric factor"
+    },
+    {
+      "record": "mbwrcx36",
+      "reason": "no compiled source acentric factor"
+    },
+    {
+      "record": "mbwrcx44",
+      "reason": "no compiled source acentric factor"
+    },
+    {
+      "record": "mbwrcx45",
+      "reason": "no compiled source acentric factor"
+    },
+    {
+      "record": "mbwrcx49",
+      "reason": "no compiled source acentric factor"
+    },
+    {
+      "record": "mbwrcx50",
+      "reason": "no compiled source acentric factor"
+    },
+    {
+      "record": "mbwrcx52",
+      "reason": "no compiled source acentric factor"
+    },
+    {
+      "record": "mbwrcx53",
+      "reason": "no compiled source acentric factor"
+    },
+    {
+      "record": "mbwrcx54",
+      "reason": "no compiled source acentric factor"
+    },
+    {
+      "record": "mbwrcx55",
+      "reason": "no compiled source acentric factor"
+    }
+  ],
+  "unqualified_returns": [
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 251.29000000000002,
+        "pressure": 449880.0,
+        "phase": 1,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        172.3297901074382,
+        1.0,
+        179566.12999267352,
+        -1.1641532182693482e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 251.29000000000002,
+        "pressure": 449880.0,
+        "phase": 2,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        172.32979010743819,
+        2.0,
+        179566.12999267352,
+        2.1827872842550277e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 251.29000000000002,
+        "pressure": 3599040.0,
+        "phase": 1,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        172.3297901074382,
+        1.0,
+        179566.12999267352,
+        -1.1641532182693482e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 251.29000000000002,
+        "pressure": 3599040.0,
+        "phase": 2,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        172.32979010743819,
+        2.0,
+        179566.12999267352,
+        2.1827872842550277e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 251.29000000000002,
+        "pressure": 4498800.0,
+        "phase": 1,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        172.3297901074382,
+        1.0,
+        179566.12999267352,
+        -1.1641532182693482e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 251.29000000000002,
+        "pressure": 4498800.0,
+        "phase": 2,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        172.32979010743819,
+        2.0,
+        179566.12999267352,
+        2.1827872842550277e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 251.29000000000002,
+        "pressure": 5398560.0,
+        "phase": 1,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        172.3297901074382,
+        1.0,
+        179566.12999267352,
+        -1.1641532182693482e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 251.29000000000002,
+        "pressure": 5398560.0,
+        "phase": 2,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        172.3297901074382,
+        2.0,
+        179566.12999267352,
+        -1.1641532182693482e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 251.29000000000002,
+        "pressure": 13496400.0,
+        "phase": 1,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        172.3297901074382,
+        1.0,
+        179566.12999267352,
+        -1.1641532182693482e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 251.29000000000002,
+        "pressure": 13496400.0,
+        "phase": 2,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        172.3297901074382,
+        2.0,
+        179566.12999267352,
+        -1.1641532182693482e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 347.94000000000005,
+        "pressure": 3599040.0,
+        "phase": 1,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        352.2125179455108,
+        1.0,
+        506816.4451034584,
+        -4.220055416226387e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 347.94000000000005,
+        "pressure": 3599040.0,
+        "phase": 2,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        352.2125179455108,
+        2.0,
+        506816.4451034584,
+        -4.220055416226387e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 347.94000000000005,
+        "pressure": 4498800.0,
+        "phase": 1,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        352.2125179455108,
+        1.0,
+        506816.4451034584,
+        -4.220055416226387e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 347.94000000000005,
+        "pressure": 4498800.0,
+        "phase": 2,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        352.21251794551074,
+        2.0,
+        506816.4451034585,
+        2.3283064365386963e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 347.94000000000005,
+        "pressure": 5398560.0,
+        "phase": 1,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        352.2125179455108,
+        1.0,
+        506816.4451034584,
+        -4.220055416226387e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 347.94000000000005,
+        "pressure": 5398560.0,
+        "phase": 2,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        352.21251794551074,
+        2.0,
+        506816.4451034585,
+        2.3283064365386963e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 347.94000000000005,
+        "pressure": 13496400.0,
+        "phase": 1,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        352.2125179455108,
+        1.0,
+        506816.4451034584,
+        -4.220055416226387e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 347.94000000000005,
+        "pressure": 13496400.0,
+        "phase": 2,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        352.2125179455108,
+        2.0,
+        506816.4451034584,
+        -4.220055416226387e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 386.56134000000003,
+        "pressure": 3599040.0,
+        "phase": 1,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        441.8180461387876,
+        1.0,
+        705702.8978151898,
+        2.9103830456733704e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 386.56134000000003,
+        "pressure": 3599040.0,
+        "phase": 2,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        441.8180461387876,
+        2.0,
+        705702.8978151898,
+        2.9103830456733704e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 386.56134000000003,
+        "pressure": 4498800.0,
+        "phase": 1,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        441.8180461387876,
+        1.0,
+        705702.8978151898,
+        2.9103830456733704e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 386.56134000000003,
+        "pressure": 4498800.0,
+        "phase": 2,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        441.8180461387877,
+        2.0,
+        705702.8978151898,
+        -1.7462298274040223e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 386.56134000000003,
+        "pressure": 5398560.0,
+        "phase": 1,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        441.8180461387876,
+        1.0,
+        705702.8978151898,
+        2.9103830456733704e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 386.56134000000003,
+        "pressure": 5398560.0,
+        "phase": 2,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        441.8180461387876,
+        2.0,
+        705702.8978151898,
+        2.9103830456733704e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 386.56134000000003,
+        "pressure": 13496400.0,
+        "phase": 1,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        441.8180461387876,
+        1.0,
+        705702.8978151898,
+        2.9103830456733704e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 386.56134000000003,
+        "pressure": 13496400.0,
+        "phase": 2,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        441.8180461387877,
+        2.0,
+        705702.8978151898,
+        -1.7462298274040223e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 386.63866,
+        "pressure": 3599040.0,
+        "phase": 1,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        442.0082571579765,
+        1.0,
+        706146.7660025905,
+        1.7462298274040223e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 386.63866,
+        "pressure": 3599040.0,
+        "phase": 2,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        442.00825715797646,
+        2.0,
+        706146.7660025904,
+        1.4551915228366852e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 386.63866,
+        "pressure": 4498800.0,
+        "phase": 1,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        442.0082571579765,
+        1.0,
+        706146.7660025905,
+        1.7462298274040223e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 386.63866,
+        "pressure": 4498800.0,
+        "phase": 2,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        442.00825715797646,
+        2.0,
+        706146.7660025904,
+        1.4551915228366852e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 386.63866,
+        "pressure": 5398560.0,
+        "phase": 1,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        442.0082571579765,
+        1.0,
+        706146.7660025905,
+        1.7462298274040223e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 386.63866,
+        "pressure": 5398560.0,
+        "phase": 2,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        442.00825715797646,
+        2.0,
+        706146.7660025904,
+        1.4551915228366852e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 386.63866,
+        "pressure": 13496400.0,
+        "phase": 1,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        442.0082571579765,
+        1.0,
+        706146.7660025905,
+        1.7462298274040223e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 386.63866,
+        "pressure": 13496400.0,
+        "phase": 2,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        442.00825715797646,
+        2.0,
+        706146.7660025904,
+        1.4551915228366852e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 463.92,
+        "pressure": 3599040.0,
+        "phase": 1,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        655.7023941167231,
+        1.0,
+        1255071.1936291947,
+        -6.693881005048752e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 463.92,
+        "pressure": 3599040.0,
+        "phase": 2,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        0.24968331121331097,
+        2.0,
+        962.9022675675104,
+        3855.7431150937678
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 463.92,
+        "pressure": 4498800.0,
+        "phase": 1,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        655.7023941167231,
+        1.0,
+        1255071.1936291947,
+        -6.693881005048752e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 463.92,
+        "pressure": 4498800.0,
+        "phase": 2,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        655.7023941167231,
+        2.0,
+        1255071.1936291947,
+        -6.693881005048752e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 463.92,
+        "pressure": 5398560.0,
+        "phase": 1,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        655.7023941167231,
+        1.0,
+        1255071.1936291947,
+        -6.693881005048752e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 463.92,
+        "pressure": 5398560.0,
+        "phase": 2,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        655.7023941167231,
+        2.0,
+        1255071.1936291952,
+        7.566995918750764e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 463.92,
+        "pressure": 13496400.0,
+        "phase": 1,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        655.7023941167231,
+        1.0,
+        1255071.1936291947,
+        -6.693881005048752e-13
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 463.92,
+        "pressure": 13496400.0,
+        "phase": 2,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "values": [
+        655.7023941167232,
+        2.0,
+        1255071.1936291947,
+        -1.2805685400962829e-12
+      ],
+      "maximum_density": 22127.89601312817
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 43,
+        "temperature": 583.0618499998765,
+        "pressure": 17806923.12393254,
+        "phase": 2,
+        "critical": [
+          647.8464999998628,
+          22258653.904915676,
+          17542.567149085564
+        ],
+        "acentric_factor": 0.344
+      },
+      "values": [
+        0.2505776965644938,
+        2.0,
+        1214.724776037671,
+        4847.548270121937
+      ],
+      "maximum_density": 70170.26859634226
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 43,
+        "temperature": 583.0618499998765,
+        "pressure": 22258653.904915676,
+        "phase": 2,
+        "critical": [
+          647.8464999998628,
+          22258653.904915676,
+          17542.567149085564
+        ],
+        "acentric_factor": 0.344
+      },
+      "values": [
+        0.2505059390384926,
+        2.0,
+        1214.3769279635774,
+        4847.548355368475
+      ],
+      "maximum_density": 70170.26859634226
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 43,
+        "temperature": 583.0618499998765,
+        "pressure": 26710384.68589881,
+        "phase": 2,
+        "critical": [
+          647.8464999998628,
+          22258653.904915676,
+          17542.567149085564
+        ],
+        "acentric_factor": 0.344
+      },
+      "values": [
+        0.25044510055433644,
+        2.0,
+        1214.0820104675645,
+        4847.548427643407
+      ],
+      "maximum_density": 70170.26859634226
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 48,
+        "temperature": 461.34000000000003,
+        "pressure": 6476720.0,
+        "phase": 2,
+        "critical": [
+          512.6,
+          8095900.0,
+          8480.165535561056
+        ],
+        "acentric_factor": 0.559
+      },
+      "values": [
+        0.25021822956502315,
+        2.0,
+        959.7165006169892,
+        3835.241638862214
+      ],
+      "maximum_density": 33920.662142244226
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 48,
+        "temperature": 461.34000000000003,
+        "pressure": 8095900.0,
+        "phase": 2,
+        "critical": [
+          512.6,
+          8095900.0,
+          8480.165535561056
+        ],
+        "acentric_factor": 0.559
+      },
+      "values": [
+        0.2501910617676875,
+        2.0,
+        959.6123055485965,
+        3835.2416988538434
+      ],
+      "maximum_density": 33920.662142244226
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 48,
+        "temperature": 461.34000000000003,
+        "pressure": 9715080.0,
+        "phase": 2,
+        "critical": [
+          512.6,
+          8095900.0,
+          8480.165535561056
+        ],
+        "acentric_factor": 0.559
+      },
+      "values": [
+        0.2501664545750506,
+        2.0,
+        959.517931016635,
+        3835.241753191174
+      ],
+      "maximum_density": 33920.662142244226
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 48,
+        "temperature": 512.5487400000001,
+        "pressure": 9715080.0,
+        "phase": 2,
+        "critical": [
+          512.6,
+          8095900.0,
+          8480.165535561056
+        ],
+        "acentric_factor": 0.559
+      },
+      "values": [
+        0.25090779908181055,
+        2.0,
+        1069.2100868084212,
+        4261.165642093001
+      ],
+      "maximum_density": 33920.662142244226
+    },
+    {
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 48,
+        "temperature": 512.65126,
+        "pressure": 9715080.0,
+        "phase": 2,
+        "critical": [
+          512.6,
+          8095900.0,
+          8480.165535561056
+        ],
+        "acentric_factor": 0.559
+      },
+      "values": [
+        0.25090861634426564,
+        2.0,
+        1069.4274743280562,
+        4262.018285384196
+      ],
+      "maximum_density": 33920.662142244226
+    }
+  ],
+  "phase_selection_differences": [
+    {
+      "case": "MBWR|mbwrcx1|171.49986|45988.176817276966|40919.45608536454|MBWR_ROOTS",
+      "phase": 1,
+      "found": 2.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 1,
+        "temperature": 171.49986,
+        "pressure": 45988.176817276966,
+        "phase": 1,
+        "critical": [
+          190.55540000000002,
+          4598817.681727696,
+          10229.864021341135
+        ],
+        "acentric_factor": 0.01131
+      },
+      "reference": [
+        32.396727454836494,
+        2.0,
+        45988.176817276966,
+        1413.1386512646493
+      ],
+      "rust_roots": [
+        32.3967274548365,
+        17262.941953669455
+      ],
+      "selected_density": 17262.941953669455
+    },
+    {
+      "case": "MBWR|mbwrcx2|171.49986|45988.176817276966|40919.45608536454|MBWR_ROOTS",
+      "phase": 1,
+      "found": 2.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 2,
+        "temperature": 171.49986,
+        "pressure": 45988.176817276966,
+        "phase": 1,
+        "critical": [
+          190.55540000000002,
+          4598817.681727696,
+          10229.864021341135
+        ],
+        "acentric_factor": 0.01131
+      },
+      "reference": [
+        32.39935460764284,
+        2.0,
+        45988.17681727697,
+        1412.9100479098076
+      ],
+      "rust_roots": [
+        32.39935460764284,
+        17175.633373452525
+      ],
+      "selected_density": 17175.633373452525
+    },
+    {
+      "case": "MBWR|mbwrcx3|171.49986|45988.176817276966|40919.45608536454|MBWR_ROOTS",
+      "phase": 1,
+      "found": 2.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 3,
+        "temperature": 171.49986,
+        "pressure": 45988.176817276966,
+        "phase": 1,
+        "critical": [
+          190.55540000000002,
+          4598817.681727696,
+          10229.864021341135
+        ],
+        "acentric_factor": 0.01131
+      },
+      "reference": [
+        32.398922905628474,
+        2.0,
+        45988.176817276966,
+        1412.9473625431833
+      ],
+      "rust_roots": [
+        32.39892290562847,
+        17366.24517517536
+      ],
+      "selected_density": 17366.24517517536
+    },
+    {
+      "case": "MBWR|mbwrcx8|139.1212799999994|50429.83469714031|54522.67003680271|MBWR_ROOTS",
+      "phase": 1,
+      "found": 2.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 8,
+        "temperature": 139.1212799999994,
+        "pressure": 50429.83469714031,
+        "phase": 1,
+        "critical": [
+          154.5791999999993,
+          5042983.469714031,
+          13630.667509200677
+        ],
+        "acentric_factor": 0.021
+      },
+      "reference": [
+        43.79498266816641,
+        2.0,
+        50429.8346971403,
+        1146.2808820772998
+      ],
+      "rust_roots": [
+        43.794982668166426,
+        23348.250483528645
+      ],
+      "selected_density": 23348.250483528645
+    },
+    {
+      "case": "MBWR|mbwrcx9|113.57883000000113|34000.08904692829|44842.06223065381|MBWR_ROOTS",
+      "phase": 1,
+      "found": 2.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 9,
+        "temperature": 113.57883000000113,
+        "pressure": 34000.08904692829,
+        "phase": 1,
+        "critical": [
+          126.19870000000125,
+          3400008.9046928287,
+          11210.515557663453
+        ],
+        "acentric_factor": 0.04
+      },
+      "reference": [
+        36.16796090546694,
+        2.0,
+        34000.08904692828,
+        935.7796711573206
+      ],
+      "rust_roots": [
+        36.167960905466956,
+        19490.9639455517
+      ],
+      "selected_density": 19490.9639455517
+    },
+    {
+      "case": "MBWR|mbwrcx11|463.92|44988.0|22127.89601312817|MBWR_ROOTS",
+      "phase": 1,
+      "found": 2.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 463.92,
+        "pressure": 44988.0,
+        "phase": 1,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "reference": [
+        11.771293344266372,
+        2.0,
+        44988.00000000001,
+        3786.444210032983
+      ],
+      "rust_roots": [
+        11.7712933442663,
+        20736.839530690613
+      ],
+      "selected_density": 20736.839530690613
+    },
+    {
+      "case": "MBWR|mbwrcx11|463.92|449880.0|22127.89601312817|MBWR_ROOTS",
+      "phase": 1,
+      "found": 2.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 463.92,
+        "pressure": 449880.0,
+        "phase": 1,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "reference": [
+        129.71763371037395,
+        2.0,
+        449880.00000000006,
+        3080.220206608072
+      ],
+      "rust_roots": [
+        129.71763371037332,
+        20740.31124809073
+      ],
+      "selected_density": 20740.31124809073
+    },
+    {
+      "case": "MBWR|mbwrcx11|773.2|44988.0|22127.89601312817|MBWR_ROOTS",
+      "phase": 1,
+      "found": 2.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 773.2,
+        "pressure": 44988.0,
+        "phase": 1,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "reference": [
+        7.009118493849065,
+        2.0,
+        44987.99999999999,
+        6408.249277950778
+      ],
+      "rust_roots": [
+        7.009118493849065,
+        14795.131731459793
+      ],
+      "selected_density": 14795.131731459793
+    },
+    {
+      "case": "MBWR|mbwrcx11|773.2|449880.0|22127.89601312817|MBWR_ROOTS",
+      "phase": 1,
+      "found": 2.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 773.2,
+        "pressure": 449880.0,
+        "phase": 1,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "reference": [
+        71.13046198800276,
+        2.0,
+        449880.00000000006,
+        6220.646482134406
+      ],
+      "rust_roots": [
+        71.13046198800278,
+        14811.265610560169
+      ],
+      "selected_density": 14811.265610560169
+    },
+    {
+      "case": "MBWR|mbwrcx11|773.2|3599040.0|22127.89601312817|MBWR_ROOTS",
+      "phase": 1,
+      "found": 2.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 773.2,
+        "pressure": 3599040.0,
+        "phase": 1,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "reference": [
+        658.5698396067254,
+        2.0,
+        3599039.9999999995,
+        4503.154997383348
+      ],
+      "rust_roots": [
+        658.5698396067256,
+        14933.313285976228
+      ],
+      "selected_density": 14933.313285976228
+    },
+    {
+      "case": "MBWR|mbwrcx11|773.2|4498800.0|22127.89601312817|MBWR_ROOTS",
+      "phase": 1,
+      "found": 2.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 773.2,
+        "pressure": 4498800.0,
+        "phase": 1,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "reference": [
+        873.1974560991304,
+        2.0,
+        4498799.999999999,
+        3882.1821856366787
+      ],
+      "rust_roots": [
+        873.1974560991309,
+        14967.13004623307
+      ],
+      "selected_density": 14967.13004623307
+    },
+    {
+      "case": "MBWR|mbwrcx11|773.2|5398560.0|22127.89601312817|MBWR_ROOTS",
+      "phase": 1,
+      "found": 2.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 11,
+        "temperature": 773.2,
+        "pressure": 5398560.0,
+        "phase": 1,
+        "critical": [
+          386.6,
+          4498800.0,
+          5531.974003282043
+        ],
+        "acentric_factor": 0.266
+      },
+      "reference": [
+        1129.1462305596806,
+        2.0,
+        5398560.000000001,
+        3150.38221093731
+      ],
+      "rust_roots": [
+        1129.1462305596783,
+        15000.507878228855
+      ],
+      "selected_density": 15000.507878228855
+    },
+    {
+      "case": "MBWR|mbwrcx14|364.8420000000497|113333.99988794437|70182.64015545645|MBWR_ROOTS",
+      "phase": 1,
+      "found": 2.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 14,
+        "temperature": 364.8420000000497,
+        "pressure": 113333.99988794437,
+        "phase": 1,
+        "critical": [
+          405.38000000005525,
+          11333399.988794437,
+          13270.491740454192
+        ],
+        "acentric_factor": 0.25
+      },
+      "reference": [
+        37.570616647673056,
+        2.0,
+        113333.99988794436,
+        2999.6854147510135
+      ],
+      "rust_roots": [
+        37.57061664767305,
+        26449.45304404419
+      ],
+      "selected_density": 26449.45304404419
+    },
+    {
+      "case": "MBWR|mbwrcx14|364.8420000000497|1133339.9988794436|70182.64015545645|MBWR_ROOTS",
+      "phase": 1,
+      "found": 2.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 14,
+        "temperature": 364.8420000000497,
+        "pressure": 1133339.9988794436,
+        "phase": 1,
+        "critical": [
+          405.38000000005525,
+          11333399.988794437,
+          13270.491740454192
+        ],
+        "acentric_factor": 0.25
+      },
+      "reference": [
+        396.51832451056487,
+        2.0,
+        1133339.9988794436,
+        2686.50633036538
+      ],
+      "rust_roots": [
+        396.5183245105648,
+        26880.718174752194
+      ],
+      "selected_density": 26880.718174752194
+    },
+    {
+      "case": "MBWR|mbwrcx15|306.28000000000003|3526080.0|16129.41052163984|MBWR_ROOTS",
+      "phase": 2,
+      "found": 1.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 15,
+        "temperature": 306.28000000000003,
+        "pressure": 3526080.0,
+        "phase": 2,
+        "critical": [
+          471.2,
+          4407600.0,
+          4032.35263040996
+        ],
+        "acentric_factor": 0.188
+      },
+      "reference": [
+        10670.33380483346,
+        1.0,
+        3526079.999999568,
+        49463.80599160996
+      ],
+      "rust_roots": [
+        4627.265657052215,
+        10670.333804833468
+      ],
+      "selected_density": 4627.265657052215
+    },
+    {
+      "case": "MBWR|mbwrcx15|306.28000000000003|4407600.0|16129.41052163984|MBWR_ROOTS",
+      "phase": 2,
+      "found": 1.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 15,
+        "temperature": 306.28000000000003,
+        "pressure": 4407600.0,
+        "phase": 2,
+        "critical": [
+          471.2,
+          4407600.0,
+          4032.35263040996
+        ],
+        "acentric_factor": 0.188
+      },
+      "reference": [
+        10687.97028713603,
+        1.0,
+        4407599.99999976,
+        50503.310678433874
+      ],
+      "rust_roots": [
+        4683.871546145911,
+        10687.970287136033
+      ],
+      "selected_density": 4683.871546145911
+    },
+    {
+      "case": "MBWR|mbwrcx15|306.28000000000003|5289120.0|16129.41052163984|MBWR_ROOTS",
+      "phase": 2,
+      "found": 1.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 15,
+        "temperature": 306.28000000000003,
+        "pressure": 5289120.0,
+        "phase": 2,
+        "critical": [
+          471.2,
+          4407600.0,
+          4032.35263040996
+        ],
+        "acentric_factor": 0.188
+      },
+      "reference": [
+        10705.249423756884,
+        1.0,
+        5289120.00000027,
+        51531.11409604629
+      ],
+      "rust_roots": [
+        4740.265995181672,
+        10705.249423756883
+      ],
+      "selected_density": 4740.265995181672
+    },
+    {
+      "case": "MBWR|mbwrcx15|306.28000000000003|13222800.0|16129.41052163984|MBWR_ROOTS",
+      "phase": 2,
+      "found": 1.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 15,
+        "temperature": 306.28000000000003,
+        "pressure": 13222800.0,
+        "phase": 2,
+        "critical": [
+          471.2,
+          4407600.0,
+          4032.35263040996
+        ],
+        "acentric_factor": 0.188
+      },
+      "reference": [
+        10847.228753045083,
+        1.0,
+        13222800.000000443,
+        60334.76655569676
+      ],
+      "rust_roots": [
+        5270.881339358761,
+        10847.228753045087
+      ],
+      "selected_density": 5270.881339358761
+    },
+    {
+      "case": "MBWR|mbwrcx16|272.28499999999997|2610160.0|13625.73364171626|MBWR_ROOTS",
+      "phase": 2,
+      "found": 1.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 16,
+        "temperature": 272.28499999999997,
+        "pressure": 2610160.0,
+        "phase": 2,
+        "critical": [
+          418.9,
+          3262700.0,
+          3406.433410429065
+        ],
+        "acentric_factor": 0.255
+      },
+      "reference": [
+        9004.768728197972,
+        1.0,
+        2610160.000000076,
+        53580.95979623252
+      ],
+      "rust_roots": [
+        3805.630602374286,
+        9004.768728197974
+      ],
+      "selected_density": 3805.630602374286
+    },
+    {
+      "case": "MBWR|mbwrcx16|272.28499999999997|3262700.0|13625.73364171626|MBWR_ROOTS",
+      "phase": 2,
+      "found": 1.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 16,
+        "temperature": 272.28499999999997,
+        "pressure": 3262700.0,
+        "phase": 2,
+        "critical": [
+          418.9,
+          3262700.0,
+          3406.433410429065
+        ],
+        "acentric_factor": 0.255
+      },
+      "reference": [
+        9016.860471577424,
+        1.0,
+        3262699.9999999935,
+        54351.52494687607
+      ],
+      "rust_roots": [
+        3874.5667681029213,
+        9016.860471577427
+      ],
+      "selected_density": 3874.5667681029213
+    },
+    {
+      "case": "MBWR|mbwrcx16|272.28499999999997|3915240.0|13625.73364171626|MBWR_ROOTS",
+      "phase": 2,
+      "found": 1.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 16,
+        "temperature": 272.28499999999997,
+        "pressure": 3915240.0,
+        "phase": 2,
+        "critical": [
+          418.9,
+          3262700.0,
+          3406.433410429065
+        ],
+        "acentric_factor": 0.255
+      },
+      "reference": [
+        9028.782533522684,
+        1.0,
+        3915240.000000212,
+        55117.07952343987
+      ],
+      "rust_roots": [
+        3945.762632004833,
+        9028.782533522688
+      ],
+      "selected_density": 3945.762632004833
+    },
+    {
+      "case": "MBWR|mbwrcx30|266.24|421800.0|17316.279053509836|MBWR_ROOTS",
+      "phase": 2,
+      "found": 1.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 30,
+        "temperature": 266.24,
+        "pressure": 421800.0,
+        "phase": 2,
+        "critical": [
+          409.6,
+          4218000.0,
+          4329.069763377459
+        ],
+        "acentric_factor": 0.236
+      },
+      "reference": [
+        11803.552453960237,
+        1.0,
+        421799.99999872124,
+        163185.57618038566
+      ],
+      "rust_roots": [
+        215.60075272211577,
+        11803.55245396025
+      ],
+      "selected_density": 215.60075272211577
+    },
+    {
+      "case": "MBWR|mbwrcx30|266.24|3374400.0|17316.279053509836|MBWR_ROOTS",
+      "phase": 2,
+      "found": 1.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 30,
+        "temperature": 266.24,
+        "pressure": 3374400.0,
+        "phase": 2,
+        "critical": [
+          409.6,
+          4218000.0,
+          4329.069763377459
+        ],
+        "acentric_factor": 0.236
+      },
+      "reference": [
+        11821.482298421604,
+        1.0,
+        3374400.000000208,
+        166170.09384766556
+      ],
+      "rust_roots": [
+        1025.354378203179,
+        11821.482298421615
+      ],
+      "selected_density": 1025.354378203179
+    },
+    {
+      "case": "MBWR|mbwrcx30|266.24|4218000.0|17316.279053509836|MBWR_ROOTS",
+      "phase": 2,
+      "found": 1.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 30,
+        "temperature": 266.24,
+        "pressure": 4218000.0,
+        "phase": 2,
+        "critical": [
+          409.6,
+          4218000.0,
+          4329.069763377459
+        ],
+        "acentric_factor": 0.236
+      },
+      "reference": [
+        11826.54609894832,
+        1.0,
+        4217999.999999433,
+        167018.81476274162
+      ],
+      "rust_roots": [
+        1158.6037615413702,
+        11826.546098948333
+      ],
+      "selected_density": 1158.6037615413702
+    },
+    {
+      "case": "MBWR|mbwrcx30|266.24|5061600.0|17316.279053509836|MBWR_ROOTS",
+      "phase": 2,
+      "found": 1.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 30,
+        "temperature": 266.24,
+        "pressure": 5061600.0,
+        "phase": 2,
+        "critical": [
+          409.6,
+          4218000.0,
+          4329.069763377459
+        ],
+        "acentric_factor": 0.236
+      },
+      "reference": [
+        11831.584258663692,
+        1.0,
+        5061600.000000345,
+        167865.79344125197
+      ],
+      "rust_roots": [
+        1284.574946072523,
+        11831.5842586637
+      ],
+      "selected_density": 1284.574946072523
+    },
+    {
+      "case": "MBWR|mbwrcx31|251.29000000000002|3600000.002112052|22098.328809344966|MBWR_ROOTS",
+      "phase": 2,
+      "found": 1.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 31,
+        "temperature": 251.29000000000002,
+        "pressure": 3600000.002112052,
+        "phase": 2,
+        "critical": [
+          386.6,
+          4500000.002640065,
+          5524.582202336242
+        ],
+        "acentric_factor": 0.266
+      },
+      "reference": [
+        15321.824998093363,
+        1.0,
+        3600000.002111981,
+        32332.25136677895
+      ],
+      "rust_roots": [
+        5121.658768798723,
+        15321.824998093367
+      ],
+      "selected_density": 5121.658768798723
+    },
+    {
+      "case": "MBWR|mbwrcx31|251.29000000000002|4500000.002640065|22098.328809344966|MBWR_ROOTS",
+      "phase": 2,
+      "found": 1.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 31,
+        "temperature": 251.29000000000002,
+        "pressure": 4500000.002640065,
+        "phase": 2,
+        "critical": [
+          386.6,
+          4500000.002640065,
+          5524.582202336242
+        ],
+        "acentric_factor": 0.266
+      },
+      "reference": [
+        15349.448054806198,
+        1.0,
+        4500000.002640063,
+        32831.43831892042
+      ],
+      "rust_roots": [
+        5181.259740988029,
+        15349.448054806198
+      ],
+      "selected_density": 5181.259740988029
+    },
+    {
+      "case": "MBWR|mbwrcx31|251.29000000000002|5400000.003168077|22098.328809344966|MBWR_ROOTS",
+      "phase": 2,
+      "found": 1.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 31,
+        "temperature": 251.29000000000002,
+        "pressure": 5400000.003168077,
+        "phase": 2,
+        "critical": [
+          386.6,
+          4500000.002640065,
+          5524.582202336242
+        ],
+        "acentric_factor": 0.266
+      },
+      "reference": [
+        15376.6555816955,
+        1.0,
+        5400000.003167936,
+        33327.443590328854
+      ],
+      "rust_roots": [
+        5240.3291764677115,
+        15376.655581695506
+      ],
+      "selected_density": 5240.3291764677115
+    },
+    {
+      "case": "MBWR|mbwrcx31|251.29000000000002|13500000.007920194|22098.328809344966|MBWR_ROOTS",
+      "phase": 2,
+      "found": 1.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 31,
+        "temperature": 251.29000000000002,
+        "pressure": 13500000.007920194,
+        "phase": 2,
+        "critical": [
+          386.6,
+          4500000.002640065,
+          5524.582202336242
+        ],
+        "acentric_factor": 0.266
+      },
+      "reference": [
+        15605.018672377319,
+        1.0,
+        13500000.007920174,
+        37664.8525765575
+      ],
+      "rust_roots": [
+        5772.733647531175,
+        15605.018672377355
+      ],
+      "selected_density": 5772.733647531175
+    },
+    {
+      "case": "MBWR|mbwrcx37|299.26|2707440.0|13049.385298556295|MBWR_ROOTS",
+      "phase": 2,
+      "found": 1.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 37,
+        "temperature": 299.26,
+        "pressure": 2707440.0,
+        "phase": 2,
+        "critical": [
+          460.4,
+          3384300.0,
+          3262.346324639074
+        ],
+        "acentric_factor": 0.227
+      },
+      "reference": [
+        8549.890183003,
+        1.0,
+        2707440.0000001155,
+        55334.3480798048
+      ],
+      "rust_roots": [
+        3543.2029275873133,
+        8549.890183002999
+      ],
+      "selected_density": 3543.2029275873133
+    },
+    {
+      "case": "MBWR|mbwrcx37|299.26|3384300.0|13049.385298556295|MBWR_ROOTS",
+      "phase": 2,
+      "found": 1.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 37,
+        "temperature": 299.26,
+        "pressure": 3384300.0,
+        "phase": 2,
+        "critical": [
+          460.4,
+          3384300.0,
+          3262.346324639074
+        ],
+        "acentric_factor": 0.227
+      },
+      "reference": [
+        8562.00478066202,
+        1.0,
+        3384300.000000013,
+        56409.950374619504
+      ],
+      "rust_roots": [
+        3574.6988902897647,
+        8562.004780662022
+      ],
+      "selected_density": 3574.6988902897647
+    },
+    {
+      "case": "MBWR|mbwrcx37|299.26|4061160.0|13049.385298556295|MBWR_ROOTS",
+      "phase": 2,
+      "found": 1.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 37,
+        "temperature": 299.26,
+        "pressure": 4061160.0,
+        "phase": 2,
+        "critical": [
+          460.4,
+          3384300.0,
+          3262.346324639074
+        ],
+        "acentric_factor": 0.227
+      },
+      "reference": [
+        8573.891797554868,
+        1.0,
+        4061160.0000000186,
+        57473.655380897435
+      ],
+      "rust_roots": [
+        3605.8334552766805,
+        8573.891797554867
+      ],
+      "selected_density": 3605.8334552766805
+    },
+    {
+      "case": "MBWR|mbwrcx37|299.26|10152900.0|13049.385298556295|MBWR_ROOTS",
+      "phase": 2,
+      "found": 1.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 37,
+        "temperature": 299.26,
+        "pressure": 10152900.0,
+        "phase": 2,
+        "critical": [
+          460.4,
+          3384300.0,
+          3262.346324639074
+        ],
+        "acentric_factor": 0.227
+      },
+      "reference": [
+        8672.172261998572,
+        1.0,
+        10152900.00000012,
+        66588.98963995466
+      ],
+      "rust_roots": [
+        3877.442311084766,
+        8672.17226199857
+      ],
+      "selected_density": 3877.442311084766
+    },
+    {
+      "case": "MBWR|mbwrcx39|351.1039350000066|2173596.77258467|9380.808428417915|MBWR_ROOTS",
+      "phase": 2,
+      "found": 1.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 39,
+        "temperature": 351.1039350000066,
+        "pressure": 2173596.77258467,
+        "phase": 2,
+        "critical": [
+          540.1599000000101,
+          2716995.9657308375,
+          2345.2021071044787
+        ],
+        "acentric_factor": 0.351
+      },
+      "reference": [
+        6346.298877544062,
+        1.0,
+        2173596.7725846246,
+        76268.2880561389
+      ],
+      "rust_roots": [
+        1369.6026411035637,
+        6346.298877544068
+      ],
+      "selected_density": 1369.6026411035637
+    },
+    {
+      "case": "MBWR|mbwrcx40|369.71999999999997|248250.0|8106.916719438265|MBWR_ROOTS",
+      "phase": 2,
+      "found": 1.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 40,
+        "temperature": 369.71999999999997,
+        "pressure": 248250.0,
+        "phase": 2,
+        "critical": [
+          568.8,
+          2482500.0,
+          2026.7291798595663
+        ],
+        "acentric_factor": 0.394
+      },
+      "reference": [
+        5591.714447631364,
+        1.0,
+        248250.00000000373,
+        82476.04763769347
+      ],
+      "rust_roots": [
+        90.0331973189943,
+        5591.714447631368
+      ],
+      "selected_density": 90.0331973189943
+    },
+    {
+      "case": "MBWR|mbwrcx40|369.71999999999997|1986000.0|8106.916719438265|MBWR_ROOTS",
+      "phase": 2,
+      "found": 1.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 40,
+        "temperature": 369.71999999999997,
+        "pressure": 1986000.0,
+        "phase": 2,
+        "critical": [
+          568.8,
+          2482500.0,
+          2026.7291798595663
+        ],
+        "acentric_factor": 0.394
+      },
+      "reference": [
+        5612.553248472805,
+        1.0,
+        1986000.00000011,
+        84318.1358234603
+      ],
+      "rust_roots": [
+        435.53336125570354,
+        5612.553248472805
+      ],
+      "selected_density": 435.53336125570354
+    },
+    {
+      "case": "MBWR|mbwrcx40|369.71999999999997|2482500.0|8106.916719438265|MBWR_ROOTS",
+      "phase": 2,
+      "found": 1.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 40,
+        "temperature": 369.71999999999997,
+        "pressure": 2482500.0,
+        "phase": 2,
+        "critical": [
+          568.8,
+          2482500.0,
+          2026.7291798595663
+        ],
+        "acentric_factor": 0.394
+      },
+      "reference": [
+        5618.423110775073,
+        1.0,
+        2482500.0000001024,
+        84852.19981696733
+      ],
+      "rust_roots": [
+        485.16083230582376,
+        5618.423110775072
+      ],
+      "selected_density": 485.16083230582376
+    },
+    {
+      "case": "MBWR|mbwrcx40|369.71999999999997|2979000.0|8106.916719438265|MBWR_ROOTS",
+      "phase": 2,
+      "found": 1.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 40,
+        "temperature": 369.71999999999997,
+        "pressure": 2979000.0,
+        "phase": 2,
+        "critical": [
+          568.8,
+          2482500.0,
+          2026.7291798595663
+        ],
+        "acentric_factor": 0.394
+      },
+      "reference": [
+        5624.256029690993,
+        1.0,
+        2978999.99999997,
+        85389.5778974128
+      ],
+      "rust_roots": [
+        528.3574343863816,
+        5624.256029690996
+      ],
+      "selected_density": 528.3574343863816
+    },
+    {
+      "case": "MBWR|mbwrcx40|369.71999999999997|7447500.0|8106.916719438265|MBWR_ROOTS",
+      "phase": 2,
+      "found": 1.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 40,
+        "temperature": 369.71999999999997,
+        "pressure": 7447500.0,
+        "phase": 2,
+        "critical": [
+          568.8,
+          2482500.0,
+          2026.7291798595663
+        ],
+        "acentric_factor": 0.394
+      },
+      "reference": [
+        5675.1307700343705,
+        1.0,
+        7447500.0000002645,
+        90363.81955896759
+      ],
+      "rust_roots": [
+        805.9286398426938,
+        5675.130770034369
+      ],
+      "selected_density": 805.9286398426938
+    },
+    {
+      "case": "MBWR|mbwrcx40|1137.6|24825.0|8106.916719438265|MBWR_ROOTS",
+      "phase": 1,
+      "found": 1.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 40,
+        "temperature": 1137.6,
+        "pressure": 24825.0,
+        "phase": 1,
+        "critical": [
+          568.8,
+          2482500.0,
+          2026.7291798595663
+        ],
+        "acentric_factor": 0.394
+      },
+      "reference": [
+        2.616805894010827,
+        1.0,
+        24825.0,
+        9514.911569842388
+      ],
+      "rust_roots": [
+        2.616805894010827,
+        3941.86912985289
+      ],
+      "selected_density": 3941.86912985289
+    },
+    {
+      "case": "MBWR|mbwrcx40|1137.6|248250.0|8106.916719438265|MBWR_ROOTS",
+      "phase": 1,
+      "found": 1.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 40,
+        "temperature": 1137.6,
+        "pressure": 248250.0,
+        "phase": 1,
+        "critical": [
+          568.8,
+          2482500.0,
+          2026.7291798595663
+        ],
+        "acentric_factor": 0.394
+      },
+      "reference": [
+        25.519225461089672,
+        1.0,
+        248250.00000000003,
+        9990.950296398509
+      ],
+      "rust_roots": [
+        25.519225461089675,
+        3951.8688049825905
+      ],
+      "selected_density": 3951.8688049825905
+    },
+    {
+      "case": "MBWR|mbwrcx40|1137.6|1986000.0|8106.916719438265|MBWR_ROOTS",
+      "phase": 1,
+      "found": 1.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 40,
+        "temperature": 1137.6,
+        "pressure": 1986000.0,
+        "phase": 1,
+        "critical": [
+          568.8,
+          2482500.0,
+          2026.7291798595663
+        ],
+        "acentric_factor": 0.394
+      },
+      "reference": [
+        179.10652592541626,
+        1.0,
+        1986000.0,
+        12425.88522751087
+      ],
+      "rust_roots": [
+        179.10652592541626,
+        4021.3580455130364
+      ],
+      "selected_density": 4021.3580455130364
+    },
+    {
+      "case": "MBWR|mbwrcx40|1137.6|2482500.0|8106.916719438265|MBWR_ROOTS",
+      "phase": 1,
+      "found": 1.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 40,
+        "temperature": 1137.6,
+        "pressure": 2482500.0,
+        "phase": 1,
+        "critical": [
+          568.8,
+          2482500.0,
+          2026.7291798595663
+        ],
+        "acentric_factor": 0.394
+      },
+      "reference": [
+        218.36973407281928,
+        1.0,
+        2482500.0,
+        12852.492080139302
+      ],
+      "rust_roots": [
+        218.3697340728193,
+        4039.0719620519817
+      ],
+      "selected_density": 4039.0719620519817
+    },
+    {
+      "case": "MBWR|mbwrcx40|1137.6|2979000.0|8106.916719438265|MBWR_ROOTS",
+      "phase": 1,
+      "found": 1.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 40,
+        "temperature": 1137.6,
+        "pressure": 2979000.0,
+        "phase": 1,
+        "critical": [
+          568.8,
+          2482500.0,
+          2026.7291798595663
+        ],
+        "acentric_factor": 0.394
+      },
+      "reference": [
+        256.473859968353,
+        1.0,
+        2979000.0000000005,
+        13196.413382123066
+      ],
+      "rust_roots": [
+        256.473859968353,
+        4056.0331075508902
+      ],
+      "selected_density": 4056.0331075508902
+    },
+    {
+      "case": "MBWR|mbwrcx40|1137.6|7447500.0|8106.916719438265|MBWR_ROOTS",
+      "phase": 1,
+      "found": 2.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 40,
+        "temperature": 1137.6,
+        "pressure": 7447500.0,
+        "phase": 1,
+        "critical": [
+          568.8,
+          2482500.0,
+          2026.7291798595663
+        ],
+        "acentric_factor": 0.394
+      },
+      "reference": [
+        580.6398222140878,
+        2.0,
+        7447499.999999999,
+        13703.27689280125
+      ],
+      "rust_roots": [
+        580.6398222140878,
+        4184.516935813818
+      ],
+      "selected_density": 4184.516935813818
+    },
+    {
+      "case": "MBWR|mbwrcx41|188.53199999999998|55250.0|43603.61881924356|MBWR_ROOTS",
+      "phase": 1,
+      "found": 2.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 41,
+        "temperature": 188.53199999999998,
+        "pressure": 55250.0,
+        "phase": 1,
+        "critical": [
+          209.48,
+          5525000.0,
+          10900.90470481089
+        ],
+        "acentric_factor": -0.004
+      },
+      "reference": [
+        35.40805397385045,
+        2.0,
+        55250.0,
+        1553.2260289555857
+      ],
+      "rust_roots": [
+        35.40805397385045,
+        18515.257744122715
+      ],
+      "selected_density": 18515.257744122715
+    },
+    {
+      "case": "MBWR|mbwrcx43|421.10022499991084|222586.53904915677|70170.26859634226|MBWR_ROOTS",
+      "phase": 1,
+      "found": 2.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 43,
+        "temperature": 421.10022499991084,
+        "pressure": 222586.53904915677,
+        "phase": 1,
+        "critical": [
+          647.8464999998628,
+          22258653.904915676,
+          17542.567149085564
+        ],
+        "acentric_factor": 0.344
+      },
+      "reference": [
+        64.87693313041913,
+        2.0,
+        222586.53904915677,
+        3360.836297816766
+      ],
+      "rust_roots": [
+        64.87693313041915,
+        51025.05999905688
+      ],
+      "selected_density": 51025.05999905688
+    },
+    {
+      "case": "MBWR|mbwrcx43|421.10022499991084|2225865.3904915676|70170.26859634226|MBWR_ROOTS",
+      "phase": 1,
+      "found": 2.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 43,
+        "temperature": 421.10022499991084,
+        "pressure": 2225865.3904915676,
+        "phase": 1,
+        "critical": [
+          647.8464999998628,
+          22258653.904915676,
+          17542.567149085564
+        ],
+        "acentric_factor": 0.344
+      },
+      "reference": [
+        849.5100939145157,
+        2.0,
+        2225865.3904915676,
+        1782.1987303765763
+      ],
+      "rust_roots": [
+        849.5100939145157,
+        51089.350805783164
+      ],
+      "selected_density": 51089.350805783164
+    },
+    {
+      "case": "MBWR|mbwrcx43|583.0618499998765|222586.53904915677|70170.26859634226|MBWR_ROOTS",
+      "phase": 1,
+      "found": 2.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 43,
+        "temperature": 583.0618499998765,
+        "pressure": 222586.53904915677,
+        "phase": 1,
+        "critical": [
+          647.8464999998628,
+          22258653.904915676,
+          17542.567149085564
+        ],
+        "acentric_factor": 0.344
+      },
+      "reference": [
+        46.17530690137657,
+        2.0,
+        222586.53904915677,
+        4793.137322390941
+      ],
+      "rust_roots": [
+        46.17530690137657,
+        36614.176046911016
+      ],
+      "selected_density": 36614.176046911016
+    },
+    {
+      "case": "MBWR|mbwrcx43|583.0618499998765|2225865.3904915676|70170.26859634226|MBWR_ROOTS",
+      "phase": 1,
+      "found": 2.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 43,
+        "temperature": 583.0618499998765,
+        "pressure": 2225865.3904915676,
+        "phase": 1,
+        "critical": [
+          647.8464999998628,
+          22258653.904915676,
+          17542.567149085564
+        ],
+        "acentric_factor": 0.344
+      },
+      "reference": [
+        487.7373495059538,
+        2.0,
+        2225865.3904915676,
+        4285.008534026333
+      ],
+      "rust_roots": [
+        487.737349505954,
+        37049.012739396334
+      ],
+      "selected_density": 37049.012739396334
+    },
+    {
+      "case": "MBWR|mbwrcx47|39.96|26616.3|92732.10751495349|MBWR_ROOTS",
+      "phase": 1,
+      "found": 2.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 47,
+        "temperature": 39.96,
+        "pressure": 26616.3,
+        "phase": 1,
+        "critical": [
+          44.4,
+          2661630.0,
+          23183.026878738372
+        ],
+        "acentric_factor": -0.03845
+      },
+      "reference": [
+        80.44466011041284,
+        2.0,
+        26616.3,
+        329.48166503968554
+      ],
+      "rust_roots": [
+        80.44466011041285,
+        40438.0184369128
+      ],
+      "selected_density": 40438.0184369128
+    },
+    {
+      "case": "MBWR|mbwrcx47|39.96|266163.0|92732.10751495349|MBWR_ROOTS",
+      "phase": 1,
+      "found": 2.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 47,
+        "temperature": 39.96,
+        "pressure": 266163.0,
+        "phase": 1,
+        "critical": [
+          44.4,
+          2661630.0,
+          23183.026878738372
+        ],
+        "acentric_factor": -0.03845
+      },
+      "reference": [
+        837.8066634417916,
+        2.0,
+        266163.0,
+        302.95890660098155
+      ],
+      "rust_roots": [
+        837.8066634417914,
+        41555.27030055041
+      ],
+      "selected_density": 41555.27030055041
+    },
+    {
+      "case": "MBWR|mbwrcx48|461.34000000000003|80959.0|33920.662142244226|MBWR_ROOTS",
+      "phase": 1,
+      "found": 2.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 48,
+        "temperature": 461.34000000000003,
+        "pressure": 80959.0,
+        "phase": 1,
+        "critical": [
+          512.6,
+          8095900.0,
+          8480.165535561056
+        ],
+        "acentric_factor": 0.559
+      },
+      "reference": [
+        21.235784726931612,
+        2.0,
+        80958.99999999999,
+        3789.0161849275114
+      ],
+      "rust_roots": [
+        21.23578472693161,
+        17511.42666219645
+      ],
+      "selected_density": 17511.42666219645
+    },
+    {
+      "case": "MBWR|mbwrcx48|461.34000000000003|809590.0|33920.662142244226|MBWR_ROOTS",
+      "phase": 1,
+      "found": 2.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 48,
+        "temperature": 461.34000000000003,
+        "pressure": 809590.0,
+        "phase": 1,
+        "critical": [
+          512.6,
+          8095900.0,
+          8480.165535561056
+        ],
+        "acentric_factor": 0.559
+      },
+      "reference": [
+        225.4283545841783,
+        2.0,
+        809590.0,
+        3351.392735961882
+      ],
+      "rust_roots": [
+        225.42835458417835,
+        17675.70421203576
+      ],
+      "selected_density": 17675.70421203576
+    },
+    {
+      "case": "MBWR|mbwrcx58|171.69291000000644|46269.86189794588|40391.45608536577|MBWR_ROOTS",
+      "phase": 1,
+      "found": 2.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 58,
+        "temperature": 171.69291000000644,
+        "pressure": 46269.86189794588,
+        "phase": 1,
+        "critical": [
+          190.76990000000714,
+          4626986.189794588,
+          10097.864021341442
+        ],
+        "acentric_factor": 0.01131
+      },
+      "reference": [
+        32.56148825281688,
+        2.0,
+        46269.86189794588,
+        1414.47165705559
+      ],
+      "rust_roots": [
+        32.561488252816886,
+        17423.043335359867
+      ],
+      "selected_density": 17423.043335359867
+    },
+    {
+      "case": "MBWR|mbwrcx61|113.67000000000415|34169.98143740536|44335.862230654995|MBWR_ROOTS",
+      "phase": 1,
+      "found": 2.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 61,
+        "temperature": 113.67000000000415,
+        "pressure": 34169.98143740536,
+        "phase": 1,
+        "critical": [
+          126.30000000000462,
+          3416998.143740536,
+          11083.965557663749
+        ],
+        "acentric_factor": 0.04
+      },
+      "reference": [
+        36.320874704690716,
+        2.0,
+        34169.98143740536,
+        936.4612536097824
+      ],
+      "rust_roots": [
+        36.320874704690716,
+        19475.543712808503
+      ],
+      "selected_density": 19475.543712808503
+    },
+    {
+      "case": "MBWR|mbwrcx62|139.30200000000536|50830.00180506117|54064.470036803774|MBWR_ROOTS",
+      "phase": 1,
+      "found": 2.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 62,
+        "temperature": 139.30200000000536,
+        "pressure": 50830.00180506117,
+        "phase": 1,
+        "critical": [
+          154.78000000000597,
+          5083000.180506117,
+          13516.117509200943
+        ],
+        "acentric_factor": 0.021
+      },
+      "reference": [
+        44.09071477191877,
+        2.0,
+        50830.00180506117,
+        1147.4865886986418
+      ],
+      "rust_roots": [
+        44.090714771918776,
+        23234.941037054024
+      ],
+      "selected_density": 23234.941037054024
+    },
+    {
+      "case": "MBWR|mbwrcx63|135.72000000000003|48737.0|53430.62673956392|MBWR_ROOTS",
+      "phase": 1,
+      "found": 2.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 63,
+        "temperature": 135.72000000000003,
+        "pressure": 48737.0,
+        "phase": 1,
+        "critical": [
+          150.8,
+          4873700.0,
+          13357.65668489098
+        ],
+        "acentric_factor": -0.004
+      },
+      "reference": [
+        43.38593135998697,
+        2.0,
+        48737.00000000001,
+        1118.2412669871685
+      ],
+      "rust_roots": [
+        43.38593135998696,
+        22790.450840275582
+      ],
+      "selected_density": 22790.450840275582
+    },
+    {
+      "case": "MBWR|mbwrcx64|304.16958|5901200.0|42576.149333787725|MBWR_ROOTS",
+      "phase": 1,
+      "found": 2.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 64,
+        "temperature": 304.16958,
+        "pressure": 5901200.0,
+        "phase": 1,
+        "critical": [
+          304.2,
+          7376500.0,
+          10644.037333446931
+        ],
+        "acentric_factor": 0.225
+      },
+      "reference": [
+        3548.076391128595,
+        2.0,
+        5901200.0,
+        961.8047344134328
+      ],
+      "rust_roots": [
+        3548.0763911285944,
+        16958.268700062177
+      ],
+      "selected_density": 16958.268700062177
+    },
+    {
+      "case": "MBWR|mbwrcx64|304.23042|5901200.0|42576.149333787725|MBWR_ROOTS",
+      "phase": 1,
+      "found": 2.0,
+      "request": {
+        "mode": "MBWR_DENSITY",
+        "record_index": 64,
+        "temperature": 304.23042,
+        "pressure": 5901200.0,
+        "phase": 1,
+        "critical": [
+          304.2,
+          7376500.0,
+          10644.037333446931
+        ],
+        "acentric_factor": 0.225
+      },
+      "reference": [
+        3545.256176941025,
+        2.0,
+        5901200.0,
+        963.7319323109576
+      ],
+      "rust_roots": [
+        3545.2561769410254,
+        16936.166815093515
+      ],
+      "selected_density": 16936.166815093515
+    }
+  ],
+  "absolute_tolerance": 0.001,
+  "relative_tolerance": 2e-06,
+  "convention": "membership in native bounded stable root set, not source iteration trajectory or requested phase identity; explicit source metadata or compiled component initial guesses"
+}

@@ -410,3 +410,86 @@ subroutine query_mbwr_properties(record,t,v,n,rule,factor,values) bind(C,name='q
   call MBWR_zfac(model,t,p,v,n,values(11),values(12),values(13),values(14:14))
   call MBWR_lnphi(model,t,p,v,n,values(15:15),values(16:16),values(17:17),values(18:18))
 end subroutine query_mbwr_properties
+
+subroutine query_mbwr_metadata(record,values) bind(C,name='query_mbwr_metadata')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use mbwrdata
+  use thermopack_var, only: kRgas
+  implicit none
+  integer(c_int),value :: record
+  real(c_double),intent(out) :: values(8)
+  character(len=8) :: id
+  integer :: idx
+  values=0.0
+  if (record<=11) then
+    id=mbwr32Array(record)%ComId
+    idx=getMBWR32critPropIndex(id)
+    if (idx>0) values(2:4)=[tc32_computed(idx),pc32_computed(idx),rc32_computed(idx)]
+  else
+    id=mbwr19Array(record-11)%ComId
+    idx=getMBWR19critPropIndex(id)
+    if (idx>0) values(2:4)=[tc19_computed(idx),pc19_computed(idx),rc19_computed(idx)]
+  endif
+  if (idx>0) then
+    values(1)=1.0
+    values(5)=values(3)/(values(4)*kRgas*values(2))
+    values(4)=values(4)*1000.0
+  endif
+  idx=getTriplePointPropIndex(id)
+  if (idx>0) then
+    values(6)=1.0
+    values(7:8)=[tTriple_coolprop(idx),pTriple_coolprop(idx)]
+  endif
+end subroutine query_mbwr_metadata
+
+subroutine query_mbwr_critical_jet(record,t,rho,values) bind(C,name='query_mbwr_critical_jet')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use mbwr, only: eosmbwr,makeParam,MBWR_pressure
+  implicit none
+  integer(c_int),value :: record
+  real(c_double),value :: t,rho
+  real(c_double),intent(out) :: values(5)
+  type(eosmbwr),save :: model
+  integer,save :: previous=0
+  real,allocatable :: param(:)
+  real :: unused
+  if (previous/=record) then
+    call initialize_mbwr_record(record,model)
+    previous=record
+  endif
+  allocate(param(1+model%bplen+model%belen))
+  call makeParam(param,t,model,0)
+  call MBWR_pressure(rho*1e-3,param,values(1),values(2),values(3))
+  call makeParam(param,t,model,1)
+  call MBWR_pressure(rho*1e-3,param,unused,values(4),values(5))
+  values(2)=values(2)*1e-3; values(3)=values(3)*1e-6
+  values(4)=values(4)*1e-3; values(5)=values(5)*1e-6
+end subroutine query_mbwr_critical_jet
+
+! Explicit metadata makes this a probe of the original density routine, without
+! triggering readDbParameters' unrelated critical grid search on legacy fluids.
+subroutine query_mbwr_density(record,t,p,phase,critical,acf,values) bind(C,name='query_mbwr_density')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use mbwr, only: eosmbwr,makeParam,MBWR_density,MBWR_pressure
+  use thermopack_var, only: kRgas
+  implicit none
+  integer(c_int),value :: record,phase
+  real(c_double),value :: t,p,acf
+  real(c_double),intent(in) :: critical(3)
+  real(c_double),intent(out) :: values(4)
+  type(eosmbwr) :: model
+  integer :: found
+  real :: rho
+  real,allocatable :: param(:)
+  call initialize_mbwr_record(record,model)
+  model%tc=critical(1);model%pc=critical(2);model%rc=critical(3)*1e-3;model%acf=acf
+  model%b_SRK=0.08664*kRgas*model%tc/model%pc
+  model%m_SRK=0.480+1.547*acf-0.176*acf**2
+  model%a0_SRK=0.42747*(kRgas*model%tc)**2/model%pc
+  allocate(param(1+model%bplen+model%belen))
+  call makeParam(param,t,model,0)
+  rho=MBWR_density(t,p,phase,param,model,found)
+  values(1)=rho*1000.0;values(2)=real(found)
+  call MBWR_pressure(rho,param,values(3),values(4))
+  values(4)=values(4)*1e-3
+end subroutine query_mbwr_density

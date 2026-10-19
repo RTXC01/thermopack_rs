@@ -65,8 +65,12 @@ impl Mbwr {
             let record = self.record.ok_or(Error::InvalidInput(
                 "custom MBWR critical point requires explicit initial T and density",
             ))?;
-            let c = crate::component(record.identifier)?;
-            (c.critical_temperature, 1000. / self.gamma.sqrt())
+            let seed = data::COMPONENT_CRITICAL_SEEDS
+                .iter()
+                .find(|(identifier, _)| *identifier == record.identifier)
+                .ok_or_else(|| Error::UnknownComponent(record.identifier.to_owned()))?
+                .1;
+            (seed[0], seed[1])
         };
         self.critical_point_from(t, rho)
     }
@@ -224,6 +228,25 @@ fn gaussian_roots(mut a: Vec<f64>, mut b: Vec<f64>, maximum: f64) -> Result<Vec<
         if scale > 0. {
             for c in a.iter_mut().chain(&mut b) {
                 *c /= scale;
+            }
+        }
+    }
+    // All subsequent bisections stay inside this interval. Check absolute
+    // Horner bounds at its upper end before relying on polynomial signs.
+    // Finite EOS input alone does not guarantee finite hierarchy arithmetic.
+    for (aa, bb) in levels
+        .iter()
+        .chain(std::iter::once(&(a.clone(), Vec::new())))
+    {
+        for coefficients in [aa, bb] {
+            let bound = coefficients
+                .iter()
+                .rev()
+                .fold(0_f64, |s, c| s * maximum + c.abs());
+            if !bound.is_finite() {
+                return Err(Error::InvalidInput(
+                    "MBWR branch search range overflows polynomial hierarchy",
+                ));
             }
         }
     }

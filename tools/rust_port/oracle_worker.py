@@ -67,6 +67,12 @@ def load_probe():
     probe.query_mbwr_integrated.restype=None
     probe.query_mbwr_properties.argtypes=[c_int,c_double,c_double,c_double,c_int,c_double,POINTER(c_double)]
     probe.query_mbwr_properties.restype=None
+    probe.query_mbwr_metadata.argtypes=[c_int,POINTER(c_double)]
+    probe.query_mbwr_metadata.restype=None
+    probe.query_mbwr_critical_jet.argtypes=[c_int,c_double,c_double,POINTER(c_double)]
+    probe.query_mbwr_critical_jet.restype=None
+    probe.query_mbwr_density.argtypes=[c_int,c_double,c_double,c_int,POINTER(c_double),c_double,POINTER(c_double)]
+    probe.query_mbwr_density.restype=None
     return probe
 
 
@@ -79,7 +85,18 @@ def main(compiler_directory):
         if request['mode'].startswith('MBWR_'):
             if probe is None:probe=load_probe()
             record=request['record_index']
-            if request['mode']=='MBWR_TP_PROPERTIES':
+            if request['mode']=='MBWR_METADATA':
+                output=(c_double*8)();probe.query_mbwr_metadata(record,output)
+                values=list(map(float,output))
+            elif request['mode']=='MBWR_CRITICAL_JET':
+                output=(c_double*5)();probe.query_mbwr_critical_jet(record,request['temperature'],request['density'],output)
+                values=list(map(float,output))
+            elif request['mode']=='MBWR_DENSITY':
+                critical=(c_double*3)(*request['critical'])
+                output=(c_double*4)();probe.query_mbwr_density(record,request['temperature'],request['pressure'],
+                    request['phase'],critical,request['acentric_factor'],output)
+                values=list(map(float,output))
+            elif request['mode']=='MBWR_TP_PROPERTIES':
                 output=(c_double*18)();probe.query_mbwr_properties(record,request['temperature'],request['volume'],request['moles'],
                     int(request.get('off_eos',False)),request.get('pressure_factor',1.),output)
                 values=list(map(float,output))

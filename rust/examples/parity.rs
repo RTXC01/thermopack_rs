@@ -93,6 +93,40 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if fields[0] == "MBWR" {
             let model = thermopack_rs::Mbwr::from_record(fields[1])?;
             let result = (|| -> thermopack_rs::Result<Vec<f64>> {
+                if fields[5] == "MBWR_METADATA" {
+                    let mut values = vec![0.; 8];
+                    if let Some(c) = model.source_critical_point() {
+                        values[..5].copy_from_slice(&[
+                            1.,
+                            c.temperature,
+                            c.pressure,
+                            1. / c.volume,
+                            c.compressibility,
+                        ]);
+                    }
+                    if let Some((t, p)) = model.source_triple_point() {
+                        values[5..].copy_from_slice(&[1., t, p]);
+                    }
+                    return Ok(values);
+                }
+                if fields[5] == "MBWR_CRITICAL" {
+                    let c = model.critical_point_from(
+                        fields[2].parse().unwrap(),
+                        fields[3].parse().unwrap(),
+                    )?;
+                    return Ok(vec![
+                        c.temperature,
+                        c.pressure,
+                        1. / c.volume,
+                        c.compressibility,
+                    ]);
+                }
+                if fields[5] == "MBWR_ROOTS" {
+                    let t = fields[2].parse().unwrap();
+                    let p = fields[3].parse().unwrap();
+                    let maximum = fields[4].parse().unwrap();
+                    return model.prepare_equilibrium(t, maximum)?.densities(p);
+                }
                 if fields[5].starts_with("MBWR_TP_PROPERTIES@") {
                     let p = fields[5].split('@').nth(1).unwrap().parse().unwrap();
                     let t = fields[2].parse().unwrap();

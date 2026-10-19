@@ -110,9 +110,10 @@ finite-difference tests independently verify all density/thermal derivatives,
 Helmholtz pressure identities, extensive Euler/scaling, the integral switch,
 zero-density limits, perfect-gas coefficients, ownership and invalid inputs.
 
-This stage does not provide MBWR ideal/full caloric state functions, density
-iteration, critical metadata/search, saturation, flashes or CSP reference-fluid
-integration. Those remain pending within the full ThermoPack migration. No
+MBWR ideal/full caloric state functions, source density-iteration trajectory
+fidelity, saturation, flashes and CSP reference-fluid integration remain pending.
+Bounded physical pressure roots and critical points have separate
+[equilibrium qualification](mbwr-equilibrium.md). No
 MBWR speedup is claimed before a dedicated native-loop benchmark.
 Residual G/H/S/Z/lnphi and physical/source TP responses have separate
 [state-function qualification](mbwr-properties.md).

@@ -5,7 +5,8 @@
   "mbwr32_records": 11,
   "source_sha256": {
     "src/mbwrdata.f90": "fc086c82f90fe921cd51882fc43da829fd9b458447b8104911504f6d07733598",
-    "src/mbwr.f90": "aab035c7dceb59e7b2dbfb2c1e57035abcb8e2717ff0f5ff47eeed25ab7927e4"
+    "src/mbwr.f90": "aab035c7dceb59e7b2dbfb2c1e57035abcb8e2717ff0f5ff47eeed25ab7927e4",
+    "src/compdatadb.f90": "57b5bcd9710f674f4e57577a1a5a958bffff19389fb5bcd4d820eed271b60698"
   },
   "order": "original mbwrcx declaration/array order; new(kind,identifier) selects first matching record, including three MBWR32 methane fits"
 }

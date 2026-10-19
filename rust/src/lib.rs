@@ -23,6 +23,8 @@ pub mod cpa;
 pub mod cpa_data;
 pub mod cubic;
 mod error;
+pub mod excess_gibbs;
+pub mod excess_gibbs_data;
 pub mod flash;
 pub mod helmholtz;
 mod hydrogen;
@@ -51,6 +53,8 @@ pub use cubic::{
     Saturation, TvProperties,
 };
 pub use error::{Error, Result};
+pub use excess_gibbs::{ExcessGibbsMixture, MixingRule};
+pub use excess_gibbs_data::{ExcessGibbsRecord, GeCorrelation};
 pub use flash::{
     FlashOptions, FlashPhase, FlashResult, RachfordRiceIteration, Stability, StabilityTrial,
 };

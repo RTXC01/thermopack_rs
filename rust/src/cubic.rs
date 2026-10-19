@@ -56,6 +56,8 @@ pub struct Cubic {
     translation_enabled: bool,
     pub(crate) caloric_minimum: f64,
     pub(crate) caloric_maximum: f64,
+    pub mixing_rule: crate::excess_gibbs::MixingRule,
+    pub excess_gibbs: Option<crate::excess_gibbs::ExcessGibbsMixture>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -63,6 +65,7 @@ pub struct CubicOptions<'a> {
     pub alpha: Option<crate::AlphaCorrelation>,
     pub parameter_reference: &'a str,
     pub volume_translation: bool,
+    pub mixing_rule: crate::excess_gibbs::MixingRule,
 }
 impl Default for CubicOptions<'_> {
     fn default() -> Self {
@@ -70,6 +73,7 @@ impl Default for CubicOptions<'_> {
             alpha: None,
             parameter_reference: "DEFAULT",
             volume_translation: false,
+            mixing_rule: crate::excess_gibbs::MixingRule::VdW,
         }
     }
 }
@@ -143,6 +147,7 @@ pub struct PreparedState<'a> {
     a_partial: Vec<f64>,
     b_partial: Vec<f64>,
     factors: Vec<(f64, f64, f64)>,
+    ai_t: Option<Vec<f64>>,
     beta: Option<crate::beta::PreparedBeta>,
     translation: Option<crate::translation::PreparedTranslation>,
 }
@@ -385,6 +390,22 @@ impl Cubic {
         if tcpr || quantum || options.volume_translation {
             model.enable_volume_translation(parameter_reference)?;
         }
+        if options.mixing_rule.is_excess_gibbs() {
+            let comp_idents: Vec<&str> = model.components.iter().map(|c| c.ident).collect();
+            let database_eos = if kind == CubicKind::RedlichKwong {
+                "SRK"
+            } else {
+                kind.name()
+            };
+            model.excess_gibbs = Some(crate::excess_gibbs::ExcessGibbsMixture::new(
+                &comp_idents,
+                options.mixing_rule,
+                database_eos,
+                Some(parameter_reference),
+                &model.kij,
+            ));
+            model.mixing_rule = options.mixing_rule;
+        }
         Ok(model)
     }
 
@@ -453,6 +474,8 @@ impl Cubic {
             translation_enabled: false,
             caloric_minimum: 80.,
             caloric_maximum: 999.,
+            mixing_rule: crate::excess_gibbs::MixingRule::VdW,
+            excess_gibbs: None,
         };
         for c in &model.components {
             positive(c.critical_temperature, "critical temperature")?;
@@ -800,6 +823,44 @@ impl Cubic {
             }
         }
         positive(b, "mixture covolume")?;
+
+        let (a, at, att, a_partial, ai_t) = if let Some(ge) = &self.excess_gibbs {
+            let is_srk = matches!(
+                self.kind,
+                CubicKind::SoaveRedlichKwong | CubicKind::RedlichKwong
+            );
+            let mut a_pure = Vec::with_capacity(n);
+            let mut da_pure = Vec::with_capacity(n);
+            let mut d2a_pure = Vec::with_capacity(n);
+            for i in 0..n {
+                let tc = self.components[i].critical_temperature;
+                let crate::AlphaValue {
+                    value: alpha,
+                    dt: alpha_t,
+                    dtt: alpha_tt,
+                } = self.alpha[i].evaluate(temperature, tc)?;
+                a_pure.push(self.a0[i] * alpha);
+                da_pure.push(self.a0[i] * alpha_t);
+                d2a_pure.push(self.a0[i] * alpha_tt);
+            }
+            let jet = crate::excess_gibbs::excess_gibbs_cubic_mix(
+                ge,
+                is_srk,
+                temperature,
+                composition,
+                &self.bi,
+                &a_pure,
+                &da_pure,
+                &d2a_pure,
+                b,
+            )?;
+            let a_partial = jet.da_dni.iter().map(|&ai| 0.5 * ai).collect();
+            let ai_t = jet.d2a_dnid_t.iter().map(|&ait| 0.5 * ait).collect();
+            (jet.a_mix, jet.da_dt, jet.d2a_dt2, a_partial, Some(ai_t))
+        } else {
+            (a, at, att, a_partial, None)
+        };
+
         if !a.is_finite() || !at.is_finite() || !att.is_finite() {
             return Err(Error::InvalidInput("temperature outside numerical range"));
         }
@@ -846,6 +907,7 @@ impl Cubic {
             a_partial,
             b_partial,
             factors,
+            ai_t,
             beta,
             translation,
         })
@@ -887,13 +949,18 @@ impl PreparedState<'_> {
                 + self.a * denom_b * self.b_partial[i] / denom.powi(2)
         };
         for i in 0..n {
-            let mut ai_t = 0.0;
-            for j in 0..n {
-                ai_t += self.composition[j]
-                    * (1.0 - self.model.kij[i * n + j])
-                    * (self.factors[i].1 * self.factors[j].0
-                        + self.factors[i].0 * self.factors[j].1);
-            }
+            let ai_t = if let Some(ait) = &self.ai_t {
+                ait[i]
+            } else {
+                let mut s = 0.0;
+                for j in 0..n {
+                    s += self.composition[j]
+                        * (1.0 - self.model.kij[i * n + j])
+                        * (self.factors[i].1 * self.factors[j].0
+                            + self.factors[i].0 * self.factors[j].1);
+                }
+                s
+            };
             let bi = self.b_partial[i];
             let di = 2.0 * self.a_partial[i];
             let pi = pressure_n(i);

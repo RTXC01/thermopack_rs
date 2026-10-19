@@ -19,6 +19,7 @@ pub fn fixture_model(fields: &[&str]) -> Cubic {
                 alpha: Some(thermopack_rs::AlphaCorrelation::from_name(config[1]).unwrap()),
                 parameter_reference: config[2],
                 volume_translation: config[3] == "1",
+                ..Default::default()
             },
         )
         .unwrap()

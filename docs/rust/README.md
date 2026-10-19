@@ -90,5 +90,7 @@ The [SAFT-VR Mie notes](saft-vrmie.md) cover SAFT-VR Mie and SAFT-VRQ Mie Helmho
 Barker-Henderson numerical quadrature, BMCSL reference, exact contact RDF derivation and mixture scaling.
 The [CPA notes](cpa.md) cover the Cubic-Plus-Association equation of state, Wertheim multi-site association,
 simplified contact RDF, quadratic closed branches and non-associating component mixing conventions.
+The [Excess Gibbs notes](excess-gibbs.md) cover Huron-Vidal (HV1, HV2) and NRTL activity model mixing rules,
+infinite-pressure excess Helmholtz energy, exact analytical derivatives and binary parameter databases.
 Regenerate inventory with
 `python tools/rust_port/inventory.py`.

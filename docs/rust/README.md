@@ -86,6 +86,8 @@ The [MBWR equilibrium notes](mbwr-equilibrium.md) cover bounded pressure branche
 derivative-hierarchy spinodals, stored critical metadata and analytic critical points.
 The [MBWR source density notes](mbwr-density.md) cover SRK seeds, Newton phase
 switches, both fallbacks, explicit initialization and raw last-iterate parity.
+The [MBWR density measurements](mbwr-density-performance.md) retain the initial
+baseline, optimization experiments and final native-loop comparisons.
 The [PC-SAFT notes](pc-saft.md) cover PC-SAFT and sPC-SAFT Helmholtz kernels,
 Lorentz-Berthelot combining rules, bounded pressure-volume branches and pure coexistence.
 The [SAFT-VR Mie notes](saft-vrmie.md) cover SAFT-VR Mie and SAFT-VRQ Mie Helmholtz kernels,

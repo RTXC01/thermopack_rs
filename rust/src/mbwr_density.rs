@@ -192,31 +192,76 @@ impl PreparedMbwrDensity {
     }
     // Direct loop order from MBWR_pressure; negative intermediate densities
     // are deliberately retained for the legacy iterator. Backend units mol/L.
-    fn pressure(&self, rho: f64) -> [f64; 3] {
+    #[inline]
+    fn pressure<const SECOND: bool>(&self, rho: f64) -> [f64; 3] {
+        if self.polynomial_count == 6 {
+            self.pressure_shape::<6, 2, SECOND>(rho)
+        } else {
+            self.pressure_shape::<9, 6, SECOND>(rho)
+        }
+    }
+    // The source-indexed loop also measured faster than the iterator rewrite
+    // on the recorded Windows GNU workload; keep its fixed family bounds.
+    #[allow(clippy::needless_range_loop)]
+    fn pressure_shape<const POLYNOMIAL: usize, const EXPONENTIAL: usize, const SECOND: bool>(
+        &self,
+        rho: f64,
+    ) -> [f64; 3] {
         let gamma = self.parameters[0];
         let r2 = rho * rho;
+        // Positive integer-power trees used by the original __powidf2 loop.
+        // Sharing them avoids repeated runtime powi calls without reordering
+        // the polynomial/Gaussian sums or their rounding-sensitive products.
+        let r3 = rho * r2;
+        let r4 = r2 * r2;
+        let r5 = rho * r4;
+        let r8 = r4 * r4;
+        let powers = [
+            1.,
+            rho,
+            r2,
+            r3,
+            r4,
+            r5,
+            r2 * r4,
+            r3 * r4,
+            r8,
+            rho * r8,
+            r2 * r8,
+            r3 * r8,
+            r4 * r8,
+            r5 * r8,
+        ];
         let ex = (-gamma * r2).exp();
         let mut poly = [0.; 3];
         let mut expo = [0.; 3];
-        for n in 1..=self.polynomial_count {
-            let term = self.parameters[n] * rho.powi(n as i32);
+        for n in 1..=POLYNOMIAL {
+            let term = self.parameters[n] * powers[n];
             poly[0] += term;
             poly[1] += term * n as f64;
-            poly[2] += term * (n * (n - 1)) as f64;
+            if SECOND {
+                poly[2] += term * (n * (n - 1)) as f64;
+            }
         }
-        for m in 1..=self.exponential_count {
-            let term = self.parameters[m + self.polynomial_count] * rho.powi((2 * m + 1) as i32);
+        for m in 1..=EXPONENTIAL {
+            let term = self.parameters[m + POLYNOMIAL] * powers[2 * m + 1];
             expo[0] += term;
             expo[1] += term * ((2 * m + 1) as f64 / rho - 2. * gamma * rho);
-            expo[2] += term
-                * (2.
-                    * ((m * (2 * m + 1)) as f64 / r2
-                        - gamma * ((4 * m + 3) as f64 - 2. * gamma * r2)));
+            if SECOND {
+                expo[2] += term
+                    * (2.
+                        * ((m * (2 * m + 1)) as f64 / r2
+                            - gamma * ((4 * m + 3) as f64 - 2. * gamma * r2)));
+            }
         }
         [
             poly[0] + ex * expo[0],
             poly[1] / rho + ex * expo[1],
-            poly[2] / r2 + ex * expo[2],
+            if SECOND {
+                poly[2] / r2 + ex * expo[2]
+            } else {
+                0.
+            },
         ]
     }
     fn liquid_guess(&self, p: f64) -> f64 {
@@ -262,7 +307,7 @@ impl PreparedMbwrDensity {
         }
     }
     fn newton(&self, p: f64, initial: f64, phase: Phase, known: Option<[f64; 3]>) -> f64 {
-        let mut q = known.unwrap_or_else(|| self.pressure(initial));
+        let mut q = known.unwrap_or_else(|| self.pressure::<false>(initial));
         let mut rho = initial;
         let mut old = 1.;
         let mut dev: f64 = 5e10;
@@ -299,7 +344,7 @@ impl PreparedMbwrDensity {
             if iter == 15 || rho < 0. {
                 return -1.;
             }
-            q = self.pressure(rho);
+            q = self.pressure::<false>(rho);
         }
         rho
     }
@@ -310,7 +355,7 @@ impl PreparedMbwrDensity {
         let mut iter = 0;
         while dev.abs() / p > P_EPS || (old - rho).abs() / old > RHO_EPS {
             old = rho;
-            let q = self.pressure(old);
+            let q = self.pressure::<false>(old);
             dev = q[0] - p;
             rho = old - dev / q[1];
             iter += 1;
@@ -325,7 +370,7 @@ impl PreparedMbwrDensity {
         let index = if phase == Phase::Liquid { 0 } else { 1 };
         let mut rho = starts[index];
         // The original evaluates liquid-start pressure even for a vapor D.
-        let mut q = self.pressure(starts[0]);
+        let mut q = self.pressure::<true>(starts[0]);
         let mut dp = p - q[0];
         let mut new_iteration = true;
         let mut iteration = 0;
@@ -349,7 +394,7 @@ impl PreparedMbwrDensity {
             let mut count = 0;
             while reduction {
                 count += 1;
-                q = self.pressure(rho);
+                q = self.pressure::<true>(rho);
                 dp = p - q[0];
                 if dd.abs() <= 1e-8 {
                     reduction = false;
@@ -372,7 +417,7 @@ impl PreparedMbwrDensity {
                     reduction = false;
                     new_iteration = false;
                 }
-                q = self.pressure(rho);
+                q = self.pressure::<true>(rho);
             }
             if dd.abs() <= 1e-8 {
                 root += 1;
@@ -380,7 +425,7 @@ impl PreparedMbwrDensity {
                 if try_other && root < 2 {
                     new_iteration = true;
                     rho = starts[1 - index];
-                    q = self.pressure(rho);
+                    q = self.pressure::<true>(rho);
                     dp = p - q[0];
                 } else {
                     return rho;
@@ -407,7 +452,7 @@ impl PreparedMbwrDensity {
         let mut path = MbwrDensityPath::RequestedPhaseNewton;
         if phase == Phase::Liquid {
             let guess = self.liquid_guess(p) * 1.35;
-            let q = self.pressure(guess);
+            let q = self.pressure::<true>(guess);
             if q[2] < 0. || q[1] < 0. {
                 phase = Phase::Vapor;
                 path = MbwrDensityPath::CurvatureSwitchNewton;
@@ -442,7 +487,7 @@ impl PreparedMbwrDensity {
                 path = MbwrDensityPath::LegacyTplibFallback;
             }
         }
-        let q = self.pressure(rho);
+        let q = self.pressure::<false>(rho);
         let relative = (q[0] - p) / p;
         let density = rho * 1000.;
         let pressure_density_derivative = q[1] * 1e-3;

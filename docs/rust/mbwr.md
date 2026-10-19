@@ -113,8 +113,9 @@ zero-density limits, perfect-gas coefficients, ownership and invalid inputs.
 MBWR ideal/full caloric state functions, source density-iteration trajectory
 fidelity, saturation, flashes and CSP reference-fluid integration remain pending.
 Bounded physical pressure roots and critical points have separate
-[equilibrium qualification](mbwr-equilibrium.md). No
-MBWR speedup is claimed before a dedicated native-loop benchmark.
+[equilibrium qualification](mbwr-equilibrium.md).
+[Density measurements](mbwr-density-performance.md) compare native loops and
+document both optimizations and remaining performance gaps.
 Residual G/H/S/Z/lnphi and physical/source TP responses have separate
 [state-function qualification](mbwr-properties.md).
 The [source density qualification](mbwr-density.md) covers raw last iterates,

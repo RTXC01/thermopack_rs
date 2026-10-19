@@ -63,8 +63,10 @@ use the bounded branch API for that selection.
 initialization constants. It survives dropping the original model. Its density
 queries allocate no scratch memory, and multiple prepared states share no
 mutable global model. `source_parameters()` exposes read-only gamma/BP/BE
-coefficients in the original backend's mol/L units. No speedup is claimed
-until a dedicated native-loop comparison is measured.
+coefficients in the original backend's mol/L units.
+[Native-loop measurements](mbwr-density-performance.md) record the initial
+Fortran comparison, optimization experiments, final results and remaining
+MBWR19 performance gaps.
 
 ## Reference qualification
 

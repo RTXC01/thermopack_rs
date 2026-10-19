@@ -58,6 +58,7 @@ def generate():
             "critical_pressure: " + number(baseline['Pc']),
             "acentric_factor: " + number(baseline['acf']),
             "rackett_factor: " + number(baseline['Zra']),
+            "critical_compressibility: " + number(baseline['Zc']),
             "cp_type: " + str(int(cp['cptype']) if cp else 0),
             "cp: [" + ", ".join(map(number, coefficients)) + "]",
             "reference_enthalpy: " + number(baseline['href']),
@@ -74,7 +75,7 @@ def generate():
     for datatype, covolume in [("kijdatadb", False), ("lijdatadb", True)]:
         for block in re.findall(datatype + r"\((.*?)^\s*\)", source, re.M | re.S):
             values = dict(re.findall(r'(\w+)\s*=\s*"([^"]*)"', block))
-            if values["eosid"] not in ("PR", "SRK") or values["mruleid"].upper() != "VDW":
+            if values["eosid"] not in ("PR", "SRK", "LK") or values["mruleid"].upper() != "VDW":
                 continue
             value = re.search(r"[kl]ijvalue\s*=\s*([\d.eEdD+-]+)", block)[1]
             lines.append("Interaction { eos: " + string(values["eosid"])

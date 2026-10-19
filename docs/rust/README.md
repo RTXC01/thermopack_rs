@@ -94,5 +94,7 @@ The [Excess Gibbs notes](excess-gibbs.md) cover Huron-Vidal (HV1, HV2) and NRTL 
 infinite-pressure excess Helmholtz energy, exact analytical derivatives and binary parameter databases.
 The [Multiparameter notes](multiparameter.md) cover reference-quality NIST multiparameter equations of state,
 fundamental reduced Helmholtz energy formulations, exact first/second derivative jets, and ancillary density equations.
+The [Lee-Kesler notes](lee-kesler.md) cover the Lee-Kesler corresponding states equation of state,
+Plöcker critical mixing rules, analytical compositional derivatives, and BWR generalized fluids.
 Regenerate inventory with
 `python tools/rust_port/inventory.py`.

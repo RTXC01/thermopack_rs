@@ -29,6 +29,7 @@ pub mod flash;
 pub mod helmholtz;
 mod hydrogen;
 pub mod ideal;
+pub mod lee_kesler;
 pub mod mbwr;
 pub mod multiparameter;
 pub mod multiparameter_data;
@@ -62,6 +63,7 @@ pub use flash::{
 };
 pub use helmholtz::{DensityHelmholtz, PureHelmholtz, PurePressure};
 pub use ideal::{EntropyReference, IdealGas, IdealProperties};
+pub use lee_kesler::{BwrCoeffs, BwrCoeffsDiff1, BwrCoeffsDiff2, LeeKesler, PreparedLeeKesler};
 pub use mbwr::{
     Mbwr, MbwrEquilibrium, MbwrHelmholtzTerm, MbwrKind, MbwrPressure, MbwrRecord, PreparedMbwr,
     mbwr_records,

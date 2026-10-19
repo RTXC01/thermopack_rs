@@ -3,6 +3,11 @@
 Experimental native port; see [coverage](../docs/rust/coverage.md) before use.
 The original Fortran/Python implementation is retained as the reference.
 
+`Mbwr` provides MBWR-19/32 pressure and residual Helmholtz kernels with all
+65 stored fits. It offers stable integrals and explicit source-order methods;
+see [MBWR scope and qualification](../docs/rust/mbwr.md). Full MBWR density,
+caloric, critical and flash integration remains pending.
+
 ```
 cargo test --all-targets
 cargo run --release --example cubic

@@ -25,6 +25,7 @@ pub mod flash;
 pub mod helmholtz;
 mod hydrogen;
 pub mod ideal;
+pub mod mbwr;
 pub mod numerics;
 pub mod pets;
 pub mod translation;
@@ -45,6 +46,9 @@ pub use flash::{
 };
 pub use helmholtz::{DensityHelmholtz, PureHelmholtz, PurePressure};
 pub use ideal::{EntropyReference, IdealGas, IdealProperties};
+pub use mbwr::{
+    Mbwr, MbwrHelmholtzTerm, MbwrKind, MbwrPressure, MbwrRecord, PreparedMbwr, mbwr_records,
+};
 pub use pets::{
     Pets, PetsContributions, PetsDiameter, PetsEquilibrium, PetsEquilibriumTv, PetsTvProperties,
     PetsVolumeIteration, PreparedPets, PureCriticalPoint,

@@ -291,3 +291,97 @@ subroutine query_pets_volume(t,p,sigma,eps,phase,values) bind(C,name='query_pets
   end select
   values(2)=pressure(t,values(1),[1.0_c_double],dpdt=values(3),dpdv=values(4))
 end subroutine query_pets_volume
+
+! Load original coefficients without unrelated critical-parameter iteration.
+! alphar_derivatives and MBWR_coef use no critical metadata or ideal Cp data.
+subroutine initialize_mbwr_record(record,model)
+  use mbwr, only: eosmbwr,allocNIJL,fillIJL19,fillIJL32,computeZCoeff,computeHelmCoeff
+  use mbwrdata, only: mbwr19Array,mbwr32Array
+  implicit none
+  integer, intent(in) :: record
+  type(eosmbwr), intent(inout) :: model
+  call model%dealloc()
+  if (record >= 1 .and. record <= 11) then
+    model%EqNo=32; model%Ipol=19; model%Iexp=13
+    model%bplen=9; model%belen=6; model%Helm_poly_len=22; model%HelmLength=40
+    call allocNIJL(model%PCoeff_rhoT,32)
+    model%PCoeff_rhoT%N=mbwr32Array(record)%coeff(1:32)
+    model%gamma=mbwr32Array(record)%coeff(33)
+    call fillIJL32(model%PCoeff_rhoT)
+  else if (record >= 12 .and. record <= 65) then
+    model%EqNo=19; model%Ipol=13; model%Iexp=6
+    model%bplen=6; model%belen=2; model%Helm_poly_len=16; model%HelmLength=22
+    call allocNIJL(model%PCoeff_rhoT,19)
+    model%PCoeff_rhoT%N=mbwr19Array(record-11)%coeff(1:19)
+    model%gamma=mbwr19Array(record-11)%coeff(20)
+    call fillIJL19(model%PCoeff_rhoT)
+  else
+    error stop 'invalid MBWR record'
+  endif
+  call computeZCoeff(model)
+  call computeHelmCoeff(model)
+end subroutine initialize_mbwr_record
+
+subroutine query_mbwr_parameters(record,values) bind(C,name='query_mbwr_parameters')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use mbwrdata, only: mbwr19Array,mbwr32Array
+  implicit none
+  integer(c_int),value :: record
+  real(c_double),intent(out) :: values(34)
+  values=0.0
+  if (record<=11) then
+    values(1)=32.0; values(2:34)=mbwr32Array(record)%coeff
+  else
+    values(1)=19.0; values(2:21)=mbwr19Array(record-11)%coeff
+  endif
+end subroutine query_mbwr_parameters
+
+subroutine query_mbwr(record,t,v,n,values) bind(C,name='query_mbwr')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use mbwr, only: eosmbwr,makeParam,MBWR_pressure
+  use mbwr_additional, only: alphar_derivatives,MBWR_Fres,MBWR_press
+  implicit none
+  integer(c_int),value :: record
+  real(c_double),value :: t,v,n
+  real(c_double),intent(out) :: values(26)
+  type(eosmbwr),save :: model
+  integer,save :: previous=0
+  real :: result(0:2),rho
+  real,allocatable :: param(:)
+  if (previous/=record) then
+    call initialize_mbwr_record(record,model)
+    previous=record
+  endif
+  rho=n/v
+  call alphar_derivatives(result,t,rho,0,2,model)
+  values(1)=result(0); values(3)=result(1); values(6)=result(2)
+  call alphar_derivatives(result,t,rho,1,1,model)
+  values(2)=result(0); values(5)=result(1)
+  call alphar_derivatives(result,t,rho,2,0,model)
+  values(4)=result(0)
+  call MBWR_Fres(model,t,v,n,Fr=values(7),F_T=values(8),F_v=values(9),F_n=values(10:10), &
+       F_TT=values(11),F_Tv=values(12),F_Tn=values(13:13),F_vv=values(14),F_vn=values(15:15),F_nn=values(16:16))
+  call MBWR_press(model,t,v,n,p=values(17),dpdt=values(18),dpdv=values(19))
+  values(20)=-values(19)*v/n
+  allocate(param(1+model%bplen+model%belen))
+  call makeParam(param,t,model,0)
+  call MBWR_pressure(rho*1e-3,param,values(21),values(23),values(26))
+  values(23)=values(23)*1e-3; values(26)=values(26)*1e-6
+  call makeParam(param,t,model,1)
+  call MBWR_pressure(rho*1e-3,param,values(22),values(25))
+  values(25)=values(25)*1e-3
+  call makeParam(param,t,model,2)
+  call MBWR_pressure(rho*1e-3,param,values(24))
+end subroutine query_mbwr
+
+subroutine query_mbwr_integrated(record,values) bind(C,name='query_mbwr_integrated')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use mbwr, only: eosmbwr
+  implicit none
+  integer(c_int),value :: record
+  real(c_double),intent(out) :: values(40)
+  type(eosmbwr) :: model
+  call initialize_mbwr_record(record,model)
+  values=0.0
+  values(1:model%HelmLength)=model%redResHelmCoeff_redrhoT%N
+end subroutine query_mbwr_integrated

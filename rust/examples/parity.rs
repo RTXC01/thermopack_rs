@@ -89,6 +89,62 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if fields.len() != 6 {
             return Err("expected six fields".into());
         }
+        if fields[0] == "MBWR" {
+            let model = thermopack_rs::Mbwr::from_record(fields[1])?;
+            let result = (|| -> thermopack_rs::Result<Vec<f64>> {
+                if fields[5] == "MBWR_INTEGRATED" {
+                    return Ok(model
+                        .baseline_helmholtz_terms()
+                        .iter()
+                        .map(|t| t.coefficient)
+                        .collect());
+                }
+                if fields[5] == "MBWR_PARAMETERS" {
+                    let (c, gamma) = model.parameters();
+                    let mut values = vec![model.kind().coefficient_count() as f64];
+                    values.extend(c);
+                    values.push(gamma);
+                    return Ok(values);
+                }
+                let t = fields[2].parse().unwrap();
+                let v = fields[3].parse().unwrap();
+                let n = fields[4].parse().unwrap();
+                let prepared = model.prepare(t)?;
+                let baseline = fields[5] == "MBWR_BASELINE_CORE";
+                let a = if baseline {
+                    prepared.baseline_residual_density(n / v)?
+                } else {
+                    prepared.residual_density(n / v)?
+                };
+                let f = if baseline {
+                    prepared.baseline_residual_helmholtz(v, n)?
+                } else {
+                    prepared.residual_helmholtz(v, n)?
+                };
+                let p = if baseline {
+                    prepared.baseline_pressure_tv(v, n)?
+                } else {
+                    prepared.pressure_tv(v, n)?
+                };
+                let d = prepared.pressure_density(n / v)?;
+                Ok(vec![
+                    a.value, a.dt, a.drho, a.dtt, a.dtrho, a.drhorho, f.value, f.dt, f.dv, f.dn,
+                    f.dtt, f.dtv, f.dtn, f.dvv, f.dvn, f.dnn, p.value, p.dt, p.dv, p.dn, d.value,
+                    d.dt, d.drho, d.dtt, d.dtrho, d.drhorho,
+                ])
+            })();
+            match result {
+                Ok(v) => println!(
+                    "{}",
+                    v.iter()
+                        .map(|x| format!("{x:.17e}"))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                ),
+                Err(e) => println!("ERROR {e}"),
+            }
+            continue;
+        }
         if fields[0] == "PETS" {
             let parameters: Vec<f64> = fields[1]
                 .split(',')

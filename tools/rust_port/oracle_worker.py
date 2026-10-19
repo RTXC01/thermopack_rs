@@ -59,6 +59,12 @@ def load_probe():
     probe.set_pets_parameters.restype=None
     probe.query_pets_volume.argtypes=[*([c_double]*4),c_int,POINTER(c_double)]
     probe.query_pets_volume.restype=None
+    probe.query_mbwr_parameters.argtypes=[c_int,POINTER(c_double)]
+    probe.query_mbwr_parameters.restype=None
+    probe.query_mbwr.argtypes=[c_int,c_double,c_double,c_double,POINTER(c_double)]
+    probe.query_mbwr.restype=None
+    probe.query_mbwr_integrated.argtypes=[c_int,POINTER(c_double)]
+    probe.query_mbwr_integrated.restype=None
     return probe
 
 
@@ -68,6 +74,22 @@ def main(compiler_directory):
     probe=None
     for line in sys.stdin:
         request=json.loads(line)
+        if request['mode'].startswith('MBWR_'):
+            if probe is None:probe=load_probe()
+            record=request['record_index']
+            if request['mode']=='MBWR_INTEGRATED':
+                output=(c_double*40)();probe.query_mbwr_integrated(record,output)
+                values=list(map(float,output))[:40 if record<=11 else 22]
+            elif request['mode']=='MBWR_PARAMETERS':
+                output=(c_double*34)();probe.query_mbwr_parameters(record,output)
+                values=list(map(float,output))[:int(output[0])+2]
+            else:
+                output=(c_double*26)();probe.query_mbwr(record,request['temperature'],request['volume'],request['moles'],output)
+                values=list(map(float,output))
+            if all(map(math.isfinite,values)):
+                print('THERMOPACK_RESULT='+json.dumps(dict(values=values)),flush=True)
+            else:print('THERMOPACK_RESULT='+json.dumps(dict(calculation_error='non-finite original MBWR kernel output',values=list(map(str,values)))),flush=True)
+            continue
         if request['mode']=='SYMMETRIC':
             if probe is None: probe=load_probe()
             n=len(request['rhs'])

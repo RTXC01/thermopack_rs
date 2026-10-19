@@ -164,3 +164,18 @@ The 697 closing results qualify raw output parity for those cases only.
 Native caloric solvers use physical Cp and require closure. Reproducing the
 fork's non-closing outputs remains an explicit compatibility gap, rather
 than silently treating them as a correct physical solution.
+
+## MBWR integrated-term cancellation
+
+The original MBWR Helmholtz expansion subtracts large density-independent
+polynomial/exponential terms. At extreme dilute extrapolations from 0.5 to
+10 K, rounding in that subtraction differs from a stable analytic integral
+in 318 of the 6760 qualified kernel states. The stable path independently
+satisfies derivative and pressure identities there. The differences and both
+sets of values are retained in the MBWR comparison report.
+
+Native `baseline_residual_density`, `baseline_residual_helmholtz` and
+`baseline_pressure_tv` preserve the original integrated coefficients and
+summation order. All 6760 source-order states match without loosening the
+stable-path tolerances. See [MBWR formulation and qualification](mbwr.md) for
+the exact coefficient checks, zero-density extension and remaining interfaces.

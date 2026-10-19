@@ -78,5 +78,7 @@ The [PeTS fixed-volume notes](pets-isochoric.md) cover equilibrium TV states,
 analytic Cv with phase redistribution, pure UV/SV and their qualification.
 The [PeTS root measurements](pets-root-performance.md) distinguish fresh,
 prepared and source-iteration paths and identify branch-discovery overhead.
+The [MBWR kernel notes](mbwr.md) cover all stored Bender/MBWR32 fits, pressure,
+residual derivatives, source summation fidelity and the stable integral path.
 Regenerate inventory with
 `python tools/rust_port/inventory.py`.

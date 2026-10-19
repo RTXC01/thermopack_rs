@@ -92,5 +92,7 @@ The [CPA notes](cpa.md) cover the Cubic-Plus-Association equation of state, Wert
 simplified contact RDF, quadratic closed branches and non-associating component mixing conventions.
 The [Excess Gibbs notes](excess-gibbs.md) cover Huron-Vidal (HV1, HV2) and NRTL activity model mixing rules,
 infinite-pressure excess Helmholtz energy, exact analytical derivatives and binary parameter databases.
+The [Multiparameter notes](multiparameter.md) cover reference-quality NIST multiparameter equations of state,
+fundamental reduced Helmholtz energy formulations, exact first/second derivative jets, and ancillary density equations.
 Regenerate inventory with
 `python tools/rust_port/inventory.py`.

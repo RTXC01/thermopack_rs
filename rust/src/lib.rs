@@ -30,6 +30,8 @@ pub mod helmholtz;
 mod hydrogen;
 pub mod ideal;
 pub mod mbwr;
+pub mod multiparameter;
+pub mod multiparameter_data;
 pub mod numerics;
 pub mod pc_saft;
 pub mod pc_saft_data;
@@ -65,6 +67,10 @@ pub use mbwr::{
     mbwr_records,
 };
 pub use mbwr::{MbwrResidualTp, MbwrTpDerivatives, MbwrTpQuantity};
+pub use multiparameter::{HelmholtzJet, Multiparameter, PreparedMultiparameter};
+pub use multiparameter_data::{
+    AncillarySatDensity, IdealGasHelmholtz, MultiparameterRecord, lookup_multiparameter_record,
+};
 pub use pc_saft::{
     PcSaft, PcSaftComponent, PcSaftKind, PcSaftPressureJet, PcSaftSaturation, PcSaftState,
     PreparedPcSaft,

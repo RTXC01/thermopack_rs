@@ -53,6 +53,11 @@ name = "pets_roots"
 path = "rust/benches/pets_roots.rs"
 harness = false
 
+[[bench]]
+name = "mbwr_density"
+path = "rust/benches/mbwr_density.rs"
+harness = false
+
 [profile.release]
 lto = "thin"
 codegen-units = 1

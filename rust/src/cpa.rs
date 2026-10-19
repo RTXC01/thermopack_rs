@@ -46,7 +46,7 @@ pub struct CpaComponent {
     pub a0: f64,
     /// Covolume parameter b [m^3 / mol].
     pub b: f64,
-    /// Critical temperature Tc [K] (used in Soave alpha).
+    /// Critical temperature Tc (K), used in Soave alpha.
     pub tc: f64,
     /// Classic alpha correlation parameter c1.
     pub c1: f64,
@@ -65,7 +65,7 @@ pub struct CpaComponent {
 /// Thermodynamic jet for pressure and its derivatives.
 #[derive(Debug, Clone, Copy)]
 pub struct CpaPressureJet {
-    /// Pressure P [Pa].
+    /// Pressure P (Pa).
     pub pressure: f64,
     /// Compressibility factor Z = P / (rho * R * T).
     pub compressibility: f64,
@@ -82,7 +82,7 @@ pub struct CpaPressureJet {
 /// Full thermodynamic state properties at specified (T, rho).
 #[derive(Debug, Clone)]
 pub struct CpaState {
-    /// Pressure P [Pa].
+    /// Pressure P (Pa).
     pub pressure: f64,
     /// Compressibility factor Z [-].
     pub compressibility: f64,
@@ -117,9 +117,9 @@ pub struct CpaState {
 /// Saturation state for pure fluids.
 #[derive(Debug, Clone, Copy)]
 pub struct CpaSaturation {
-    /// Saturation temperature T [K].
+    /// Saturation temperature T (K).
     pub temperature: f64,
-    /// Saturation pressure P_sat [Pa].
+    /// Saturation pressure P_sat (Pa).
     pub pressure: f64,
     /// Liquid molar volume [m^3 / mol].
     pub liquid_volume: f64,
@@ -416,7 +416,7 @@ pub struct PreparedCpa<'a> {
 }
 
 impl<'a> PreparedCpa<'a> {
-    /// Create and prepare a CPA state at temperature T [K] and mole fractions x.
+    /// Create and prepare a CPA state at temperature T (K) and mole fractions x.
     pub fn new(model: &'a Cpa, temperature: f64, mole_fractions: &[f64]) -> Result<Self> {
         if temperature <= 0.0 || !temperature.is_finite() {
             return Err(Error::InvalidInput("temperature must be strictly positive"));
@@ -963,7 +963,7 @@ impl<'a> PreparedCpa<'a> {
         }
     }
 
-    /// Pure fluid saturation pressure and coexistence volumes at temperature T [K].
+    /// Pure fluid saturation pressure and coexistence volumes at temperature T (K).
     pub fn saturation_pressure(&self, temperature: f64) -> Result<CpaSaturation> {
         if self.model.num_components() != 1 {
             return Err(Error::InvalidInput(

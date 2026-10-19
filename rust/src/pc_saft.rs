@@ -415,7 +415,7 @@ impl<'a> PreparedPcSaft<'a> {
         1.0 + rho * (d_ahc + d_adisp)
     }
 
-    /// Absolute pressure P(rho, T, x) [Pa].
+    /// Absolute pressure P(rho, T, x) (Pa).
     pub fn pressure(&self, rho: f64) -> f64 {
         rho * RGAS * self.temperature * self.compressibility_factor(rho)
     }

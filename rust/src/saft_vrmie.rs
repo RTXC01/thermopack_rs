@@ -489,7 +489,7 @@ impl<'a> PreparedSaftVrMie<'a> {
         self.conv_zeta * rho
     }
 
-    /// Hard-sphere diameters [m].
+    /// Hard-sphere diameters (m).
     pub fn d(&self) -> &[f64] {
         &self.d
     }

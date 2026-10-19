@@ -69,15 +69,17 @@ pub struct MbwrHelmholtzTerm {
 }
 #[path = "mbwr_data.rs"]
 mod data;
+#[path = "mbwr_equilibrium.rs"]
+mod equilibrium;
 #[path = "mbwr_properties.rs"]
 mod properties;
+pub use equilibrium::MbwrEquilibrium;
 pub use properties::{MbwrResidualTp, MbwrTpDerivatives, MbwrTpQuantity};
 pub fn mbwr_records() -> &'static [MbwrRecord] {
     data::RECORDS
 }
 
-/// Owned coefficients. This stage provides homogeneous residual kernels;
-/// critical points, density iteration and full caloric/flash integration follow.
+/// Owned pure-fluid coefficients; no global active model or mutable scratch.
 #[derive(Debug, Clone)]
 pub struct Mbwr {
     kind: MbwrKind,

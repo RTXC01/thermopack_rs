@@ -80,6 +80,9 @@ pub use density::{
     MbwrDensityIteration, MbwrDensityParameters, MbwrDensityPath, PreparedMbwrDensity,
 };
 pub use properties::{MbwrResidualTp, MbwrTpDerivatives, MbwrTpQuantity};
+#[path = "mbwr_initialization.rs"]
+mod initialization;
+pub use initialization::MbwrInitialization;
 pub fn mbwr_records() -> &'static [MbwrRecord] {
     data::RECORDS
 }
@@ -93,6 +96,7 @@ pub struct Mbwr {
     record: Option<&'static MbwrRecord>,
     source_terms: [MbwrHelmholtzTerm; 40],
     source_count: usize,
+    source_initialization: OnceLock<Result<MbwrInitialization>>,
 }
 
 /// Pressure (Pa) differentiated in T (K) and molar density (mol/m3).
@@ -171,6 +175,7 @@ impl Mbwr {
             record: None,
             source_terms,
             source_count,
+            source_initialization: OnceLock::new(),
         })
     }
     pub fn kind(&self) -> MbwrKind {

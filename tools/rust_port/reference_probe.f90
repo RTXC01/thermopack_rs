@@ -493,3 +493,48 @@ subroutine query_mbwr_density(record,t,p,phase,critical,acf,values) bind(C,name=
   call MBWR_pressure(rho,param,values(3),values(4))
   values(4)=values(4)*1e-3
 end subroutine query_mbwr_density
+
+subroutine query_mbwr_initialization(record,values,status) bind(C,name='query_mbwr_initialization')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use mbwr, only: eosmbwr,initializeMBWRmodel
+  use mbwrdata, only: mbwr19Array,mbwr32Array
+  use compdata_init, only: getCompDBindex
+  implicit none
+  integer(c_int),value :: record
+  real(c_double),intent(out) :: values(8)
+  integer(c_int),intent(out) :: status
+  type(eosmbwr) :: model
+  character(len=8) :: id
+  if (record<=11) then
+    id=mbwr32Array(record)%ComId
+  else
+    id=mbwr19Array(record-11)%ComId
+  endif
+  status=0
+  if (getCompDBindex(id)==0) then
+    ! The original unguarded compdb(0) access has undefined behavior.
+    ! Report it explicitly instead of executing an out-of-bounds initializer.
+    status=1;values=0.0;return
+  endif
+  if (record<=11) then
+    call initializeMBWRmodel(mbwr32Array(record)%ComId,model,32)
+  else
+    call initializeMBWRmodel(mbwr19Array(record-11)%ComId,model,19)
+  endif
+  values=[model%tc,model%pc,model%rc*1000.0,model%zc,model%acf,model%b_SRK*1e-3,model%m_SRK,model%a0_SRK*1e-6]
+end subroutine query_mbwr_initialization
+
+subroutine query_mbwr_critical_grid(record,initial,values) bind(C,name='query_mbwr_critical_grid')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use mbwr, only: eosmbwr,MBWR_criticalParameters
+  implicit none
+  integer(c_int),value :: record
+  real(c_double),intent(in) :: initial(3)
+  real(c_double),intent(out) :: values(3)
+  type(eosmbwr) :: model
+  real :: t,p,r
+  call initialize_mbwr_record(record,model)
+  t=initial(1);p=initial(2);r=initial(3)*1e-3
+  call MBWR_criticalParameters(t,p,r,model)
+  values=[t,p,r*1000.0]
+end subroutine query_mbwr_critical_grid

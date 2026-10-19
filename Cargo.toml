@@ -28,6 +28,11 @@ name = "mbwr_source_density"
 path = "tests/mbwr_source_density.rs"
 harness = false
 
+[[test]]
+name = "mbwr_source_initialization"
+path = "tests/mbwr_source_initialization.rs"
+harness = false
+
 [[bench]]
 name = "cubic"
 path = "rust/benches/cubic.rs"

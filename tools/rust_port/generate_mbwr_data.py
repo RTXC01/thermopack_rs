@@ -83,9 +83,10 @@ def generate():
         rho=c['Pc']/(c['Zc']*8.31446261815324*c['Tc'])
         lines.append('('+json.dumps(identifier)+','+repr([c['Tc'],rho])+'),')
     lines.append('];')
-    lines.append('pub(super) const COMPONENT_ACENTRIC_FACTORS: &[(&str, f64)] = &[')
+    lines.append('pub(super) const COMPONENT_INITIALIZATION: &[(&str, [f64;4])] = &[')
     for identifier in sorted({r['identifier'] for r in data if r['identifier'] in general}):
-        lines.append('('+json.dumps(identifier)+','+repr(general[identifier]['acf'])+'),')
+        c=general[identifier]
+        lines.append('('+json.dumps(identifier)+','+repr([c['Tc'],c['Pc'],c['Zc'],c['acf']])+'),')
     lines.append('];')
     lines+=source_helmholtz_function()
     path=ROOT/'rust/src/mbwr_data.rs'

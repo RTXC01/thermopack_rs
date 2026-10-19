@@ -73,6 +73,10 @@ def load_probe():
     probe.query_mbwr_critical_jet.restype=None
     probe.query_mbwr_density.argtypes=[c_int,c_double,c_double,c_int,POINTER(c_double),c_double,POINTER(c_double)]
     probe.query_mbwr_density.restype=None
+    probe.query_mbwr_initialization.argtypes=[c_int,POINTER(c_double),POINTER(c_int)]
+    probe.query_mbwr_initialization.restype=None
+    probe.query_mbwr_critical_grid.argtypes=[c_int,POINTER(c_double),POINTER(c_double)]
+    probe.query_mbwr_critical_grid.restype=None
     return probe
 
 
@@ -85,7 +89,17 @@ def main(compiler_directory):
         if request['mode'].startswith('MBWR_'):
             if probe is None:probe=load_probe()
             record=request['record_index']
-            if request['mode']=='MBWR_METADATA':
+            if request['mode']=='MBWR_INITIALIZATION':
+                output=(c_double*8)();status=c_int();probe.query_mbwr_initialization(record,output,byref(status))
+                if status.value:
+                    print('THERMOPACK_RESULT='+json.dumps(dict(undefined_source_initialization='getCompDBindex returned 0; original initializer reads compdb(0)',probe_status=status.value)),flush=True)
+                    continue
+                values=list(map(float,output))
+            elif request['mode']=='MBWR_CRITICAL_GRID':
+                initial=(c_double*3)(*request['initial'])
+                output=(c_double*3)();probe.query_mbwr_critical_grid(record,initial,output)
+                values=list(map(float,output))
+            elif request['mode']=='MBWR_METADATA':
                 output=(c_double*8)();probe.query_mbwr_metadata(record,output)
                 values=list(map(float,output))
             elif request['mode']=='MBWR_CRITICAL_JET':

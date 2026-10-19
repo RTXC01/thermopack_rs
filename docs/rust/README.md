@@ -88,6 +88,9 @@ The [MBWR source density notes](mbwr-density.md) cover SRK seeds, Newton phase
 switches, both fallbacks, explicit initialization and raw last-iterate parity.
 The [MBWR density measurements](mbwr-density-performance.md) retain the initial
 baseline, optimization experiments and final native-loop comparisons.
+The [MBWR initialization notes](mbwr-initialization.md) cover cached default
+metadata, original coarse critical scans, source terminations and undefined
+missing-component initializers.
 The [PC-SAFT notes](pc-saft.md) cover PC-SAFT and sPC-SAFT Helmholtz kernels,
 Lorentz-Berthelot combining rules, bounded pressure-volume branches and pure coexistence.
 The [SAFT-VR Mie notes](saft-vrmie.md) cover SAFT-VR Mie and SAFT-VRQ Mie Helmholtz kernels,

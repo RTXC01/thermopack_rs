@@ -182,6 +182,11 @@ The [MBWR source density qualification](mbwr-density.md) separately compares
 unclosed source returns in the comparison and recording one source NaN/native
 error. Explicit initialization, including synthetic metadata for 17 legacy fits,
 and original default-initializer limitations are documented.
+The [MBWR default-initialization qualification](mbwr-initialization.md) adds
+32 finite initializations and 27 explicit source critical-grid results, checking
+native errors for 16 original terminations and 17 undefined missing-component
+lookups. All 65 default initialization statuses are retained in a separate
+fixture; the source bounds defect is explicitly distinguished from valid output.
 The [PeTS flash qualification](pets-flash.md) adds 923 finite/closing TP/PH/PS
 states from 1035 source attempts, retaining 112 failed/nonclosing calls.
 Saturated endpoints use an explicit physical-state comparison convention;

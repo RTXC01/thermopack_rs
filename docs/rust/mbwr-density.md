@@ -21,12 +21,13 @@ All public inputs and returned densities use SI: K, Pa and mol/m3.
 initialization data. Parameters are validated again during preparation even
 if callers construct the public struct directly. `source_density_parameters()`
 uses the original explicit MBWR critical table and compiled component acentric
-factor. It returns an error when either is unavailable. It does not silently
-substitute the independently refined physical critical point.
+factor, falling back to the original coarse critical grid when no table entry
+exists. The [default initialization qualification](mbwr-initialization.md)
+documents its cached results, source terminations and undefined legacy lookups.
+It does not silently substitute the independently refined physical critical point.
 
-The source initializer's coarse critical grid search remains separate and
-pending. For records without a critical table entry, callers can pass its
-result, compiled component estimates, or explicit custom initialization data.
+Callers can also pass compiled component estimates or explicit custom
+initialization data directly.
 Different initialization data can change source fallback behavior. The
 qualification below states which data it passes; it does not qualify the full
 original initializer for every legacy record.
@@ -101,7 +102,7 @@ coefficients, ownership and prepared/convenience API equivalence.
 
 This closes the raw-output and phase-choice gap identified in the previous
 bounded-root qualification for the documented explicit initialization cases.
-Inner trajectory identity, `meta_extrem`, full default initialization,
+Inner trajectory identity, `meta_extrem`,
 `MBWR_stableDensity`, full ideal/caloric properties, coexistence/flashes and CSP
 integration remain pending within the full migration.
 

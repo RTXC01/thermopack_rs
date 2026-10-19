@@ -66,8 +66,8 @@ pub use ideal::{EntropyReference, IdealGas, IdealProperties};
 pub use lee_kesler::{BwrCoeffs, BwrCoeffsDiff1, BwrCoeffsDiff2, LeeKesler, PreparedLeeKesler};
 pub use mbwr::{
     Mbwr, MbwrDensityIteration, MbwrDensityParameters, MbwrDensityPath, MbwrEquilibrium,
-    MbwrHelmholtzTerm, MbwrKind, MbwrPressure, MbwrRecord, PreparedMbwr, PreparedMbwrDensity,
-    mbwr_records,
+    MbwrHelmholtzTerm, MbwrInitialization, MbwrKind, MbwrPressure, MbwrRecord, PreparedMbwr,
+    PreparedMbwrDensity, mbwr_records,
 };
 pub use mbwr::{MbwrResidualTp, MbwrTpDerivatives, MbwrTpQuantity};
 pub use multiparameter::{HelmholtzJet, Multiparameter, PreparedMultiparameter};

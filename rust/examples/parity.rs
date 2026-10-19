@@ -93,6 +93,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if fields[0] == "MBWR" {
             let model = thermopack_rs::Mbwr::from_record(fields[1])?;
             let result = (|| -> thermopack_rs::Result<Vec<f64>> {
+                if fields[5] == "MBWR_INITIALIZATION" {
+                    let s = model.source_initialization()?;
+                    let a = s.parameters;
+                    return Ok(vec![
+                        a.critical_temperature,
+                        a.critical_pressure,
+                        a.critical_density,
+                        s.compressibility,
+                        a.acentric_factor,
+                        s.srk_covolume,
+                        s.srk_alpha_coefficient,
+                        s.srk_attraction,
+                    ]);
+                }
+                if fields[5].starts_with("MBWR_CRITICAL_GRID@") {
+                    let a: Vec<f64> = fields[5]
+                        .split('@')
+                        .nth(1)
+                        .unwrap()
+                        .split(',')
+                        .map(|s| s.parse().unwrap())
+                        .collect();
+                    let s = model.baseline_critical_grid(
+                        thermopack_rs::MbwrDensityParameters::new(a[0], a[1], a[2], 0.)?,
+                    )?;
+                    return Ok(vec![s.temperature, s.pressure, 1. / s.volume]);
+                }
                 if fields[5].starts_with("MBWR_DENSITY@") {
                     let a: Vec<f64> = fields[5]
                         .split('@')

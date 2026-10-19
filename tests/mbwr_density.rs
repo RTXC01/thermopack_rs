@@ -48,7 +48,9 @@ fn tabulated_initialization_and_model_convenience_match_prepared_queries() {
         }
     }
     let no_table = Mbwr::new(MbwrKind::Mbwr32, "IC4").unwrap();
-    assert!(no_table.source_density_parameters().is_err());
+    let initialized = no_table.source_initialization().unwrap();
+    assert!(!initialized.from_critical_table);
+    assert!((initialized.parameters.critical_temperature - 407.847).abs() < 1e-7);
     let no_acf = Mbwr::from_record("mbwrcx12").unwrap();
     assert!(no_acf.source_density_parameters().is_err());
 }

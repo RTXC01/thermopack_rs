@@ -92,21 +92,10 @@ pub struct PreparedMbwrDensity {
 }
 
 impl Mbwr {
-    /// Metadata available without running the source's coarse critical search.
-    /// Missing table entries require explicit initialization parameters.
+    /// Original default critical/acentric initialization, cached per model.
+    /// Missing critical tables use the source's coarse grid search.
     pub fn source_density_parameters(&self) -> Result<MbwrDensityParameters> {
-        let record = self.record.ok_or(Error::InvalidInput(
-            "custom MBWR density requires explicit initialization data",
-        ))?;
-        let cp = self.source_critical_point().ok_or(Error::Unsupported(
-            "MBWR source critical initialization without a table entry",
-        ))?;
-        let acf = data::COMPONENT_ACENTRIC_FACTORS
-            .iter()
-            .find(|(id, _)| *id == record.identifier)
-            .ok_or_else(|| Error::UnknownComponent(record.identifier.to_owned()))?
-            .1;
-        MbwrDensityParameters::new(cp.temperature, cp.pressure, 1. / cp.volume, acf)
+        Ok(self.source_initialization()?.parameters)
     }
     pub fn prepare_baseline_density(
         &self,
@@ -115,6 +104,30 @@ impl Mbwr {
     ) -> Result<PreparedMbwrDensity> {
         positive(t, "temperature")?;
         critical.validate()?;
+        let (a, polynomial_count, exponential_count) = self.source_pressure_coefficients(t)?;
+        let tc = critical.critical_temperature;
+        let pc = critical.critical_pressure;
+        let w = critical.acentric_factor;
+        let result = PreparedMbwrDensity {
+            t,
+            parameters: a,
+            polynomial_count,
+            exponential_count,
+            critical,
+            b_srk: 0.08664 * KR * tc / pc,
+            m_srk: 0.480 + 1.547 * w - 0.176 * w.powi(2),
+            a0_srk: 0.42747 * (KR * tc).powi(2) / pc,
+        };
+        if [result.b_srk, result.m_srk, result.a0_srk]
+            .iter()
+            .any(|v| !v.is_finite())
+        {
+            return Err(Error::InvalidInput("non-finite MBWR density preparation"));
+        }
+        Ok(result)
+    }
+    pub(super) fn source_pressure_coefficients(&self, t: f64) -> Result<([f64; 16], usize, usize)> {
+        positive(t, "temperature")?;
         let c = &self.coefficients;
         let t2 = t * t;
         let t3 = t2 * t;
@@ -151,26 +164,10 @@ impl Mbwr {
             a[15] = (c[29] + c[30] / t + c[31] / t2) / t2;
             (9, 6)
         };
-        let tc = critical.critical_temperature;
-        let pc = critical.critical_pressure;
-        let w = critical.acentric_factor;
-        let result = PreparedMbwrDensity {
-            t,
-            parameters: a,
-            polynomial_count,
-            exponential_count,
-            critical,
-            b_srk: 0.08664 * KR * tc / pc,
-            m_srk: 0.480 + 1.547 * w - 0.176 * w.powi(2),
-            a0_srk: 0.42747 * (KR * tc).powi(2) / pc,
-        };
-        if a.iter()
-            .chain([&result.b_srk, &result.m_srk, &result.a0_srk])
-            .any(|v| !v.is_finite())
-        {
-            return Err(Error::InvalidInput("non-finite MBWR density preparation"));
+        if a.iter().any(|v| !v.is_finite()) {
+            return Err(Error::InvalidInput("non-finite MBWR pressure coefficients"));
         }
-        Ok(result)
+        Ok((a, polynomial_count, exponential_count))
     }
     pub fn baseline_density(
         &self,
@@ -195,19 +192,35 @@ impl PreparedMbwrDensity {
     #[inline]
     fn pressure<const SECOND: bool>(&self, rho: f64) -> [f64; 3] {
         if self.polynomial_count == 6 {
-            self.pressure_shape::<6, 2, SECOND>(rho)
+            Self::pressure_shape::<6, 2, true, SECOND>(&self.parameters, rho)
         } else {
-            self.pressure_shape::<9, 6, SECOND>(rho)
+            Self::pressure_shape::<9, 6, true, SECOND>(&self.parameters, rho)
+        }
+    }
+    pub(super) fn pressure_value_backend(
+        parameters: &[f64; 16],
+        polynomial_count: usize,
+        rho: f64,
+    ) -> f64 {
+        if polynomial_count == 6 {
+            Self::pressure_shape::<6, 2, false, false>(parameters, rho)[0]
+        } else {
+            Self::pressure_shape::<9, 6, false, false>(parameters, rho)[0]
         }
     }
     // The source-indexed loop also measured faster than the iterator rewrite
     // on the recorded Windows GNU workload; keep its fixed family bounds.
     #[allow(clippy::needless_range_loop)]
-    fn pressure_shape<const POLYNOMIAL: usize, const EXPONENTIAL: usize, const SECOND: bool>(
-        &self,
+    fn pressure_shape<
+        const POLYNOMIAL: usize,
+        const EXPONENTIAL: usize,
+        const FIRST: bool,
+        const SECOND: bool,
+    >(
+        parameters: &[f64; 16],
         rho: f64,
     ) -> [f64; 3] {
-        let gamma = self.parameters[0];
+        let gamma = parameters[0];
         let r2 = rho * rho;
         // Positive integer-power trees used by the original __powidf2 loop.
         // Sharing them avoids repeated runtime powi calls without reordering
@@ -236,17 +249,21 @@ impl PreparedMbwrDensity {
         let mut poly = [0.; 3];
         let mut expo = [0.; 3];
         for n in 1..=POLYNOMIAL {
-            let term = self.parameters[n] * powers[n];
+            let term = parameters[n] * powers[n];
             poly[0] += term;
-            poly[1] += term * n as f64;
+            if FIRST {
+                poly[1] += term * n as f64;
+            }
             if SECOND {
                 poly[2] += term * (n * (n - 1)) as f64;
             }
         }
         for m in 1..=EXPONENTIAL {
-            let term = self.parameters[m + POLYNOMIAL] * powers[2 * m + 1];
+            let term = parameters[m + POLYNOMIAL] * powers[2 * m + 1];
             expo[0] += term;
-            expo[1] += term * ((2 * m + 1) as f64 / rho - 2. * gamma * rho);
+            if FIRST {
+                expo[1] += term * ((2 * m + 1) as f64 / rho - 2. * gamma * rho);
+            }
             if SECOND {
                 expo[2] += term
                     * (2.
@@ -256,7 +273,11 @@ impl PreparedMbwrDensity {
         }
         [
             poly[0] + ex * expo[0],
-            poly[1] / rho + ex * expo[1],
+            if FIRST {
+                poly[1] / rho + ex * expo[1]
+            } else {
+                0.
+            },
             if SECOND {
                 poly[2] / r2 + ex * expo[2]
             } else {

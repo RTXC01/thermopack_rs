@@ -1,5 +1,5 @@
 """Compare original default MBWR initialization and its coarse critical grid."""
-import argparse,csv,hashlib,json,math,os,subprocess
+import argparse,csv,hashlib,json,math,os,re,subprocess
 from reference import ROOT,ReferenceProcess
 from generate_mbwr_data import records,stored_properties
 from validate_alpha import verify_probe
@@ -7,6 +7,24 @@ from validate_alpha import verify_probe
 INITIAL_ATOL=[1e-8,1e-3,1e-6,1e-10,1e-14,1e-14,1e-14,1e-12]
 GRID_ATOL=[1e-8,1e-3,1e-6]
 RTOL=2e-10
+ADDRESS=re.compile(r'0x[0-9a-fA-F]+')
+
+def normalize_output(output):
+    """Drop ASLR-dependent load addresses from recorded source backtraces.
+
+    The frame count and the final diagnostic message are retained; only the
+    per-frame instruction addresses are replaced so that regenerating the
+    fixture in another process produces identical metadata.
+    """
+    return [ADDRESS.sub('0xADDR',line) for line in output]
+
+def normalize_result(result):
+    """Apply `normalize_output` to every recorded source output list."""
+    if isinstance(result,dict):
+        return {k:(normalize_output(v) if k=='output' and isinstance(v,list) else normalize_result(v)) for k,v in result.items()}
+    if isinstance(result,list):
+        return [normalize_result(v) for v in result]
+    return result
 
 def encode(record,mode):return '|'.join(['MBWR',record['source_name'],'0','0','0',mode])
 def native(cases):
@@ -32,9 +50,9 @@ def validate(directory):
             request=dict(mode='MBWR_INITIALIZATION',record_index=int(record['source_name'][6:]))
             result=oracle.call(request);key=encode(record,request['mode'])
             if 'undefined_source_initialization' in result:
-                undefined.append(dict(case=key,request=request,record=record['identifier'],result=result));continue
+                undefined.append(dict(case=key,request=request,record=record['identifier'],result=normalize_result(result)));continue
             if 'values' not in result or 'calculation_error' in result:
-                initial_errors.append(dict(case=key,request=request,result=result));continue
+                initial_errors.append(dict(case=key,request=request,result=normalize_result(result)));continue
             initial.append([key,*result['values']])
         for record in records():
             table=tables.get((record['kind'],record['identifier']))
@@ -48,7 +66,7 @@ def validate(directory):
                 key=encode(record,'MBWR_CRITICAL_GRID@'+','.join(map(str,values)))
                 result=oracle.call(request)
                 if 'values' not in result or 'calculation_error' in result:
-                    grid_errors.append(dict(case=key,request=request,result=result));continue
+                    grid_errors.append(dict(case=key,request=request,result=normalize_result(result)));continue
                 grid.append([key,*result['values']])
     subprocess.run(['cargo','build','--release','--example','parity'],cwd=ROOT,check=True)
     failures=[]

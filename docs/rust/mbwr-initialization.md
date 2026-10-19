@@ -91,6 +91,12 @@ cloning, coefficient-only availability after failure, unused-input independence,
 uninitialized source bounds and stagnant grid increments. Broader host/runtime
 rounding behavior is not a bitwise portability promise.
 
+Recorded source terminations keep their raw exit code and backtrace frame count,
+but the per-frame load addresses are replaced by a placeholder. Those addresses
+depend on address-space layout randomization, so retaining them would make the
+fixture metadata differ on every regeneration. Regenerating twice on the same
+baseline now produces byte-identical fixtures.
+
 The optional `meta_extrem` density branch, `MBWR_stableDensity`, full caloric,
 coexistence/flash and CSP integration remain pending within the full migration.
 

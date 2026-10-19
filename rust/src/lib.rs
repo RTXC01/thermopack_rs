@@ -30,6 +30,8 @@ pub mod numerics;
 pub mod pc_saft;
 pub mod pc_saft_data;
 pub mod pets;
+pub mod saft_vrmie;
+pub mod saft_vrmie_data;
 pub mod translation;
 
 pub use alpha::{Alpha, AlphaCorrelation, AlphaValue};
@@ -62,6 +64,11 @@ pub use pets::{
     Pets, PetsContributions, PetsDiameter, PetsEquilibrium, PetsEquilibriumTv, PetsTvProperties,
     PetsVolumeIteration, PreparedPets, PureCriticalPoint,
 };
+pub use saft_vrmie::{
+    PreparedSaftVrMie, SaftVrMie, SaftVrMieComponent, SaftVrMieHelmholtzTerms,
+    SaftVrMiePressureJet, SaftVrMieSaturation, SaftVrMieState,
+};
+pub use saft_vrmie_data::{SaftVrMieKijRecord, SaftVrMieLijRecord, SaftVrMieRecord};
 pub use translation::{TranslationKind, TranslationValue, VolumeTranslation};
 
 /// Gas constant [J/(mol K)], using the exact expression from ThermoPack.

@@ -49,6 +49,7 @@ pub use ideal::{EntropyReference, IdealGas, IdealProperties};
 pub use mbwr::{
     Mbwr, MbwrHelmholtzTerm, MbwrKind, MbwrPressure, MbwrRecord, PreparedMbwr, mbwr_records,
 };
+pub use mbwr::{MbwrResidualTp, MbwrTpDerivatives, MbwrTpQuantity};
 pub use pets::{
     Pets, PetsContributions, PetsDiameter, PetsEquilibrium, PetsEquilibriumTv, PetsTvProperties,
     PetsVolumeIteration, PreparedPets, PureCriticalPoint,

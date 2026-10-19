@@ -69,6 +69,9 @@ pub struct MbwrHelmholtzTerm {
 }
 #[path = "mbwr_data.rs"]
 mod data;
+#[path = "mbwr_properties.rs"]
+mod properties;
+pub use properties::{MbwrResidualTp, MbwrTpDerivatives, MbwrTpQuantity};
 pub fn mbwr_records() -> &'static [MbwrRecord] {
     data::RECORDS
 }
@@ -417,7 +420,27 @@ impl PreparedMbwr<'_> {
     pub fn baseline_residual_helmholtz(&self, v: f64, n: f64) -> Result<PureHelmholtz> {
         positive(v, "total volume")?;
         positive(n, "mole number")?;
-        self.baseline_residual_density(n / v)?.extensive(v, n)
+        let a = self.baseline_residual_density(n / v)?;
+        // Retain the original converter's arithmetic order. Algebraic
+        // rearrangement changes the cancellation artifacts in pure TP n responses.
+        let f = PureHelmholtz {
+            value: n * a.value,
+            dt: n * a.dt,
+            dv: -a.drho * n.powi(2) / (v * v),
+            dn: a.value + n / v * a.drho,
+            dtt: n * a.dtt,
+            dtv: -n.powi(2) / (v * v) * a.dtrho,
+            dtn: a.dt + n / v * a.dtrho,
+            dvv: n.powi(2) / (v * v * v) * (2. * a.drho + n / v * a.drhorho),
+            dvn: -(n / (v * v)) * (2. * a.drho + n / v * a.drhorho),
+            dnn: 2. / v * a.drho + n / v.powi(2) * a.drhorho,
+        };
+        if f.values().iter().any(|v| !v.is_finite()) {
+            return Err(Error::InvalidInput(
+                "non-finite baseline MBWR extensive derivatives",
+            ));
+        }
+        Ok(f)
     }
     pub fn baseline_pressure_tv(&self, v: f64, n: f64) -> Result<PurePressure> {
         let f = self.baseline_residual_helmholtz(v, n)?;

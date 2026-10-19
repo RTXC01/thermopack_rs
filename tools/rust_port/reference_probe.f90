@@ -385,3 +385,28 @@ subroutine query_mbwr_integrated(record,values) bind(C,name='query_mbwr_integrat
   values=0.0
   values(1:model%HelmLength)=model%redResHelmCoeff_redrhoT%N
 end subroutine query_mbwr_integrated
+
+subroutine query_mbwr_properties(record,t,v,n,rule,factor,values) bind(C,name='query_mbwr_properties')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use mbwr, only: eosmbwr
+  use mbwr_additional, only: MBWR_press,MBWR_Gres,MBWR_Hres,MBWR_Sres,MBWR_zfac,MBWR_lnphi
+  implicit none
+  integer(c_int),value :: record,rule
+  real(c_double),value :: t,v,n,factor
+  real(c_double),intent(out) :: values(18)
+  type(eosmbwr),save :: model
+  integer,save :: previous=0
+  real :: p
+  if (previous/=record) then
+    call initialize_mbwr_record(record,model)
+    previous=record
+  endif
+  call MBWR_press(model,t,v,n,p=p)
+  if (rule==1) p=abs(p)*factor+1000.0
+  values(1)=p
+  call MBWR_Gres(model,t,p,v,n,values(2))
+  call MBWR_Hres(model,t,p,v,n,values(3),values(4),values(5),values(6:6))
+  call MBWR_Sres(model,t,p,v,n,values(7),values(8),values(9),values(10:10))
+  call MBWR_zfac(model,t,p,v,n,values(11),values(12),values(13),values(14:14))
+  call MBWR_lnphi(model,t,p,v,n,values(15:15),values(16:16),values(17:17),values(18:18))
+end subroutine query_mbwr_properties

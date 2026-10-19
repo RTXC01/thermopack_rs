@@ -18,6 +18,11 @@ path = "rust/examples/cubic.rs"
 name = "parity"
 path = "rust/examples/parity.rs"
 
+[[test]]
+name = "mbwr_source_properties"
+path = "tests/mbwr_source_properties.rs"
+harness = false
+
 [[bench]]
 name = "cubic"
 path = "rust/benches/cubic.rs"

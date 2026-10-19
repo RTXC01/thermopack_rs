@@ -72,6 +72,8 @@ coefficient expressions and preserves their arithmetic tree. Gamma powers
 five/six use the original compiler's multiplication chains; a final coefficient
 ulp can otherwise be amplified by cancellation. All stored integrated
 coefficients compare exactly in the pinned reference qualification.
+The baseline extensive converter also retains the original n/V arithmetic
+order, which matters for tiny pure-fluid mole-response cancellation residues.
 
 Source-order thermal coefficients are initialized lazily inside a prepared
 state and reused across densities. The default stable pressure/integral path
@@ -112,6 +114,8 @@ This stage does not provide MBWR ideal/full caloric state functions, density
 iteration, critical metadata/search, saturation, flashes or CSP reference-fluid
 integration. Those remain pending within the full ThermoPack migration. No
 MBWR speedup is claimed before a dedicated native-loop benchmark.
+Residual G/H/S/Z/lnphi and physical/source TP responses have separate
+[state-function qualification](mbwr-properties.md).
 
 ```
 python tools/rust_port/generate_mbwr_data.py

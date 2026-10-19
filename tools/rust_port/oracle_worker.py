@@ -65,6 +65,8 @@ def load_probe():
     probe.query_mbwr.restype=None
     probe.query_mbwr_integrated.argtypes=[c_int,POINTER(c_double)]
     probe.query_mbwr_integrated.restype=None
+    probe.query_mbwr_properties.argtypes=[c_int,c_double,c_double,c_double,c_int,c_double,POINTER(c_double)]
+    probe.query_mbwr_properties.restype=None
     return probe
 
 
@@ -77,7 +79,11 @@ def main(compiler_directory):
         if request['mode'].startswith('MBWR_'):
             if probe is None:probe=load_probe()
             record=request['record_index']
-            if request['mode']=='MBWR_INTEGRATED':
+            if request['mode']=='MBWR_TP_PROPERTIES':
+                output=(c_double*18)();probe.query_mbwr_properties(record,request['temperature'],request['volume'],request['moles'],
+                    int(request.get('off_eos',False)),request.get('pressure_factor',1.),output)
+                values=list(map(float,output))
+            elif request['mode']=='MBWR_INTEGRATED':
                 output=(c_double*40)();probe.query_mbwr_integrated(record,output)
                 values=list(map(float,output))[:40 if record<=11 else 22]
             elif request['mode']=='MBWR_PARAMETERS':

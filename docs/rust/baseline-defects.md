@@ -179,3 +179,16 @@ Native `baseline_residual_density`, `baseline_residual_helmholtz` and
 summation order. All 6760 source-order states match without loosening the
 stable-path tolerances. See [MBWR formulation and qualification](mbwr.md) for
 the exact coefficient checks, zero-density extension and remaining interfaces.
+
+## MBWR entropy pressure-response signs
+
+`MBWR_Sres` computes `P_V=-R*(T*F_VV-n*T/V^2)` and
+`P_n=-R*(T*F_Vn+T/V)`. These differ from the physical pressure derivatives
+used in `MBWR_Hres`, `MBWR_zfac` and `MBWR_lnphi`. In the ideal-coefficient
+limit, its residual entropy value is zero but its T/P responses become
+`-2*n*R/T` and `2*V/T`, instead of zero.
+
+`Mbwr::baseline_residual_tp` preserves those source expressions.
+`residual_tp` uses physical pressure response and verifies S_T=H_T/T against
+independent finite differences. See [MBWR state functions](mbwr-properties.md)
+for scope, derivative singularities and source snapshot execution context.

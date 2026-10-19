@@ -92,6 +92,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if fields[0] == "MBWR" {
             let model = thermopack_rs::Mbwr::from_record(fields[1])?;
             let result = (|| -> thermopack_rs::Result<Vec<f64>> {
+                if fields[5].starts_with("MBWR_TP_PROPERTIES@") {
+                    let p = fields[5].split('@').nth(1).unwrap().parse().unwrap();
+                    let t = fields[2].parse().unwrap();
+                    let v = fields[3].parse().unwrap();
+                    let n = fields[4].parse().unwrap();
+                    let state = model.baseline_residual_tp(t, p, v, n)?;
+                    let mut values = vec![state.pressure, state.gibbs_energy];
+                    for q in [
+                        state.enthalpy,
+                        state.entropy,
+                        state.compressibility,
+                        state.ln_fugacity_coefficient,
+                    ] {
+                        let d = q.derivatives.ok_or(thermopack_rs::Error::NotConverged(
+                            "singular residual TP response",
+                        ))?;
+                        values.extend([q.value, d.dt, d.dp, d.dn]);
+                    }
+                    return Ok(values);
+                }
                 if fields[5] == "MBWR_INTEGRATED" {
                     return Ok(model
                         .baseline_helmholtz_terms()

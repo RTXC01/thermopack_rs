@@ -80,5 +80,7 @@ The [PeTS root measurements](pets-root-performance.md) distinguish fresh,
 prepared and source-iteration paths and identify branch-discovery overhead.
 The [MBWR kernel notes](mbwr.md) cover all stored Bender/MBWR32 fits, pressure,
 residual derivatives, source summation fidelity and the stable integral path.
+The [MBWR state-function notes](mbwr-properties.md) cover residual G/H/S/Z/lnphi,
+physical/source TP responses, entropy signs and raw-rounding test context.
 Regenerate inventory with
 `python tools/rust_port/inventory.py`.

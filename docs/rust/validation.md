@@ -38,6 +38,7 @@ python tools/rust_port/validate_pets_equilibrium.py
 python tools/rust_port/validate_pets_flash.py
 python tools/rust_port/validate_pets_isochoric.py
 python tools/rust_port/validate_mbwr.py
+python tools/rust_port/validate_mbwr_properties.py
 python tools/rust_port/benchmark_isochoric.py --compiler /path/to/gfortran --preflight-only
 python tools/rust_port/benchmark_isochoric.py --compiler /path/to/gfortran --tcpr --preflight-only
 python tools/rust_port/validate_ideal.py
@@ -165,6 +166,12 @@ calls are finite. Source-order methods match the full matrix; the separate
 stable integral has 318 recorded summation differences at extreme dilute,
 cryogenic extrapolations. Independent tests verify finite differences,
 Helmholtz pressure identities, Euler/scaling and analytic zero-density limits.
+The [MBWR residual-state qualification](mbwr-properties.md) adds 5983 finite
+state-function results with 18 outputs, retaining 1817 nonpositive-pressure
+source results. Original entropy response signs and raw mole-response residues
+are compared explicitly; the source-snapshot executable uses process-main
+context to match the oracle's Windows CRT math behavior. Physical finite-
+difference checks run on normal test workers.
 The [PeTS flash qualification](pets-flash.md) adds 923 finite/closing TP/PH/PS
 states from 1035 source attempts, retaining 112 failed/nonclosing calls.
 Saturated endpoints use an explicit physical-state comparison convention;

@@ -7,6 +7,8 @@ The original Fortran/Python implementation is retained as the reference.
 65 stored fits. It offers stable integrals and explicit source-order methods;
 see [MBWR scope and qualification](../docs/rust/mbwr.md). Full MBWR density,
 caloric, critical and flash integration remains pending.
+Its [residual TP state functions](../docs/rust/mbwr-properties.md) now provide
+G/H/S/Z/lnphi and local TP responses, with explicit source-compatible methods.
 
 ```
 cargo test --all-targets

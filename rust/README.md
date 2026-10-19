@@ -5,10 +5,13 @@ The original Fortran/Python implementation is retained as the reference.
 
 `Mbwr` provides MBWR-19/32 pressure and residual Helmholtz kernels with all
 65 stored fits. It offers stable integrals and explicit source-order methods;
-see [MBWR scope and qualification](../docs/rust/mbwr.md). Full MBWR density,
-caloric, critical and flash integration remains pending.
+see [MBWR scope and qualification](../docs/rust/mbwr.md).
 Its [residual TP state functions](../docs/rust/mbwr-properties.md) now provide
 G/H/S/Z/lnphi and local TP responses, with explicit source-compatible methods.
+[Bounded pressure branches and critical points](../docs/rust/mbwr-equilibrium.md)
+and [source density iteration](../docs/rust/mbwr-density.md) have separate APIs
+and qualifications. Full MBWR initialization, caloric and flash/CSP integration
+remain pending.
 
 ```
 cargo test --all-targets
@@ -91,7 +94,7 @@ See [numerical differences](../docs/rust/baseline-defects.md).
 
 See [validation](../docs/rust/validation.md),
 [benchmarks](../docs/rust/performance.md) and the
-[migration design](../docs/rust/README.md). SAFT, mu-T flashes, phase envelopes,
+[migration design](../docs/rust/README.md). Remaining SAFT capabilities, mu-T flashes, phase envelopes,
 solids/hydrates and existing language-interface compatibility remain pending.
 
 Regenerate data with `python tools/rust_port/generate_data.py`.

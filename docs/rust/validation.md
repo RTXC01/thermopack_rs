@@ -177,6 +177,11 @@ The [MBWR equilibrium qualification](mbwr-equilibrium.md) adds 65 metadata rows,
 source density iterates that belong to native bounded root sets. Fifty unqualified
 source returns and 60 requested-phase selection differences are retained. This
 qualifies root membership, not full source phase-selection or trajectory fidelity.
+The [MBWR source density qualification](mbwr-density.md) separately compares
+8839 finite raw iterates and exact phase flags across all 65 fits, retaining 438
+unclosed source returns in the comparison and recording one source NaN/native
+error. Explicit initialization, including synthetic metadata for 17 legacy fits,
+and original default-initializer limitations are documented.
 The [PeTS flash qualification](pets-flash.md) adds 923 finite/closing TP/PH/PS
 states from 1035 source attempts, retaining 112 failed/nonclosing calls.
 Saturated endpoints use an explicit physical-state comparison convention;

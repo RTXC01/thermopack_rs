@@ -117,6 +117,8 @@ Bounded physical pressure roots and critical points have separate
 MBWR speedup is claimed before a dedicated native-loop benchmark.
 Residual G/H/S/Z/lnphi and physical/source TP responses have separate
 [state-function qualification](mbwr-properties.md).
+The [source density qualification](mbwr-density.md) covers raw last iterates,
+phase switches and both fallbacks with explicit initialization.
 
 ```
 python tools/rust_port/generate_mbwr_data.py

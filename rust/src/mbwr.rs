@@ -74,6 +74,11 @@ mod equilibrium;
 #[path = "mbwr_properties.rs"]
 mod properties;
 pub use equilibrium::MbwrEquilibrium;
+#[path = "mbwr_density.rs"]
+mod density;
+pub use density::{
+    MbwrDensityIteration, MbwrDensityParameters, MbwrDensityPath, PreparedMbwrDensity,
+};
 pub use properties::{MbwrResidualTp, MbwrTpDerivatives, MbwrTpQuantity};
 pub fn mbwr_records() -> &'static [MbwrRecord] {
     data::RECORDS

@@ -68,6 +68,7 @@ jobs:
       - run: python tools/rust_port/validate_mbwr.py
       - run: python tools/rust_port/validate_mbwr_properties.py
       - run: python tools/rust_port/validate_mbwr_equilibrium.py
+      - run: python tools/rust_port/validate_mbwr_density.py
       - run: python tools/rust_port/benchmark_pets_roots.py --compiler /usr/bin/gfortran-13 --preflight-only
       - run: python tools/rust_port/benchmark_isochoric.py --compiler /usr/bin/gfortran-13 --preflight-only
       - run: python tools/rust_port/benchmark_isochoric.py --compiler /usr/bin/gfortran-13 --tcpr --preflight-only

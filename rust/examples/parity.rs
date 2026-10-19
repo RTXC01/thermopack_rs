@@ -93,6 +93,39 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if fields[0] == "MBWR" {
             let model = thermopack_rs::Mbwr::from_record(fields[1])?;
             let result = (|| -> thermopack_rs::Result<Vec<f64>> {
+                if fields[5].starts_with("MBWR_DENSITY@") {
+                    let a: Vec<f64> = fields[5]
+                        .split('@')
+                        .nth(1)
+                        .unwrap()
+                        .split(',')
+                        .map(|s| s.parse().unwrap())
+                        .collect();
+                    let parameters =
+                        thermopack_rs::MbwrDensityParameters::new(a[0], a[1], a[2], a[3])?;
+                    let phase = if fields[4] == "L" {
+                        Phase::Liquid
+                    } else {
+                        Phase::Vapor
+                    };
+                    let result = model.baseline_density(
+                        fields[2].parse().unwrap(),
+                        fields[3].parse().unwrap(),
+                        phase,
+                        parameters,
+                    )?;
+                    return Ok(vec![
+                        result.density,
+                        if result.phase == Phase::Liquid {
+                            1.
+                        } else {
+                            2.
+                        },
+                        result.pressure,
+                        result.pressure_density_derivative,
+                        result.path as u8 as f64,
+                    ]);
+                }
                 if fields[5] == "MBWR_METADATA" {
                     let mut values = vec![0.; 8];
                     if let Some(c) = model.source_critical_point() {

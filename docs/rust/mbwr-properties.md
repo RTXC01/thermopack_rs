@@ -85,8 +85,10 @@ G_T=-S, G_P=V-nRT/P, H-TS=G, G=nRT*ln(phi), extensive scaling and perfect-gas
 limits. A custom singular EOS tests retained values/optional responses.
 Their local Newton helper is test-only. Bounded physical density roots and
 critical points have separate [equilibrium qualification](mbwr-equilibrium.md).
-Source density-iteration fidelity, ideal/full caloric properties and flash/CSP
-integration remain pending. No new speedup is claimed here.
+The [source density API](mbwr-density.md) separately qualifies raw last iterates
+and phase choices with explicit initialization. Full initialization, inner
+trajectory identity, ideal/full caloric properties and flash/CSP integration
+remain pending. No new speedup is claimed here.
 
 ```
 python tools/rust_port/validate_mbwr_properties.py --compiler-directory /path/to/compiler/bin

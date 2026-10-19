@@ -27,6 +27,8 @@ mod hydrogen;
 pub mod ideal;
 pub mod mbwr;
 pub mod numerics;
+pub mod pc_saft;
+pub mod pc_saft_data;
 pub mod pets;
 pub mod translation;
 
@@ -51,6 +53,11 @@ pub use mbwr::{
     mbwr_records,
 };
 pub use mbwr::{MbwrResidualTp, MbwrTpDerivatives, MbwrTpQuantity};
+pub use pc_saft::{
+    PcSaft, PcSaftComponent, PcSaftKind, PcSaftPressureJet, PcSaftSaturation, PcSaftState,
+    PreparedPcSaft,
+};
+pub use pc_saft_data::{PcSaftKijRecord, PcSaftRecord};
 pub use pets::{
     Pets, PetsContributions, PetsDiameter, PetsEquilibrium, PetsEquilibriumTv, PetsTvProperties,
     PetsVolumeIteration, PreparedPets, PureCriticalPoint,

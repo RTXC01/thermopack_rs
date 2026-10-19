@@ -84,5 +84,7 @@ The [MBWR state-function notes](mbwr-properties.md) cover residual G/H/S/Z/lnphi
 physical/source TP responses, entropy signs and raw-rounding test context.
 The [MBWR equilibrium notes](mbwr-equilibrium.md) cover bounded pressure branches,
 derivative-hierarchy spinodals, stored critical metadata and analytic critical points.
+The [PC-SAFT notes](pc-saft.md) cover PC-SAFT and sPC-SAFT Helmholtz kernels,
+Lorentz-Berthelot combining rules, bounded pressure-volume branches and pure coexistence.
 Regenerate inventory with
 `python tools/rust_port/inventory.py`.

@@ -19,6 +19,8 @@ pub mod alpha;
 pub mod beta;
 pub mod caloric;
 pub mod component;
+pub mod cpa;
+pub mod cpa_data;
 pub mod cubic;
 mod error;
 pub mod flash;
@@ -40,6 +42,10 @@ pub use caloric::{
     CaloricFlashOptions, EquilibriumProperties, EquilibriumResponse, VolumeFlashOptions,
 };
 pub use component::{Component, component, components};
+pub use cpa::{
+    Cpa, CpaComponent, CpaCubicKind, CpaPressureJet, CpaSaturation, CpaState, PreparedCpa,
+};
+pub use cpa_data::{AssocScheme, CpaBinaryRecord, CpaPureRecord};
 pub use cubic::{
     Cubic, CubicKind, CubicOptions, Phase, PreparedState, Pressure, PseudoCritical, Residual,
     Saturation, TvProperties,

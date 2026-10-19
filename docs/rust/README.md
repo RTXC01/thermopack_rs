@@ -88,5 +88,7 @@ The [PC-SAFT notes](pc-saft.md) cover PC-SAFT and sPC-SAFT Helmholtz kernels,
 Lorentz-Berthelot combining rules, bounded pressure-volume branches and pure coexistence.
 The [SAFT-VR Mie notes](saft-vrmie.md) cover SAFT-VR Mie and SAFT-VRQ Mie Helmholtz kernels,
 Barker-Henderson numerical quadrature, BMCSL reference, exact contact RDF derivation and mixture scaling.
+The [CPA notes](cpa.md) cover the Cubic-Plus-Association equation of state, Wertheim multi-site association,
+simplified contact RDF, quadratic closed branches and non-associating component mixing conventions.
 Regenerate inventory with
 `python tools/rust_port/inventory.py`.

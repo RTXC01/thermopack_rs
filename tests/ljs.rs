@@ -125,6 +125,21 @@ fn the_state_matches_the_source() {
 }
 
 #[test]
+fn the_volume_solve_returns_a_state_of_the_pressure() {
+    let model = LjsBh::new();
+    for (temperature, pressure) in [(100.0, 1.0e5), (150.0, 1.0e6), (200.0, 5.0e6)] {
+        let volume = model
+            .volume(temperature, pressure, thermopack_rs::Phase::Vapor)
+            .unwrap();
+        let (value, _) = model.pressure(temperature, volume, 1.0).unwrap();
+        assert!(
+            (value - pressure).abs() <= 1.0e-6 * pressure.abs(),
+            "{temperature} K: {value} against {pressure}"
+        );
+    }
+}
+
+#[test]
 fn the_caloric_state_matches_the_source() {
     let model = LjsBh::new();
     let mut checked = 0;

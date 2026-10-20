@@ -12,7 +12,8 @@
 //! perturbation terms and the Barker-Henderson diameter, and it prepares the
 //! parameters of the model.
 
-use crate::error::Result;
+use crate::Phase;
+use crate::error::{Error, Result};
 
 /// The polynomial coefficients of the source, in the order of the source
 /// array. The source stores them in a four by fifteen array, and the first
@@ -234,6 +235,56 @@ impl LjsBh {
     pub fn fugacity_coefficient(&self, temperature: f64, volume: f64, moles: f64) -> Result<f64> {
         let (energy, _, mole_derivative) = self.energy_derivatives(temperature, volume, moles)?;
         Ok(energy + moles * mole_derivative)
+    }
+
+    /// The molar volume of the model at a temperature and a pressure.
+    ///
+    /// The phase selects the liquid branch, which has the smaller molar
+    /// volume, and the vapor branch, which has the larger molar volume. The
+    /// solve brackets the pressure difference on a logarithmic grid of molar
+    /// volumes and refines the bracket with a bisection.
+    pub fn volume(&self, temperature: f64, pressure: f64, phase: Phase) -> Result<f64> {
+        crate::error::positive(temperature, "the LJS temperature")?;
+        crate::error::positive(pressure, "the LJS pressure")?;
+        let lower: f64 = 1.0e-8;
+        let upper: f64 = 1.0e2;
+        // The pressure of the state grows with the volume far from the
+        // critical region, so the grid brackets the roots of the difference.
+        let mut points = Vec::with_capacity(256);
+        let mut volumes = Vec::with_capacity(256);
+        for index in 0..256 {
+            let volume = lower * (upper / lower).powf(index as f64 / 255.0);
+            let value = self.pressure(temperature, volume, 1.0)?.0 - pressure;
+            points.push(value);
+            volumes.push(volume);
+        }
+        let mut roots = Vec::new();
+        for index in 0..points.len() - 1 {
+            if points[index] == 0.0 {
+                roots.push(volumes[index]);
+            } else if points[index].signum() != points[index + 1].signum() {
+                let mut low = volumes[index];
+                let mut high = volumes[index + 1];
+                for _ in 0..200 {
+                    let middle = 0.5 * (low + high);
+                    let value = self.pressure(temperature, middle, 1.0)?.0 - pressure;
+                    if value.signum() == points[index].signum() {
+                        low = middle;
+                    } else {
+                        high = middle;
+                    }
+                }
+                roots.push(0.5 * (low + high));
+            }
+        }
+        match phase {
+            Phase::Liquid => roots.first().copied().ok_or(Error::NotConverged(
+                "the liquid volume of the splined Lennard-Jones model",
+            )),
+            _ => roots.last().copied().ok_or(Error::NotConverged(
+                "the vapor volume of the splined Lennard-Jones model",
+            )),
+        }
     }
 
     /// The state of the model at a temperature and a volume.

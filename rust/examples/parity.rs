@@ -102,6 +102,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             && fields[0] != "LJSSTATE"
             && fields[0] != "LJSFUGACITY"
             && fields[0] != "LJSCALORIC"
+            && fields[0] != "LJSVOLUME"
             && fields[0] != "CRITICAL"
             && fields.len() != 6
         {
@@ -125,6 +126,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "{:.17e},{:.17e},{:.17e}",
                 point.temperature, point.volume, point.pressure
             );
+            continue;
+        }
+        if fields[0] == "LJSVOLUME" {
+            let temperature: f64 = fields[1].parse().unwrap();
+            let pressure: f64 = fields[2].parse().unwrap();
+            let phase = match fields[3].parse::<i32>().unwrap() {
+                2 => Phase::Vapor,
+                _ => Phase::Liquid,
+            };
+            let model = thermopack_rs::ljs::LjsBh::new();
+            let volume = model.volume(temperature, pressure, phase)?;
+            println!("{:.17e}", volume);
             continue;
         }
         if fields[0] == "LJSCALORIC" {

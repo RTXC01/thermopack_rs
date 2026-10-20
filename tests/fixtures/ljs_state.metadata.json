@@ -132,7 +132,7 @@
   "cases": 8,
   "attempted_cases": 8,
   "generator": "tools/rust_port/validate_ljs_state.py",
-  "fixture_sha256": "f7b3ce9c1b3c865140cf625e5db12bf3a06c2f7c5ff386642fbecdd14623d32b",
+  "fixture_sha256": "fedcc7750ef2d46643c0052b044e3cbfd6bdabc61bcf117d2e87031d434426cc",
   "quantities": [
     "volume",
     "compressibility"

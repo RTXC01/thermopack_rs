@@ -69,6 +69,7 @@ def main(directory):
             continue
         volume = expected["values"][0]
         lines.append(f"LJSSTATE|{temperature:.17e}|{volume:.17e}|1.0")
+        lines.append(f"LJSVOLUME|{temperature:.17e}|{pressure:.17e}|{phase}")
     native_values = native(lines)
 
     failures = []
@@ -81,7 +82,8 @@ def main(directory):
             failures.append(dict(case=label, reason="source did not report values", detail=expected))
             continue
         source_volume, source_compressibility = expected["values"]
-        actual = native_values[index]
+        actual = native_values[2 * index]
+        native_volume = native_values[2 * index + 1][0]
         index += 1
         if isinstance(actual, str):
             failures.append(dict(case=label, reason="native error", native=actual))
@@ -110,12 +112,14 @@ def main(directory):
                 )
             )
             continue
-        rows.append([label, source_volume, source_compressibility, native_pressure])
+        rows.append([label, source_volume, source_compressibility, native_pressure, native_volume])
 
     path = ROOT / "tests/fixtures/ljs_state.csv"
     with path.open("w", newline="") as handle:
         writer = csv.writer(handle, delimiter=";", lineterminator="\n")
-        writer.writerow(["case", "volume", "compressibility", "native_pressure"])
+        writer.writerow(
+            ["case", "volume", "compressibility", "native_pressure", "native_volume"]
+        )
         for row in rows:
             writer.writerow(
                 [
@@ -123,6 +127,7 @@ def main(directory):
                     f"{row[1]:.17e}",
                     f"{row[2]:.17e}",
                     f"{row[3]:.17e}",
+                    f"{row[4]:.17e}",
                 ]
             )
     metadata = json.loads((ROOT / ".reference/metadata.json").read_text())

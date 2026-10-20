@@ -21,6 +21,7 @@ second order term.
 | `src/lj_splined.f90:calcFresLJs_bh` (temperature derivative) | `ljs::LjsBh::residual_helmholtz_energy_derivative` |
 | `src/lj_splined.f90:calcFresLJs_bh` (mole number derivative) | `ljs::LjsBh::fugacity_coefficient` |
 | `src/lj_splined.f90:calcFresLJs_bh` (state functions) | `ljs::LjsBh::state` |
+| `src/lj_splined.f90:specific_volume` | `ljs::LjsBh::volume` (native) |
 
 The native model provides the reduced perturbation terms and the reduced
 Barker-Henderson hard-sphere diameter, the polynomials of the spline with
@@ -156,8 +157,18 @@ The committed fixture is `tests/fixtures/ljs_caloric.csv`; the test is
 
 ## Remaining scope
 
-* The fugacity of a state and the volume solve of the model are not yet
-  ported.
+* The volume solve of the model is native. The pressure of the model falls
+  with the molar volume over parts of the range, because the source scales the
+  perturbation terms with the well depth and the temperature, and the isotherm
+  therefore has more than one crossing with a pressure. The original solves
+  the volume with a bracketed solver that starts from the volume of the
+  saturation state or from the ideal gas volume, and it selects one of the
+  crossings. The native model brackets the crossings on a logarithmic grid and
+  takes the smallest one for the liquid phase and the largest one for the vapor
+  phase, which can be another crossing than the original picks.
+* The WCA and the UV variants of the source, the hard-sphere reference of the
+  White Bear family and the convolution of the fundamental measure theory are
+  not yet ported.
 * The WCA and the UV variants of the source, the hard-sphere reference of the
   White Bear family and the convolution of the fundamental measure theory are
   not yet ported.

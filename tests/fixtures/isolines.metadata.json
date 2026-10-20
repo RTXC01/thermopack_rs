@@ -129,12 +129,13 @@
     "complexmodelinit": "6ffae447c3e2be271d9720f3b5217bebf669fa879cf9291be7f5d0a407a96b41",
     "external": "e57f6391c43791ae80fde558f66d9c39ed40b3d3b27859579fc11d3ef0c97f9d"
   },
-  "cases": 80,
-  "curves": 9,
-  "attempted_curves": 9,
+  "cases": 101,
+  "curves": 13,
+  "attempted_curves": 13,
   "generator": "tools/rust_port/validate_isolines.py",
-  "fixture_sha256": "6e15731c389ed329e3ef0c1e2c455b520da2a27c893fd56353b623a8e982ba1c",
+  "fixture_sha256": "f3987a90909dee373265265a85e70caffda14c80ce89338ce88b5a372d940122",
   "quantities": [
+    "temperature",
     "pressure",
     "volume",
     "entropy",
@@ -142,6 +143,6 @@
   ],
   "relative_tolerance": 1e-06,
   "absolute_tolerance": 1e-09,
-  "worst_relative_difference": 8.913436018231918e-10,
+  "worst_relative_difference": 1.4193346835182225e-09,
   "convention": "the original isotherm and isobar of src/isolines.f90; the fixture holds the prescribed variable of every point, which is the pressure of an isotherm and the temperature of an isobar, and the source reports the molar volume, the molar entropy and the molar enthalpy of the same points"
 }

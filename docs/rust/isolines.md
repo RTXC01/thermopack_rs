@@ -10,13 +10,12 @@ isenthalp and an isentrope.
 | --- | --- |
 | `src/isolines.f90:isotherm` | `isolines::isotherm` |
 | `src/isolines.f90:isobar` | `isolines::isobar` |
-| `src/isolines.f90:isenthalp` | not yet ported |
-| `src/isolines.f90:isentrope` | not yet ported |
+| `src/isolines.f90:isenthalp` | `isolines::isenthalp` |
+| `src/isolines.f90:isentrope` | `isolines::isentrope` |
 
 The isenthalp and the isentrope of the original solve a pressure-enthalpy and
-a pressure-entropy flash at every point of the grid. The native model has no
-pressure-enthalpy and no pressure-entropy flash, so those two lines are not
-yet ported.
+a pressure-entropy flash at every point of the grid. The native model uses its
+own pressure-enthalpy and pressure-entropy flash for the same purpose.
 
 ## Method
 
@@ -34,6 +33,20 @@ and the count is reduced by one when it exceeds half of the grid. The
 saturation state of the original is the bubble point of the pure fluid, and
 the native model uses its fixed composition saturation solve.
 
+The isenthalp and the isentrope run a caloric flash at every point of the
+pressure grid. The first point starts at the mean of the temperature limits
+and every following point starts at the temperature of the previous point, as
+in the original. The original drops the points that the flash cannot solve,
+and the native model drops them as well.
+
+## Unreachable specifications
+
+The original reports the temperature limit of the flash when the caloric
+specification lies outside the range that the temperature limits allow, and
+it keeps that point in the line. The native model drops such a point, because
+the limit is not a solution of the specification. The qualification therefore
+uses the specifications that the whole pressure range can reach.
+
 ## The single point grid defect
 
 The original `linspace` divides by the number of intervals, so a grid of one
@@ -49,14 +62,15 @@ qualification compares the not-a-number values of both.
 exact-source library. The oracle calls the Python interface of the fork,
 which reaches the original routines.
 
-* 9 cases: isotherms and isobars of methane and of carbon dioxide in the
-  Peng-Robinson and the Soave-Redlich-Kwong equations of state, and isotherms
-  and an isobar of the methane-propane and the methane-carbon dioxide
-  mixtures.
-* The compared quantities are the pressure or the temperature of the point,
-  the molar volume, the molar entropy and the molar enthalpy. All 9 cases
-  match with a relative tolerance of 1e-6, and the observed worst relative
-  difference is 8.9e-10. The difference is the saturation state of the
+* 13 cases: isotherms and isobars of methane and of carbon dioxide in the
+  Peng-Robinson and the Soave-Redlich-Kwong equations of state, isotherms and
+  an isobar of the methane-propane and the methane-carbon dioxide mixtures,
+  and the isenthalp and the isentrope of methane and of the methane-propane
+  mixture.
+* The compared quantities are the temperature, the pressure, the molar volume,
+  the molar entropy and the molar enthalpy of every point. All 13 cases match
+  with a relative tolerance of 1e-6, and the observed worst relative
+  difference is 1.4e-9. The difference is the saturation state of the
   original and of the native model, which agree to a relative 1e-8.
 
 The committed fixture is `tests/fixtures/isolines.csv`; the test is
@@ -64,8 +78,6 @@ The committed fixture is `tests/fixtures/isolines.csv`; the test is
 
 ## Remaining scope
 
-* The isenthalp and the isentrope need the pressure-enthalpy and the
-  pressure-entropy flash.
 * The saturation-line crossing of the original, which inserts the saturation
   point into a mixture grid, is inactive in the original, because the number
   of points of the grid is never reduced there.

@@ -110,14 +110,46 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let specification: f64 = fields[4].parse().unwrap();
             let minimum: f64 = fields[5].parse().unwrap();
             let maximum: f64 = fields[6].parse().unwrap();
-            let points: usize = fields[7].parse().unwrap();
+            let (lower, upper, points) = if fields.len() > 9 {
+                (
+                    fields[7].parse().unwrap(),
+                    fields[8].parse().unwrap(),
+                    fields[9].parse().unwrap(),
+                )
+            } else {
+                (0.0, 0.0, fields[7].parse().unwrap())
+            };
             let model = thermopack_rs::Cubic::new(kind, &components)?;
-            let line = match fields[8] {
+            let line = match fields[fields.len() - 1] {
                 "isobar" => thermopack_rs::isolines::isobar(
                     &model,
                     specification,
                     minimum,
                     maximum,
+                    &composition,
+                    points,
+                )?,
+                "isenthalp" => thermopack_rs::isolines::isenthalp(
+                    &model,
+                    thermopack_rs::isolines::CaloricLine {
+                        specification,
+                        minimum_pressure: minimum,
+                        maximum_pressure: maximum,
+                        minimum_temperature: lower,
+                        maximum_temperature: upper,
+                    },
+                    &composition,
+                    points,
+                )?,
+                "isentrope" => thermopack_rs::isolines::isentrope(
+                    &model,
+                    thermopack_rs::isolines::CaloricLine {
+                        specification,
+                        minimum_pressure: minimum,
+                        maximum_pressure: maximum,
+                        minimum_temperature: lower,
+                        maximum_temperature: upper,
+                    },
                     &composition,
                     points,
                 )?,

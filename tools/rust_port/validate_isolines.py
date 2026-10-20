@@ -16,21 +16,25 @@ from reference import ROOT, ReferenceProcess
 
 # The cases: the line, the equation of state, the components, the composition,
 # the prescribed variable, the limits of the other variable and the number of
-# points.
+# points. The isenthalp and the isentrope add the temperature limits.
 CASES = [
-    ("isotherm", "PR", ["C1"], [1.0], 150.0, 1.0e5, 1.0e7, 10),
-    ("isotherm", "PR", ["C1"], [1.0], 250.0, 1.0e5, 1.0e7, 10),
-    ("isotherm", "PR", ["CO2"], [1.0], 250.0, 5.0e5, 2.0e7, 12),
-    ("isotherm", "SRK", ["CO2"], [1.0], 280.0, 1.0e6, 1.5e7, 8),
-    ("isobar", "PR", ["C1"], [1.0], 1.0e6, 120.0, 190.0, 8),
-    ("isobar", "PR", ["CO2"], [1.0], 5.0e6, 240.0, 300.0, 8),
-    ("isotherm", "PR", ["C1", "C3"], [0.5, 0.5], 250.0, 1.0e5, 1.0e7, 8),
-    ("isotherm", "PR", ["C1", "CO2"], [0.7, 0.3], 220.0, 1.0e5, 2.0e7, 8),
-    ("isobar", "PR", ["C1", "C3"], [0.5, 0.5], 2.0e6, 180.0, 280.0, 8),
+    ("isotherm", "PR", ["C1"], [1.0], 150.0, 1.0e5, 1.0e7, 10, None, None),
+    ("isotherm", "PR", ["C1"], [1.0], 250.0, 1.0e5, 1.0e7, 10, None, None),
+    ("isotherm", "PR", ["CO2"], [1.0], 250.0, 5.0e5, 2.0e7, 12, None, None),
+    ("isotherm", "SRK", ["CO2"], [1.0], 280.0, 1.0e6, 1.5e7, 8, None, None),
+    ("isobar", "PR", ["C1"], [1.0], 1.0e6, 120.0, 190.0, 8, None, None),
+    ("isobar", "PR", ["CO2"], [1.0], 5.0e6, 240.0, 300.0, 8, None, None),
+    ("isotherm", "PR", ["C1", "C3"], [0.5, 0.5], 250.0, 1.0e5, 1.0e7, 8, None, None),
+    ("isotherm", "PR", ["C1", "CO2"], [0.7, 0.3], 220.0, 1.0e5, 2.0e7, 8, None, None),
+    ("isobar", "PR", ["C1", "C3"], [0.5, 0.5], 2.0e6, 180.0, 280.0, 8, None, None),
+    ("isenthalp", "PR", ["C1"], [1.0], -78000.0, 1.0e5, 1.0e7, 8, 150.0, 250.0),
+    ("isenthalp", "PR", ["CO2"], [1.0], -395800.0, 5.0e5, 1.5e7, 8, 220.0, 300.0),
+    ("isentrope", "PR", ["C1"], [1.0], 165.0, 1.0e5, 5.0e5, 8, 150.0, 250.0),
+    ("isentrope", "PR", ["C1", "C3"], [0.5, 0.5], 160.0, 1.0e5, 1.0e7, 8, 180.0, 280.0),
 ]
-# The quantities that are compared: the pressure or the temperature of the
-# point, the molar volume, the molar entropy and the molar enthalpy.
-QUANTITIES = ["pressure", "volume", "entropy", "enthalpy"]
+# The quantities that are compared: the temperature, the pressure, the molar
+# volume, the molar entropy and the molar enthalpy of every point.
+QUANTITIES = ["temperature", "pressure", "volume", "entropy", "enthalpy"]
 RTOL = 1e-6
 ATOL = 1e-9
 
@@ -55,27 +59,29 @@ def close(source, native):
 
 def main(directory):
     lines = []
-    for line, eos, components, composition, value, minimum, maximum, points in CASES:
-        lines.append(
-            "|".join(
-                [
-                    "ISOLINE",
-                    eos,
-                    ",".join(components),
-                    ",".join(f"{item:.17e}" for item in composition),
-                    f"{value:.17e}",
-                    f"{minimum:.17e}",
-                    f"{maximum:.17e}",
-                    str(points),
-                    line,
-                ]
-            )
-        )
+    for case in CASES:
+        line, eos, components, composition, value, minimum, maximum, points, tmin, tmax = case
+        fields = [
+            "ISOLINE",
+            eos,
+            ",".join(components),
+            ",".join(f"{item:.17e}" for item in composition),
+            f"{value:.17e}",
+            f"{minimum:.17e}",
+            f"{maximum:.17e}",
+        ]
+        if tmin is None:
+            fields.append(str(points))
+        else:
+            fields.extend([f"{tmin:.17e}", f"{tmax:.17e}", str(points)])
+        fields.append(line)
+        lines.append("|".join(fields))
     native_values = native(lines)
 
     with ReferenceProcess(directory) as oracle:
         reference_values = []
-        for line, eos, components, composition, value, minimum, maximum, points in CASES:
+        for case in CASES:
+            line, eos, components, composition, value, minimum, maximum, points, tmin, tmax = case
             request = {
                 "mode": "ISOLINE",
                 "line": line,
@@ -88,6 +94,14 @@ def main(directory):
             }
             if line == "isobar":
                 request["pressure"] = value
+            elif line == "isenthalp":
+                request["enthalpy"] = value
+                request["tmin"] = tmin
+                request["tmax"] = tmax
+            elif line == "isentrope":
+                request["entropy"] = value
+                request["tmin"] = tmin
+                request["tmax"] = tmax
             else:
                 request["temperature"] = value
             reference_values.append(oracle.call(request))
@@ -96,11 +110,13 @@ def main(directory):
     rows = []
     worst = 0.0
     for index, case in enumerate(CASES):
-        line, eos, components, composition, value, minimum, maximum, points = case
+        line, eos, components, composition, value, minimum, maximum, points, tmin, tmax = case
         label = (
             f"{line}|{eos}|{','.join(components)}|"
             f"{','.join(f'{item:.17e}' for item in composition)}|"
-            f"{value:.17e}|{minimum:.17e}|{maximum:.17e}|{points}"
+            f"{value:.17e}|{minimum:.17e}|{maximum:.17e}|"
+            f"{'none' if tmin is None else f'{tmin:.17e}'}|"
+            f"{'none' if tmax is None else f'{tmax:.17e}'}|{points}"
         )
         expected = reference_values[index]
         actual = native_values[index]
@@ -119,16 +135,10 @@ def main(directory):
         bad = []
         for point in range(len(actual)):
             native_point = [float(value) for value in actual[point].split(",")]
-            # The source returns the pressure, the volume, the entropy and the
-            # enthalpy of an isotherm and the temperature, the volume, the
-            # entropy and the enthalpy of an isobar. The native point holds the
-            # temperature, the pressure, the volume, the entropy and the
-            # enthalpy in both cases.
+            # The oracle reports the temperature, the pressure, the volume, the
+            # entropy and the enthalpy of every point, and the native point
+            # holds the same five quantities.
             source_point = [float(values[point]) for values in source_arrays]
-            if line == "isotherm":
-                native_point = native_point[1:5]
-            else:
-                native_point = [native_point[0], native_point[2], native_point[3], native_point[4]]
             for position, (source, native_value) in enumerate(zip(source_point, native_point)):
                 if not close(source, native_value):
                     bad.append((point, QUANTITIES[position], source, native_value))
@@ -143,7 +153,15 @@ def main(directory):
     with path.open("w", newline="") as handle:
         writer = csv.writer(handle, delimiter=";", lineterminator="\n")
         writer.writerow(
-            ["case", "point", "pressure_or_temperature", "volume", "entropy", "enthalpy"]
+            [
+                "case",
+                "point",
+                "temperature",
+                "pressure",
+                "volume",
+                "entropy",
+                "enthalpy",
+            ]
         )
         for label, arrays in rows:
             for point in range(len(arrays[0])):
@@ -155,6 +173,7 @@ def main(directory):
                         f"{float(arrays[1][point]):.17e}",
                         f"{float(arrays[2][point]):.17e}",
                         f"{float(arrays[3][point]):.17e}",
+                        f"{float(arrays[4][point]):.17e}",
                     ]
                 )
     metadata = json.loads((ROOT / ".reference/metadata.json").read_text())

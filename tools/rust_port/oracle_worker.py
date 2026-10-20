@@ -200,10 +200,22 @@ def main(compiler_directory):
             if request['line']=='isobar':
                 t,v,s,h=model.get_isobar(request['pressure'],z,
                                         request['minimum'],request['maximum'],points)
+                p=[request['pressure']]*len(t)
+            elif request['line']=='isenthalp':
+                t,p,v,s=model.get_isenthalp(request['enthalpy'],z,
+                                            request['minimum'],request['maximum'],
+                                            request['tmin'],request['tmax'],points)
+                h=[request['enthalpy']]*len(t)
+            elif request['line']=='isentrope':
+                t,p,v,h=model.get_isentrope(request['entropy'],z,
+                                            request['minimum'],request['maximum'],
+                                            request['tmin'],request['tmax'],points)
+                s=[request['entropy']]*len(t)
             else:
-                t,v,s,h=model.get_isotherm(request['temperature'],z,
+                p,v,s,h=model.get_isotherm(request['temperature'],z,
                                          request['minimum'],request['maximum'],points)
-            arrays=[list(map(float,values)) for values in (t,v,s,h)]
+                t=[request['temperature']]*len(p)
+            arrays=[list(map(float,values)) for values in (t,p,v,s,h)]
             # The source writes a not-a-number point into a grid of one point,
             # so the isolines may carry that value.
             print('THERMOPACK_RESULT='+json.dumps(dict(values=arrays)),flush=True)

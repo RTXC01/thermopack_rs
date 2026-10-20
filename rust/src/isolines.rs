@@ -300,6 +300,157 @@ pub fn isobar(
     }
 }
 
+/// The specification and the limits of a caloric iso-line.
+#[derive(Debug, Clone, Copy)]
+pub struct CaloricLine {
+    /// The specified molar enthalpy in joule per mole, or the specified molar
+    /// entropy in joule per mole and kelvin.
+    pub specification: f64,
+    /// The lowest pressure of the grid in pascal.
+    pub minimum_pressure: f64,
+    /// The highest pressure of the grid in pascal.
+    pub maximum_pressure: f64,
+    /// The lowest temperature of the flash in kelvin.
+    pub minimum_temperature: f64,
+    /// The highest temperature of the flash in kelvin.
+    pub maximum_temperature: f64,
+}
+
+/// Maps an isenthalp of the model.
+///
+/// The specification of the line is the molar enthalpy in joule per mole, the
+/// limits bound the pressure grid in pascal and the temperature limits bound
+/// the flash in kelvin, and the composition holds the mole fractions. Every
+/// point of the pressure grid carries a pressure-enthalpy flash, and the
+/// points that the flash cannot solve are dropped, as in the original.
+pub fn isenthalp(
+    model: &Cubic,
+    line: CaloricLine,
+    composition: &[f64],
+    points: usize,
+) -> Result<Isoline> {
+    crate::error::positive(line.minimum_pressure, "the minimum isenthalp pressure")?;
+    crate::error::positive(line.maximum_pressure, "the maximum isenthalp pressure")?;
+    crate::error::positive(
+        line.minimum_temperature,
+        "the minimum isenthalp temperature",
+    )?;
+    crate::error::positive(
+        line.maximum_temperature,
+        "the maximum isenthalp temperature",
+    )?;
+    if points < 2 {
+        return Err(Error::InvalidInput(
+            "an isenthalp needs at least two points",
+        ));
+    }
+    if composition.len() != model.components().len() {
+        return Err(Error::InvalidInput("composition mismatch"));
+    }
+    let pressures = linspace(line.minimum_pressure, line.maximum_pressure, points);
+    let mut result = Isoline::with_points(0);
+    let mut temperature = 0.5 * (line.maximum_temperature + line.minimum_temperature);
+    for &pressure in &pressures {
+        let options = crate::caloric::CaloricFlashOptions {
+            temperature_guess: Some(temperature),
+            minimum_temperature: line.minimum_temperature,
+            maximum_temperature: line.maximum_temperature,
+            ..Default::default()
+        };
+        let flash =
+            match model.ph_flash_with_options(pressure, composition, line.specification, options) {
+                Ok(flash) => flash,
+                Err(_) => continue,
+            };
+        temperature = flash.temperature;
+        let (volume, _, entropy) = flash_properties(model, &flash, pressure)?;
+        result.temperature.push(flash.temperature);
+        result.pressure.push(pressure);
+        result.volume.push(volume);
+        result.entropy.push(entropy);
+        result.enthalpy.push(line.specification);
+    }
+    Ok(result)
+}
+
+/// Maps an isentrope of the model.
+///
+/// The specification of the line is the molar entropy in joule per mole and
+/// kelvin, the limits bound the pressure grid in pascal and the temperature
+/// limits bound the flash in kelvin, and the composition holds the mole
+/// fractions. Every point of the pressure grid carries a pressure-entropy
+/// flash, and the points that the flash cannot solve are dropped, as in the
+/// original.
+pub fn isentrope(
+    model: &Cubic,
+    line: CaloricLine,
+    composition: &[f64],
+    points: usize,
+) -> Result<Isoline> {
+    crate::error::positive(line.minimum_pressure, "the minimum isentrope pressure")?;
+    crate::error::positive(line.maximum_pressure, "the maximum isentrope pressure")?;
+    crate::error::positive(
+        line.minimum_temperature,
+        "the minimum isentrope temperature",
+    )?;
+    crate::error::positive(
+        line.maximum_temperature,
+        "the maximum isentrope temperature",
+    )?;
+    if points < 2 {
+        return Err(Error::InvalidInput(
+            "an isentrope needs at least two points",
+        ));
+    }
+    if composition.len() != model.components().len() {
+        return Err(Error::InvalidInput("composition mismatch"));
+    }
+    let pressures = linspace(line.minimum_pressure, line.maximum_pressure, points);
+    let mut result = Isoline::with_points(0);
+    let mut temperature = 0.5 * (line.maximum_temperature + line.minimum_temperature);
+    for &pressure in &pressures {
+        let options = crate::caloric::CaloricFlashOptions {
+            temperature_guess: Some(temperature),
+            minimum_temperature: line.minimum_temperature,
+            maximum_temperature: line.maximum_temperature,
+            ..Default::default()
+        };
+        let flash =
+            match model.ps_flash_with_options(pressure, composition, line.specification, options) {
+                Ok(flash) => flash,
+                Err(_) => continue,
+            };
+        temperature = flash.temperature;
+        let (volume, enthalpy, _) = flash_properties(model, &flash, pressure)?;
+        result.temperature.push(flash.temperature);
+        result.pressure.push(pressure);
+        result.volume.push(volume);
+        result.entropy.push(line.specification);
+        result.enthalpy.push(enthalpy);
+    }
+    Ok(result)
+}
+
+/// The phase weighted molar volume, enthalpy and entropy of a flash state.
+fn flash_properties(
+    model: &Cubic,
+    flash: &crate::flash::FlashResult,
+    pressure: f64,
+) -> Result<(f64, f64, f64)> {
+    if flash.phase == FlashPhase::TwoPhase {
+        two_phase_properties(model, flash.temperature, pressure, flash)
+    } else {
+        let phase = if flash.phase == FlashPhase::Vapor {
+            Phase::Vapor
+        } else {
+            Phase::Liquid
+        };
+        let state = model.prepare(flash.temperature, &flash.feed)?;
+        let volume = state.volume(pressure, phase)?;
+        Ok((volume, state.enthalpy(volume)?, state.entropy(volume)?))
+    }
+}
+
 /// The phase weighted molar volume, enthalpy and entropy of a two phase state.
 fn two_phase_properties(
     model: &Cubic,

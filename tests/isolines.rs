@@ -36,31 +36,78 @@ fn isolines_match_the_source() {
         let value: f64 = parts[4].parse().unwrap();
         let minimum: f64 = parts[5].parse().unwrap();
         let maximum: f64 = parts[6].parse().unwrap();
-        let points: usize = parts[7].parse().unwrap();
-        let model = Cubic::new(kind, &components).unwrap();
-        let line_result = if line == "isobar" {
-            thermopack_rs::isolines::isobar(&model, value, minimum, maximum, &composition, points)
-                .unwrap()
+        let lower = if parts[7] == "none" {
+            None
         } else {
-            thermopack_rs::isolines::isotherm(&model, value, minimum, maximum, &composition, points)
-                .unwrap()
+            Some(parts[7].parse::<f64>().unwrap())
         };
-        let source_pressure: f64 = fields[2].parse().unwrap();
-        let source_volume: f64 = fields[3].parse().unwrap();
-        let source_entropy: f64 = fields[4].parse().unwrap();
-        let source_enthalpy: f64 = fields[5].parse().unwrap();
-        let index: usize = fields[1].parse().unwrap();
-        if line == "isotherm" {
-            assert!(
-                close(source_pressure, line_result.pressure[index]),
-                "{case} {index}"
-            );
+        let upper = if parts[8] == "none" {
+            None
         } else {
-            assert!(
-                close(source_pressure, line_result.temperature[index]),
-                "{case} {index}"
-            );
-        }
+            Some(parts[8].parse::<f64>().unwrap())
+        };
+        let points: usize = parts[9].parse().unwrap();
+        let model = Cubic::new(kind, &components).unwrap();
+        let line_result = match line {
+            "isobar" => thermopack_rs::isolines::isobar(
+                &model,
+                value,
+                minimum,
+                maximum,
+                &composition,
+                points,
+            )
+            .unwrap(),
+            "isenthalp" => thermopack_rs::isolines::isenthalp(
+                &model,
+                thermopack_rs::isolines::CaloricLine {
+                    specification: value,
+                    minimum_pressure: minimum,
+                    maximum_pressure: maximum,
+                    minimum_temperature: lower.unwrap(),
+                    maximum_temperature: upper.unwrap(),
+                },
+                &composition,
+                points,
+            )
+            .unwrap(),
+            "isentrope" => thermopack_rs::isolines::isentrope(
+                &model,
+                thermopack_rs::isolines::CaloricLine {
+                    specification: value,
+                    minimum_pressure: minimum,
+                    maximum_pressure: maximum,
+                    minimum_temperature: lower.unwrap(),
+                    maximum_temperature: upper.unwrap(),
+                },
+                &composition,
+                points,
+            )
+            .unwrap(),
+            _ => thermopack_rs::isolines::isotherm(
+                &model,
+                value,
+                minimum,
+                maximum,
+                &composition,
+                points,
+            )
+            .unwrap(),
+        };
+        let source_temperature: f64 = fields[2].parse().unwrap();
+        let source_pressure: f64 = fields[3].parse().unwrap();
+        let source_volume: f64 = fields[4].parse().unwrap();
+        let source_entropy: f64 = fields[5].parse().unwrap();
+        let source_enthalpy: f64 = fields[6].parse().unwrap();
+        let index: usize = fields[1].parse().unwrap();
+        assert!(
+            close(source_temperature, line_result.temperature[index]),
+            "{case} {index}"
+        );
+        assert!(
+            close(source_pressure, line_result.pressure[index]),
+            "{case} {index}"
+        );
         assert!(
             close(source_volume, line_result.volume[index]),
             "{case} {index}"
@@ -75,7 +122,7 @@ fn isolines_match_the_source() {
         );
         checked += 1;
     }
-    assert!(checked > 60);
+    assert!(checked > 80);
 }
 
 #[test]
@@ -121,4 +168,48 @@ fn the_isobar_splits_at_the_saturation_temperature() {
     assert!(first_vapor > 0);
     assert!((line.temperature[first_vapor - 1] - saturation.temperature).abs() < 1.0e-9);
     assert!(line.volume[first_vapor] > line.volume[0]);
+}
+
+#[test]
+fn the_isenthalp_holds_the_enthalpy() {
+    let model = Cubic::new(CubicKind::PengRobinson, &["C1"]).unwrap();
+    let line = thermopack_rs::isolines::isenthalp(
+        &model,
+        thermopack_rs::isolines::CaloricLine {
+            specification: -78000.0,
+            minimum_pressure: 1.0e5,
+            maximum_pressure: 1.0e7,
+            minimum_temperature: 150.0,
+            maximum_temperature: 250.0,
+        },
+        &[1.0],
+        8,
+    )
+    .unwrap();
+    assert!(!line.pressure.is_empty());
+    for index in 0..line.pressure.len() {
+        assert!((line.enthalpy[index] + 78000.0).abs() < 1.0e-6);
+    }
+}
+
+#[test]
+fn the_isentrope_holds_the_entropy() {
+    let model = Cubic::new(CubicKind::PengRobinson, &["C1"]).unwrap();
+    let line = thermopack_rs::isolines::isentrope(
+        &model,
+        thermopack_rs::isolines::CaloricLine {
+            specification: 165.0,
+            minimum_pressure: 1.0e5,
+            maximum_pressure: 5.0e5,
+            minimum_temperature: 150.0,
+            maximum_temperature: 250.0,
+        },
+        &[1.0],
+        8,
+    )
+    .unwrap();
+    assert!(!line.pressure.is_empty());
+    for index in 0..line.pressure.len() {
+        assert!((line.entropy[index] - 165.0).abs() < 1.0e-6);
+    }
 }

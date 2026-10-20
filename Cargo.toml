@@ -18,7 +18,6 @@ path = "rust/examples/cubic.rs"
 name = "parity"
 path = "rust/examples/parity.rs"
 
-
 [[test]]
 name = "mbwr_source_properties"
 path = "tests/mbwr_source_properties.rs"
@@ -100,3 +99,4 @@ codegen-units = 1
 
 [lints.rust]
 unsafe_code = "forbid"
+

@@ -1131,6 +1131,32 @@ subroutine query_ljs_spline(t_star,rho_star,index,values,count) &
   count=6
 end subroutine query_ljs_spline
 
+! Evaluate the reduced residual Helmholtz energy of the splined model of the
+! original.
+subroutine query_ljs_helmholtz(temperature,volume,moles,values,count) &
+     bind(C,name='query_ljs_helmholtz')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use thermopack_var, only: nc, get_active_eos, base_eos_param
+  use lj_splined, only: ljs_bh_eos, calcFresLJs_bh
+  implicit none
+  real(c_double), value :: temperature, volume, moles
+  real(c_double), intent(out) :: values(1)
+  integer(c_int), intent(out) :: count
+  ! Locals
+  class(base_eos_param), pointer :: eos
+  real :: n(1)
+  real :: F
+  n(1) = moles
+  F = 0.0
+  eos => get_active_eos()
+  select type(p_eos => eos)
+  class is(ljs_bh_eos)
+    call calcFresLJs_bh(p_eos,nc,temperature,volume,n,F)
+  end select
+  values(1) = F
+  count = 1
+end subroutine query_ljs_helmholtz
+
 ! Evaluate the matrix of the third virial coefficients of the original.
 subroutine query_binary_third_virial_matrix(temperature,values,count) &
      bind(C,name='query_binary_third_virial_matrix')

@@ -121,3 +121,6 @@ pub use unifac_data::{
 
 /// Gas constant [J/(mol K)], using the exact expression from ThermoPack.
 pub const R: f64 = 6.02214076e23 * 1.380649e-23;
+
+/// The Avogadro constant in inverse mole.
+pub const N_A: f64 = 6.02214076e23;

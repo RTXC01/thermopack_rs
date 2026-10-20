@@ -68,6 +68,7 @@ python tools/rust_port/validate_virial.py
 python tools/rust_port/validate_virial_matrix.py
 python tools/rust_port/validate_ljs.py
 python tools/rust_port/validate_ljs_spline.py
+python tools/rust_port/validate_ljs_helmholtz.py
 python tools/rust_port/validate_critical.py
 python tools/rust_port/validate_mut_solve.py
 python tools/rust_port/validate_hyperdual.py
@@ -321,6 +322,11 @@ their partial derivatives. The polynomial, the first and the second
 derivative with respect to the reduced temperature, the first and the second
 derivative with respect to the reduced density and the mixed derivative match
 with a relative 1e-10, and the observed worst relative difference is 3.1e-14.
+The [Lennard-Jones Helmholtz energy qualification](ljs.md) adds 8 cases of the
+original `calcFresLJs_bh`: the reduced residual Helmholtz energy of the
+splined Lennard-Jones model over the dilute and the dense fluid. The energy
+matches with a relative 1e-9, and the observed worst relative difference is
+3.3e-14.
 The [critical point qualification](spinodal.md#critical-points) adds 7 cases of
 the original `calcCriticalTV`: methane, carbon dioxide, propane and water in
 the Peng-Robinson equation of state, nitrogen and methane in the

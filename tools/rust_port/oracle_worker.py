@@ -206,6 +206,17 @@ def main(compiler_directory):
             values=[float(temperature),float(volume),float(pressure)]
             print('THERMOPACK_RESULT='+json.dumps(dict(values=values)),flush=True)
             continue
+        if request['mode']=='LJS_HELMHOLTZ':
+            if probe is None:probe=load_probe()
+            probe.query_ljs_helmholtz.argtypes=[c_double,c_double,c_double,POINTER(c_double),POINTER(c_int)]
+            probe.query_ljs_helmholtz.restype=None
+            from thermopack.ljs_bh import ljs_bh
+            model=ljs_bh(request.get('parameter_reference','Default'),2.0)
+            values=(c_double*1)();number=c_int()
+            probe.query_ljs_helmholtz(request['temperature'],request['volume'],
+                                     request['moles'],values,byref(number))
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=list(map(float,values))[:number.value])),flush=True)
+            continue
         if request['mode']=='LJS_SPLINE':
             if probe is None:probe=load_probe()
             probe.query_ljs_spline.argtypes=[c_double,c_double,c_int,POINTER(c_double),POINTER(c_int)]

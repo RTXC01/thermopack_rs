@@ -4,7 +4,7 @@
 
 #![allow(clippy::excessive_precision)]
 
-use thermopack_rs::ljs::LjsBh;
+use thermopack_rs::ljs::{LjsBh, LjsControl};
 
 const ATOL: f64 = 1.0e-12;
 const RTOL: f64 = 1.0e-10;
@@ -63,6 +63,49 @@ fn the_spline_polynomials_match_the_source() {
         checked += 1;
     }
     assert_eq!(checked, 8);
+}
+
+#[test]
+fn the_helmholtz_energy_matches_the_source() {
+    let model = LjsBh::new();
+    let mut checked = 0;
+    for row in include_str!("fixtures/ljs_helmholtz.csv").lines().skip(1) {
+        let fields: Vec<_> = row.split(';').collect();
+        let case = fields[0];
+        let parts: Vec<_> = case.split('|').collect();
+        let temperature: f64 = parts[0].parse().unwrap();
+        let volume: f64 = parts[1].parse().unwrap();
+        let moles: f64 = parts[2].parse().unwrap();
+        let source: f64 = fields[1].parse().unwrap();
+        let molar = model
+            .residual_helmholtz_energy(temperature, volume, moles)
+            .unwrap();
+        let native = molar * moles;
+        assert!(
+            (source - native).abs() <= ATOL + RTOL * source.abs(),
+            "{case}: source {source} native {native}"
+        );
+        checked += 1;
+    }
+    assert_eq!(checked, 8);
+}
+
+#[test]
+fn the_terms_can_be_switched() {
+    // The original lets the user switch the terms of the model off.
+    let mut model = LjsBh::new();
+    let full = model.residual_helmholtz_energy(150.0, 1.0e-3, 1.0).unwrap();
+    model.set_control(LjsControl {
+        enable_hard_sphere: false,
+        enable_a1: false,
+        enable_a2: false,
+        enable_a3: false,
+        enable_chi_correction: true,
+        use_lafitte_a3: false,
+    });
+    let empty = model.residual_helmholtz_energy(150.0, 1.0e-3, 1.0).unwrap();
+    assert!(empty.abs() < 1.0e-18);
+    assert!(full.abs() > 1.0e-6);
 }
 
 #[test]

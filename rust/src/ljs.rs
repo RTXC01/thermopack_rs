@@ -102,6 +102,37 @@ const C_FAC: f64 = 4.0;
 pub struct LjsBh {
     sigma: f64,
     eps: f64,
+    control: LjsControl,
+}
+
+/// The terms of the model that the original lets the user switch on and off.
+#[derive(Debug, Clone, Copy)]
+pub struct LjsControl {
+    /// Whether the hard-sphere reference is included.
+    pub enable_hard_sphere: bool,
+    /// Whether the first order perturbation term is included.
+    pub enable_a1: bool,
+    /// Whether the second order perturbation term is included.
+    pub enable_a2: bool,
+    /// Whether the third order perturbation term is included.
+    pub enable_a3: bool,
+    /// Whether the correction of the second order term is included.
+    pub enable_chi_correction: bool,
+    /// Whether the Lafitte form of the third order term is used.
+    pub use_lafitte_a3: bool,
+}
+
+impl Default for LjsControl {
+    fn default() -> Self {
+        Self {
+            enable_hard_sphere: true,
+            enable_a1: true,
+            enable_a2: true,
+            enable_a3: true,
+            enable_chi_correction: true,
+            use_lafitte_a3: false,
+        }
+    }
 }
 
 impl Default for LjsBh {
@@ -116,12 +147,27 @@ impl LjsBh {
         Self {
             sigma: ARGON_SIGMA,
             eps: ARGON_EPS,
+            control: LjsControl::default(),
         }
     }
 
     /// The model with the segment diameter and the well depth of the user.
     pub fn with_parameters(sigma: f64, eps: f64) -> Self {
-        Self { sigma, eps }
+        Self {
+            sigma,
+            eps,
+            control: LjsControl::default(),
+        }
+    }
+
+    /// The terms of the model that the user switches.
+    pub fn control(&self) -> LjsControl {
+        self.control
+    }
+
+    /// Switches the terms of the model, as the original does.
+    pub fn set_control(&mut self, control: LjsControl) {
+        self.control = control;
     }
 
     /// The segment diameter of the model in metre.
@@ -156,6 +202,51 @@ impl LjsBh {
         let temperature = reduced_temperature * self.eps;
         let (diameter, _, _) = self.diameter(temperature)?;
         Ok(diameter / self.sigma)
+    }
+
+    /// The molar reduced residual Helmholtz energy of the model.
+    ///
+    /// The temperature is in kelvin, the volume in cubic metre and the number
+    /// of moles is the amount of the single component. The energy is the
+    /// reduced residual energy of the original, the hard-sphere reference and
+    /// the three perturbation terms.
+    pub fn residual_helmholtz_energy(
+        &self,
+        temperature: f64,
+        volume: f64,
+        moles: f64,
+    ) -> Result<f64> {
+        crate::error::positive(temperature, "the LJS temperature")?;
+        crate::error::positive(volume, "the LJS volume")?;
+        crate::error::positive(moles, "the LJS number of moles")?;
+        let density = moles / volume;
+        let (diameter, _, _) = self.diameter(temperature)?;
+        let tau = 1.0 - diameter / self.sigma;
+        let reduced_density = crate::N_A * self.sigma.powi(3) * density;
+        let mut energy = 0.0;
+        if self.control.enable_hard_sphere {
+            let eta = std::f64::consts::PI / 6.0 * crate::N_A * diameter.powi(3) * density;
+            energy += (4.0 * eta - 3.0 * eta * eta) / (1.0 - eta).powi(2);
+        }
+        if self.control.enable_a1 {
+            let first = 2.0 * std::f64::consts::PI * self.eps * polynomial(0, tau, reduced_density);
+            energy += first / temperature;
+        }
+        if self.control.enable_a2 {
+            let mut second =
+                -std::f64::consts::PI * self.eps * self.eps * polynomial(1, tau, reduced_density);
+            if self.control.enable_chi_correction {
+                second *= 1.0 + polynomial(3, tau, reduced_density);
+            }
+            let eta = std::f64::consts::PI / 6.0 * crate::N_A * diameter.powi(3) * density;
+            second *= khs(eta);
+            energy += second / (temperature * temperature);
+        }
+        if self.control.enable_a3 {
+            let third = self.eps.powi(3) * polynomial(2, tau, reduced_density);
+            energy += third / temperature.powi(3);
+        }
+        Ok(energy)
     }
 
     /// The reduced perturbation terms of the model.

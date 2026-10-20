@@ -98,6 +98,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             && fields[0] != "THIRDVIRIALMATRIX"
             && fields[0] != "LJS"
             && fields[0] != "LJSSPLINE"
+            && fields[0] != "LJSHELMHOLTZ"
             && fields[0] != "CRITICAL"
             && fields.len() != 6
         {
@@ -121,6 +122,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "{:.17e},{:.17e},{:.17e}",
                 point.temperature, point.volume, point.pressure
             );
+            continue;
+        }
+        if fields[0] == "LJSHELMHOLTZ" {
+            let temperature: f64 = fields[1].parse().unwrap();
+            let volume: f64 = fields[2].parse().unwrap();
+            let moles: f64 = fields[3].parse().unwrap();
+            let model = thermopack_rs::ljs::LjsBh::new();
+            let molar = model.residual_helmholtz_energy(temperature, volume, moles)?;
+            println!("{:.17e}", molar * moles);
             continue;
         }
         if fields[0] == "LJSSPLINE" {

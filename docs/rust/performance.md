@@ -124,6 +124,38 @@ python tools/rust_port/benchmark.py --compiler /path/to/gfortran --repeats 5
 python tools/rust_port/benchmark.py --compiler /path/to/gfortran --repeats 5 --tcpr
 ```
 
-Next optimization targets are reusable preparation buffers, separately
+## Mixture preparation
+
+The mixture preparation dominates a single cubic property evaluation. A
+prepared state evaluates the pressure in about 13 ns, while the preparation of
+the same state costs several hundred nanoseconds. The
+[preparation benchmark](../rust/benches/preparation.rs) measures the
+preparation alone for four models with three components at 200000 states:
+
+| Preparation | Before | After | Change |
+|---|---:|---:|---:|
+| PR, van der Waals mixing | 458 | 262 | -43% |
+| SRK, van der Waals mixing | 483 | 271 | -44% |
+| PR, tcPR reference | 1298 | 830 | -36% |
+| SRK, Huron-Vidal mixing | 2399 | 2153 | -10% |
+
+The preparation allocated one vector per component quantity: the composition,
+the partial attraction parameters, the partial covolumes and the three
+square-root factors of every component. The four allocations are now one
+allocation that holds all six component vectors, and the partial attraction
+parameters reuse the same storage instead of a second vector. The values and
+their order of operations are unchanged, so the property, flash and parity
+results are identical. The remaining preparation cost is dominated by the
+alpha correlation: the TWU evaluation of the tcPR reference needs one
+logarithm and three exponentials per component, and the phase profile of the
+preparation attributes about 45% of the tcPR preparation to that evaluation.
+
+Reproduce with:
+
+```
+cargo bench --bench preparation
+```
+
+Next optimization targets are the alpha correlation evaluations, separately
 requested derivative paths and profiling the flash/SAFT hot loops once those
 implementations pass parity. No SIMD or thread-level speedups are claimed yet.

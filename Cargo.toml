@@ -63,6 +63,11 @@ name = "mbwr_density"
 path = "rust/benches/mbwr_density.rs"
 harness = false
 
+[[bench]]
+name = "preparation"
+path = "rust/benches/preparation.rs"
+harness = false
+
 [profile.release]
 lto = "thin"
 codegen-units = 1

@@ -139,17 +139,56 @@ pub struct PseudoCritical {
 pub struct PreparedState<'a> {
     model: &'a Cubic,
     temperature: f64,
-    composition: Vec<f64>,
+    /// Component buffers: the composition, the partial attraction parameters,
+    /// the partial covolumes and the three square-root factors share one
+    /// allocation.
+    buffer: Vec<f64>,
     a: f64,
     at: f64,
     att: f64,
     b: f64,
-    a_partial: Vec<f64>,
-    b_partial: Vec<f64>,
-    factors: Vec<(f64, f64, f64)>,
     ai_t: Option<Vec<f64>>,
     beta: Option<crate::beta::PreparedBeta>,
     translation: Option<crate::translation::PreparedTranslation>,
+}
+
+impl PreparedState<'_> {
+    /// Number of components of the model.
+    #[inline]
+    fn count(&self) -> usize {
+        self.model.components.len()
+    }
+
+    /// Mole fractions of the prepared state.
+    #[inline]
+    fn composition_slice(&self) -> &[f64] {
+        &self.buffer[..self.count()]
+    }
+
+    /// Partial attraction parameters of the prepared state.
+    #[inline]
+    fn a_partial_slice(&self) -> &[f64] {
+        let n = self.count();
+        &self.buffer[n..2 * n]
+    }
+
+    /// Partial covolumes of the prepared state.
+    #[inline]
+    fn b_partial_slice(&self) -> &[f64] {
+        let n = self.count();
+        &self.buffer[2 * n..3 * n]
+    }
+
+    /// Square-root factors of the prepared state.
+    #[inline]
+    fn factors(&self) -> (&[f64], &[f64], &[f64]) {
+        let n = self.count();
+        (
+            &self.buffer[3 * n..4 * n],
+            &self.buffer[4 * n..5 * n],
+            &self.buffer[5 * n..6 * n],
+        )
+    }
 }
 
 impl Cubic {
@@ -704,7 +743,10 @@ impl Cubic {
             ));
         }
         let n = self.components.len();
-        let mut factors = Vec::with_capacity(n);
+        // The composition, the partial attraction parameters, the partial
+        // covolumes and the three square-root factors share one allocation.
+        let mut buffer = vec![0.0; 6 * n];
+        buffer[..n].copy_from_slice(composition);
         let (mut sum, mut sum_t, mut sum_tt) = (0.0, 0.0, 0.0);
         for (i, &x) in composition.iter().enumerate() {
             let tc = self.components[i].critical_temperature;
@@ -724,7 +766,9 @@ impl Cubic {
             } else {
                 0.0
             };
-            factors.push((f, ft, ftt));
+            buffer[3 * n + i] = f;
+            buffer[4 * n + i] = ft;
+            buffer[5 * n + i] = ftt;
             sum += x * f;
             sum_t += x * ft;
             sum_tt += x * ftt;
@@ -732,10 +776,16 @@ impl Cubic {
         let mut a = sum * sum;
         let mut at = 2.0 * sum * sum_t;
         let mut att = 2.0 * (sum_t * sum_t + sum * sum_tt);
-        let mut a_partial: Vec<_> = factors.iter().map(|f| f.0 * sum).collect();
+        let (head, factors) = buffer.split_at_mut(3 * n);
+        let (_, tail) = head.split_at_mut(n);
+        let (a_partial, b_partial) = tail.split_at_mut(n);
+        let (f, ft, ftt) = (&factors[..n], &factors[n..2 * n], &factors[2 * n..3 * n]);
+        for i in 0..n {
+            a_partial[i] = f[i] * sum;
+        }
         for &(i, j, k) in &self.nonzero_kij {
-            let (fi, fit, fitt) = factors[i];
-            let (fj, fjt, fjtt) = factors[j];
+            let (fi, fit, fitt) = (f[i], ft[i], ftt[i]);
+            let (fj, fjt, fjtt) = (f[j], ft[j], ftt[j]);
             let pair = k * fi * fj;
             let xx = 2.0 * composition[i] * composition[j];
             a -= xx * pair;
@@ -769,14 +819,18 @@ impl Cubic {
         } else {
             None
         };
-        let mut b_partial: Vec<_> = match &beta {
-            Some(beta) => beta.components.iter().map(|b| b.value).collect(),
-            None => self.bi.clone(),
-        };
+        match &beta {
+            Some(beta) => {
+                for (slot, component) in b_partial.iter_mut().zip(beta.components.iter()) {
+                    *slot = component.value;
+                }
+            }
+            None => b_partial.copy_from_slice(&self.bi),
+        }
         if self.lij.iter().all(|l| *l == 0.0) {
             b = composition
                 .iter()
-                .zip(&b_partial)
+                .zip(b_partial.iter())
                 .map(|(x, bi)| x * bi)
                 .sum();
             if let Some(beta) = &mut beta {
@@ -813,7 +867,7 @@ impl Cubic {
                     beta.dtt += composition[i] * btt_partial;
                 }
             }
-            for bi in &mut b_partial {
+            for bi in b_partial.iter_mut() {
                 *bi = 2.0 * *bi - b;
             }
             if let Some(beta) = &mut beta {
@@ -824,7 +878,7 @@ impl Cubic {
         }
         positive(b, "mixture covolume")?;
 
-        let (a, at, att, a_partial, ai_t) = if let Some(ge) = &self.excess_gibbs {
+        let (a, at, att, ai_t) = if let Some(ge) = &self.excess_gibbs {
             let mut a_pure = Vec::with_capacity(n);
             let mut da_pure = Vec::with_capacity(n);
             let mut d2a_pure = Vec::with_capacity(n);
@@ -850,11 +904,13 @@ impl Cubic {
                 &d2a_pure,
                 b,
             )?;
-            let a_partial = jet.da_dni.iter().map(|&ai| 0.5 * ai).collect();
+            for (slot, &ai) in buffer[n..2 * n].iter_mut().zip(jet.da_dni.iter()) {
+                *slot = 0.5 * ai;
+            }
             let ai_t = jet.d2a_dnid_t.iter().map(|&ait| 0.5 * ait).collect();
-            (jet.a_mix, jet.da_dt, jet.d2a_dt2, a_partial, Some(ai_t))
+            (jet.a_mix, jet.da_dt, jet.d2a_dt2, Some(ai_t))
         } else {
-            (a, at, att, a_partial, None)
+            (a, at, att, None)
         };
 
         if !a.is_finite() || !at.is_finite() || !att.is_finite() {
@@ -895,14 +951,11 @@ impl Cubic {
         Ok(PreparedState {
             model: self,
             temperature,
-            composition: composition.to_vec(),
+            buffer,
             a,
             at,
             att,
             b,
-            a_partial,
-            b_partial,
-            factors,
             ai_t,
             beta,
             translation,
@@ -922,7 +975,7 @@ impl PreparedState<'_> {
         dp: &mut [f64],
         dn: &mut [f64],
     ) -> Result<()> {
-        let n = self.composition.len();
+        let n = self.composition_slice().len();
         if dt.len() != n || dp.len() != n || dn.len() != n * n {
             return Err(Error::InvalidInput("fugacity derivative buffer dimensions"));
         }
@@ -941,24 +994,25 @@ impl PreparedState<'_> {
         let denom_b = (d1 + d2) * volume + 2.0 * d1 * d2 * self.b;
         let (integral, ib, ibb) = self.attraction_integral_derivatives(volume);
         let pressure_n = |i: usize| {
-            rt / free + rt * self.b_partial[i] / free.powi(2) - 2.0 * self.a_partial[i] / denom
-                + self.a * denom_b * self.b_partial[i] / denom.powi(2)
+            rt / free + rt * self.b_partial_slice()[i] / free.powi(2)
+                - 2.0 * self.a_partial_slice()[i] / denom
+                + self.a * denom_b * self.b_partial_slice()[i] / denom.powi(2)
         };
         for i in 0..n {
             let ai_t = if let Some(ait) = &self.ai_t {
                 ait[i]
             } else {
                 let mut s = 0.0;
+                let (f, ft, _) = self.factors();
                 for j in 0..n {
-                    s += self.composition[j]
+                    s += self.composition_slice()[j]
                         * (1.0 - self.model.kij[i * n + j])
-                        * (self.factors[i].1 * self.factors[j].0
-                            + self.factors[i].0 * self.factors[j].1);
+                        * (ft[i] * f[j] + f[i] * ft[j]);
                 }
                 s
             };
-            let bi = self.b_partial[i];
-            let di = 2.0 * self.a_partial[i];
+            let bi = self.b_partial_slice()[i];
+            let di = 2.0 * self.a_partial_slice()[i];
             let pi = pressure_n(i);
             let mut fnt =
                 -(2.0 * ai_t - di / t) * integral / rt - (self.at - self.a / t) * ib * bi / rt;
@@ -971,8 +1025,8 @@ impl PreparedState<'_> {
             dt[i] = fnt + pi * p.dt / (rt * p.dv) + 1.0 / t;
             dp[i] = -pi / (rt * p.dv) - 1.0 / p.value;
             for j in 0..n {
-                let bj = self.b_partial[j];
-                let dj = 2.0 * self.a_partial[j];
+                let bj = self.b_partial_slice()[j];
+                let dj = 2.0 * self.a_partial_slice()[j];
                 let bii = self
                     .beta
                     .as_ref()
@@ -983,8 +1037,10 @@ impl PreparedState<'_> {
                     .map_or(self.model.bi[j], |b| b.components[j].value);
                 let bij = (1.0 - self.model.lij[i * n + j]) * (bii + bjj) / 2.0;
                 let bnn = 2.0 * bij - bi - bj;
-                let dnn =
-                    2.0 * (1.0 - self.model.kij[i * n + j]) * self.factors[i].0 * self.factors[j].0;
+                let dnn = 2.0
+                    * (1.0 - self.model.kij[i * n + j])
+                    * self.factors().0[i]
+                    * self.factors().0[j];
                 let fnn = (bi + bj + bnn) / free + bi * bj / free.powi(2)
                     - (dnn * integral
                         + (di * bj + dj * bi) * ib
@@ -1042,7 +1098,7 @@ impl PreparedState<'_> {
             enthalpy: 0.0,
             entropy: 0.0,
         };
-        for (&x, gas) in self.composition.iter().zip(&self.model.ideal_gases) {
+        for (&x, gas) in self.composition_slice().iter().zip(&self.model.ideal_gases) {
             if x == 0.0 {
                 continue;
             }
@@ -1127,7 +1183,7 @@ impl PreparedState<'_> {
     pub fn speed_of_sound(&self, volume: f64) -> Result<f64> {
         let cv = self.ideal(1e5)?.enthalpy_dt - R + self.residual_cv_tv(volume)?;
         let mass: f64 = self
-            .composition
+            .composition_slice()
             .iter()
             .zip(&self.model.components)
             .map(|(x, c)| x * c.molar_mass * 1e-3)
@@ -1152,7 +1208,7 @@ impl PreparedState<'_> {
         let derivative = pressure.dv - self.temperature * pressure.dt * pressure.dt / cv;
         if derivative < 0. {
             let mass: f64 = self
-                .composition
+                .composition_slice()
                 .iter()
                 .zip(&self.model.components)
                 .map(|(x, c)| x * c.molar_mass * 1e-3)
@@ -1166,7 +1222,7 @@ impl PreparedState<'_> {
         self.temperature
     }
     pub fn composition(&self) -> &[f64] {
-        &self.composition
+        self.composition_slice()
     }
     pub fn covolume(&self) -> f64 {
         self.b - self.translation.as_ref().map_or(0., |c| c.c)
@@ -1322,7 +1378,7 @@ impl PreparedState<'_> {
     /// Using the specified pressure avoids reconstructing it by subtracting
     /// large repulsive/attractive terms in dense, low-pressure liquids.
     pub fn ln_fugacity_tp_into(&self, p: f64, volume: f64, output: &mut [f64]) -> Result<()> {
-        if output.len() != self.composition.len() {
+        if output.len() != self.composition_slice().len() {
             return Err(Error::InvalidInput("fugacity buffer length"));
         }
         self.volume_check(volume)?;
@@ -1333,8 +1389,10 @@ impl PreparedState<'_> {
         let repulsion = (z * (1.0 - self.b / volume)).ln();
         let integral = self.attraction_integral(volume) / rt;
         for (i, phi) in output.iter_mut().enumerate() {
-            let br = self.b_partial[i] / self.b;
-            *phi = br * (z - 1.0) - repulsion - (2.0 * self.a_partial[i] - self.a * br) * integral;
+            let br = self.b_partial_slice()[i] / self.b;
+            *phi = br * (z - 1.0)
+                - repulsion
+                - (2.0 * self.a_partial_slice()[i] - self.a * br) * integral;
             if let Some(shift) = &self.translation {
                 *phi -= p * shift.components[i].value / rt;
             }

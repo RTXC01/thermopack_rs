@@ -204,6 +204,17 @@ impl LjsBh {
         Ok(diameter / self.sigma)
     }
 
+    /// The logarithm of the fugacity coefficient of the model.
+    ///
+    /// The residual chemical potential of a single component follows from the
+    /// reduced residual Helmholtz energy and from its derivative with respect
+    /// to the number of moles, because the reduced density and the packing
+    /// fraction follow the number of moles at a fixed temperature and volume.
+    pub fn fugacity_coefficient(&self, temperature: f64, volume: f64, moles: f64) -> Result<f64> {
+        let (energy, _, mole_derivative) = self.energy_derivatives(temperature, volume, moles)?;
+        Ok(energy + moles * mole_derivative)
+    }
+
     /// The pressure of the model at a temperature and a volume.
     ///
     /// The temperature is in kelvin, the volume in cubic metre and the number
@@ -278,6 +289,18 @@ impl LjsBh {
         volume: f64,
         moles: f64,
     ) -> Result<(f64, f64)> {
+        let (energy, derivative, _) = self.energy_derivatives(temperature, volume, moles)?;
+        Ok((energy, derivative))
+    }
+
+    /// The molar reduced residual Helmholtz energy of the model with its
+    /// temperature and mole number derivatives.
+    fn energy_derivatives(
+        &self,
+        temperature: f64,
+        volume: f64,
+        moles: f64,
+    ) -> Result<(f64, f64, f64)> {
         crate::error::positive(temperature, "the LJS temperature")?;
         crate::error::positive(volume, "the LJS volume")?;
         crate::error::positive(moles, "the LJS number of moles")?;
@@ -286,6 +309,7 @@ impl LjsBh {
         let tau = 1.0 - diameter / self.sigma;
         let tau_t = -diameter_t / self.sigma;
         let reduced_density = crate::N_A * self.sigma.powi(3) * density;
+        let reduced_density_n = crate::N_A * self.sigma.powi(3) / volume;
         let eta = std::f64::consts::PI / 6.0 * crate::N_A * diameter.powi(3) * density;
         let eta_t = std::f64::consts::PI / 6.0
             * crate::N_A
@@ -294,31 +318,43 @@ impl LjsBh {
             * diameter
             * diameter_t
             * density;
+        let eta_n = std::f64::consts::PI / 6.0 * crate::N_A * diameter.powi(3) / volume;
         let mut energy = 0.0;
         let mut derivative = 0.0;
+        let mut mole_derivative = 0.0;
         if self.control.enable_hard_sphere {
+            let slope = (4.0 - 2.0 * eta) / (1.0 - eta).powi(3);
             energy += (4.0 * eta - 3.0 * eta * eta) / (1.0 - eta).powi(2);
-            derivative += (4.0 - 2.0 * eta) / (1.0 - eta).powi(3) * eta_t;
+            derivative += slope * eta_t;
+            mole_derivative += slope * eta_n;
         }
         if self.control.enable_a1 {
-            let (value, _, value_x, ..) = polynomial_with_derivatives(0, tau, reduced_density, 1.0);
+            let (value, value_r, value_x, ..) =
+                polynomial_with_derivatives(0, tau, reduced_density, 1.0);
             let first = 2.0 * std::f64::consts::PI * self.eps * value;
             let first_t = 2.0 * std::f64::consts::PI * self.eps * value_x * tau_t;
             energy += first / temperature;
             derivative += first_t / temperature - first / (temperature * temperature);
+            mole_derivative +=
+                2.0 * std::f64::consts::PI * self.eps * value_r * reduced_density_n / temperature;
         }
         if self.control.enable_a2 {
-            let (value, _, value_x, ..) = polynomial_with_derivatives(1, tau, reduced_density, 1.0);
-            let (correction, _, correction_x, ..) =
+            let (value, value_r, value_x, ..) =
+                polynomial_with_derivatives(1, tau, reduced_density, 1.0);
+            let (correction, correction_r, correction_x, ..) =
                 polynomial_with_derivatives(3, tau, reduced_density, 1.0);
             let mut second = -std::f64::consts::PI * self.eps * self.eps * value;
             let mut second_t = -std::f64::consts::PI * self.eps * self.eps * value_x * tau_t;
+            let mut second_r = -std::f64::consts::PI * self.eps * self.eps * value_r;
             if self.control.enable_chi_correction {
                 let scaled = 1.0 + correction;
                 let scaled_t = correction_x * tau_t;
+                let scaled_r = correction_r;
                 second *= scaled;
                 second_t = second_t * scaled
                     + (-std::f64::consts::PI * self.eps * self.eps * value) * scaled_t;
+                second_r = second_r * scaled
+                    + (-std::f64::consts::PI * self.eps * self.eps * value) * scaled_r;
             }
             let compressibility = khs(eta);
             let compressibility_t = khs_eta(eta) * eta_t;
@@ -328,15 +364,22 @@ impl LjsBh {
             energy += second / (temperature * temperature);
             derivative +=
                 second_t / (temperature * temperature) - 2.0 * second / temperature.powi(3);
+            // The compressibility factor follows the packing fraction, and the
+            // packing fraction follows the number of moles.
+            mole_derivative += second_r * reduced_density_n * compressibility
+                / (temperature * temperature)
+                + unscaled * khs_eta(eta) * eta_n / (temperature * temperature);
         }
         if self.control.enable_a3 {
-            let (value, _, value_x, ..) = polynomial_with_derivatives(2, tau, reduced_density, 1.0);
+            let (value, value_r, value_x, ..) =
+                polynomial_with_derivatives(2, tau, reduced_density, 1.0);
             let third = self.eps.powi(3) * value;
             let third_t = self.eps.powi(3) * value_x * tau_t;
             energy += third / temperature.powi(3);
             derivative += third_t / temperature.powi(3) - 3.0 * third / temperature.powi(4);
+            mole_derivative += self.eps.powi(3) * value_r * reduced_density_n / temperature.powi(3);
         }
-        Ok((energy, derivative))
+        Ok((energy, derivative, mole_derivative))
     }
 
     /// The molar reduced residual Helmholtz energy of the model.

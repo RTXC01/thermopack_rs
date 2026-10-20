@@ -19,13 +19,14 @@ second order term.
 | `src/lj_splined.f90:calcFresLJs_bh` | `ljs::LjsBh::residual_helmholtz_energy` |
 | `src/lj_splined.f90:calcFresLJs_bh` (volume derivative) | `ljs::LjsBh::pressure` |
 | `src/lj_splined.f90:calcFresLJs_bh` (temperature derivative) | `ljs::LjsBh::residual_helmholtz_energy_derivative` |
+| `src/lj_splined.f90:calcFresLJs_bh` (mole number derivative) | `ljs::LjsBh::fugacity_coefficient` |
 
 The native model provides the reduced perturbation terms and the reduced
 Barker-Henderson hard-sphere diameter, the polynomials of the spline with
 their partial derivatives, the parameters and the switches of the model, the
-reduced residual Helmholtz energy with its temperature derivative, and the
-pressure of a state. The composition derivative of the energy is not yet
-ported.
+reduced residual Helmholtz energy with its temperature derivative, the pressure
+of a state and the reduced residual chemical potential. The enthalpy, the
+entropy and the fugacity of a state are not yet ported.
 
 ## Method
 
@@ -114,11 +115,32 @@ factor of the same state with the analytic volume derivative of the energy.
 The committed fixture is `tests/fixtures/ljs_state.csv`; the test is
 `tests/ljs.rs`.
 
+`tools/rust_port/validate_ljs_fugacity.py` compares the reduced residual
+chemical potential against the exact-source library. The reference probe calls
+the original `calcFresLJs_bh` with the derivative with respect to the number of
+moles, and the native model evaluates the same derivative, the reduced
+residual chemical potential of the single component.
+
+* 8 cases: the temperature, the pressure and the phase of the single
+  component over the dilute and the dense fluid.
+* The compared quantity is the reduced residual chemical potential. All 8 cases
+  match with a relative 1e-6, and the observed worst relative difference is
+  1.1e-15.
+
+The Python interface of the fork reports the logarithm of the fugacity
+coefficient of this model as the reduced residual energy of the state, which is
+a different convention from the reduced residual chemical potential. The
+qualification therefore compares the derivative of the original with the same
+derivative of the native model.
+
+The committed fixture is `tests/fixtures/ljs_fugacity.csv`; the test is
+`tests/ljs.rs`.
+
 ## Remaining scope
 
-* The composition derivative of the residual Helmholtz energy is not yet
-  ported, so the native model does not yet evaluate the enthalpy, the entropy
-  and the fugacity of the splined Lennard-Jones fluid.
+* The enthalpy, the entropy and the fugacity of a state are not yet ported,
+  because they need the ideal part of the model, which the source fixes to a
+  constant heat capacity of 2.5 times the gas constant.
 * The WCA and the UV variants of the source, the hard-sphere reference of the
   White Bear family and the convolution of the fundamental measure theory are
   not yet ported.

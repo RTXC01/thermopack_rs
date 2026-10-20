@@ -88,6 +88,7 @@ jobs:
       - run: python tools/rust_port/validate_ljs_spline.py
       - run: python tools/rust_port/validate_ljs_helmholtz.py
       - run: python tools/rust_port/validate_ljs_state.py
+      - run: python tools/rust_port/validate_ljs_fugacity.py
       - run: python tools/rust_port/validate_critical.py
       - run: python tools/rust_port/validate_mut_solve.py
       - run: python tools/rust_port/validate_hyperdual.py

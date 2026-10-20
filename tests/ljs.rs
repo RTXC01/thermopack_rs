@@ -125,6 +125,36 @@ fn the_state_matches_the_source() {
 }
 
 #[test]
+fn the_residual_chemical_potential_matches_the_source() {
+    let model = LjsBh::new();
+    let mut checked = 0;
+    for row in include_str!("fixtures/ljs_fugacity.csv").lines().skip(1) {
+        let fields: Vec<_> = row.split(';').collect();
+        let case = fields[0];
+        let parts: Vec<_> = case.split('|').collect();
+        let temperature: f64 = parts[0].parse().unwrap();
+        let pressure: f64 = parts[1].parse().unwrap();
+        let source: f64 = fields[1].parse().unwrap();
+        let coefficient: f64 = fields[2].parse().unwrap();
+        let volume: f64 = fields[3].parse().unwrap();
+        let native = model
+            .fugacity_coefficient(temperature, volume, 1.0)
+            .unwrap();
+        assert!(
+            (source - native).abs() <= 1.0e-9 + 1.0e-6 * source.abs(),
+            "{case}: source {source} native {native}"
+        );
+        // The pressure of the state follows the volume derivative of the
+        // energy.
+        let (native_pressure, _) = model.pressure(temperature, volume, 1.0).unwrap();
+        assert!((native_pressure - pressure).abs() <= 1.0e-6 * pressure.abs());
+        assert!((coefficient - native).abs() <= 1.0e-9);
+        checked += 1;
+    }
+    assert_eq!(checked, 8);
+}
+
+#[test]
 fn the_terms_can_be_switched() {
     // The original lets the user switch the terms of the model off.
     let mut model = LjsBh::new();

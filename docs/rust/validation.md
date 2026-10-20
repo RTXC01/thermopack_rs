@@ -70,6 +70,7 @@ python tools/rust_port/validate_ljs.py
 python tools/rust_port/validate_ljs_spline.py
 python tools/rust_port/validate_ljs_helmholtz.py
 python tools/rust_port/validate_ljs_state.py
+python tools/rust_port/validate_ljs_fugacity.py
 python tools/rust_port/validate_critical.py
 python tools/rust_port/validate_mut_solve.py
 python tools/rust_port/validate_hyperdual.py
@@ -334,6 +335,11 @@ compressibility factor, with the analytic volume derivative of the reduced
 residual Helmholtz energy. The pressure matches with a relative 1e-6 and the
 compressibility factor with a relative 1e-6, and the observed worst relative
 difference is 1.9e-13.
+The [Lennard-Jones chemical potential qualification](ljs.md) adds 8 cases of
+the original `calcFresLJs_bh`: the reduced residual chemical potential of the
+single component, which the original reports as the derivative of the reduced
+energy with respect to the number of moles. The quantity matches with a
+relative 1e-6, and the observed worst relative difference is 1.1e-15.
 The [critical point qualification](spinodal.md#critical-points) adds 7 cases of
 the original `calcCriticalTV`: methane, carbon dioxide, propane and water in
 the Peng-Robinson equation of state, nitrogen and methane in the

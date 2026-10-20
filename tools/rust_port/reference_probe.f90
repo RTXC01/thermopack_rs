@@ -866,3 +866,120 @@ subroutine query_solid_h2o(t,p,values) bind(C,name='query_solid_h2o')
        sh2o_d2gdtdp(t,p),sh2o_specvol(t,p),sh2o_entropy(t,p),sh2o_enthalpy(t,p),sh2o_energy(t,p), &
        sh2o_helmholtz(t,p),sh2o_heat_capacity(t,p)]
 end subroutine query_solid_h2o
+
+! Solve the mu-T and lnf-T problems with the original solver.
+! The component list and the initial density are installed in the source
+! globals for the call and restored afterwards.
+subroutine query_mut_solve(ncomponents,kind,components,densities,temperature,mu,result,status) &
+     bind(C,name='query_mut_solve')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double,c_char
+  use thermopack_var, only: complist,nc,nce
+  use mut_solver, only: solve_mu_t, solve_lnf_t
+  implicit none
+  integer(c_int), value :: ncomponents
+  integer(c_int), value :: kind
+  character(kind=c_char), intent(in) :: components(*)
+  real(c_double), intent(in) :: densities(*)
+  real(c_double), value :: temperature
+  real(c_double), intent(in) :: mu(*)
+  real(c_double), intent(out) :: result(*)
+  integer(c_int), intent(out) :: status
+  ! Locals
+  integer, parameter :: nmax=8
+  character(len=20) :: component_name
+  character(len=20), pointer :: saved(:)
+  integer :: saved_nc, saved_nce, i, n, ierr
+  logical :: had_complist
+  real :: rho(nmax)
+  n = int(ncomponents)
+  if (n < 1 .or. n > nmax) error stop 'query_mut_solve: unsupported component count'
+  do i=1,20
+    component_name(i:i)=components(i)
+  enddo
+  do i=1,n
+    rho(i)=densities(i)
+  enddo
+  saved_nc = nc
+  saved_nce = nce
+  had_complist = associated(complist)
+  if (had_complist) saved=>complist
+  nullify(complist)
+  allocate(complist(n))
+  do i=1,n
+    complist(i)=component_name((i-1)*20+1:i*20)
+  enddo
+  nc = n
+  nce = n
+  if (int(kind) == 0) then
+    call solve_mu_t(mu(1:n),temperature,rho,ierr)
+  else
+    call solve_lnf_t(mu(1:n),temperature,rho,ierr)
+  endif
+  deallocate(complist)
+  if (had_complist) complist=>saved
+  nc = saved_nc
+  nce = saved_nce
+  do i=1,n
+    result(i)=rho(i)
+  enddo
+  status = ierr
+end subroutine query_mut_solve
+
+! Evaluate the original chemical potential or log fugacity coefficients at a
+! given density, to build the target of a mu-T or lnf-T solve.
+subroutine query_mut_target(ncomponents,temperature,components,densities,kind,result,count) &
+     bind(C,name='query_mut_target')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double,c_char
+  use thermopack_var, only: complist,nc,nce
+  use eosTV, only: thermo_tv, chemical_potential_tv
+  implicit none
+  integer(c_int), value :: ncomponents
+  real(c_double), value :: temperature
+  character(kind=c_char), intent(in) :: components(*)
+  real(c_double), intent(in) :: densities(*)
+  integer(c_int), value :: kind
+  real(c_double), intent(out) :: result(*)
+  integer(c_int), intent(out) :: count
+  ! Locals
+  integer, parameter :: nmax=8
+  character(len=20) :: component_name
+  character(len=20), pointer :: saved(:)
+  integer :: saved_nc, saved_nce, i, n
+  logical :: had_complist
+  real :: rho(nmax), lnf(nmax), mu(nmax)
+  n = int(ncomponents)
+  if (n < 1 .or. n > nmax) error stop 'query_mut_target: unsupported component count'
+  do i=1,20
+    component_name(i:i)=components(i)
+  enddo
+  do i=1,n
+    rho(i)=densities(i)
+  enddo
+  saved_nc = nc
+  saved_nce = nce
+  had_complist = associated(complist)
+  if (had_complist) saved=>complist
+  nullify(complist)
+  allocate(complist(n))
+  do i=1,n
+    complist(i)=component_name((i-1)*20+1:i*20)
+  enddo
+  nc = n
+  nce = n
+  call thermo_tv(temperature,1.0,rho,lnf)
+  if (int(kind) == 0) then
+    call chemical_potential_tv(temperature,1.0,rho,mu)
+    do i=1,n
+      result(i)=mu(i)
+    enddo
+  else
+    do i=1,n
+      result(i)=lnf(i)
+    enddo
+  endif
+  deallocate(complist)
+  if (had_complist) complist=>saved
+  nc = saved_nc
+  nce = saved_nce
+  count = n
+end subroutine query_mut_target

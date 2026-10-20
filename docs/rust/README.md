@@ -104,6 +104,9 @@ Staverman-Guggenheim combinatorial terms, the generated group database, the zero
 of the cubic mixing rule and the source limitations that are reproduced.
 The [solid line notes](solid.md) cover the melting and sublimation line correlations, the
 generated parameter database and the source limitations that are reproduced.
+The [mu-T flash notes](mut-flash.md) cover the log fugacity and chemical potential
+solvers, the source's fixed-point chemical potential variant and the states
+where the original evaluates a formal log fugacity.
 The [multiparameter notes](multiparameter.md) cover five NIST fluids, both LJ
 fits for four noble gases, reduced LJTS, shared state/Helmholtz derivatives,
 source sound mass units, strict qualification and native-loop measurements.

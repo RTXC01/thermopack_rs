@@ -77,6 +77,7 @@ jobs:
       - run: python tools/rust_port/validate_unifac_cubic.py
       - run: python tools/rust_port/validate_solid_lines.py
       - run: python tools/rust_port/validate_solid_co2.py
+      - run: python tools/rust_port/validate_mut_solve.py
       - run: python tools/rust_port/validate_solid_water.py
       - run: python tools/rust_port/validate_fmt.py
       - run: python tools/rust_port/validate_meos.py

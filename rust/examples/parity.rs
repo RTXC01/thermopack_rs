@@ -333,6 +333,65 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             );
             continue;
         }
+        if fields[0] == "MUT" {
+            let components: Vec<&str> = fields[1].split(',').collect();
+            let temperature: f64 = fields[2].parse().unwrap();
+            let densities: Vec<f64> = fields[4]
+                .split(',')
+                .map(|value| value.parse().unwrap())
+                .collect();
+            let config: Vec<&str> = fields[5].split(':').collect();
+            let model =
+                thermopack_rs::Cubic::new(thermopack_rs::CubicKind::PengRobinson, &components)?;
+            let target: Vec<f64> = if config.len() > 1 {
+                config[1]
+                    .split(',')
+                    .map(|value| value.parse().unwrap())
+                    .collect()
+            } else {
+                Vec::new()
+            };
+            let kind = config[0];
+            let outcome = match kind {
+                "MU" => {
+                    thermopack_rs::mut_flash::solve_mu_t(&model, temperature, &target, &densities)
+                        .map(|solution| solution.density)
+                }
+                "LNF" => {
+                    thermopack_rs::mut_flash::solve_lnf_t(&model, temperature, &target, &densities)
+                        .map(|solution| solution.density)
+                }
+                "MUTARGET" => thermopack_rs::mut_flash::log_fugacity_and_potential(
+                    &model,
+                    temperature,
+                    &densities,
+                )
+                .map(|(_, potential)| potential),
+                "LNFTARGET" => thermopack_rs::mut_flash::log_fugacity_and_potential(
+                    &model,
+                    temperature,
+                    &densities,
+                )
+                .map(|(fugacity, _)| fugacity),
+                _ => Err(thermopack_rs::Error::InvalidInput("unknown mu-T mode")),
+            };
+            let values = match outcome {
+                Ok(values) => values,
+                Err(error) => {
+                    println!("ERROR: {error}");
+                    continue;
+                }
+            };
+            println!(
+                "{}",
+                values
+                    .iter()
+                    .map(|v| format!("{v:.17e}"))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            );
+            continue;
+        }
         if fields[0] == "SOLID" {
             let component = fields[1];
             let kind = match fields[5] {

@@ -34,6 +34,7 @@ pub mod lee_kesler;
 pub mod mbwr;
 pub mod multiparameter;
 pub mod multiparameter_data;
+pub mod mut_flash;
 pub mod numerics;
 pub mod pc_saft;
 pub mod pc_saft_data;

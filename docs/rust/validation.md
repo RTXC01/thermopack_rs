@@ -233,6 +233,13 @@ the cancellation of nearly equal terms in some melting curves; the 4
 remaining cases are the hydrogen sulfide sublimation lines, where the source
 stops because the correlation label has no fourth character and the native
 model reports the same error.
+The [mu-T qualification](mut-flash.md) adds 32 log fugacity solves over four
+mixtures and four temperatures, with the specification taken at the true state
+and the solve started from a different guess. All 32 states agree with the
+exact-source library to a worst relative difference of 7.4e-13. The original's
+chemical potential variant derives its specification from the initial guess
+and is therefore a fixed point, which the native model reproduces and the
+test verifies.
 The [solid carbon dioxide qualification](solid.md#solid-carbon-dioxide) adds
 7 states with 13 quantities each: the Gibbs energy of solid carbon dioxide
 with its first and second temperature and pressure derivatives, the mixed

@@ -95,6 +95,10 @@ def load_probe():
     probe.query_solid_h2o_init.restype=None
     probe.query_solid_h2o.argtypes=[c_double,c_double,POINTER(c_double)]
     probe.query_solid_h2o.restype=None
+    probe.query_mut_solve.argtypes=[c_int,c_int,POINTER(c_char),POINTER(c_double),c_double,POINTER(c_double),POINTER(c_double),POINTER(c_int)]
+    probe.query_mut_solve.restype=None
+    probe.query_mut_target.argtypes=[c_int,c_double,POINTER(c_char),POINTER(c_double),c_int,POINTER(c_double),POINTER(c_int)]
+    probe.query_mut_target.restype=None
     return probe
 
 
@@ -156,6 +160,33 @@ def main(compiler_directory):
             probe.query_solid_co2(request['temperature'],request['pressure'],output,byref(count))
             values=list(map(float,output))[:count.value]
             print('THERMOPACK_RESULT='+json.dumps(dict(values=values)),flush=True)
+            continue
+        if request['mode']=='MU_T':
+            if probe is None:probe=load_probe()
+            components=request['components']
+            count=len(components)
+            from thermopack.cubic import cubic
+            key=('MU_T',tuple(components),request.get('eos','PR'))
+            if previous!=key:
+                model=cubic(",".join(components),request.get('eos','PR'));previous=key
+            model.activate()
+            names=bytearray(b' '*20*count)
+            for index,identifier in enumerate(components):
+                names[index*20:index*20+20]=identifier.encode()[:20].ljust(20,b' ')
+            densities=(c_double*count)(*request['densities'])
+            if request['kind']=='TARGET':
+                values=(c_double*count)();number=c_int()
+                probe.query_mut_target(count,request['temperature'],
+                                       (c_char*len(names)).from_buffer_copy(bytes(names)),
+                                       densities,int(request.get('target_kind',0)),values,byref(number))
+                print('THERMOPACK_RESULT='+json.dumps(dict(values=list(map(float,values))[:number.value])),flush=True)
+                continue
+            target=(c_double*count)(*request['target'])
+            values=(c_double*count)();status=c_int()
+            probe.query_mut_solve(count,0 if request['kind']=='MU' else 1,
+                                  (c_char*len(names)).from_buffer_copy(bytes(names)),
+                                  densities,request['temperature'],target,values,byref(status))
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=list(map(float,values)),status=status.value)),flush=True)
             continue
         if request['mode']=='SOLID_LINE':
             if probe is None:probe=load_probe()

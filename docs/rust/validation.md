@@ -66,6 +66,7 @@ python tools/rust_port/validate_spinodal.py
 python tools/rust_port/validate_joule_thompson.py
 python tools/rust_port/validate_virial.py
 python tools/rust_port/validate_virial_matrix.py
+python tools/rust_port/validate_ljs.py
 python tools/rust_port/validate_critical.py
 python tools/rust_port/validate_mut_solve.py
 python tools/rust_port/validate_hyperdual.py
@@ -308,6 +309,11 @@ the Peng-Robinson equation of state and the methane-propane mixture in the
 Soave-Redlich-Kwong equation of state. The matrix of the pure and the cross
 second virial coefficients matches with a relative 1e-3, and the observed
 worst relative difference is 1.5e-4.
+The [Lennard-Jones splined qualification](ljs.md) adds 8 cases of the original
+`calc_ai_reduced_LJs_ex` and `ljs_bh_get_bh_diameter_div_sigma`: the three
+reduced perturbation terms and the reduced Barker-Henderson hard-sphere
+diameter of the splined Lennard-Jones model. The four quantities match with a
+relative 1e-10, and the observed worst relative difference is 1.5e-12.
 The [critical point qualification](spinodal.md#critical-points) adds 7 cases of
 the original `calcCriticalTV`: methane, carbon dioxide, propane and water in
 the Peng-Robinson equation of state, nitrogen and methane in the

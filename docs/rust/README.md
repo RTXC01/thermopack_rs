@@ -126,6 +126,8 @@ the single point grid defect of the original.
 The [stability limit notes](spinodal.md) cover the meta stability limit of a
 pure fluid, the point of the limit at a given pressure, the two branches of
 the limit and the Joule-Thomson inversion.
+The [Lennard-Jones splined notes](ljs.md) cover the reduced perturbation terms
+and the Barker-Henderson hard-sphere diameter of the splined model.
 
 The [FMT notes](fmt.md) cover all three fundamental-measure functionals,
 analytic Hessians, source arithmetic compatibility and native grid measurements.

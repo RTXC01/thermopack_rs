@@ -35,6 +35,7 @@ pub mod ideal;
 pub mod isolines;
 pub mod joule_thompson;
 pub mod lee_kesler;
+pub mod ljs;
 pub mod mbwr;
 pub mod multiparameter;
 pub mod multiparameter_data;

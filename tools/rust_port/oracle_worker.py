@@ -206,6 +206,16 @@ def main(compiler_directory):
             values=[float(temperature),float(volume),float(pressure)]
             print('THERMOPACK_RESULT='+json.dumps(dict(values=values)),flush=True)
             continue
+        if request['mode']=='LJS':
+            from thermopack.ljs_bh import ljs_bh
+            model=ljs_bh(request.get('parameter_reference','Default'),2.0)
+            t_star=request['reduced_temperature']
+            rho_star=request['reduced_density']
+            first,second,third=model.get_pert_a(t_star,rho_star)
+            diameter=model.get_bh_diameter_div_sigma(t_star)
+            values=[float(first),float(second),float(third),float(diameter)]
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=values)),flush=True)
+            continue
         if request['mode']=='THIRD_VIRIAL_MATRIX':
             if probe is None:probe=load_probe()
             probe.query_binary_third_virial_matrix.argtypes=[c_double,POINTER(c_double),POINTER(c_int)]

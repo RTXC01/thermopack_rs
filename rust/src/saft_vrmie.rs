@@ -1149,7 +1149,7 @@ fn calc_mie_potential_full(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn calc_hardsphere_diameter_pure(
+pub(crate) fn calc_hardsphere_diameter_pure(
     temperature: f64,
     sigma: f64,
     eps_depth_divk: f64,

@@ -96,6 +96,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             && fields[0] != "VIRIAL"
             && fields[0] != "VIRIALMATRIX"
             && fields[0] != "THIRDVIRIALMATRIX"
+            && fields[0] != "LJS"
             && fields[0] != "CRITICAL"
             && fields.len() != 6
         {
@@ -118,6 +119,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!(
                 "{:.17e},{:.17e},{:.17e}",
                 point.temperature, point.volume, point.pressure
+            );
+            continue;
+        }
+        if fields[0] == "LJS" {
+            let reduced_temperature: f64 = fields[1].parse().unwrap();
+            let reduced_density: f64 = fields[2].parse().unwrap();
+            let model = thermopack_rs::ljs::LjsBh::new();
+            let (first, second, third) =
+                model.reduced_perturbation_terms(reduced_temperature, reduced_density)?;
+            let diameter = model.diameter_div_sigma(reduced_temperature)?;
+            println!(
+                "{:.17e},{:.17e},{:.17e},{:.17e}",
+                first, second, third, diameter
             );
             continue;
         }

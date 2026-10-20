@@ -59,6 +59,8 @@ python tools/rust_port/validate_unifac.py
 python tools/rust_port/validate_unifac_cubic.py
 python tools/rust_port/validate_solid_lines.py
 python tools/rust_port/validate_solid_co2.py
+python tools/rust_port/validate_mut_solve.py
+python tools/rust_port/validate_hyperdual.py
 ```
 
 On Windows add `--compiler-directory /path/to/gfortran/bin` to the validation
@@ -285,3 +287,10 @@ CI contains native Windows/Linux/macOS checks and a Linux exact-source build
 that regenerates comparisons. It has been configured locally; hosted CI has
 not run yet. Original pFUnit/Python example suites and models outside the
 coverage ledger's qualified subset remain pending.
+
+The [hyperdual qualification](hyperdual.md) adds 6 states covering the first,
+second, third and zero differentiation order, with the twelve elementary
+functions of the calculus and their eight components each. All 6 states agree
+with the exact-source library and the largest observed relative difference is
+zero. The third order derivative of the arc tangent reproduces the double
+power that the original writes.

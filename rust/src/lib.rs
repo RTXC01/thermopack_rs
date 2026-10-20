@@ -29,6 +29,7 @@ pub mod flash;
 pub mod fmt;
 pub mod helmholtz;
 mod hydrogen;
+pub mod hyperdual;
 pub mod ideal;
 pub mod lee_kesler;
 pub mod mbwr;

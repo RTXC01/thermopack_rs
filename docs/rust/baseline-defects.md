@@ -229,6 +229,15 @@ analytic derivatives without the reciprocal floor. Both retain the source
 max(1-n3,1e-12) branch and raw, cancellation-sensitive White Bear formulas.
 See [FMT qualification](fmt.md) for singular states and numerical scope.
 
+## Hyperdual arc tangent third derivative
+
+`atanHyperDual` writes `deriv**3**v1%f1` for the last term of its third
+order derivative, which is a double power: the exponent of the derivative is
+three raised to the first derivative of the argument. The native
+`hyperdual::HyperDual::atan` preserves that expression, and the
+[hyperdual qualification](hyperdual.md) confirms that all eight components of
+all twelve elementary functions agree with the exact-source library.
+
 ## Lennard-Jones meos sound mass units
 
 `constructor_LJ` copies `compdb%mw` in g/mol into `meos%molarMass`, a field

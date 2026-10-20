@@ -983,3 +983,49 @@ subroutine query_mut_target(ncomponents,temperature,components,densities,kind,re
   nce = saved_nce
   count = n
 end subroutine query_mut_target
+
+! Evaluate the original hyperdual elementary functions.
+! The inputs are the value, the three first order derivatives and the three
+! mixed derivatives, followed by the overall differentiation order. The result
+! holds the eight components of twelve functions.
+subroutine query_hyperdual(inputs,values,count) bind(C,name='query_hyperdual')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use hyperdual_mod, only: hyperdual, exp, log, sqrt, sin, cos, tan, sinh, cosh, tanh, &
+       asin, acos, atan
+  implicit none
+  real(c_double), intent(in) :: inputs(9)
+  real(c_double), intent(out) :: values(96)
+  integer(c_int), intent(out) :: count
+  ! Locals
+  type(hyperdual) :: x
+  integer :: i
+  x%f0=inputs(1);x%f1=inputs(2);x%f2=inputs(3);x%f3=inputs(4)
+  x%f12=inputs(5);x%f13=inputs(6);x%f23=inputs(7);x%f123=inputs(8)
+  x%order=int(inputs(9))
+  call store(0,exp(x))
+  call store(1,log(x))
+  call store(2,sqrt(x))
+  call store(3,sin(x))
+  call store(4,cos(x))
+  call store(5,tan(x))
+  call store(6,sinh(x))
+  call store(7,cosh(x))
+  call store(8,tanh(x))
+  call store(9,asin(x))
+  call store(10,acos(x))
+  call store(11,atan(x))
+  count=96
+contains
+  subroutine store(offset,v)
+    integer, intent(in) :: offset
+    type(hyperdual), intent(in) :: v
+    values(offset*8+1)=v%f0
+    values(offset*8+2)=v%f1
+    values(offset*8+3)=v%f2
+    values(offset*8+4)=v%f3
+    values(offset*8+5)=v%f12
+    values(offset*8+6)=v%f13
+    values(offset*8+7)=v%f23
+    values(offset*8+8)=v%f123
+  end subroutine store
+end subroutine query_hyperdual

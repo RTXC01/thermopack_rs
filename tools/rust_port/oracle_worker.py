@@ -99,6 +99,8 @@ def load_probe():
     probe.query_mut_solve.restype=None
     probe.query_mut_target.argtypes=[c_int,c_double,POINTER(c_char),POINTER(c_double),c_int,POINTER(c_double),POINTER(c_int)]
     probe.query_mut_target.restype=None
+    probe.query_hyperdual.argtypes=[POINTER(c_double),POINTER(c_double),POINTER(c_int)]
+    probe.query_hyperdual.restype=None
     return probe
 
 
@@ -160,6 +162,13 @@ def main(compiler_directory):
             probe.query_solid_co2(request['temperature'],request['pressure'],output,byref(count))
             values=list(map(float,output))[:count.value]
             print('THERMOPACK_RESULT='+json.dumps(dict(values=values)),flush=True)
+            continue
+        if request['mode']=='HYPERDUAL':
+            if probe is None:probe=load_probe()
+            inputs=(c_double*9)(*request['inputs'])
+            values=(c_double*96)();count=c_int()
+            probe.query_hyperdual(inputs,values,byref(count))
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=list(map(float,values))[:count.value])),flush=True)
             continue
         if request['mode']=='MU_T':
             if probe is None:probe=load_probe()

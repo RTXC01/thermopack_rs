@@ -87,7 +87,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for line in io::stdin().lock().lines() {
         let line = line?;
         let fields: Vec<_> = line.split('|').collect();
-        if fields[0] != "SOLIDCO2" && fields.len() != 6 {
+        if fields[0] != "SOLIDCO2" && fields[0] != "HYPERDUAL" && fields.len() != 6 {
             return Err("expected six fields".into());
         }
         if fields[0] == "MEOS" {
@@ -323,6 +323,51 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 model.heat_capacity(temperature, pressure),
                 model.speed_of_sound(temperature, pressure),
             ];
+            println!(
+                "{}",
+                values
+                    .iter()
+                    .map(|v| format!("{v:.17e}"))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            );
+            continue;
+        }
+        if fields[0] == "HYPERDUAL" {
+            let inputs: Vec<f64> = fields[1]
+                .split(',')
+                .map(|value| value.parse().unwrap())
+                .collect();
+            let mut number =
+                thermopack_rs::hyperdual::HyperDual::with_order(inputs[0], inputs[8] as u8);
+            number.f1 = inputs[1];
+            number.f2 = inputs[2];
+            number.f3 = inputs[3];
+            number.f12 = inputs[4];
+            number.f13 = inputs[5];
+            number.f23 = inputs[6];
+            number.f123 = inputs[7];
+            let functions: Vec<thermopack_rs::hyperdual::HyperDual> = vec![
+                number.exp(),
+                number.ln(),
+                number.sqrt(),
+                number.sin(),
+                number.cos(),
+                number.tan(),
+                number.sinh(),
+                number.cosh(),
+                number.tanh(),
+                number.asin(),
+                number.acos(),
+                number.atan(),
+            ];
+            let mut values = Vec::with_capacity(96);
+            for value in functions {
+                values.extend([
+                    value.f0, value.f1, value.f2, value.f3, value.f12, value.f13, value.f23,
+                    value.f123,
+                ]);
+            }
             println!(
                 "{}",
                 values

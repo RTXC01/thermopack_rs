@@ -757,6 +757,61 @@ impl Cubic {
             .map_err(|e| e.clone())
     }
 
+    /// The matrix of the third virial coefficients of a binary model.
+    ///
+    /// This is the native form of the original `binaryThirdVirialCoeffMatrix`,
+    /// which is only defined for a binary system. The pure coefficients come
+    /// from the pure fluids. The cross coefficient of the pair follows from
+    /// the two unsymmetric mixtures of the pair, with the linear system of the
+    /// original. The matrix is stored row by row.
+    pub fn binary_third_virial_coefficient_matrix(&self, temperature: f64) -> Result<Vec<f64>> {
+        let count = self.components().len();
+        if count != 2 {
+            return Err(Error::InvalidInput(
+                "the third virial coefficient matrix is only defined for a binary model",
+            ));
+        }
+        let mut matrix = vec![0.0; 4];
+        for i in 0..count {
+            let mut composition = vec![0.0; count];
+            composition[i] = 1.0;
+            let state = self.prepare(temperature, &composition)?;
+            matrix[i * count + i] = state.virial_coefficients()?.1;
+        }
+        let share = 0.75;
+        // The two mixtures of the pair with the right hand side of the system
+        // of the original.
+        let mut mixtures = [(0.0, 0.0, 0.0); 2];
+        for (index, (first, second)) in [(share, 1.0 - share), (1.0 - share, share)]
+            .into_iter()
+            .enumerate()
+        {
+            let mut composition = vec![0.0; count];
+            composition[0] = first;
+            composition[1] = second;
+            let state = self.prepare(temperature, &composition)?;
+            let mixed = state.virial_coefficients()?.1;
+            let right =
+                -mixed + matrix[0] * first * first * first + matrix[3] * second * second * second;
+            mixtures[index] = (first, second, right);
+        }
+        let (one, two, three) = mixtures[0];
+        let (four, five, six) = mixtures[1];
+        let a11 = 3.0 * one * one * two;
+        let a12 = 3.0 * two * two * one;
+        let a21 = 3.0 * four * four * five;
+        let a22 = 3.0 * (1.0 - share) * five * five * four;
+        let determinant = a11 * a22 - a12 * a21;
+        if determinant == 0.0 || !determinant.is_finite() {
+            return Err(Error::NotConverged(
+                "the third virial coefficient system of the original",
+            ));
+        }
+        matrix[1] = (three * a22 - a12 * six) / determinant;
+        matrix[2] = (a11 * six - three * a21) / determinant;
+        Ok(matrix)
+    }
+
     /// The matrix of the second virial coefficients of the model.
     ///
     /// The pure coefficients and the cross coefficients follow the original

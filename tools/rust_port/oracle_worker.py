@@ -206,6 +206,18 @@ def main(compiler_directory):
             values=[float(temperature),float(volume),float(pressure)]
             print('THERMOPACK_RESULT='+json.dumps(dict(values=values)),flush=True)
             continue
+        if request['mode']=='THIRD_VIRIAL_MATRIX':
+            if probe is None:probe=load_probe()
+            probe.query_binary_third_virial_matrix.argtypes=[c_double,POINTER(c_double),POINTER(c_int)]
+            probe.query_binary_third_virial_matrix.restype=None
+            eos,comps=request['eos'],request['components']
+            from thermopack.cubic import cubic
+            model=cubic(",".join(comps),eos)
+            model.activate()
+            values=(c_double*4)();number=c_int()
+            probe.query_binary_third_virial_matrix(request['temperature'],values,byref(number))
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=list(map(float,values))[:number.value])),flush=True)
+            continue
         if request['mode']=='VIRIAL_MATRIX':
             if probe is None:probe=load_probe()
             probe.query_second_virial_matrix.argtypes=[c_double,POINTER(c_double),POINTER(c_int)]

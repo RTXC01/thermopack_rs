@@ -102,3 +102,19 @@ the exact-source library. A reference probe calls the original routine.
 
 The committed fixture is `tests/fixtures/virial_matrix.csv`; the test is
 `tests/virial_matrix.rs`.
+
+## The matrix of the third virial coefficients
+
+The original `binaryThirdVirialCoeffMatrix` fills the matrix of the pure and
+the cross third virial coefficients of a binary model. The native method
+`Cubic::binary_third_virial_coefficient_matrix` builds the same matrix with
+the linear system of the original, which is not symmetric, so the two cross
+coefficients of a pair differ.
+
+The third virial coefficient of the original is the difference of two large
+terms of the finite volume estimate, so it carries the cancellation of that
+estimate. The values of the original are therefore much larger than the
+analytic values of the equation of state, and the native values follow the
+analytic values. The two differ, and the matrix is not compared with the
+original, in the same way as the third virial coefficient itself. The test
+`tests/third_virial_matrix.rs` checks the structure of the native matrix.

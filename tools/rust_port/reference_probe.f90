@@ -1102,3 +1102,25 @@ subroutine query_second_virial_matrix(temperature,values,count) &
     end do
   end do
 end subroutine query_second_virial_matrix
+
+! Evaluate the matrix of the third virial coefficients of the original.
+subroutine query_binary_third_virial_matrix(temperature,values,count) &
+     bind(C,name='query_binary_third_virial_matrix')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use thermopack_var, only: nc
+  use eosTV, only: binaryThirdVirialCoeffMatrix
+  implicit none
+  real(c_double), value :: temperature
+  real(c_double), intent(out) :: values(4)
+  integer(c_int), intent(out) :: count
+  ! Locals
+  real :: Cmat(nc,nc)
+  integer :: i,j
+  call binaryThirdVirialCoeffMatrix(temperature,Cmat)
+  count = nc*nc
+  do j=1,nc
+    do i=1,nc
+      values((j-1)*nc+i) = Cmat(i,j)
+    end do
+  end do
+end subroutine query_binary_third_virial_matrix

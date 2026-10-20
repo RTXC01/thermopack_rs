@@ -190,6 +190,17 @@ def main(compiler_directory):
                                         request['ln_spec'],result,byref(status))
             print('THERMOPACK_RESULT='+json.dumps(dict(values=list(map(float,result)),status=status.value)),flush=True)
             continue
+        if request['mode']=='SPINODAL':
+            eos,comps=request['eos'],request['components']
+            from thermopack.cubic import cubic
+            model=cubic(",".join(comps),eos)
+            model.activate()
+            z=request['feed']
+            phase=model.LIQPH if request['phase']==1 else model.VAPPH
+            temperature,volume=model.spinodal_point(z,request['pressure'],phase)
+            values=[float(temperature),float(volume),float(request['pressure'])]
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=values)),flush=True)
+            continue
         if request['mode']=='ISOLINE':
             eos,comps=request['eos'],request['components']
             from thermopack.cubic import cubic

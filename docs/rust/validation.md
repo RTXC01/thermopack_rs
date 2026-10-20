@@ -62,6 +62,7 @@ python tools/rust_port/validate_solid_co2.py
 python tools/rust_port/validate_solid_saturation.py
 python tools/rust_port/validate_pseudo_components.py
 python tools/rust_port/validate_isolines.py
+python tools/rust_port/validate_spinodal.py
 python tools/rust_port/validate_mut_solve.py
 python tools/rust_port/validate_hyperdual.py
 ```
@@ -275,6 +276,14 @@ the molar volume, the molar entropy and the molar enthalpy of every point
 match with a relative 1e-6, and the observed worst relative difference is
 1.4e-9. The not-a-number point of the original, which a grid of one point
 produces, is reproduced.
+The [stability limit qualification](spinodal.md) adds 12 cases of the original
+`initial_stab_limit_point`: the liquid and the vapor branch of the meta
+stability limit of methane and of carbon dioxide in the Peng-Robinson
+equation of state and the two branches of methane in the Soave-Redlich-Kwong
+equation of state. The temperature and the molar volume of the point match
+with an absolute 1e-6 K and an absolute 1e-10 cubic metre per mole, and the
+observed worst relative difference is 1.4e-9, which is the tolerance of the
+source solver.
 The [multiparameter density qualification](multiparameter.md#density-iteration)
 adds 1694 attempted density solves over the fourteen model configurations: 1669
 states match the exact-source library, including the density, the raw phase

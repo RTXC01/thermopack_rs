@@ -123,6 +123,9 @@ from them.
 The [iso-line notes](isolines.md) cover the isotherms and the isobars of the
 cubic model, the split of the grid of a pure fluid at the saturation state and
 the single point grid defect of the original.
+The [stability limit notes](spinodal.md) cover the meta stability limit of a
+pure fluid, the point of the limit at a given pressure and the two branches of
+the limit.
 
 The [FMT notes](fmt.md) cover all three fundamental-measure functionals,
 analytic Hessians, source arithmetic compatibility and native grid measurements.

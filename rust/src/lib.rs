@@ -48,6 +48,7 @@ pub mod solid_co2;
 pub mod solid_data;
 pub mod solid_saturation;
 pub mod solid_water;
+pub mod spinodal;
 pub mod translation;
 pub mod unifac;
 pub mod unifac_data;

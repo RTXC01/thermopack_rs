@@ -1348,6 +1348,20 @@ impl PreparedState<'_> {
         Ok(pressure)
     }
 
+    /// The second volume derivative of the pressure at constant temperature
+    /// in pascal mole squared per cubic metre. The volume translation is a
+    /// constant shift and does not change it.
+    pub fn pressure_second_derivative(&self, volume: f64) -> Result<f64> {
+        self.volume_check(volume)?;
+        let (d1, d2) = self.model.kind.deltas();
+        let eos = self.eos_volume(volume);
+        let free = eos - self.b;
+        let denom = (eos + d1 * self.b) * (eos + d2 * self.b);
+        let slope = 2.0 * eos + (d1 + d2) * self.b;
+        Ok(2.0 * R * self.temperature / (free * free * free)
+            + self.a * (2.0 / (denom * denom) - 2.0 * slope * slope / (denom * denom * denom)))
+    }
+
     #[inline]
     fn eos_pressure(&self, volume: f64) -> Result<Pressure> {
         if !volume.is_finite() || volume <= self.b {

@@ -120,6 +120,9 @@ analytic derivatives, source/physical heat capacity and native-loop measurements
 The [pseudo component notes](pseudo-components.md) cover the user supplied
 critical data of the pseudo components and the cubic equation of state built
 from them.
+The [iso-line notes](isolines.md) cover the isotherms and the isobars of the
+cubic model, the split of the grid of a pure fluid at the saturation state and
+the single point grid defect of the original.
 
 The [FMT notes](fmt.md) cover all three fundamental-measure functionals,
 analytic Hessians, source arithmetic compatibility and native grid measurements.

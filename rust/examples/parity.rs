@@ -90,9 +90,62 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if fields[0] != "SOLIDCO2"
             && fields[0] != "HYPERDUAL"
             && fields[0] != "PSEUDOC"
+            && fields[0] != "ISOLINE"
             && fields.len() != 6
         {
             return Err("expected six fields".into());
+        }
+        if fields[0] == "ISOLINE" {
+            let kind = match fields[1] {
+                "SRK" => thermopack_rs::CubicKind::SoaveRedlichKwong,
+                "RK" => thermopack_rs::CubicKind::RedlichKwong,
+                "VDW" => thermopack_rs::CubicKind::VanDerWaals,
+                _ => thermopack_rs::CubicKind::PengRobinson,
+            };
+            let components: Vec<&str> = fields[2].split(',').collect();
+            let composition: Vec<f64> = fields[3]
+                .split(',')
+                .map(|value| value.parse().unwrap())
+                .collect();
+            let specification: f64 = fields[4].parse().unwrap();
+            let minimum: f64 = fields[5].parse().unwrap();
+            let maximum: f64 = fields[6].parse().unwrap();
+            let points: usize = fields[7].parse().unwrap();
+            let model = thermopack_rs::Cubic::new(kind, &components)?;
+            let line = match fields[8] {
+                "isobar" => thermopack_rs::isolines::isobar(
+                    &model,
+                    specification,
+                    minimum,
+                    maximum,
+                    &composition,
+                    points,
+                )?,
+                _ => thermopack_rs::isolines::isotherm(
+                    &model,
+                    specification,
+                    minimum,
+                    maximum,
+                    &composition,
+                    points,
+                )?,
+            };
+            let mut text = String::new();
+            for index in 0..line.temperature.len() {
+                if index > 0 {
+                    text.push(';');
+                }
+                text.push_str(&format!(
+                    "{:.17e},{:.17e},{:.17e},{:.17e},{:.17e}",
+                    line.temperature[index],
+                    line.pressure[index],
+                    line.volume[index],
+                    line.entropy[index],
+                    line.enthalpy[index]
+                ));
+            }
+            println!("{text}");
+            continue;
         }
         if fields[0] == "PSEUDOC" {
             let kind = match fields[1] {

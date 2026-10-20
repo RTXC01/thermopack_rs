@@ -190,6 +190,24 @@ def main(compiler_directory):
                                         request['ln_spec'],result,byref(status))
             print('THERMOPACK_RESULT='+json.dumps(dict(values=list(map(float,result)),status=status.value)),flush=True)
             continue
+        if request['mode']=='ISOLINE':
+            eos,comps=request['eos'],request['components']
+            from thermopack.cubic import cubic
+            model=cubic(",".join(comps),"SRK" if eos=="RK" else eos)
+            model.activate()
+            z=request['feed']
+            points=request.get('points',20)
+            if request['line']=='isobar':
+                t,v,s,h=model.get_isobar(request['pressure'],z,
+                                        request['minimum'],request['maximum'],points)
+            else:
+                t,v,s,h=model.get_isotherm(request['temperature'],z,
+                                         request['minimum'],request['maximum'],points)
+            arrays=[list(map(float,values)) for values in (t,v,s,h)]
+            # The source writes a not-a-number point into a grid of one point,
+            # so the isolines may carry that value.
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=arrays)),flush=True)
+            continue
         if request['mode']=='PSEUDO_COMPONENT':
             from thermopack.cubic import cubic
             comps=request['components']

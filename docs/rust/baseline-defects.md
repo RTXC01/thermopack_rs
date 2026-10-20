@@ -280,3 +280,24 @@ A native ideal mixture is therefore not qualified and the model stays
 pending. The pure model kernels, their density iteration and their state
 functions are qualified separately.
 See [pure multiparameter qualification](multiparameter.md).
+## Iso-line grid of a single point is not a number
+
+src/isolines.f90:linspace divides by the number of intervals of the grid,
+so a grid of one point holds a not-a-number value instead of the limit of
+the grid. The pure fluid branch of isotherm and isobar splits the grid at
+the saturation state, and the number of points of the two branches follows
+the original formula
+
+    n_vap = ceiling(n (P_sat - P_min) / (P_max - P_min))
+
+reduced by one when it exceeds half of the grid. That count can be one, and
+the original then reports a not-a-number pressure with not-a-number volume,
+entropy and enthalpy for that point. The isotherm of methane at 150 K from
+1e5 Pa to 1e7 Pa with ten points is such a case, because the saturation
+pressure of methane at 150 K is 1047350.03 Pa and the vapor branch holds a
+single point.
+
+The native model reproduces the not-a-number value, because the parity of the
+grid depends on it, and the qualification compares the not-a-number values of
+both models.
+See [iso-line qualification](isolines.md).

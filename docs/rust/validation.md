@@ -61,6 +61,7 @@ python tools/rust_port/validate_solid_lines.py
 python tools/rust_port/validate_solid_co2.py
 python tools/rust_port/validate_solid_saturation.py
 python tools/rust_port/validate_pseudo_components.py
+python tools/rust_port/validate_isolines.py
 python tools/rust_port/validate_mut_solve.py
 python tools/rust_port/validate_hyperdual.py
 ```
@@ -265,6 +266,13 @@ and a pseudo component with a real fluid, in the Peng-Robinson and the
 Soave-Redlich-Kwong equations of state. The molar volume, the enthalpy, the
 entropy and the compressibility factor match with a relative 1e-10, and the
 observed worst relative difference is 7.9e-15.
+The [iso-line qualification](isolines.md) adds 9 cases of the original
+`isotherm` and `isobar`: isotherms and isobars of two pure fluids and of two
+mixtures in the Peng-Robinson and the Soave-Redlich-Kwong equations of state.
+The pressure or the temperature of every point, the molar volume, the molar
+entropy and the molar enthalpy match with a relative 1e-6, and the observed
+worst relative difference is 8.9e-10. The not-a-number point of the original,
+which a grid of one point produces, is reproduced.
 The [multiparameter density qualification](multiparameter.md#density-iteration)
 adds 1694 attempted density solves over the fourteen model configurations: 1669
 states match the exact-source library, including the density, the raw phase

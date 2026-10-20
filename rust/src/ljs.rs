@@ -182,6 +182,31 @@ impl LjsBh {
         let third = polynomial(2, tau, reduced_density);
         Ok((first, second, third))
     }
+
+    /// One polynomial of the spline of the excess energy and its partial
+    /// derivatives.
+    ///
+    /// The derivatives are the ones of the source: the first and the second
+    /// derivative with respect to the reduced temperature, the first and the
+    /// second derivative with respect to the reduced density and the mixed
+    /// derivative.
+    pub fn spline_polynomial(
+        &self,
+        index: usize,
+        reduced_temperature: f64,
+        reduced_density: f64,
+    ) -> Result<(f64, f64, f64, f64, f64, f64)> {
+        let temperature = reduced_temperature * self.eps;
+        let (diameter, _, _) = self.diameter(temperature)?;
+        let x0 = self.sigma / diameter;
+        let tau = 1.0 - 1.0 / x0;
+        Ok(polynomial_with_derivatives(
+            index,
+            tau,
+            reduced_density,
+            1.0,
+        ))
+    }
 }
 
 /// One polynomial of the spline of the excess energy.
@@ -190,23 +215,74 @@ impl LjsBh {
 /// polynomial of the term `index` uses the coefficients of the columns zero
 /// to four, five to nine and ten to fourteen of that row.
 fn polynomial(index: usize, tau: f64, rho: f64) -> f64 {
-    // The powers of the reduced density, the fifth power first.
+    polynomial_with_derivatives(index, tau, rho, 1.0).0
+}
+
+/// One polynomial of the spline of the excess energy with its partial
+/// derivatives and the prefactor of the source.
+fn polynomial_with_derivatives(
+    index: usize,
+    tau: f64,
+    rho: f64,
+    prefactor: f64,
+) -> (f64, f64, f64, f64, f64, f64) {
+    // The powers of the reduced density and their first two derivatives, the
+    // fifth power first.
     let mut powers = [0.0; 5];
     powers[4] = rho;
     for position in (0..4).rev() {
         powers[position] = powers[position + 1] * rho;
     }
-    // The three polynomials in the reduced temperature.
-    let g = [1.0, tau, tau * tau];
+    let mut first = [0.0; 5];
+    first[4] = 1.0;
+    first[3] = 2.0 * rho;
+    first[2] = 3.0 * powers[3];
+    first[1] = 4.0 * powers[2];
+    first[0] = 5.0 * powers[1];
+    let mut second = [0.0; 5];
+    second[4] = 0.0;
+    second[3] = 2.0;
+    second[2] = 6.0 * rho;
+    second[1] = 12.0 * powers[3];
+    second[0] = 20.0 * powers[2];
+    // The three polynomials in the reduced temperature and their first two
+    // derivatives.
+    let g = [
+        [1.0, 0.0, 0.0],
+        [tau, 1.0, 0.0],
+        [tau * tau, 2.0 * tau, 2.0],
+    ];
     let mut value = 0.0;
+    let mut value_x = 0.0;
+    let mut value_r = 0.0;
+    let mut value_xx = 0.0;
+    let mut value_rr = 0.0;
+    let mut value_rx = 0.0;
     for (position, block) in [0usize, 5, 10].into_iter().enumerate() {
         let mut sum = 0.0;
+        let mut sum_first = 0.0;
+        let mut sum_second = 0.0;
         for column in 0..5 {
-            sum += POLYNOMIALS[(block + column) * 4 + index] * powers[column];
+            let coefficient = POLYNOMIALS[(block + column) * 4 + index];
+            sum += coefficient * powers[column];
+            sum_first += coefficient * first[column];
+            sum_second += coefficient * second[column];
         }
-        value += sum * g[position];
+        value += sum * g[position][0];
+        value_x += sum * g[position][1];
+        value_r += sum_first * g[position][0];
+        value_xx += sum * g[position][2];
+        value_rr += sum_second * g[position][0];
+        value_rx += sum_first * g[position][1];
     }
-    value
+    (
+        prefactor * value,
+        prefactor * value_r,
+        prefactor * value_x,
+        prefactor * value_rr,
+        prefactor * value_xx,
+        prefactor * value_rx,
+    )
 }
 
 /// The isothermal compressibility factor of the hard-sphere reference, the

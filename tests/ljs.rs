@@ -38,6 +38,34 @@ fn ljs_terms_match_the_source() {
 }
 
 #[test]
+fn the_spline_polynomials_match_the_source() {
+    let model = LjsBh::new();
+    let mut checked = 0;
+    for row in include_str!("fixtures/ljs_spline.csv").lines().skip(1) {
+        let fields: Vec<_> = row.split(';').collect();
+        let case = fields[0];
+        let parts: Vec<_> = case.split('|').collect();
+        let reduced_temperature: f64 = parts[0].parse().unwrap();
+        let reduced_density: f64 = parts[1].parse().unwrap();
+        let index: usize = parts[2].parse().unwrap();
+        let source: Vec<f64> = fields[1..].iter().map(|v| v.parse().unwrap()).collect();
+        let native = model
+            .spline_polynomial(index, reduced_temperature, reduced_density)
+            .unwrap();
+        let native = [native.0, native.1, native.2, native.3, native.4, native.5];
+        assert_eq!(native.len(), source.len(), "{case}");
+        for (position, (source, native)) in source.iter().zip(native.iter()).enumerate() {
+            assert!(
+                (source - native).abs() <= ATOL + RTOL * source.abs(),
+                "{case} entry {position}: source {source} native {native}"
+            );
+        }
+        checked += 1;
+    }
+    assert_eq!(checked, 8);
+}
+
+#[test]
 fn the_diameter_is_close_to_the_segment_diameter() {
     // The Barker-Henderson diameter of the argon record of the source is
     // close to its segment diameter over the reduced temperature range.

@@ -1103,6 +1103,34 @@ subroutine query_second_virial_matrix(temperature,values,count) &
   end do
 end subroutine query_second_virial_matrix
 
+! Evaluate one polynomial of the spline of the excess energy of the original,
+! with its partial derivatives.
+subroutine query_ljs_spline(t_star,rho_star,index,values,count) &
+     bind(C,name='query_ljs_spline')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use lj_splined, only: calc_ai_LJs_ex, ljs_bh_get_pure_params, &
+       ljs_bh_get_bh_diameter_div_sigma
+  implicit none
+  real(c_double), value :: t_star, rho_star
+  integer(c_int), value :: index
+  real(c_double), intent(out) :: values(6)
+  integer(c_int), intent(out) :: count
+  ! Locals
+  real :: sigma, eps, d_bh, tau
+  real :: a, a_r, a_x, a_rr, a_xx, a_rx
+  call ljs_bh_get_pure_params(sigma,eps)
+  call ljs_bh_get_bh_diameter_div_sigma(t_star,d_bh)
+  tau = 1.0 - d_bh
+  call calc_ai_LJs_ex(index+1,tau,rho_star,1.0,a,a_r,a_x,a_rr,a_xx,a_rx)
+  values(1)=a
+  values(2)=a_r
+  values(3)=a_x
+  values(4)=a_rr
+  values(5)=a_xx
+  values(6)=a_rx
+  count=6
+end subroutine query_ljs_spline
+
 ! Evaluate the matrix of the third virial coefficients of the original.
 subroutine query_binary_third_virial_matrix(temperature,values,count) &
      bind(C,name='query_binary_third_virial_matrix')

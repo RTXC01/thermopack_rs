@@ -12,14 +12,16 @@ second order term.
 | Original routine | Rust |
 | --- | --- |
 | `src/lj_splined.f90:calc_ai_reduced_LJs_ex` | `ljs::LjsBh::reduced_perturbation_terms` |
+| `src/lj_splined.f90:calc_ai_LJs_ex` | `ljs::LjsBh::spline_polynomial` |
 | `src/lj_splined.f90:ljs_bh_get_bh_diameter_div_sigma` | `ljs::LjsBh::diameter_div_sigma` |
 | `src/lj_splined.f90:init_LJs_bh` | `ljs::LjsBh::new`, `ljs::LjsBh::with_parameters` |
 | `src/lj_splined.f90:calcFresLJs_bh` | not yet ported |
 
 The native model provides the reduced perturbation terms and the reduced
-Barker-Henderson hard-sphere diameter, and the parameters of the model. The
-residual Helmholtz energy of the model, with its temperature, volume and
-composition derivatives, is not yet ported.
+Barker-Henderson hard-sphere diameter, the polynomials of the spline with
+their partial derivatives, and the parameters of the model. The residual
+Helmholtz energy of the model, with its temperature, volume and composition
+derivatives, is not yet ported.
 
 ## Method
 
@@ -53,6 +55,22 @@ reaches the original routines through `get_pert_a` and
   1e-12, and the observed worst relative difference is 1.5e-12.
 
 The committed fixture is `tests/fixtures/ljs.csv`; the test is `tests/ljs.rs`.
+
+`tools/rust_port/validate_ljs_spline.py` compares the polynomials of the
+spline and their partial derivatives against the exact-source library. The
+reference probe calls the original `calc_ai_LJs_ex` with the reduced
+temperature of the model.
+
+* 8 cases: the four polynomials of the spline over the reduced temperature and
+  the reduced density.
+* The compared quantities are the polynomial, the first and the second
+  derivative with respect to the reduced temperature, the first and the second
+  derivative with respect to the reduced density and the mixed derivative. All
+  8 cases match with a relative 1e-10, and the observed worst relative
+  difference is 3.1e-14.
+
+The committed fixture is `tests/fixtures/ljs_spline.csv`; the test is
+`tests/ljs.rs`.
 
 ## Remaining scope
 

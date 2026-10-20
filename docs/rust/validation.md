@@ -67,6 +67,7 @@ python tools/rust_port/validate_joule_thompson.py
 python tools/rust_port/validate_virial.py
 python tools/rust_port/validate_virial_matrix.py
 python tools/rust_port/validate_ljs.py
+python tools/rust_port/validate_ljs_spline.py
 python tools/rust_port/validate_critical.py
 python tools/rust_port/validate_mut_solve.py
 python tools/rust_port/validate_hyperdual.py
@@ -314,6 +315,12 @@ The [Lennard-Jones splined qualification](ljs.md) adds 8 cases of the original
 reduced perturbation terms and the reduced Barker-Henderson hard-sphere
 diameter of the splined Lennard-Jones model. The four quantities match with a
 relative 1e-10, and the observed worst relative difference is 1.5e-12.
+The [Lennard-Jones spline qualification](ljs.md) adds 8 cases of the original
+`calc_ai_LJs_ex`: the four polynomials of the spline of the excess energy and
+their partial derivatives. The polynomial, the first and the second
+derivative with respect to the reduced temperature, the first and the second
+derivative with respect to the reduced density and the mixed derivative match
+with a relative 1e-10, and the observed worst relative difference is 3.1e-14.
 The [critical point qualification](spinodal.md#critical-points) adds 7 cases of
 the original `calcCriticalTV`: methane, carbon dioxide, propane and water in
 the Peng-Robinson equation of state, nitrogen and methane in the

@@ -237,3 +237,37 @@ sound is smaller by sqrt(1000). The Rust `baseline_speed_of_sound` preserves
 that source value; normal sound and mass access use SI units. The source
 matrix checks the baseline and an independent thermodynamic identity checks
 physical sound. See [pure multiparameter qualification](multiparameter.md).
+
+## Multiparameter ideal mixture is unreachable and inconsistent
+
+`src/multiparameter_idealmix.f90` mixes the multiparameter equations of state
+with an ideal mixing rule, but the fork cannot construct that model. The
+`NIST_MEOS_MIX` label reaches `single_eos_allocate_and_init`, which accepts
+that label for a multicomponent model, and that routine then calls
+`single_eos_alloc` with the same label. `single_eos_alloc` only handles
+`NIST_MEOS`, `LJ_MEOS` and `LJTS_MEOS` and stops with "Wrong input for
+multiparameter EoS." for `NIST_MEOS_MIX`. The label therefore always
+terminates the caller, and the mixture model is unreachable through the
+public API.
+
+The mixture routines have further defects that a port cannot reproduce.
+`calc_multiparameter_idealmix_enthalpy` and `..._entropy` never assign their
+component pressure derivative, and requesting it also clears the component
+temperature derivative, so the reported enthalpy and entropy pressure
+derivatives are undefined. `..._Gres` assigns the total residual Gibbs energy
+to its pressure derivative.
+
+The composition derivative arrays are written one slot beyond the component
+index. For a two-component mixture of C3 and N-H2 at 200 K and 0.1 MPa the
+compressibility factor array of the original holds a zero in the first slot
+and the value of the first component in the second slot, and the value of the
+second component lands past the end of the array. The enthalpy, entropy,
+fugacity and derivative arrays show the same offset, and the last value of
+one array appears in the first slot of the next. The same library built with
+that module compiled at -O0 reproduces the offset, so it is not an
+optimization artifact of the qualified compiler.
+
+A native ideal mixture is therefore not qualified and the model stays
+pending. The pure model kernels, their density iteration and their state
+functions are qualified separately.
+See [pure multiparameter qualification](multiparameter.md).

@@ -1,3 +1,66 @@
+! Pure multiparameter kernel and constructor metadata, with source optional
+! properties left non-finite instead of dropping their otherwise valid states.
+subroutine query_meos(t,v,amount,reduced,values,metadata) bind(C,name='query_meos')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use thermopack_var, only: get_active_eos,base_eos_param
+  use eos_parameters, only: single_eos
+  use multiparameter_base, only: meos
+  use multiparameter_lj, only: meos_lj,init_LJTS
+  implicit none
+  real(c_double),value :: t,v,amount
+  integer(c_int),value :: reduced
+  real(c_double),intent(out) :: values(46),metadata(18)
+  class(base_eos_param),pointer :: active
+  class(meos),pointer :: fluid
+  type(meos_lj),target :: local
+  real :: a0(0:2,0:2),ar(0:2,0:2),rho,tau,delta,p,pr,pt,r
+  real :: a,at,av,att,atv,avv
+  real :: f,ft,fv,fn(1),ftt,ftv,ftn(1),fvv,fvn(1),fnn(1,1)
+  if (reduced==1) then
+    call init_LJTS(local)
+    fluid=>local
+  else
+    active=>get_active_eos()
+    select type(eos=>active)
+    class is(single_eos)
+      fluid=>eos%nist(1)%meos
+    class default
+      error stop 'Expected a multiparameter model'
+    end select
+  endif
+  rho=1/v;tau=fluid%tc/t;delta=rho/fluid%rc;r=fluid%Rgas_meos
+  call fluid%alpha0Derivs_taudelta(delta,tau,a0)
+  call fluid%alphaResDerivs_taudelta(delta,tau,ar)
+  values(1:6)=[a0(0,0),a0(0,1),a0(0,2),a0(1,0),a0(2,0),a0(1,1)]
+  values(7:12)=[ar(0,0),ar(0,1),ar(0,2),ar(1,0),ar(2,0),ar(1,1)]
+  call fluid%mp_pressure(rho,t,p,pr,pt)
+  values(13:15)=[p,pt,-rho*rho*pr]
+  call fluid%alphaDerivs_Tv(t,v,a,at,av,att,atv,avv)
+  values(16)=-r*t*t*at
+  values(17)=-r*(a+t*at)
+  values(18)=values(16)+p*v
+  values(19)=r*t*a
+  values(20)=values(19)+p*v
+  values(21)=fluid%cv(t,v)
+  values(22)=fluid%cp(t,v)
+  values(23)=ar(0,0)+ar(1,0)-log(1.+ar(1,0))
+  values(24)=fluid%speed_of_sound(t,v)
+  call fluid%calc_F(t,v*amount,[amount],f,ft,fv,fn,ftt,ftv,ftn,fvv,fvn,fnn)
+  values(25:34)=[f,ft,fv,fn(1),ftt,ftv,ftn(1),fvv,fvn(1),fnn(1,1)]
+  call fluid%calc_Fid(t,v*amount,[amount],f,ft,fv,fn,ftt,ftv,ftn,fvv,fvn,fnn)
+  values(35:44)=[f,ft,fv,fn(1),ftt,ftv,ftn(1),fvv,fvn(1),fnn(1,1)]
+  values(45:46)=[fluid%satDeltaEstimate(tau,1),fluid%satDeltaEstimate(tau,2)]
+  metadata=0.
+  metadata(1:11)=[fluid%tc,fluid%pc,fluid%rc,fluid%acf,fluid%molarMass,fluid%t_triple, &
+      fluid%p_triple,fluid%rhoLiq_triple,fluid%rhoVap_triple,fluid%Rgas_fit,fluid%Rgas_meos]
+  select type(eos=>fluid)
+  class is(meos_lj)
+    metadata(12:13)=[eos%maxT,eos%maxP]
+    if (reduced==0) metadata(14:15)=[eos%sigma,eos%eps_divk]
+    metadata(16:18)=[real(eos%upPol),real(eos%upExp),real(eos%upExpExp)]
+  end select
+end subroutine query_meos
+
 ! Direct FMT grid entry point; optional output combinations exercise all source branches.
 subroutine query_fmt(model,ngrid,n,flags,values) bind(C,name='query_fmt')
   use, intrinsic :: iso_c_binding, only: c_int,c_double

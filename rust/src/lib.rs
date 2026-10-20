@@ -77,7 +77,10 @@ pub use mbwr::{
     PreparedMbwrDensity, mbwr_records,
 };
 pub use mbwr::{MbwrResidualTp, MbwrTpDerivatives, MbwrTpQuantity};
-pub use multiparameter::{HelmholtzJet, Multiparameter, PreparedMultiparameter};
+pub use multiparameter::{
+    HelmholtzJet, LennardJonesKind, LennardJonesParameters, Multiparameter, MultiparameterState,
+    PreparedMultiparameter,
+};
 pub use multiparameter_data::{
     AncillarySatDensity, IdealGasHelmholtz, MultiparameterRecord, lookup_multiparameter_record,
 };

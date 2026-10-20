@@ -258,6 +258,14 @@ quantities per return. All 56 non-finite source returns are retained as errors.
 The analytic path has independent gradient/Hessian and bulk-limit tests;
 the source baseline retains operand order and reciprocal derivative floors.
 
+The [pure multiparameter qualification](multiparameter.md) adds 5082 states
+with 46 quantities and fourteen metadata vectors for five NIST fluids, eight
+LJ noble-gas fits and reduced LJTS. It includes extensive T/V/n derivatives,
+critical states, three mole amounts, non-finite source outputs and an explicit
+baseline for the source's LJ sound mass units. Source snapshots run in the
+oracle's process-main context; physical identity tests also run in normal
+test threads. This supersedes the earlier loose NIST smoke-test evidence.
+
 CI contains native Windows/Linux/macOS checks and a Linux exact-source build
 that regenerates comparisons. It has been configured locally; hosted CI has
 not run yet. Original pFUnit/Python example suites and models outside the

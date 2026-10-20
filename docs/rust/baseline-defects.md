@@ -228,3 +228,12 @@ preserves the floor and source operation order; `energy_density` computes
 analytic derivatives without the reciprocal floor. Both retain the source
 max(1-n3,1e-12) branch and raw, cancellation-sensitive White Bear formulas.
 See [FMT qualification](fmt.md) for singular states and numerical scope.
+
+## Lennard-Jones meos sound mass units
+
+`constructor_LJ` copies `compdb%mw` in g/mol into `meos%molarMass`, a field
+documented and used as kg/mol by the direct `speed_of_sound` method. Its
+sound is smaller by sqrt(1000). The Rust `baseline_speed_of_sound` preserves
+that source value; normal sound and mass access use SI units. The source
+matrix checks the baseline and an independent thermodynamic identity checks
+physical sound. See [pure multiparameter qualification](multiparameter.md).

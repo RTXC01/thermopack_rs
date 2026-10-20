@@ -90,6 +90,115 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if fields[0] != "SOLIDCO2" && fields.len() != 6 {
             return Err("expected six fields".into());
         }
+        if fields[0] == "MEOS" {
+            let outcome = (|| -> thermopack_rs::Result<Vec<f64>> {
+                use thermopack_rs::{LennardJonesKind, Multiparameter};
+                let config: Vec<_> = fields[1].split(':').collect();
+                let model = match config[0] {
+                    "LJ_MEOS" => Multiparameter::lennard_jones(config[1], LennardJonesKind::Full)?,
+                    "LJTS_MEOS" => Multiparameter::lennard_jones(
+                        config[1],
+                        LennardJonesKind::TruncatedShifted,
+                    )?,
+                    "LJTS_REDUCED" => Multiparameter::reduced_lennard_jones_truncated_shifted(),
+                    _ => Multiparameter::new(config[1])?,
+                };
+                if fields[5] == "META" {
+                    let r = model.record();
+                    let (mt, mp) = model.lennard_jones_limits().unwrap_or((0., 0.));
+                    let (sigma, eps) = model
+                        .lennard_jones_parameters()
+                        .map_or((0., 0.), |p| (p.sigma, p.epsilon_over_k));
+                    let (np, ne, ng) = if config[0] == "NIST_MEOS" {
+                        (0, 0, 0)
+                    } else {
+                        (
+                            r.pol_terms.len(),
+                            r.pol_terms.len() + r.exp_terms.len(),
+                            r.pol_terms.len() + r.exp_terms.len() + r.expexp_terms.len(),
+                        )
+                    };
+                    return Ok(vec![
+                        r.tc,
+                        r.pc,
+                        r.rc,
+                        r.acf,
+                        model.baseline_molar_mass(),
+                        r.t_triple,
+                        r.p_triple,
+                        r.rholiq_triple,
+                        r.rhovap_triple,
+                        r.rgas_fit,
+                        model.gas_constant(),
+                        mt,
+                        mp,
+                        sigma,
+                        eps,
+                        np as f64,
+                        ne as f64,
+                        ng as f64,
+                    ]);
+                }
+                let t = fields[2].parse().unwrap();
+                let v: f64 = fields[3].parse().unwrap();
+                let n: f64 = fields[4].parse().unwrap();
+                let prep = model.prepare(t)?;
+                let s = prep.state(v)?;
+                let i = s.ideal;
+                let r = s.residual;
+                let mut values = vec![
+                    i.alpha,
+                    i.d_tau,
+                    i.d_tautau,
+                    i.d_delta,
+                    i.d_deltadelta,
+                    i.d_deltatau,
+                    r.alpha,
+                    r.d_tau,
+                    r.d_tautau,
+                    r.d_delta,
+                    r.d_deltadelta,
+                    r.d_deltatau,
+                    s.pressure.value,
+                    s.pressure.dt,
+                    s.pressure.dv,
+                    s.internal_energy,
+                    s.entropy,
+                    s.enthalpy,
+                    s.helmholtz_energy,
+                    s.gibbs_energy,
+                    s.heat_capacity_v,
+                    s.heat_capacity_p,
+                    s.ln_fugacity.unwrap_or(f64::NAN),
+                    s.baseline_speed_of_sound.unwrap_or(f64::NAN),
+                ];
+                for a in [
+                    prep.residual_helmholtz(v * n, n)?,
+                    prep.ideal_helmholtz(v * n, n)?,
+                ] {
+                    values.extend([
+                        a.value, a.dt, a.dv, a.dn, a.dtt, a.dtv, a.dtn, a.dvv, a.dvn, a.dnn,
+                    ]);
+                }
+                values.extend([
+                    prep.sat_delta_estimate(Phase::Liquid).unwrap_or(f64::NAN),
+                    prep.sat_delta_estimate(Phase::Vapor).unwrap_or(f64::NAN),
+                ]);
+                Ok(values)
+            })();
+            match outcome {
+                Ok(values) => println!(
+                    "{}",
+                    values
+                        .iter()
+                        .map(|v| format!("{v:.17e}"))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                ),
+                Err(e) => println!("ERROR {e}"),
+            }
+            continue;
+        }
         if fields[0] == "FMT" {
             let outcome = (|| -> thermopack_rs::Result<Vec<f64>> {
                 let model = thermopack_rs::fmt::FmtModel::from_code(fields[1].parse().unwrap())?;

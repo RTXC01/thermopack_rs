@@ -38,6 +38,11 @@ name = "cubic"
 path = "rust/benches/cubic.rs"
 harness = false
 
+[[test]]
+name = "meos_source"
+path = "tests/meos_source.rs"
+harness = false
+
 [[bench]]
 name = "sound"
 path = "rust/benches/sound.rs"
@@ -76,6 +81,11 @@ harness = false
 [[bench]]
 name = "fmt"
 path = "rust/benches/fmt.rs"
+harness = false
+
+[[bench]]
+name = "meos"
+path = "rust/benches/meos.rs"
 harness = false
 
 [profile.release]

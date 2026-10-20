@@ -104,8 +104,9 @@ Staverman-Guggenheim combinatorial terms, the generated group database, the zero
 of the cubic mixing rule and the source limitations that are reproduced.
 The [solid line notes](solid.md) cover the melting and sublimation line correlations, the
 generated parameter database and the source limitations that are reproduced.
-The [Multiparameter notes](multiparameter.md) cover reference-quality NIST multiparameter equations of state,
-fundamental reduced Helmholtz energy formulations, exact first/second derivative jets, and ancillary density equations.
+The [multiparameter notes](multiparameter.md) cover five NIST fluids, both LJ
+fits for four noble gases, reduced LJTS, shared state/Helmholtz derivatives,
+source sound mass units, strict qualification and native-loop measurements.
 The [Lee-Kesler notes](lee-kesler.md) cover the Lee-Kesler corresponding states equation of state,
 Plöcker critical mixing rules, analytical compositional derivatives, and BWR generalized fluids.
 The [ice Ih notes](solid-water.md) cover owned Gibbs reference shifts,

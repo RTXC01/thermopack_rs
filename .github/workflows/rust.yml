@@ -77,6 +77,8 @@ jobs:
       - run: python tools/rust_port/validate_solid_lines.py
       - run: python tools/rust_port/validate_solid_co2.py
       - run: python tools/rust_port/validate_solid_water.py
+      - run: python tools/rust_port/validate_fmt.py
+      - run: python tools/rust_port/benchmark_fmt.py --compiler /usr/bin/gfortran-13 --preflight-only
       - run: python tools/rust_port/benchmark_solid_water.py --compiler /usr/bin/gfortran-13 --preflight-only
       - run: python tools/rust_port/benchmark_mbwr_density.py --compiler /usr/bin/gfortran-13 --preflight-only
       - run: python tools/rust_port/benchmark_pets_roots.py --compiler /usr/bin/gfortran-13 --preflight-only

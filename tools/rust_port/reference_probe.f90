@@ -1,3 +1,45 @@
+! Direct FMT grid entry point; optional output combinations exercise all source branches.
+subroutine query_fmt(model,ngrid,n,flags,values) bind(C,name='query_fmt')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use fundamental_measure_theory, only: fmt_energy_density
+  implicit none
+  integer(c_int), value :: model,ngrid,flags
+  real(c_double), intent(in) :: n(ngrid,6)
+  real(c_double), intent(out) :: values(43,ngrid)
+  real :: phi(ngrid),gradient(ngrid,6),hessian(ngrid,6,6)
+  integer :: i,j,k,offset
+  phi=0;gradient=0;hessian=0
+  select case(flags)
+  case(1)
+    call fmt_energy_density(model,ngrid,6,n,phi=phi)
+  case(2)
+    call fmt_energy_density(model,ngrid,6,n,phi_n=gradient)
+  case(3)
+    call fmt_energy_density(model,ngrid,6,n,phi=phi,phi_n=gradient)
+  case(4)
+    call fmt_energy_density(model,ngrid,6,n,phi_nn=hessian)
+  case(5)
+    call fmt_energy_density(model,ngrid,6,n,phi=phi,phi_nn=hessian)
+  case(6)
+    call fmt_energy_density(model,ngrid,6,n,phi_n=gradient,phi_nn=hessian)
+  case(7)
+    call fmt_energy_density(model,ngrid,6,n,phi=phi,phi_n=gradient,phi_nn=hessian)
+  case default
+    error stop 'Unsupported FMT probe output flags'
+  end select
+  do k=1,ngrid
+    values(1,k)=phi(k)
+    values(2:7,k)=gradient(k,:)
+    offset=8
+    do i=1,6
+      do j=1,6
+        values(offset,k)=hessian(k,i,j)
+        offset=offset+1
+      enddo
+    enddo
+  enddo
+end subroutine query_fmt
+
 ! Access source-model alpha initialization/values for differential qualification.
 ! Linked to the existing exact-source library; never duplicates its globals.
 subroutine query_alpha(index,t,method,params,values) bind(C,name='query_alpha')

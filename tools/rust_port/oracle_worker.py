@@ -31,6 +31,8 @@ def phase_permutation_allowed(model,result):
 
 def load_probe():
     probe=CDLL(str(ROOT/'.reference'/('reference_probe.dll' if os.name=='nt' else 'libreference_probe.so')))
+    probe.query_fmt.argtypes=[c_int,c_int,POINTER(c_double),c_int,POINTER(c_double)]
+    probe.query_fmt.restype=None
     probe.query_alpha.argtypes=[c_int,c_double,POINTER(c_int),POINTER(c_double),POINTER(c_double)]
     probe.query_alpha.restype=None
     probe.initialize_alpha.argtypes=[c_char_p,c_int,c_char_p,c_int]
@@ -98,6 +100,16 @@ def main(compiler_directory):
     probe=None
     for line in sys.stdin:
         request=json.loads(line)
+        if request['mode']=='FMT':
+            if probe is None:probe=load_probe()
+            grid=request['grid'];size=len(grid)
+            inputs=(c_double*(6*size))(*(row[i] for i in range(6) for row in grid))
+            output=(c_double*(43*size))()
+            probe.query_fmt(request['model'],size,inputs,request['flags'],output)
+            rows=[list(map(float,output[i*43:(i+1)*43])) for i in range(size)]
+            # Non-finite entries are reported per row, never dropped from the matrix.
+            print('THERMOPACK_RESULT='+json.dumps(dict(rows=[v if all(map(math.isfinite,v)) else list(map(str,v)) for v in rows])),flush=True)
+            continue
         if request['mode']=='SOLID_H2O_INIT':
             if probe is None:probe=load_probe()
             probe.query_solid_h2o_init(request['entropy'],request['gibbs'])

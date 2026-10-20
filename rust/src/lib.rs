@@ -26,6 +26,7 @@ mod error;
 pub mod excess_gibbs;
 pub mod excess_gibbs_data;
 pub mod flash;
+pub mod fmt;
 pub mod helmholtz;
 mod hydrogen;
 pub mod ideal;

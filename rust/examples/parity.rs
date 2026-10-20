@@ -90,6 +90,38 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if fields[0] != "SOLIDCO2" && fields.len() != 6 {
             return Err("expected six fields".into());
         }
+        if fields[0] == "FMT" {
+            let outcome = (|| -> thermopack_rs::Result<Vec<f64>> {
+                let model = thermopack_rs::fmt::FmtModel::from_code(fields[1].parse().unwrap())?;
+                let n: Vec<f64> = fields[2].split(',').map(|v| v.parse().unwrap()).collect();
+                let s =
+                    model.baseline_energy_density(n.try_into().map_err(|_| {
+                        thermopack_rs::Error::InvalidInput("six weighted densities")
+                    })?)?;
+                let flags: u8 = fields[3].parse().unwrap();
+                let mut values = vec![if flags & 1 != 0 { s.value } else { 0. }];
+                values.extend(s.gradient.map(|v| if flags & 2 != 0 { v } else { 0. }));
+                values.extend(
+                    s.hessian
+                        .into_iter()
+                        .flatten()
+                        .map(|v| if flags & 4 != 0 { v } else { 0. }),
+                );
+                Ok(values)
+            })();
+            match outcome {
+                Ok(values) => println!(
+                    "{}",
+                    values
+                        .iter()
+                        .map(|v| format!("{v:.17e}"))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                ),
+                Err(e) => println!("ERROR {e}"),
+            }
+            continue;
+        }
         if fields[0] == "SOLIDH2O" {
             let outcome = (|| -> thermopack_rs::Result<Vec<f64>> {
                 let mut model = thermopack_rs::SolidWater::new();

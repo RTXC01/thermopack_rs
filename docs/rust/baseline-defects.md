@@ -217,3 +217,14 @@ Native `SolidWater::baseline_heat_capacity` preserves that source value;
 `heat_capacity` uses -T*G_TT and matches finite differences of enthalpy.
 All other public source values and reference shifts are compared directly.
 See [ice Ih qualification](solid-water.md).
+
+## FMT hyperdual reciprocal derivatives
+
+`PowerHyperDualReal` uses the actual value in x**(-1), but replaces |x|<1e-15
+by a signed floor when calculating the derivative powers. The resulting
+derivatives differ from mathematical differentiation of the FMT expression
+near tiny coefficient denominators. The native `baseline_energy_density`
+preserves the floor and source operation order; `energy_density` computes
+analytic derivatives without the reciprocal floor. Both retain the source
+max(1-n3,1e-12) branch and raw, cancellation-sensitive White Bear formulas.
+See [FMT qualification](fmt.md) for singular states and numerical scope.

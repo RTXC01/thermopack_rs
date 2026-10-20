@@ -73,6 +73,11 @@ name = "preparation"
 path = "rust/benches/preparation.rs"
 harness = false
 
+[[bench]]
+name = "fmt"
+path = "rust/benches/fmt.rs"
+harness = false
+
 [profile.release]
 lto = "thin"
 codegen-units = 1

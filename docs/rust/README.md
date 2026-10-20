@@ -111,5 +111,8 @@ Plöcker critical mixing rules, analytical compositional derivatives, and BWR ge
 The [ice Ih notes](solid-water.md) cover owned Gibbs reference shifts,
 analytic derivatives, source/physical heat capacity and native-loop measurements.
 
+The [FMT notes](fmt.md) cover all three fundamental-measure functionals,
+analytic Hessians, source arithmetic compatibility and native grid measurements.
+
 Regenerate inventory with
 `python tools/rust_port/inventory.py`.

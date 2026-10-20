@@ -252,6 +252,12 @@ and an explicit baseline for the source Cp mass-conversion defect. Physical Cp
 and derivative identities have independent finite-difference checks. Its
 native-loop benchmark preflights 100 source and 200 fresh/prepared native states.
 
+The [FMT qualification](fmt.md) adds 1288 finite grid returns across three
+functionals and all seven combinations of optional outputs, with up to 43
+quantities per return. All 56 non-finite source returns are retained as errors.
+The analytic path has independent gradient/Hessian and bulk-limit tests;
+the source baseline retains operand order and reciprocal derivative floors.
+
 CI contains native Windows/Linux/macOS checks and a Linux exact-source build
 that regenerates comparisons. It has been configured locally; hosted CI has
 not run yet. Original pFUnit/Python example suites and models outside the

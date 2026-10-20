@@ -5,7 +5,7 @@ import sys
 import warnings
 import math
 import os
-from ctypes import c_double,c_int,c_char_p,CDLL,POINTER,byref
+from ctypes import c_double,c_int,c_char,c_char_p,CDLL,POINTER,byref
 from reference import ROOT,load
 
 
@@ -77,6 +77,8 @@ def load_probe():
     probe.query_mbwr_initialization.restype=None
     probe.query_mbwr_critical_grid.argtypes=[c_int,POINTER(c_double),POINTER(c_double)]
     probe.query_mbwr_critical_grid.restype=None
+    probe.query_unifac.argtypes=[c_int,POINTER(c_char),c_int,c_double,POINTER(c_double),POINTER(c_double),POINTER(c_int)]
+    probe.query_unifac.restype=None
     return probe
 
 
@@ -86,6 +88,21 @@ def main(compiler_directory):
     probe=None
     for line in sys.stdin:
         request=json.loads(line)
+        if request['mode']=='UNIFAC':
+            if probe is None:probe=load_probe()
+            components=request['components']
+            names=bytearray(b' '*512)
+            for index,identifier in enumerate(components):
+                encoded=identifier.encode()[:20].ljust(20,b' ')
+                names[index*20:index*20+20]=encoded
+            composition=(c_double*len(components))(*request['composition'])
+            output=(c_double*128)();count=c_int()
+            probe.query_unifac(len(components),(c_char*512).from_buffer_copy(bytes(names)),
+                               int(request.get('variant',0)),request['temperature'],
+                               composition,output,byref(count))
+            values=list(map(float,output))[:count.value]
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=values)),flush=True)
+            continue
         if request['mode'].startswith('MBWR_'):
             if probe is None:probe=load_probe()
             record=request['record_index']
@@ -327,18 +344,21 @@ def main(compiler_directory):
         ref=request.get('parameter_reference',request.get('alpha_reference','Default'))
         shift=request.get('volume_shift',False)
         quantum_helper=request.get('quantum_helper',False)
-        key=(eos,comps,alpha,ref,shift,quantum_helper,'alpha_kernel' if request['mode'] in ('ALPHA','ALPHA_PROPERTIES') else 'public')
+        mixing=request.get('mixing')
+        key=(eos,comps,alpha,ref,shift,quantum_helper,mixing,'alpha_kernel' if request['mode'] in ('ALPHA','ALPHA_PROPERTIES') else 'public')
         if previous!=key:
             # ALPHA qualifies tpInitAlphaCorr separately from eoslibinit's
             # forced tcPR translation / QuantumCubic critical-data overrides.
             alpha_mode=request['mode'] in ('ALPHA','ALPHA_PROPERTIES')
             base_ref=('tcPR' if 'BUTANAL' in comps.split(',') else 'Default') if alpha_mode else ref
+            mixing_option={'mixing':mixing} if mixing else {}
             if quantum_helper:
                 from thermopack.quantum_cubic import qcubic
                 model=qcubic(comps)
             else:
                 model=cubic(comps,"SRK" if eos=="RK" else eos,
-                            alpha='Classic' if alpha_mode else alpha,parameter_reference=base_ref,volume_shift=shift)
+                            alpha='Classic' if alpha_mode else alpha,parameter_reference=base_ref,volume_shift=shift,
+                            **mixing_option)
             previous=key
         extra={}
         if request['mode'].startswith('V_'):

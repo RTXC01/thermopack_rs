@@ -40,6 +40,8 @@ pub mod pets;
 pub mod saft_vrmie;
 pub mod saft_vrmie_data;
 pub mod translation;
+pub mod unifac;
+pub mod unifac_data;
 
 pub use alpha::{Alpha, AlphaCorrelation, AlphaValue};
 pub use beta::{Beta, BetaCorrelation, BetaValue};
@@ -89,6 +91,11 @@ pub use saft_vrmie::{
 };
 pub use saft_vrmie_data::{SaftVrMieKijRecord, SaftVrMieLijRecord, SaftVrMieRecord};
 pub use translation::{TranslationKind, TranslationValue, VolumeTranslation};
+pub use unifac::{Unifac, UnifacExcessGibbs, UnifacVariant};
+pub use unifac_data::{
+    UnifacComponent, UnifacInteraction, UnifacSubGroup, lookup_unifac_component,
+    lookup_unifac_interaction,
+};
 
 /// Gas constant [J/(mol K)], using the exact expression from ThermoPack.
 pub const R: f64 = 6.02214076e23 * 1.380649e-23;

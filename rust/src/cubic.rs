@@ -403,7 +403,7 @@ impl Cubic {
                 database_eos,
                 Some(parameter_reference),
                 &model.kij,
-            ));
+            )?);
             model.mixing_rule = options.mixing_rule;
         }
         Ok(model)
@@ -825,10 +825,6 @@ impl Cubic {
         positive(b, "mixture covolume")?;
 
         let (a, at, att, a_partial, ai_t) = if let Some(ge) = &self.excess_gibbs {
-            let is_srk = matches!(
-                self.kind,
-                CubicKind::SoaveRedlichKwong | CubicKind::RedlichKwong
-            );
             let mut a_pure = Vec::with_capacity(n);
             let mut da_pure = Vec::with_capacity(n);
             let mut d2a_pure = Vec::with_capacity(n);
@@ -845,7 +841,7 @@ impl Cubic {
             }
             let jet = crate::excess_gibbs::excess_gibbs_cubic_mix(
                 ge,
-                is_srk,
+                self.kind,
                 temperature,
                 composition,
                 &self.bi,

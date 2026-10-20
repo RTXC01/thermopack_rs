@@ -53,6 +53,9 @@ python tools/rust_port/validate_symmetric.py
 python tools/rust_port/validate_response.py
 python tools/rust_port/validate_sound.py
 python tools/rust_port/validate_translated_flash.py
+python tools/rust_port/generate_unifac_data.py
+python tools/rust_port/validate_unifac.py
+python tools/rust_port/validate_unifac_cubic.py
 ```
 
 On Windows add `--compiler-directory /path/to/gfortran/bin` to the validation
@@ -204,6 +207,20 @@ flash results and 141 TV property results. Metadata retains 137 failed source
 calls. Native tests independently check U/S/V closure, component balance,
 chemical equilibrium and caloric derivatives; single-phase comparison
 canonicalization and remaining raw output limits are explicit.
+The [UNIFAC qualification](unifac.md) adds 1540 unit-level excess Gibbs
+comparisons against the exact-source library: 20 pure components, all 190
+binary pairs and five ternary mixtures at three temperatures, with the
+`UNIFAC`, `UMR` and `VTPR` labels. Every case matches within a relative
+tolerance of 2e-10, covering the excess Gibbs energy, both temperature
+derivatives, the composition derivatives, the mixed derivative and the second
+composition derivatives. The source reports energies per kilomole, so the
+native per-mole values are scaled by 1000 for the comparison. A second
+qualification compares the mixing rule inside the cubic equation of state:
+270 of 288 PR and SRK states match with worst scaled errors of 1.5e-11 for the
+pressure and 2.4e-12 for the fugacity coefficients; the 18 remaining cases
+terminate in the source because its UNIFAC component database spells toluene
+`TOLUENE` while the equation of state uses `TOLU`, and the native model
+reports the same missing component.
 
 Tolerances are quantity-specific and recorded in fixture metadata and tests.
 They are not a promise of bitwise identity across compilers or all states.

@@ -538,3 +538,81 @@ subroutine query_mbwr_critical_grid(record,initial,values) bind(C,name='query_mb
   call MBWR_criticalParameters(t,p,r,model)
   values=[t,p,r*1000.0]
 end subroutine query_mbwr_critical_grid
+
+! Evaluate the original UNIFAC excess Gibbs energy and its analytical derivatives.
+! The component list is installed in the source globals for the duration of the
+! call and restored afterwards, so the probe never disturbs a live model.
+subroutine query_unifac(ncomponents,names,variant,t,composition,values,count) &
+     bind(C,name='query_unifac')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double,c_char
+  use thermopack_var, only: complist,nc
+  use unifac, only: init_unifac, unifdb, Ge_UNIFAC_GH_SG
+  implicit none
+  integer(c_int), value :: ncomponents
+  character(kind=c_char), intent(in) :: names(*)
+  integer(c_int), value :: variant
+  real(c_double), value :: t
+  real(c_double), intent(in) :: composition(*)
+  real(c_double), intent(out) :: values(128)
+  integer(c_int), intent(out) :: count
+  ! Locals
+  integer, parameter :: nmax=8
+  character(len=512) :: namelist
+  character(len=20) :: mrulestr
+  character(len=20), pointer :: saved(:)
+  integer :: saved_nc, i, j, n
+  logical :: had_complist
+  real :: ge,dgedt,d2gedt2
+  real, allocatable :: dgedn(:),d2gedndt(:),z(:)
+  real, allocatable :: d2gedndn(:,:)
+  n = int(ncomponents)
+  if (n < 1 .or. n > nmax) error stop 'query_unifac: unsupported component count'
+  ! The source dummies have the component count as an explicit shape. The
+  ! local arrays must match it exactly: a larger actual argument is
+  ! associated in array element order and would scramble the matrix.
+  allocate(dgedn(n),d2gedndt(n),z(n),d2gedndn(n,n))
+  do i=1,512
+    namelist(i:i)=names(i)
+  enddo
+  select case (int(variant))
+  case (0)
+    mrulestr='UNIFAC'
+  case (1)
+    mrulestr='UMR'
+  case (2)
+    mrulestr='VTPR'
+  case default
+    error stop 'query_unifac: unknown variant'
+  end select
+  do i=1,n
+    z(i)=composition(i)
+  enddo
+  saved_nc=nc
+  had_complist=associated(complist)
+  if (had_complist) saved=>complist
+  nullify(complist)
+  allocate(complist(n))
+  do i=1,n
+    complist(i)=namelist((i-1)*20+1:i*20)
+  enddo
+  nc=n
+  call init_unifac(unifdb,mrulestr)
+  call Ge_UNIFAC_GH_SG(z,t,unifdb,ge,dgedt,d2gedt2,dgedn,d2gedndt,d2gedndn)
+  deallocate(complist)
+  if (had_complist) complist=>saved
+  nc=saved_nc
+  values(1)=ge
+  values(2)=dgedt
+  values(3)=d2gedt2
+  do i=1,n
+    values(3+i)=dgedn(i)
+    values(3+n+i)=d2gedndt(i)
+  enddo
+  do i=1,n
+    do j=1,n
+      values(3+2*n+(i-1)*n+j)=d2gedndn(i,j)
+    enddo
+  enddo
+  count=3+2*n+n*n
+  deallocate(dgedn,d2gedndt,z,d2gedndn)
+end subroutine query_unifac

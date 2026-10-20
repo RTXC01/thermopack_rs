@@ -18,6 +18,8 @@ pub enum MixingRule {
     HuronVidal2,
     /// Pure NRTL mixing rule.
     Nrtl,
+    /// UNIFAC with the Flory-Huggins and Staverman-Guggenheim combinatorial terms.
+    Unifac,
 }
 
 impl MixingRule {
@@ -28,25 +30,51 @@ impl MixingRule {
             Self::HuronVidal1 => "HV1",
             Self::HuronVidal2 => "HV2",
             Self::Nrtl => "NRTL",
+            Self::Unifac => "UNIFAC",
         }
     }
 
     /// Whether this mixing rule requires excess Gibbs evaluations.
     #[inline]
     pub fn is_excess_gibbs(self) -> bool {
-        matches!(self, Self::HuronVidal1 | Self::HuronVidal2 | Self::Nrtl)
+        matches!(
+            self,
+            Self::HuronVidal1 | Self::HuronVidal2 | Self::Nrtl | Self::Unifac
+        )
     }
 }
 
-/// Evaluates the infinite-pressure limit parameter C* = Lambda_GE for a cubic equation.
-#[inline]
-pub fn infinite_limit_c(is_srk: bool) -> f64 {
-    if is_srk {
-        std::f64::consts::LN_2 // 0.6931471805599453
-    } else {
-        // C_PR = -ln(sqrt(2) - 1) / sqrt(2)
-        let s2 = std::f64::consts::SQRT_2;
-        -(s2 - 1.0).ln() / s2 // 0.6232252401402305
+/// The limit of the excess Gibbs model that a cubic equation uses.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GeLimit {
+    /// Infinite-pressure limit, used by the Huron-Vidal and NRTL models.
+    Infinite,
+    /// Zero-pressure limit, used by the UNIFAC mixing rule.
+    Zero,
+}
+
+/// Limiting constant of the excess Gibbs model for a cubic equation.
+///
+/// The original `getInfinitLimitC` and `getZeroLimitC` select the constant
+/// from the sub-equation of state. The UNIFAC mixing rule uses the
+/// zero-pressure limit, every other excess Gibbs model uses the
+/// infinite-pressure limit.
+pub fn excess_gibbs_limit(kind: crate::cubic::CubicKind, limit: GeLimit) -> f64 {
+    use crate::cubic::CubicKind;
+    match limit {
+        GeLimit::Infinite => match kind {
+            CubicKind::VanDerWaals => 1.0,
+            CubicKind::SoaveRedlichKwong | CubicKind::RedlichKwong => std::f64::consts::LN_2,
+            CubicKind::PengRobinson => {
+                let s2 = std::f64::consts::SQRT_2;
+                -(s2 - 1.0).ln() / s2
+            }
+        },
+        GeLimit::Zero => match kind {
+            CubicKind::VanDerWaals => 0.55,
+            CubicKind::SoaveRedlichKwong | CubicKind::RedlichKwong => 0.593,
+            CubicKind::PengRobinson => 0.53087,
+        },
     }
 }
 
@@ -79,6 +107,8 @@ pub struct ExcessGibbsMixture {
     pub nc: usize,
     /// nc * nc matrix of pair parameters indexed as [i * nc + j] (interaction of i in j)
     pub pairs: Vec<ExcessGibbsPair>,
+    /// Active UNIFAC parameter set, present for the UNIFAC mixing rule.
+    pub unifac: Option<crate::unifac::Unifac>,
 }
 
 impl ExcessGibbsMixture {
@@ -89,7 +119,7 @@ impl ExcessGibbsMixture {
         eos_name: &str,
         preferred_ref: Option<&str>,
         kij_matrix: &[f64],
-    ) -> Self {
+    ) -> Result<Self> {
         let nc = component_names.len();
         let mut pairs = vec![ExcessGibbsPair::default(); nc * nc];
 
@@ -141,7 +171,23 @@ impl ExcessGibbsMixture {
             }
         }
 
-        Self { mrule, nc, pairs }
+        // The UNIFAC model keeps its own group database. The original aborts
+        // when a component is missing from it.
+        let unifac = if mrule == MixingRule::Unifac {
+            Some(crate::unifac::Unifac::new(
+                component_names,
+                crate::unifac::UnifacVariant::Unifac,
+            )?)
+        } else {
+            None
+        };
+
+        Ok(Self {
+            mrule,
+            nc,
+            pairs,
+            unifac,
+        })
     }
 }
 
@@ -155,12 +201,22 @@ pub struct ExcessGibbsCubicJet {
     pub d2a_dnid_t: Vec<f64>,
 }
 
-/// Computes the mixture cubic parameter a(T, x) and its exact derivatives via Huron-Vidal / NRTL.
-/// Follows `ExcessGibbsMix` and `gEinf` from `src/excess_gibbs.f90`.
+/// Excess Gibbs energy and derivatives consumed by the cubic mixing rule.
+struct ExcessGibbsKernel {
+    gibbs: f64,
+    dg_dt: f64,
+    d2g_dt2: f64,
+    dg_dn: Vec<f64>,
+    d2g_dn_dt: Vec<f64>,
+}
+
+/// Computes the mixture cubic parameter a(T, x) and its exact derivatives via
+/// Huron-Vidal, NRTL or UNIFAC.
+/// Follows `ExcessGibbsMix` and `gExcess` from `src/excess_gibbs.f90`.
 #[allow(clippy::too_many_arguments)]
 pub fn excess_gibbs_cubic_mix(
     ge_mix: &ExcessGibbsMixture,
-    is_srk: bool,
+    kind: crate::cubic::CubicKind,
     temperature: f64,
     mole_fractions: &[f64],
     b_pure: &[f64],
@@ -176,7 +232,99 @@ pub fn excess_gibbs_cubic_mix(
         ));
     }
 
-    let lambda_ge = infinite_limit_c(is_srk);
+    // The UNIFAC mixing rule uses the zero-pressure limit of the cubic
+    // equation, every other excess Gibbs model the infinite-pressure limit.
+    let (kernel, lambda_ge) = if ge_mix.mrule == MixingRule::Unifac {
+        let database = ge_mix.unifac.as_ref().ok_or(Error::InvalidInput(
+            "UNIFAC mixing rule without a group database",
+        ))?;
+        let ge = database.excess_gibbs(temperature, mole_fractions)?;
+        (
+            ExcessGibbsKernel {
+                gibbs: ge.gibbs,
+                dg_dt: ge.dg_dt,
+                d2g_dt2: ge.d2g_dt2,
+                dg_dn: ge.dg_dn,
+                d2g_dn_dt: ge.d2g_dn_dt,
+            },
+            excess_gibbs_limit(kind, GeLimit::Zero),
+        )
+    } else {
+        let lambda_ge = excess_gibbs_limit(kind, GeLimit::Infinite);
+        (
+            hv_nrtl_kernel(
+                ge_mix,
+                lambda_ge,
+                temperature,
+                mole_fractions,
+                b_pure,
+                a_pure,
+                da_dt_pure,
+                d2a_dt2_pure,
+            )?,
+            lambda_ge,
+        )
+    };
+
+    let g_ex = kernel.gibbs;
+    let dg_ex_dt = kernel.dg_dt;
+    let d2g_ex_dt2 = kernel.d2g_dt2;
+    let dg_ex_dni = kernel.dg_dn;
+    let d2g_ex_dni_dt = kernel.d2g_dn_dt;
+
+    // Combine with cubic covolume B = b_mix to obtain a_mix and derivatives
+    let mut sum_aa_b = 0.0;
+    let mut sum_da_b = 0.0;
+    let mut sum_d2a_b = 0.0;
+
+    for i in 0..nc {
+        let bi = b_pure[i];
+        let zi = mole_fractions[i];
+        sum_aa_b += zi * a_pure[i] / bi;
+        sum_da_b += zi * da_dt_pure[i] / bi;
+        sum_d2a_b += zi * d2a_dt2_pure[i] / bi;
+    }
+
+    let a_mix = b_mix * (sum_aa_b - g_ex / lambda_ge);
+    let da_dt = b_mix * (sum_da_b - dg_ex_dt / lambda_ge);
+    let d2a_dt2 = b_mix * (sum_d2a_b - d2g_ex_dt2 / lambda_ge);
+
+    let mut da_dni = Vec::with_capacity(nc);
+    let mut d2a_dnid_t = Vec::with_capacity(nc);
+
+    for i in 0..nc {
+        let bi = b_pure[i];
+        // ai = (bi / B) * A + B * (a_i / b_i - dGex/dni / lambda_ge)
+        let ai = (bi / b_mix) * a_mix + b_mix * (a_pure[i] / bi - dg_ex_dni[i] / lambda_ge);
+        let ait =
+            (bi / b_mix) * da_dt + b_mix * (da_dt_pure[i] / bi - d2g_ex_dni_dt[i] / lambda_ge);
+        da_dni.push(ai);
+        d2a_dnid_t.push(ait);
+    }
+
+    Ok(ExcessGibbsCubicJet {
+        a_mix,
+        da_dt,
+        d2a_dt2,
+        da_dni,
+        d2a_dnid_t,
+    })
+}
+
+/// Huron-Vidal and NRTL excess Gibbs energy with analytical derivatives.
+/// Follows `gEinf` from `src/excess_gibbs.f90`.
+#[allow(clippy::too_many_arguments)]
+fn hv_nrtl_kernel(
+    ge_mix: &ExcessGibbsMixture,
+    lambda_ge: f64,
+    temperature: f64,
+    mole_fractions: &[f64],
+    b_pure: &[f64],
+    a_pure: &[f64],
+    da_dt_pure: &[f64],
+    d2a_dt2_pure: &[f64],
+) -> Result<ExcessGibbsKernel> {
+    let nc = ge_mix.nc;
     let t = temperature;
 
     // Allocate tau, dtaudt, d2taudt2, cij, alpha (nc x nc)
@@ -399,41 +547,11 @@ pub fn excess_gibbs_cubic_mix(
             + RGAS * t * (term_self_dt + sum3ji + sum4ji + sum5ji - sum6ji - 2.0 * sum7ji);
     }
 
-    // 5. Combine with cubic covolume B = b_mix to obtain a_mix and derivatives
-    let mut sum_aa_b = 0.0;
-    let mut sum_da_b = 0.0;
-    let mut sum_d2a_b = 0.0;
-
-    for i in 0..nc {
-        let bi = b_pure[i];
-        let zi = mole_fractions[i];
-        sum_aa_b += zi * a_pure[i] / bi;
-        sum_da_b += zi * da_dt_pure[i] / bi;
-        sum_d2a_b += zi * d2a_dt2_pure[i] / bi;
-    }
-
-    let a_mix = b_mix * (sum_aa_b - g_ex / lambda_ge);
-    let da_dt = b_mix * (sum_da_b - dg_ex_dt / lambda_ge);
-    let d2a_dt2 = b_mix * (sum_d2a_b - d2g_ex_dt2 / lambda_ge);
-
-    let mut da_dni = Vec::with_capacity(nc);
-    let mut d2a_dnid_t = Vec::with_capacity(nc);
-
-    for i in 0..nc {
-        let bi = b_pure[i];
-        // ai = (bi / B) * A + B * (a_i / b_i - dGex/dni / lambda_ge)
-        let ai = (bi / b_mix) * a_mix + b_mix * (a_pure[i] / bi - dg_ex_dni[i] / lambda_ge);
-        let ait =
-            (bi / b_mix) * da_dt + b_mix * (da_dt_pure[i] / bi - d2g_ex_dni_dt[i] / lambda_ge);
-        da_dni.push(ai);
-        d2a_dnid_t.push(ait);
-    }
-
-    Ok(ExcessGibbsCubicJet {
-        a_mix,
-        da_dt,
-        d2a_dt2,
-        da_dni,
-        d2a_dnid_t,
+    Ok(ExcessGibbsKernel {
+        gibbs: g_ex,
+        dg_dt: dg_ex_dt,
+        d2g_dt2: d2g_ex_dt2,
+        dg_dn: dg_ex_dni,
+        d2g_dn_dt: d2g_ex_dni_dt,
     })
 }

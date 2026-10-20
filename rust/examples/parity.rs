@@ -90,6 +90,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if fields.len() != 6 {
             return Err("expected six fields".into());
         }
+        if fields[0] == "UNIFAC" {
+            let components: Vec<&str> = fields[1].split(',').collect();
+            let composition: Vec<f64> = fields[4]
+                .split(',')
+                .map(|value| value.parse().unwrap())
+                .collect();
+            let variant = match fields[5] {
+                "UNIFAC" => thermopack_rs::UnifacVariant::Unifac,
+                "UMR" => thermopack_rs::UnifacVariant::Umr,
+                "VTPR" => thermopack_rs::UnifacVariant::Vtpr,
+                other => return Err(format!("unknown unifac variant: {other}").into()),
+            };
+            let model = thermopack_rs::Unifac::new(&components, variant)?;
+            let result = model.excess_gibbs(fields[2].parse().unwrap(), &composition)?;
+            let mut values = vec![result.gibbs, result.dg_dt, result.d2g_dt2];
+            values.extend(result.dg_dn.iter().copied());
+            values.extend(result.d2g_dn_dt.iter().copied());
+            values.extend(result.d2g_dn_dn.iter().copied());
+            println!(
+                "{}",
+                values
+                    .iter()
+                    .map(|v| format!("{v:.17e}"))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            );
+            continue;
+        }
         if fields[0] == "MBWR" {
             let model = thermopack_rs::Mbwr::from_record(fields[1])?;
             let result = (|| -> thermopack_rs::Result<Vec<f64>> {
@@ -630,6 +658,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let property_config: Vec<_> = fields[5].split('@').collect();
         let alpha_properties = property_config[0].starts_with("A_");
         let translated = property_config[0].starts_with("V_");
+        // The UNIFAC mixing rule is selected with a "unifac" entry in the
+        // property configuration.
+        let unifac = property_config
+            .iter()
+            .any(|entry| entry.eq_ignore_ascii_case("unifac"));
         let mut model = if translated {
             match translated_model(kind, fields[1], &property_config) {
                 Ok(model) => model,
@@ -645,6 +678,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 thermopack_rs::AlphaCorrelation::from_name(property_config[1])?,
                 property_config[2],
             )?
+        } else if unifac {
+            match Cubic::with_options(
+                kind,
+                &fields[1].split(',').collect::<Vec<_>>(),
+                thermopack_rs::CubicOptions {
+                    mixing_rule: thermopack_rs::MixingRule::Unifac,
+                    ..Default::default()
+                },
+            ) {
+                Ok(model) => model,
+                Err(error) => {
+                    println!("ERROR: {error}");
+                    continue;
+                }
+            }
         } else {
             Cubic::new(kind, &fields[1].split(',').collect::<Vec<_>>())?
         };

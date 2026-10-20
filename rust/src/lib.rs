@@ -45,6 +45,7 @@ pub mod saft_vrmie_data;
 pub mod solid;
 pub mod solid_co2;
 pub mod solid_data;
+pub mod solid_saturation;
 pub mod solid_water;
 pub mod translation;
 pub mod unifac;

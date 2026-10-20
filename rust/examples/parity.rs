@@ -333,6 +333,50 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             );
             continue;
         }
+        if fields[0] == "SOLIDSAT" {
+            let component = fields[1];
+            let temperature: f64 = fields[2].parse().unwrap();
+            let pressure: f64 = fields[3].parse().unwrap();
+            let phase = match fields[4].parse::<i32>().unwrap() {
+                1 => Phase::Liquid,
+                _ => Phase::Vapor,
+            };
+            let specification: Vec<&str> = fields[5].split(':').collect();
+            let kind = specification[0];
+            let value: f64 = specification[1].parse().unwrap();
+            let model =
+                thermopack_rs::Cubic::new(thermopack_rs::CubicKind::PengRobinson, &[component])?;
+            let solid = thermopack_rs::solid_saturation::solid_co2_with_fluid_reference(&model)?;
+            let ideal =
+                thermopack_rs::IdealGas::new(thermopack_rs::component::component(component)?)?;
+            let (specification, initial) = match kind {
+                "T" => (
+                    thermopack_rs::solid_saturation::SolidSaturationSpecification::FixedTemperature(
+                        value,
+                    ),
+                    (value, pressure),
+                ),
+                _ => (
+                    thermopack_rs::solid_saturation::SolidSaturationSpecification::FixedPressure(
+                        value,
+                    ),
+                    (temperature, value),
+                ),
+            };
+            let solution = thermopack_rs::solid_saturation::solid_co2_saturation(
+                &model,
+                &solid,
+                &ideal,
+                specification,
+                initial,
+                phase,
+            )?;
+            println!(
+                "{:.17e},{:.17e},{:.17e}",
+                solution.temperature, solution.pressure, solution.residual
+            );
+            continue;
+        }
         if fields[0] == "HYPERDUAL" {
             let inputs: Vec<f64> = fields[1]
                 .split(',')

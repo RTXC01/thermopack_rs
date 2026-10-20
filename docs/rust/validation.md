@@ -59,6 +59,7 @@ python tools/rust_port/validate_unifac.py
 python tools/rust_port/validate_unifac_cubic.py
 python tools/rust_port/validate_solid_lines.py
 python tools/rust_port/validate_solid_co2.py
+python tools/rust_port/validate_solid_saturation.py
 python tools/rust_port/validate_mut_solve.py
 python tools/rust_port/validate_hyperdual.py
 ```
@@ -249,6 +250,14 @@ derivative, the specific volume, the entropy, the enthalpy, the internal
 energy, the Helmholtz energy, the heat capacity and the speed of sound. All
 7 states match the exact-source library within a relative 1e-11 after the
 source reference shift.
+The [solid saturation qualification](solid.md#solid-saturation-line) adds 6
+single component cases of the original `solidPointOnEnvelope`: three
+temperature specifications and three pressure specifications on the
+solid-fluid line of carbon dioxide. All 6 cases match, the solved pressure
+within a relative 1e-6 and the solved temperature within an absolute 1e-8 K
+and a relative 1e-9, with an observed worst relative difference of 3.3e-8.
+The reference levels of the solid model follow the liquid at the triple point
+of the original, 216.592 K and 513602.16 Pa.
 The [multiparameter density qualification](multiparameter.md#density-iteration)
 adds 1694 attempted density solves over the fourteen model configurations: 1669
 states match the exact-source library, including the density, the raw phase

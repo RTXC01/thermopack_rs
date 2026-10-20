@@ -123,10 +123,57 @@ the states.
 The committed fixture is `tests/fixtures/solid_co2.csv`; the test is
 `tests/solid_co2.rs`.
 
+## Solid saturation line
+
+`src/solid_saturation.f90` locates the state where a solid phase and the fluid
+phase of the equation of state share the fugacity. The routine
+`solidPointOnEnvelope` solves for the pressure of a given temperature or for the
+temperature of a given pressure, with a Newton iteration in the logarithm of
+both variables. The native model is in `solid_saturation`.
+
+The solid contributes the logarithm of its fugacity coefficient
+
+$$
+\ln \phi^{\mathrm{solid}} = \frac{G^{\mathrm{solid}} - G^{\mathrm{ideal}}}{R T},
+$$
+
+and the fluid phase contributes the logarithm of its fugacity coefficient. The
+residual of the iteration is the difference of the two. The original reduces
+its residual to the same difference for a single component, because the
+logarithm of the mole fraction of the solid component vanishes, and it uses
+the same logarithmic variables in its Newton step. The native model evaluates
+the derivatives of the residual by a centred difference of the same size, and
+it applies the step in the logarithm of the pressure or of the temperature.
+
+The reference levels of the solid model are part of the line. The original
+`initDryIce` refines the triple point pressure of carbon dioxide with a bubble
+pressure solve, takes the entropy and the Gibbs energy of the liquid at that
+point and shifts the reference levels of the solid model onto them. The native
+function `solid_co2_with_fluid_reference` performs the same shift with the
+bubble pressure of the native equation of state, and both place the solid on
+the liquid at the triple point of the original, 216.592 K and 513602.16 Pa.
+
+`tools/rust_port/validate_solid_saturation.py` compares the native model
+against the exact-source library through a reference probe that installs the
+component in the source globals, initializes the source dry ice model and calls
+the original routine.
+
+* 6 cases: three temperature specifications at the triple point and above it,
+  and three pressure specifications on the same line. The initial guess of the
+  solved variable is close to the line, because the original is a local solver.
+* All 6 cases match. The solved pressure agrees with a relative tolerance of
+  1e-6 and the solved temperature with an absolute 1e-8 K and a relative 1e-9.
+  The observed worst relative difference is 3.3e-8, in the pressure of the line
+  at 216.6 K.
+
+The committed fixture is `tests/fixtures/solid_saturation.csv`; the test is
+`tests/solid_saturation.rs`.
+
 ## Remaining scope
 
-* The solid Gibbs energy model of water, the solid saturation pressure, the
-  three-phase envelopes and the hydrate model are not yet ported.
+* The solid saturation line is ported for a single component with the solid
+  carbon dioxide model. The three-phase envelopes, the mixture flash with a
+  solid phase and the hydrate model are not yet ported.
 * The scaling of the reducing pressure to the equation of state is not
   ported.
 * The solid phase is not yet connected to the mixture flash, so the formation

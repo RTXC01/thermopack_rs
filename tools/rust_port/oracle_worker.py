@@ -101,6 +101,8 @@ def load_probe():
     probe.query_mut_target.restype=None
     probe.query_hyperdual.argtypes=[POINTER(c_double),POINTER(c_double),POINTER(c_int)]
     probe.query_hyperdual.restype=None
+    probe.query_solid_saturation.argtypes=[POINTER(c_char),c_double,c_double,c_int,c_int,c_double,POINTER(c_double),POINTER(c_int)]
+    probe.query_solid_saturation.restype=None
     return probe
 
 
@@ -169,6 +171,24 @@ def main(compiler_directory):
             values=(c_double*96)();count=c_int()
             probe.query_hyperdual(inputs,values,byref(count))
             print('THERMOPACK_RESULT='+json.dumps(dict(values=list(map(float,values))[:count.value])),flush=True)
+            continue
+        if request['mode']=='SOLID_SATURATION':
+            if probe is None:probe=load_probe()
+            component=request['component']
+            from thermopack.cubic import cubic
+            key=('SOLID_SATURATION',component,request.get('eos','PR'))
+            if previous!=key:
+                model=cubic(component,request.get('eos','PR'));previous=key
+            model.activate()
+            names=bytearray(b' '*20)
+            encoded=component.encode()[:20]
+            names[:len(encoded)]=encoded
+            result=(c_double*2)();status=c_int()
+            probe.query_solid_saturation((c_char*20).from_buffer_copy(bytes(names)),
+                                        request['temperature'],request['pressure'],
+                                        request['phase'],request['specification'],
+                                        request['ln_spec'],result,byref(status))
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=list(map(float,result)),status=status.value)),flush=True)
             continue
         if request['mode']=='MU_T':
             if probe is None:probe=load_probe()

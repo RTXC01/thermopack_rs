@@ -1029,3 +1029,54 @@ contains
     values(offset*8+8)=v%f123
   end subroutine store
 end subroutine query_hyperdual
+
+! Locate the state where the solid and the fluid phase of the original
+! coexist. The component list is installed in the source globals for the
+! call and restored afterwards.
+subroutine query_solid_saturation(component,temperature,pressure,phase, &
+     specification,ln_spec,result,status) bind(C,name='query_solid_saturation')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double,c_char
+  use thermopack_var, only: complist,nc,nce
+  use solideos, only: initDryIce
+  use solid_saturation, only: solidPointOnEnvelope
+  implicit none
+  character(kind=c_char), intent(in) :: component(*)
+  real(c_double), value :: temperature, pressure
+  integer(c_int), value :: phase
+  integer(c_int), value :: specification
+  real(c_double), value :: ln_spec
+  real(c_double), intent(out) :: result(2)
+  integer(c_int), intent(out) :: status
+  ! Locals
+  character(len=20) :: component_name
+  character(len=20), pointer :: saved(:)
+  integer :: saved_nc, saved_nce, ierr, iterations, i
+  logical :: had_complist
+  real :: t, p, beta_sol
+  real, dimension(1) :: z
+  do i=1,20
+    component_name(i:i)=component(i)
+  enddo
+  saved_nc = nc
+  saved_nce = nce
+  had_complist = associated(complist)
+  if (had_complist) saved=>complist
+  nullify(complist)
+  allocate(complist(1))
+  complist(1)=component_name
+  nc = 1
+  nce = 1
+  call initDryIce()
+  z = 1.0
+  t = temperature
+  p = pressure
+  beta_sol = 0.0
+  iterations = solidPointOnEnvelope(z,t,p,phase,beta_sol,1,specification,ln_spec,ierr)
+  deallocate(complist)
+  if (had_complist) complist=>saved
+  nc = saved_nc
+  nce = saved_nce
+  result(1)=t
+  result(2)=p
+  status=ierr
+end subroutine query_solid_saturation

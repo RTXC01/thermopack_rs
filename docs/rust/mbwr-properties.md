@@ -86,7 +86,7 @@ limits. A custom singular EOS tests retained values/optional responses.
 Their local Newton helper is test-only. Bounded physical density roots and
 critical points have separate [equilibrium qualification](mbwr-equilibrium.md).
 The [source density API](mbwr-density.md) separately qualifies raw last iterates
-and phase choices with explicit initialization. Full initialization, inner
+and phase choices with explicit initialization. Inner
 trajectory identity, ideal/full caloric properties and flash/CSP integration
 remain pending. No new speedup is claimed here.
 

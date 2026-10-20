@@ -10,7 +10,8 @@ Its [residual TP state functions](../docs/rust/mbwr-properties.md) now provide
 G/H/S/Z/lnphi and local TP responses, with explicit source-compatible methods.
 [Bounded pressure branches and critical points](../docs/rust/mbwr-equilibrium.md)
 and [source density iteration](../docs/rust/mbwr-density.md) have separate APIs
-and qualifications. Full MBWR initialization, caloric and flash/CSP integration
+and qualifications. [Default initialization](../docs/rust/mbwr-initialization.md)
+also ports the source coarse critical search. Full caloric and flash/CSP integration
 remain pending.
 
 ```

@@ -192,3 +192,18 @@ limit, its residual entropy value is zero but its T/P responses become
 `residual_tp` uses physical pressure response and verifies S_T=H_T/T against
 independent finite differences. See [MBWR state functions](mbwr-properties.md)
 for scope, derivative singularities and source snapshot execution context.
+
+## MBWR default initialization bounds
+
+`readDbParameters` uses `compdb(getCompDBindex(id))` without checking for a
+zero lookup result. Seventeen legacy MBWR identifiers lack that general data;
+their default initialization accesses out of bounds. The reference probe
+diagnoses this before execution. Rust returns an error while retaining the
+coefficient-only kernels and explicit-metadata density solver.
+
+The coarse critical search can also reach its result without assigning a lower
+bound. Native code reports that undefined path explicitly. The qualified matrix
+contains 32 finite default initializations, 16 source terminations and 17
+undefined lookups, plus 27 direct critical-grid comparisons. See
+[MBWR initialization](mbwr-initialization.md) for the original loop rules,
+model-local cache and the distinction from analytic critical refinement.

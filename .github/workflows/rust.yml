@@ -71,6 +71,7 @@ jobs:
       - run: python tools/rust_port/validate_mbwr_properties.py
       - run: python tools/rust_port/validate_mbwr_equilibrium.py
       - run: python tools/rust_port/validate_mbwr_density.py
+      - run: python tools/rust_port/validate_mbwr_initialization.py
       - run: python tools/rust_port/validate_unifac.py
       - run: python tools/rust_port/validate_unifac_cubic.py
       - run: python tools/rust_port/validate_solid_lines.py

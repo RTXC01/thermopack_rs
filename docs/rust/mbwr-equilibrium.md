@@ -95,7 +95,8 @@ while returning the opposite endpoint root. All are retained with complete
 native root sets. All 50 unqualified returns fail pressure closure; 21 also have
 negative pressure slope (these counts overlap). They are not phase-selection
 parity successes for the stable-root API. Full source inner trajectory identity
-and the coarse critical search remain pending. Full ideal/caloric, saturation, flash and
+remain pending. The separate [default initialization API](mbwr-initialization.md)
+qualifies the original coarse critical search. Full ideal/caloric, saturation, flash and
 CSP integration are also pending; no MBWR speedup is claimed here.
 The separate [source density API](mbwr-density.md) now qualifies raw output and
 phase-choice reproduction for explicit initialization, including these source

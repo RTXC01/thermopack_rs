@@ -1,5 +1,5 @@
 """Original pure MEOS density iteration; explicit source failures and deadlines."""
-import argparse,csv,hashlib,json,math,os,subprocess
+import argparse,csv,hashlib,json,math,os,re,subprocess
 from collections import Counter
 from reference import ROOT
 from deadline_reference import DeadlineReferenceProcess
@@ -28,6 +28,21 @@ def cases(meta):
     for phase in [1,2]:
         for pr in [.001,1.]:yield tc*.3,pc*pr,phase,2.
 
+ADDRESS=re.compile(r'0x[0-9a-fA-F]+')
+
+def normalize_result(result):
+    """Drop the address-space randomized load addresses of a source backtrace.
+
+    The recorded source terminations keep their exit code and the frame count,
+    but the per-frame instruction addresses change with every process, so the
+    fixture metadata would differ on every regeneration.
+    """
+    if isinstance(result,dict):
+        return {key:(normalize_result(value) if key=='output' else normalize_result(value)) for key,value in result.items()}
+    if isinstance(result,list):
+        return [ADDRESS.sub('0xADDR',line) if isinstance(line,str) else normalize_result(line) for line in result]
+    return result
+
 def validate(directory):
     probe=verify_probe();finite=[];failures=[];censored=[];attempts=[];source_unqualified=[]
     with DeadlineReferenceProcess(directory) as oracle:
@@ -38,7 +53,7 @@ def validate(directory):
                 case=f'MEOS|{e}:{c}|{t!r}|{p!r}|{phase}|DENSITY';attempts.append(case)
                 result=oracle.call(dict(mode='MEOS_DENSITY',eos=e,component=c,temperature=t,pressure=p,phase=phase),timeout=deadline)
                 if 'reference_timeout' in result:censored.append(dict(case=case,result=result));continue
-                if 'reference_error' in result:failures.append(dict(case=case,result=result));continue
+                if 'reference_error' in result:failures.append(dict(case=case,result=normalize_result(result)));continue
                 assert 'values' in result,result
                 if any(v is None for v in result['values']):source_unqualified.append(dict(case=case,result=result));continue
                 finite.append([case,*result['values']])

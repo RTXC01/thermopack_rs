@@ -12,7 +12,7 @@
     "-ffree-line-length-none"
   ],
   "lapack_commit": "3c351aad417ae1ad8552bc742a6f039d6a298f2c",
-  "library_sha256": "7ae70182c38e69812d6b563731e0d2b58cb795022ff48d57276d268dffa1c566",
+  "library_sha256": "05c5eeb892302a0700ad079073d160fe607275ac673d7b1d6791073fca26a6ac",
   "sources": {
     "numconstants": "81b2771fa060b08c6dc551a32eafcb61b91f139d1864644fc25ca7d89ab4f330",
     "stringmod": "0c2459ae3cd3a0c227b15107337d66d8c79ced4eb868ce69dd8bb5bd4af352e2",

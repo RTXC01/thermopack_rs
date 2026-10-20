@@ -240,6 +240,14 @@ derivative, the specific volume, the entropy, the enthalpy, the internal
 energy, the Helmholtz energy, the heat capacity and the speed of sound. All
 7 states match the exact-source library within a relative 1e-11 after the
 source reference shift.
+The [multiparameter density qualification](multiparameter.md#density-iteration)
+adds 1694 attempted density solves over the fourteen model configurations: 1669
+states match the exact-source library, including the density, the raw phase
+flag, the source `ierr` and the final pressure and its density derivative. The
+density tolerance adds the conditioning term `1e-14*|p|/|dP/drho|`, because
+the Newton step divides the kernel's 1e-14 relative pressure difference by a
+small dP/drho. The 25 remaining states terminate in the source because its
+ancillary rejects the phase flag, and the native model reports the same error.
 
 Tolerances are quantity-specific and recorded in fixture metadata and tests.
 They are not a promise of bitwise identity across compilers or all states.

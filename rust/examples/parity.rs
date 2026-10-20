@@ -103,6 +103,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     "LJTS_REDUCED" => Multiparameter::reduced_lennard_jones_truncated_shifted(),
                     _ => Multiparameter::new(config[1])?,
                 };
+                if fields[5] == "DENSITY" {
+                    let t = fields[2].parse().unwrap();
+                    let p = fields[3].parse().unwrap();
+                    let phase = fields[4].parse().unwrap();
+                    let prep = model.prepare(t)?;
+                    let r = prep.baseline_density_with_phase_code(p, phase)?;
+                    let strict = match phase {
+                        1 => Some(Phase::Liquid),
+                        2 => Some(Phase::Vapor),
+                        3 => Some(Phase::MinimumGibbs),
+                        _ => None,
+                    }
+                    .and_then(|phase| prep.volume(p, phase).ok());
+                    return Ok(vec![
+                        r.density,
+                        r.phase as f64,
+                        r.source_error_code as f64,
+                        r.pressure,
+                        r.pressure_density_derivative,
+                        r.iterations as f64,
+                        r.phase_switches as f64,
+                        f64::from(r.pressure_converged),
+                        f64::from(r.mechanically_stable),
+                        r.relative_pressure_error,
+                        strict.unwrap_or(f64::NAN),
+                        f64::from(r.relaxed_convergence),
+                    ]);
+                }
                 if fields[5] == "META" {
                     let r = model.record();
                     let (mt, mp) = model.lennard_jones_limits().unwrap_or((0., 0.));

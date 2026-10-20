@@ -80,6 +80,7 @@ jobs:
       - run: python tools/rust_port/validate_solid_water.py
       - run: python tools/rust_port/validate_fmt.py
       - run: python tools/rust_port/validate_meos.py
+      - run: python tools/rust_port/validate_meos_density.py
       - run: python tools/rust_port/benchmark_meos.py --compiler /usr/bin/gfortran-13 --preflight-only
       - run: python tools/rust_port/benchmark_fmt.py --compiler /usr/bin/gfortran-13 --preflight-only
       - run: python tools/rust_port/benchmark_solid_water.py --compiler /usr/bin/gfortran-13 --preflight-only

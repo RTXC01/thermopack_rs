@@ -33,6 +33,8 @@ def load_probe():
     probe=CDLL(str(ROOT/'.reference'/('reference_probe.dll' if os.name=='nt' else 'libreference_probe.so')))
     probe.query_meos.argtypes=[c_double,c_double,c_double,c_int,POINTER(c_double),POINTER(c_double)]
     probe.query_meos.restype=None
+    probe.query_meos_density.argtypes=[c_double,c_double,c_int,c_int,POINTER(c_double)]
+    probe.query_meos_density.restype=None
     probe.query_fmt.argtypes=[c_int,c_int,POINTER(c_double),c_int,POINTER(c_double)]
     probe.query_fmt.restype=None
     probe.query_alpha.argtypes=[c_int,c_double,POINTER(c_int),POINTER(c_double),POINTER(c_double)]
@@ -102,7 +104,7 @@ def main(compiler_directory):
     probe=None
     for line in sys.stdin:
         request=json.loads(line)
-        if request['mode']=='MEOS':
+        if request['mode'] in ['MEOS','MEOS_DENSITY']:
             if probe is None:probe=load_probe()
             reduced=int(request['eos']=='LJTS_REDUCED')
             key=('MEOS',request['eos'],request['component'])
@@ -111,6 +113,11 @@ def main(compiler_directory):
                     from thermopack.multiparameter import multiparam
                     model=multiparam(request['component'],request['eos']);previous=key
                 model.activate()
+            if request['mode']=='MEOS_DENSITY':
+                output=(c_double*5)()
+                probe.query_meos_density(request['temperature'],request['pressure'],request['phase'],reduced,output)
+                print('THERMOPACK_RESULT='+json.dumps(dict(values=[float(v) if math.isfinite(v) else None for v in output])),flush=True)
+                continue
             output=(c_double*46)();metadata=(c_double*18)()
             probe.query_meos(request['temperature'],request['volume'],request.get('amount',1.),reduced,output,metadata)
             values=[float(v) if math.isfinite(v) else None for v in output]

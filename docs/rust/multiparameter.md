@@ -80,6 +80,45 @@ counterpart is checked independently from the pressure/Cp/Cv identity.
 This convention concerns the direct meos method, not a claim about every
 higher-level sound wrapper.
 
+## Density iteration
+
+The original `multiparameter_base::densitySolver` solves for the density at a
+specified pressure and phase flag. The native `baseline_density` and
+`baseline_density_with_phase_code` reproduce its structure: the phase
+switching on an unstable branch, the raw source phase flags, the curvature
+guard, the pressure and density stopping tests, the source `ierr` at
+iteration 200 and the two-switch rule that turns off the robustness measures
+above the triple point. The execution is bounded at 10000 steps and 1024
+liquid seed doublings, and an undefined or non-finite state is an error
+rather than a last iterate.
+
+The original density criterion needs the density change to fall below
+`releps_rho*rhoOld`, which is 2.2e-10 relative, while the pressure criterion
+is met. The native residual kernel agrees with the source only to about 1e-14
+relative, and the Newton step divides that pressure difference by dP/drho, so
+a state close to the critical point cannot reach the original density
+criterion. The native model therefore accepts a stalled iteration, with a
+closed pressure on a mechanically stable branch, and reports it through
+`relaxed_convergence`. A contracting iteration reaches the original criterion
+first and never takes that path.
+
+The qualification covers 1694 attempted states over the fourteen model
+configurations, with reduced temperatures from 0.6 to 3 and reduced pressures
+from 1e-4 to 10, plus the phase flags that the original does not support and
+selected below-triple extrapolations.
+
+* 1669 states return a density and match the exact-source library. The
+  density tolerance adds the conditioning term `1e-14*|p|/|dP/drho|`, which
+  is the uncertainty that the kernel agreement allows at a state with a small
+  dP/drho.
+* 25 states terminate in the source because its ancillary rejects the phase
+  flag, and the native model reports the same error.
+* No state is censored, and the relaxed criterion is used in 11 of the 1669
+  states, all of them at the reduced critical point.
+
+The committed fixture is `tests/fixtures/meos_density.csv`; the test is
+`tests/meos_density.rs`.
+
 ## Qualification and numerical limits
 
 The source matrix contains 5082 homogeneous states over fourteen model

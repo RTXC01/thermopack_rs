@@ -1,3 +1,34 @@
+subroutine query_meos_density(t,p,phase,reduced,values) bind(C,name='query_meos_density')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use thermopack_var, only: get_active_eos,base_eos_param
+  use eos_parameters, only: single_eos
+  use multiparameter_base, only: meos
+  use multiparameter_lj, only: meos_lj,init_LJTS
+  implicit none
+  real(c_double),value :: t,p
+  integer(c_int),value :: phase,reduced
+  real(c_double),intent(out) :: values(5)
+  class(base_eos_param),pointer :: active
+  class(meos),pointer :: fluid
+  type(meos_lj),target :: local
+  real :: rho,actual_p,dp
+  integer :: found,status
+  if (reduced==1) then
+    call init_LJTS(local);fluid=>local
+  else
+    active=>get_active_eos()
+    select type(eos=>active)
+    class is(single_eos)
+      fluid=>eos%nist(1)%meos
+    class default
+      error stop 'Expected a multiparameter model'
+    end select
+  endif
+  call fluid%densitySolver(t,p,phase,rho,found,status)
+  call fluid%mp_pressure(rho,t,actual_p,dp)
+  values=[rho,real(found),real(status),actual_p,dp]
+end subroutine query_meos_density
+
 ! Pure multiparameter kernel and constructor metadata, with source optional
 ! properties left non-finite instead of dropping their otherwise valid states.
 subroutine query_meos(t,v,amount,reduced,values,metadata) bind(C,name='query_meos')

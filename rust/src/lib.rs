@@ -78,8 +78,8 @@ pub use mbwr::{
 };
 pub use mbwr::{MbwrResidualTp, MbwrTpDerivatives, MbwrTpQuantity};
 pub use multiparameter::{
-    HelmholtzJet, LennardJonesKind, LennardJonesParameters, Multiparameter, MultiparameterState,
-    PreparedMultiparameter,
+    HelmholtzJet, LennardJonesKind, LennardJonesParameters, Multiparameter,
+    MultiparameterDensityIteration, MultiparameterState, PreparedMultiparameter,
 };
 pub use multiparameter_data::{
     AncillarySatDensity, IdealGasHelmholtz, MultiparameterRecord, lookup_multiparameter_record,

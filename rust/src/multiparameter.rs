@@ -13,6 +13,10 @@ use crate::{Error, Phase, Pressure, R, Result};
 #[path = "lj_meos_data.rs"]
 mod lj_data;
 
+#[path = "multiparameter_density.rs"]
+mod density;
+pub use density::MultiparameterDensityIteration;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LennardJonesKind {
     Full,
@@ -381,6 +385,15 @@ impl<'a> PreparedMultiparameter<'a> {
     pub fn residual_jet(&self, v: f64) -> Result<HelmholtzJet> {
         positive(v, "volume")?;
         let delta = 1. / (v * self.eos.record.rc);
+        self.residual_at_delta(delta)
+    }
+
+    fn residual_at_delta(&self, delta: f64) -> Result<HelmholtzJet> {
+        if !delta.is_finite() || delta < 0. {
+            return Err(Error::InvalidInput(
+                "nonnegative finite reduced density required",
+            ));
+        }
 
         let mut jet = HelmholtzJet::default();
 
@@ -726,72 +739,18 @@ impl<'a> PreparedMultiparameter<'a> {
         }
     }
 
-    /// Robust 1D Newton solver for molar volume `v` (m^3/mol) at specified pressure `p_spec` (Pa) and phase.
+    /// Source phase-switch density iteration, accepted only when the final
+    /// pressure closes and dP/drho is positive. A last iterate alone is not
+    /// a physical volume. Subcritical source phase codes require liquid/vapor.
     pub fn volume(&self, p_spec: f64, phase: Phase) -> Result<f64> {
-        positive(p_spec, "pressure")?;
-        let rc = self.eos.record.rc;
-
-        // Determine initial density estimate
-        let mut rho = if self.temperature > self.eos.record.tc {
-            // Supercritical: ideal gas
-            p_spec / (self.eos.gas_constant * self.temperature)
+        let result = self.baseline_density(p_spec, phase)?;
+        if result.pressure_converged && result.mechanically_stable && result.source_error_code == 0
+        {
+            Ok(1. / result.density)
         } else {
-            match phase {
-                Phase::Liquid => {
-                    let est_delta = self.sat_delta_estimate(Phase::Liquid)?;
-                    1.01 * rc * est_delta
-                }
-                Phase::Vapor | Phase::MinimumGibbs => {
-                    p_spec / (self.eos.gas_constant * self.temperature)
-                }
-            }
-        };
-
-        let max_iter = 100;
-        let releps_p = 1e-8;
-        let releps_rho = 1e-8;
-
-        for _ in 0..max_iter {
-            let v = 1.0 / rho;
-            let p_res = self.pressure(v)?;
-            let p_curr = p_res.value;
-            let dp_drho = -v * v * p_res.dv;
-
-            let diff_p = p_curr - p_spec;
-            if diff_p.abs() < releps_p * p_spec + 1e-4 {
-                return Ok(v);
-            }
-
-            if dp_drho <= 0.0 {
-                // If derivative is non-positive, shift density
-                rho = match phase {
-                    Phase::Liquid => rho * 1.05,
-                    _ => rho * 0.95,
-                };
-                continue;
-            }
-
-            let delta_rho = diff_p / dp_drho;
-            let mut step = delta_rho;
-            if step > 0.5 * rho {
-                step = 0.5 * rho;
-            } else if step < -0.5 * rho {
-                step = -0.5 * rho;
-            }
-
-            let rho_next = rho - step;
-            if rho_next <= 0.0 {
-                rho *= 0.5;
-                continue;
-            }
-
-            if (rho_next - rho).abs() < releps_rho * rho {
-                return Ok(1.0 / rho_next);
-            }
-
-            rho = rho_next;
+            Err(Error::NotConverged(
+                "multiparameter density did not close on a stable branch",
+            ))
         }
-
-        Ok(1.0 / rho)
     }
 }

@@ -102,6 +102,8 @@ infinite-pressure excess Helmholtz energy, exact analytical derivatives and bina
 The [UNIFAC notes](unifac.md) cover the UNIFAC activity model with Flory-Huggins and
 Staverman-Guggenheim combinatorial terms, the generated group database, the zero-pressure limit
 of the cubic mixing rule and the source limitations that are reproduced.
+The [solid line notes](solid.md) cover the melting and sublimation line correlations, the
+generated parameter database and the source limitations that are reproduced.
 The [Multiparameter notes](multiparameter.md) cover reference-quality NIST multiparameter equations of state,
 fundamental reduced Helmholtz energy formulations, exact first/second derivative jets, and ancillary density equations.
 The [Lee-Kesler notes](lee-kesler.md) cover the Lee-Kesler corresponding states equation of state,

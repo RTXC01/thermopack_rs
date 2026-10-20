@@ -79,6 +79,8 @@ def load_probe():
     probe.query_mbwr_critical_grid.restype=None
     probe.query_unifac.argtypes=[c_int,POINTER(c_char),c_int,c_double,POINTER(c_double),POINTER(c_double),POINTER(c_int)]
     probe.query_unifac.restype=None
+    probe.query_solid_line.argtypes=[c_int,POINTER(c_char),c_double,c_int,POINTER(c_double),POINTER(c_double),POINTER(c_int)]
+    probe.query_solid_line.restype=None
     return probe
 
 
@@ -88,6 +90,19 @@ def main(compiler_directory):
     probe=None
     for line in sys.stdin:
         request=json.loads(line)
+        if request['mode']=='SOLID_LINE':
+            if probe is None:probe=load_probe()
+            identifier=request['component']
+            names=bytearray(b' '*20)
+            encoded=identifier.encode()[:20]
+            names[:len(encoded)]=encoded
+            points=int(request['points'])
+            temperatures=(c_double*points)();pressures=(c_double*points)();count=c_int()
+            probe.query_solid_line(int(request['kind']),(c_char*20).from_buffer_copy(bytes(names)),
+                                  request['temperature'],points,temperatures,pressures,byref(count))
+            values=list(map(float,temperatures))[:count.value]+list(map(float,pressures))[:count.value]
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=values)),flush=True)
+            continue
         if request['mode']=='UNIFAC':
             if probe is None:probe=load_probe()
             components=request['components']

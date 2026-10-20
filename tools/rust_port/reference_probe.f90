@@ -616,3 +616,56 @@ subroutine query_unifac(ncomponents,names,variant,t,composition,values,count) &
   count=3+2*n+n*n
   deallocate(dgedn,d2gedndt,z,d2gedndn)
 end subroutine query_unifac
+
+! Evaluate the original melting or sublimation line correlation.
+! The component list is installed in the source globals for the call and
+! restored afterwards, so the probe never disturbs a live model.
+subroutine query_solid_line(kind,component,tlimit,npoints,temperatures,pressures,count) &
+     bind(C,name='query_solid_line')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double,c_char
+  use thermopack_var, only: complist,nc,nce
+  use solid_saturation, only: melting_pressure_correlation, sublimation_pressure_correlation
+  implicit none
+  integer(c_int), value :: kind
+  character(kind=c_char), intent(in) :: component(*)
+  real(c_double), value :: tlimit
+  integer(c_int), value :: npoints
+  real(c_double), intent(out) :: temperatures(*)
+  real(c_double), intent(out) :: pressures(*)
+  integer(c_int), intent(out) :: count
+  ! Locals
+  integer, parameter :: nmax = 64
+  character(len=20) :: component_name
+  character(len=20), pointer :: saved(:)
+  integer :: saved_nc, saved_nce, i, ierr, n
+  logical :: had_complist
+  real, dimension(nmax) :: t_line, p_line
+  n = int(npoints)
+  if (n < 1 .or. n > nmax) error stop 'query_solid_line: unsupported point count'
+  do i=1,20
+    component_name(i:i)=component(i)
+  enddo
+  saved_nc = nc
+  saved_nce = nce
+  had_complist = associated(complist)
+  if (had_complist) saved=>complist
+  nullify(complist)
+  allocate(complist(1))
+  complist(1) = component_name
+  nc = 1
+  nce = 1
+  if (int(kind) == 0) then
+    call melting_pressure_correlation(tlimit, 1, .false., n, t_line, p_line, ierr)
+  else
+    call sublimation_pressure_correlation(tlimit, 1, .false., n, t_line, p_line, ierr)
+  endif
+  deallocate(complist)
+  if (had_complist) complist=>saved
+  nc = saved_nc
+  nce = saved_nce
+  do i=1,n
+    temperatures(i) = t_line(i)
+    pressures(i) = p_line(i)
+  enddo
+  count = n
+end subroutine query_solid_line

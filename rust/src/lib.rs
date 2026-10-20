@@ -39,6 +39,8 @@ pub mod pc_saft_data;
 pub mod pets;
 pub mod saft_vrmie;
 pub mod saft_vrmie_data;
+pub mod solid;
+pub mod solid_data;
 pub mod translation;
 pub mod unifac;
 pub mod unifac_data;
@@ -90,6 +92,10 @@ pub use saft_vrmie::{
     SaftVrMiePressureJet, SaftVrMieSaturation, SaftVrMieState,
 };
 pub use saft_vrmie_data::{SaftVrMieKijRecord, SaftVrMieLijRecord, SaftVrMieRecord};
+pub use solid::SolidLine;
+pub use solid_data::{
+    SolidCorrelation, lookup_melting_correlation, lookup_sublimation_correlation,
+};
 pub use translation::{TranslationKind, TranslationValue, VolumeTranslation};
 pub use unifac::{Unifac, UnifacExcessGibbs, UnifacVariant};
 pub use unifac_data::{

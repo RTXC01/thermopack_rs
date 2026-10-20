@@ -90,6 +90,43 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if fields.len() != 6 {
             return Err("expected six fields".into());
         }
+        if fields[0] == "SOLID" {
+            let component = fields[1];
+            let kind = match fields[5] {
+                "MELT" => 0,
+                "SUBL" => 1,
+                other => return Err(format!("unknown solid line kind: {other}").into()),
+            };
+            let points: usize = fields[3].parse().unwrap();
+            let outcome = if kind == 0 {
+                thermopack_rs::solid::melting_line(component, fields[2].parse().unwrap(), points)
+            } else {
+                thermopack_rs::solid::sublimation_line(
+                    component,
+                    fields[2].parse().unwrap(),
+                    points,
+                )
+            };
+            let line = match outcome {
+                Ok(line) => line,
+                Err(error) => {
+                    println!("ERROR: {error}");
+                    continue;
+                }
+            };
+            let mut values = Vec::with_capacity(2 * points);
+            values.extend(line.temperature.iter().copied());
+            values.extend(line.pressure.iter().copied());
+            println!(
+                "{}",
+                values
+                    .iter()
+                    .map(|v| format!("{v:.17e}"))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            );
+            continue;
+        }
         if fields[0] == "UNIFAC" {
             let components: Vec<&str> = fields[1].split(',').collect();
             let composition: Vec<f64> = fields[4]

@@ -6,6 +6,8 @@ pub enum Error {
     UnknownComponent(String),
     InvalidInput(&'static str),
     Unsupported(&'static str),
+    /// An unsupported label with a descriptive message.
+    UnsupportedDetail(String),
     NoPhysicalRoot,
     NotConverged(&'static str),
 }
@@ -18,6 +20,7 @@ impl fmt::Display for Error {
             Self::UnknownComponent(s) => write!(f, "unknown component: {s}"),
             Self::InvalidInput(s) => write!(f, "invalid input: {s}"),
             Self::Unsupported(s) => write!(f, "not implemented: {s}"),
+            Self::UnsupportedDetail(s) => write!(f, "not implemented: {s}"),
             Self::NoPhysicalRoot => f.write_str("no physical volume root"),
             Self::NotConverged(s) => write!(f, "solver did not converge: {s}"),
         }

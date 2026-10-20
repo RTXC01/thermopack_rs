@@ -102,7 +102,20 @@ def split_arguments(body):
 
 
 def number(text):
-    return float(text.replace("d", "e").replace("D", "e"))
+    """Parse a Fortran real literal and format it so that it round-trips.
+
+    The guard rejects a value that the fixed format would not reproduce, so
+    that a future data change cannot silently lose significant digits.
+    """
+    value = float(text.replace("d", "e").replace("D", "e"))
+    formatted = f"{value:.10e}"
+    if float(formatted) != value:
+        raise SystemExit(f"value {text} does not round-trip through {formatted}")
+    return value, formatted
+
+
+def number_value(text):
+    return number(text)[0]
 
 
 subgroups = []
@@ -113,8 +126,8 @@ for body in calls("unifacprm"):
             "sub_group": int(args[0]),
             "main_group": int(args[1]),
             "formula": args[2].strip().strip('"'),
-            "rk": number(args[3]),
-            "qk": number(args[4]),
+            "rk": number_value(args[3]),
+            "qk": number_value(args[4]),
             "data_source": args[5].strip().strip('"'),
         }
     )
@@ -138,9 +151,9 @@ for body in calls("unifacUij"):
         {
             "main_group_i": int(args[0]),
             "main_group_j": int(args[1]),
-            "aij": number(args[2]),
-            "bij": number(args[3]),
-            "cij": number(args[4]),
+            "aij": number_value(args[2]),
+            "bij": number_value(args[3]),
+            "cij": number_value(args[4]),
             "data_source": args[5].strip().strip('"'),
         }
     )

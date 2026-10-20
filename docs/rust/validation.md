@@ -54,8 +54,10 @@ python tools/rust_port/validate_response.py
 python tools/rust_port/validate_sound.py
 python tools/rust_port/validate_translated_flash.py
 python tools/rust_port/generate_unifac_data.py
+python tools/rust_port/generate_solid_data.py
 python tools/rust_port/validate_unifac.py
 python tools/rust_port/validate_unifac_cubic.py
+python tools/rust_port/validate_solid_lines.py
 ```
 
 On Windows add `--compiler-directory /path/to/gfortran/bin` to the validation
@@ -221,6 +223,15 @@ pressure and 2.4e-12 for the fugacity coefficients; the 18 remaining cases
 terminate in the source because its UNIFAC component database spells toluene
 `TOLUENE` while the equation of state uses `TOLU`, and the native model
 reports the same missing component.
+The [solid line qualification](solid.md) adds 156 melting and sublimation
+line comparisons against the exact-source library: 23 melting and 16
+sublimation components at four temperature limits with seven points per line.
+152 cases match, including the temperature grid and every pressure, with a
+relative tolerance of 1e-10 and an absolute tolerance of 1e-4 Pa that cover
+the cancellation of nearly equal terms in some melting curves; the 4
+remaining cases are the hydrogen sulfide sublimation lines, where the source
+stops because the correlation label has no fourth character and the native
+model reports the same error.
 
 Tolerances are quantity-specific and recorded in fixture metadata and tests.
 They are not a promise of bitwise identity across compilers or all states.

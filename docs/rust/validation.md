@@ -69,6 +69,7 @@ python tools/rust_port/validate_virial_matrix.py
 python tools/rust_port/validate_ljs.py
 python tools/rust_port/validate_ljs_spline.py
 python tools/rust_port/validate_ljs_helmholtz.py
+python tools/rust_port/validate_ljs_state.py
 python tools/rust_port/validate_critical.py
 python tools/rust_port/validate_mut_solve.py
 python tools/rust_port/validate_hyperdual.py
@@ -327,6 +328,12 @@ original `calcFresLJs_bh`: the reduced residual Helmholtz energy of the
 splined Lennard-Jones model over the dilute and the dense fluid. The energy
 matches with a relative 1e-9, and the observed worst relative difference is
 3.3e-14.
+The [Lennard-Jones state qualification](ljs.md) adds 8 cases of the original
+state of the splined Lennard-Jones model: the pressure of the state and the
+compressibility factor, with the analytic volume derivative of the reduced
+residual Helmholtz energy. The pressure matches with a relative 1e-6 and the
+compressibility factor with a relative 1e-6, and the observed worst relative
+difference is 1.9e-13.
 The [critical point qualification](spinodal.md#critical-points) adds 7 cases of
 the original `calcCriticalTV`: methane, carbon dioxide, propane and water in
 the Peng-Robinson equation of state, nitrogen and methane in the

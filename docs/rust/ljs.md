@@ -17,13 +17,13 @@ second order term.
 | `src/lj_splined.f90:init_LJs_bh` | `ljs::LjsBh::new`, `ljs::LjsBh::with_parameters` |
 | `src/lj_splined.f90:ljs_bh_model_control` | `ljs::LjsBh::set_control`, `ljs::LjsControl` |
 | `src/lj_splined.f90:calcFresLJs_bh` | `ljs::LjsBh::residual_helmholtz_energy` |
+| `src/lj_splined.f90:calcFresLJs_bh` (volume derivative) | `ljs::LjsBh::pressure` |
 
 The native model provides the reduced perturbation terms and the reduced
 Barker-Henderson hard-sphere diameter, the polynomials of the spline with
-their partial derivatives, the parameters and the switches of the model, and
-the reduced residual Helmholtz energy. The derivatives of the energy, with
-respect to the temperature, the volume and the composition, are not yet
-ported.
+their partial derivatives, the parameters and the switches of the model, the
+reduced residual Helmholtz energy and the pressure of a state. The temperature
+and the composition derivatives of the energy are not yet ported.
 
 ## Method
 
@@ -97,12 +97,26 @@ the original `calcFresLJs_bh` with the active model of the fork.
 The committed fixture is `tests/fixtures/ljs_helmholtz.csv`; the test is
 `tests/ljs.rs`.
 
+`tools/rust_port/validate_ljs_state.py` compares the state of the model
+against the exact-source library. The reference oracle asks the Python
+interface of the fork for the molar volume and the compressibility factor of a
+state, and the native model evaluates the pressure and the compressibility
+factor of the same state with the analytic volume derivative of the energy.
+
+* 8 cases: the temperature, the pressure and the phase of the single
+  component over the dilute and the dense fluid.
+* The compared quantities are the pressure of the state and the compressibility
+  factor. All 8 cases match with a relative 1e-6, and the observed worst
+  relative difference is 1.9e-13.
+
+The committed fixture is `tests/fixtures/ljs_state.csv`; the test is
+`tests/ljs.rs`.
+
 ## Remaining scope
 
-* The derivatives of the residual Helmholtz energy, with respect to the
-  temperature, the volume and the composition, are not yet ported, so the
-  native model does not yet evaluate the pressure, the enthalpy and the
-  entropy of the splined Lennard-Jones fluid.
+* The temperature and the composition derivatives of the residual Helmholtz
+  energy are not yet ported, so the native model does not yet evaluate the
+  enthalpy, the entropy and the fugacity of the splined Lennard-Jones fluid.
 * The WCA and the UV variants of the source, the hard-sphere reference of the
   White Bear family and the convolution of the fundamental measure theory are
   not yet ported.

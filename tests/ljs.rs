@@ -91,6 +91,34 @@ fn the_helmholtz_energy_matches_the_source() {
 }
 
 #[test]
+fn the_state_matches_the_source() {
+    let model = LjsBh::new();
+    let mut checked = 0;
+    for row in include_str!("fixtures/ljs_state.csv").lines().skip(1) {
+        let fields: Vec<_> = row.split(';').collect();
+        let case = fields[0];
+        let parts: Vec<_> = case.split('|').collect();
+        let temperature: f64 = parts[0].parse().unwrap();
+        let pressure: f64 = parts[1].parse().unwrap();
+        let source_volume: f64 = fields[1].parse().unwrap();
+        let source_compressibility: f64 = fields[2].parse().unwrap();
+        let (native_pressure, native_compressibility) =
+            model.pressure(temperature, source_volume, 1.0).unwrap();
+        assert!(
+            (native_pressure - pressure).abs() <= 1.0e-6 * pressure.abs(),
+            "{case}: source {pressure} native {native_pressure}"
+        );
+        assert!(
+            (source_compressibility - native_compressibility).abs()
+                <= 1.0e-9 + 1.0e-6 * source_compressibility.abs(),
+            "{case}: source {source_compressibility} native {native_compressibility}"
+        );
+        checked += 1;
+    }
+    assert_eq!(checked, 8);
+}
+
+#[test]
 fn the_terms_can_be_switched() {
     // The original lets the user switch the terms of the model off.
     let mut model = LjsBh::new();

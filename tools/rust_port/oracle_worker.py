@@ -206,6 +206,22 @@ def main(compiler_directory):
             values=[float(temperature),float(volume),float(pressure)]
             print('THERMOPACK_RESULT='+json.dumps(dict(values=values)),flush=True)
             continue
+        if request['mode']=='LJS_STATE':
+            from thermopack.ljs_bh import ljs_bh
+            model=ljs_bh(request.get('parameter_reference','Default'),2.0)
+            temperature=request['temperature']
+            pressure=request['pressure']
+            z=request['feed']
+            phase=model.LIQPH if request['phase']==1 else model.VAPPH
+            try:
+                volume=model.specific_volume(temperature,pressure,z,phase)[0]
+                compressibility=model.zfac(temperature,pressure,z,phase)[0]
+            except Exception as error:
+                print('THERMOPACK_RESULT='+json.dumps(dict(calculation_error=str(error))),flush=True)
+                continue
+            values=[float(volume),float(compressibility)]
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=values)),flush=True)
+            continue
         if request['mode']=='LJS_HELMHOLTZ':
             if probe is None:probe=load_probe()
             probe.query_ljs_helmholtz.argtypes=[c_double,c_double,c_double,POINTER(c_double),POINTER(c_int)]

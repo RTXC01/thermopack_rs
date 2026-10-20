@@ -204,6 +204,65 @@ impl LjsBh {
         Ok(diameter / self.sigma)
     }
 
+    /// The pressure of the model at a temperature and a volume.
+    ///
+    /// The temperature is in kelvin, the volume in cubic metre and the number
+    /// of moles is the amount of the single component. The method returns the
+    /// pressure and the compressibility factor. The volume derivative of the
+    /// reduced residual Helmholtz energy follows the chain rule of the source,
+    /// the reduced density and the packing fraction depend on the volume, and
+    /// the reduced temperature does not.
+    pub fn pressure(&self, temperature: f64, volume: f64, moles: f64) -> Result<(f64, f64)> {
+        crate::error::positive(temperature, "the LJS temperature")?;
+        crate::error::positive(volume, "the LJS volume")?;
+        crate::error::positive(moles, "the LJS number of moles")?;
+        let density = moles / volume;
+        let (diameter, _, _) = self.diameter(temperature)?;
+        let tau = 1.0 - diameter / self.sigma;
+        let reduced_density = crate::N_A * self.sigma.powi(3) * density;
+        let reduced_density_v = -crate::N_A * self.sigma.powi(3) * moles / (volume * volume);
+        let eta = std::f64::consts::PI / 6.0 * crate::N_A * diameter.powi(3) * density;
+        let eta_v = -eta / volume;
+        // The volume derivative of the molar reduced residual energy.
+        let mut derivative = 0.0;
+        if self.control.enable_hard_sphere {
+            derivative += (4.0 - 2.0 * eta) / (1.0 - eta).powi(3) * eta_v;
+        }
+        if self.control.enable_a1 {
+            let (_, value_r, ..) = polynomial_with_derivatives(0, tau, reduced_density, 1.0);
+            derivative +=
+                2.0 * std::f64::consts::PI * self.eps * value_r * reduced_density_v / temperature;
+        }
+        if self.control.enable_a2 {
+            let (value, value_r, ..) = polynomial_with_derivatives(1, tau, reduced_density, 1.0);
+            let (correction, correction_r, ..) =
+                polynomial_with_derivatives(3, tau, reduced_density, 1.0);
+            let mut second = value;
+            let mut second_v = value_r * reduced_density_v;
+            if self.control.enable_chi_correction {
+                second *= 1.0 + correction;
+                second_v = second_v * (1.0 + correction) + value * correction_r * reduced_density_v;
+            }
+            let compressibility = khs(eta);
+            let compressibility_v = khs_eta(eta) * eta_v;
+            second_v = second_v * compressibility + second * compressibility_v;
+            derivative += -std::f64::consts::PI * self.eps * self.eps * second_v
+                / (temperature * temperature);
+        }
+        if self.control.enable_a3 {
+            let (_, value_r, ..) = polynomial_with_derivatives(2, tau, reduced_density, 1.0);
+            derivative += self.eps.powi(3) * value_r * reduced_density_v / temperature.powi(3);
+        }
+        // The pressure of the ideal gas and the pressure of the residual
+        // energy, which is the negative volume derivative of the residual
+        // energy.
+        let ideal = crate::R * temperature * moles / volume;
+        let residual = -crate::R * temperature * moles * derivative;
+        let pressure = ideal + residual;
+        let compressibility = pressure / (density * crate::R * temperature);
+        Ok((pressure, compressibility))
+    }
+
     /// The molar reduced residual Helmholtz energy of the model.
     ///
     /// The temperature is in kelvin, the volume in cubic metre and the number
@@ -383,4 +442,12 @@ fn khs(eta: f64) -> f64 {
         1.0 + 4.0 * eta + 4.0 * eta * eta - 4.0 * eta * eta * eta + eta * eta * eta * eta;
     let one_minus = 1.0 - eta;
     one_minus.powi(4) / denominator
+}
+
+/// The derivative of the isothermal compressibility factor of the hard-sphere
+/// reference with respect to the packing fraction.
+fn khs_eta(eta: f64) -> f64 {
+    let eta2 = eta * eta;
+    let denominator = 1.0 + 4.0 * eta + 4.0 * eta2 - 4.0 * eta2 * eta + eta2 * eta2;
+    4.0 * (eta2 - 5.0 * eta - 2.0) * (1.0 - eta).powi(3) / (denominator * denominator)
 }

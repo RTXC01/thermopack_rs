@@ -669,3 +669,44 @@ subroutine query_solid_line(kind,component,tlimit,npoints,temperatures,pressures
   enddo
   count = n
 end subroutine query_solid_line
+
+! Shift the reference levels of the solid carbon dioxide model.
+subroutine query_solid_co2_init(liquid_entropy,liquid_gibbs,temperature,pressure) &
+     bind(C,name='query_solid_co2_init')
+  use, intrinsic :: iso_c_binding, only: c_double
+  use co2_gibbs, only: sco2init
+  implicit none
+  real(c_double), value :: liquid_entropy
+  real(c_double), value :: liquid_gibbs
+  real(c_double), value :: temperature
+  real(c_double), value :: pressure
+  call sco2init(liquid_entropy,liquid_gibbs,temperature,pressure)
+end subroutine query_solid_co2_init
+
+! Evaluate the solid carbon dioxide model with its current reference levels.
+subroutine query_solid_co2(temperature,pressure,values,count) &
+     bind(C,name='query_solid_co2')
+  use, intrinsic :: iso_c_binding, only: c_double,c_int
+  use co2_gibbs, only: sco2_gibbs, sco2_dgdp, sco2_d2gdp2, sco2_dgdT, sco2_d2gdT2, &
+       sco2_d2gdtdp, sco2_specvol, sco2_entropy, sco2_enthalpy, sco2_energy, &
+       sco2_helmholtz, sco2_heat_capacity, sco2_speed_of_sound
+  implicit none
+  real(c_double), value :: temperature
+  real(c_double), value :: pressure
+  real(c_double), intent(out) :: values(13)
+  integer(c_int), intent(out) :: count
+  values(1) = sco2_gibbs(temperature,pressure)
+  values(2) = sco2_dgdp(temperature,pressure)
+  values(3) = sco2_d2gdp2(temperature,pressure)
+  values(4) = sco2_dgdT(temperature,pressure)
+  values(5) = sco2_d2gdT2(temperature,pressure)
+  values(6) = sco2_d2gdtdp(temperature,pressure)
+  values(7) = sco2_specvol(temperature,pressure)
+  values(8) = sco2_entropy(temperature,pressure)
+  values(9) = sco2_enthalpy(temperature,pressure)
+  values(10) = sco2_energy(temperature,pressure)
+  values(11) = sco2_helmholtz(temperature,pressure)
+  values(12) = sco2_heat_capacity(temperature,pressure)
+  values(13) = sco2_speed_of_sound(temperature,pressure)
+  count = 13
+end subroutine query_solid_co2

@@ -81,6 +81,10 @@ def load_probe():
     probe.query_unifac.restype=None
     probe.query_solid_line.argtypes=[c_int,POINTER(c_char),c_double,c_int,POINTER(c_double),POINTER(c_double),POINTER(c_int)]
     probe.query_solid_line.restype=None
+    probe.query_solid_co2_init.argtypes=[c_double,c_double,c_double,c_double]
+    probe.query_solid_co2_init.restype=None
+    probe.query_solid_co2.argtypes=[c_double,c_double,POINTER(c_double),POINTER(c_int)]
+    probe.query_solid_co2.restype=None
     return probe
 
 
@@ -90,6 +94,19 @@ def main(compiler_directory):
     probe=None
     for line in sys.stdin:
         request=json.loads(line)
+        if request['mode']=='SOLID_CO2_INIT':
+            if probe is None:probe=load_probe()
+            probe.query_solid_co2_init(request['liquid_entropy'],request['liquid_gibbs'],
+                                       request['temperature'],request['pressure'])
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=[])),flush=True)
+            continue
+        if request['mode']=='SOLID_CO2':
+            if probe is None:probe=load_probe()
+            output=(c_double*13)();count=c_int()
+            probe.query_solid_co2(request['temperature'],request['pressure'],output,byref(count))
+            values=list(map(float,output))[:count.value]
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=values)),flush=True)
+            continue
         if request['mode']=='SOLID_LINE':
             if probe is None:probe=load_probe()
             identifier=request['component']

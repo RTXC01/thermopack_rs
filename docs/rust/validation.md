@@ -58,6 +58,7 @@ python tools/rust_port/generate_solid_data.py
 python tools/rust_port/validate_unifac.py
 python tools/rust_port/validate_unifac_cubic.py
 python tools/rust_port/validate_solid_lines.py
+python tools/rust_port/validate_solid_co2.py
 ```
 
 On Windows add `--compiler-directory /path/to/gfortran/bin` to the validation
@@ -232,6 +233,13 @@ the cancellation of nearly equal terms in some melting curves; the 4
 remaining cases are the hydrogen sulfide sublimation lines, where the source
 stops because the correlation label has no fourth character and the native
 model reports the same error.
+The [solid carbon dioxide qualification](solid.md#solid-carbon-dioxide) adds
+7 states with 13 quantities each: the Gibbs energy of solid carbon dioxide
+with its first and second temperature and pressure derivatives, the mixed
+derivative, the specific volume, the entropy, the enthalpy, the internal
+energy, the Helmholtz energy, the heat capacity and the speed of sound. All
+7 states match the exact-source library within a relative 1e-11 after the
+source reference shift.
 
 Tolerances are quantity-specific and recorded in fixture metadata and tests.
 They are not a promise of bitwise identity across compilers or all states.

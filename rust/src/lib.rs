@@ -40,6 +40,7 @@ pub mod pets;
 pub mod saft_vrmie;
 pub mod saft_vrmie_data;
 pub mod solid;
+pub mod solid_co2;
 pub mod solid_data;
 pub mod translation;
 pub mod unifac;
@@ -93,6 +94,7 @@ pub use saft_vrmie::{
 };
 pub use saft_vrmie_data::{SaftVrMieKijRecord, SaftVrMieLijRecord, SaftVrMieRecord};
 pub use solid::SolidLine;
+pub use solid_co2::SolidCo2;
 pub use solid_data::{
     SolidCorrelation, lookup_melting_correlation, lookup_sublimation_correlation,
 };

@@ -87,8 +87,43 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for line in io::stdin().lock().lines() {
         let line = line?;
         let fields: Vec<_> = line.split('|').collect();
-        if fields.len() != 6 {
+        if fields[0] != "SOLIDCO2" && fields.len() != 6 {
             return Err("expected six fields".into());
+        }
+        if fields[0] == "SOLIDCO2" {
+            let mut model = thermopack_rs::solid_co2::SolidCo2::new();
+            model.initialize(
+                fields[1].parse().unwrap(),
+                fields[2].parse().unwrap(),
+                fields[3].parse().unwrap(),
+                fields[4].parse().unwrap(),
+            );
+            let temperature: f64 = fields[5].parse().unwrap();
+            let pressure: f64 = fields[6].parse().unwrap();
+            let values = [
+                model.gibbs(temperature, pressure),
+                model.dg_dp(temperature, pressure),
+                model.d2g_dp2(temperature, pressure),
+                model.dg_dt(temperature, pressure),
+                model.d2g_dt2(temperature, pressure),
+                model.d2g_dtdp(temperature, pressure),
+                model.specific_volume(temperature, pressure),
+                model.entropy(temperature, pressure),
+                model.enthalpy(temperature, pressure),
+                model.internal_energy(temperature, pressure),
+                model.helmholtz(temperature, pressure),
+                model.heat_capacity(temperature, pressure),
+                model.speed_of_sound(temperature, pressure),
+            ];
+            println!(
+                "{}",
+                values
+                    .iter()
+                    .map(|v| format!("{v:.17e}"))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            );
+            continue;
         }
         if fields[0] == "SOLID" {
             let component = fields[1];

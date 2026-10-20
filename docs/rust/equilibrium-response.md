@@ -52,17 +52,17 @@ tests. Broader quantum/critical/multiphase response qualification remains pendin
 The second and the third virial coefficients follow the definition of the
 original, the pressure expansion
 
-
+$$
 \frac{P}{R T} = \rho + B \rho^2 + C \rho^3 + O(\rho^4)
-
+$$
 
 at the zero density. The original estimates them from the residual Helmholtz
 energy at a molar volume of 1e7 cubic metre per mole, and the native method
-PreparedState::virial_coefficients uses the same estimate.
+`PreparedState::virial_coefficients` uses the same estimate.
 
-	ools/rust_port/validate_virial.py compares the native model against the
+`tools/rust_port/validate_virial.py` compares the native model against the
 exact-source library. The oracle calls the Python interface of the fork, which
-reaches the original irial_coefficients.
+reaches the original `virial_coefficients`.
 
 * 10 cases: methane, carbon dioxide and nitrogen, two mixtures, in the
   Peng-Robinson and the Soave-Redlich-Kwong equations of state.
@@ -76,5 +76,29 @@ reaches the original irial_coefficients.
   the analytic value, and the two differ. The fixture holds the value of the
   original as a reference and the test does not compare it.
 
-The committed fixture is 	ests/fixtures/virial.csv; the test is
-	ests/virial.rs.
+The committed fixture is `tests/fixtures/virial.csv`; the test is
+`tests/virial.rs`.
+
+## The matrix of the second virial coefficients
+
+The original `secondVirialCoeffMatrix` fills the matrix of the pure and the
+cross second virial coefficients of the model. The native method
+`Cubic::second_virial_coefficient_matrix` builds the same matrix: the pure
+coefficients come from the pure fluids and the cross coefficient of a pair
+follows from the virial coefficient of the equal mixture of the pair and the
+pure coefficients.
+
+`tools/rust_port/validate_virial_matrix.py` compares the native model against
+the exact-source library. A reference probe calls the original routine.
+
+* 6 cases: methane, the methane-propane mixture and the
+  carbon dioxide-methane-nitrogen mixture in the Peng-Robinson equation of
+  state and the methane-propane mixture in the Soave-Redlich-Kwong equation
+  of state.
+* The matrix matches with a relative 1e-3 and an absolute 1e-8 cubic metre
+  per mole, and the observed worst relative difference is 1.5e-4. The
+  difference is the truncation error of the finite volume estimate of the
+  original, which the cross coefficients amplify.
+
+The committed fixture is `tests/fixtures/virial_matrix.csv`; the test is
+`tests/virial_matrix.rs`.

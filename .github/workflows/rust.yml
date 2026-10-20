@@ -83,6 +83,7 @@ jobs:
       - run: python tools/rust_port/validate_spinodal.py
       - run: python tools/rust_port/validate_joule_thompson.py
       - run: python tools/rust_port/validate_virial.py
+      - run: python tools/rust_port/validate_virial_matrix.py
       - run: python tools/rust_port/validate_critical.py
       - run: python tools/rust_port/validate_mut_solve.py
       - run: python tools/rust_port/validate_hyperdual.py

@@ -65,6 +65,7 @@ python tools/rust_port/validate_isolines.py
 python tools/rust_port/validate_spinodal.py
 python tools/rust_port/validate_joule_thompson.py
 python tools/rust_port/validate_virial.py
+python tools/rust_port/validate_virial_matrix.py
 python tools/rust_port/validate_critical.py
 python tools/rust_port/validate_mut_solve.py
 python tools/rust_port/validate_hyperdual.py
@@ -300,6 +301,13 @@ and an absolute 1e-8 cubic metre per mole, and the observed worst relative
 difference is 1.8e-4, the truncation error of the finite volume estimate that
 the native model and the original share. The third virial coefficient of the
 original carries the cancellation of that estimate and is not reproduced.
+The [virial matrix qualification](equilibrium-response.md#the-matrix-of-the-second-virial-coefficients)
+adds 6 cases of the original `secondVirialCoeffMatrix`: methane, the
+methane-propane mixture and the carbon dioxide-methane-nitrogen mixture in
+the Peng-Robinson equation of state and the methane-propane mixture in the
+Soave-Redlich-Kwong equation of state. The matrix of the pure and the cross
+second virial coefficients matches with a relative 1e-3, and the observed
+worst relative difference is 1.5e-4.
 The [critical point qualification](spinodal.md#critical-points) adds 7 cases of
 the original `calcCriticalTV`: methane, carbon dioxide, propane and water in
 the Peng-Robinson equation of state, nitrogen and methane in the

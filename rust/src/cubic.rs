@@ -757,6 +757,41 @@ impl Cubic {
             .map_err(|e| e.clone())
     }
 
+    /// The matrix of the second virial coefficients of the model.
+    ///
+    /// The pure coefficients and the cross coefficients follow the original
+    /// `secondVirialCoeffMatrix`. The cross coefficient of a pair follows from
+    /// the virial coefficient of the equal mixture of the pair and the pure
+    /// coefficients, with the equal mixture as the reference. The matrix is
+    /// stored row by row.
+    pub fn second_virial_coefficient_matrix(&self, temperature: f64) -> Result<Vec<f64>> {
+        let count = self.components().len();
+        let mut matrix = vec![0.0; count * count];
+        for i in 0..count {
+            let mut composition = vec![0.0; count];
+            composition[i] = 1.0;
+            let state = self.prepare(temperature, &composition)?;
+            matrix[i * count + i] = state.virial_coefficients()?.0;
+        }
+        let share = 0.5;
+        for i in 0..count {
+            for j in i + 1..count {
+                let mut composition = vec![0.0; count];
+                composition[i] = share;
+                composition[j] = 1.0 - share;
+                let state = self.prepare(temperature, &composition)?;
+                let mixed = state.virial_coefficients()?.0;
+                let cross = (mixed
+                    - matrix[i * count + i] * share * share
+                    - matrix[j * count + j] * (1.0 - share) * (1.0 - share))
+                    / (2.0 * share * (1.0 - share));
+                matrix[i * count + j] = cross;
+                matrix[j * count + i] = cross;
+            }
+        }
+        Ok(matrix)
+    }
+
     pub fn kij(&self, i: usize, j: usize) -> Result<f64> {
         self.validate_pair(i, j)?;
         Ok(self.kij[i * self.components.len() + j])

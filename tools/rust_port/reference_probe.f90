@@ -1080,3 +1080,25 @@ subroutine query_solid_saturation(component,temperature,pressure,phase, &
   result(2)=p
   status=ierr
 end subroutine query_solid_saturation
+
+! Evaluate the matrix of the second virial coefficients of the original.
+subroutine query_second_virial_matrix(temperature,values,count) &
+     bind(C,name='query_second_virial_matrix')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use thermopack_var, only: nc
+  use eosTV, only: secondVirialCoeffMatrix
+  implicit none
+  real(c_double), value :: temperature
+  real(c_double), intent(out) :: values(16)
+  integer(c_int), intent(out) :: count
+  ! Locals
+  real :: Bmat(nc,nc)
+  integer :: i,j
+  call secondVirialCoeffMatrix(temperature,Bmat)
+  count = nc*nc
+  do j=1,nc
+    do i=1,nc
+      values((j-1)*nc+i) = Bmat(i,j)
+    end do
+  end do
+end subroutine query_second_virial_matrix

@@ -94,6 +94,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             && fields[0] != "SPINODAL"
             && fields[0] != "JTI"
             && fields[0] != "VIRIAL"
+            && fields[0] != "VIRIALMATRIX"
             && fields[0] != "CRITICAL"
             && fields.len() != 6
         {
@@ -117,6 +118,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "{:.17e},{:.17e},{:.17e}",
                 point.temperature, point.volume, point.pressure
             );
+            continue;
+        }
+        if fields[0] == "VIRIALMATRIX" {
+            let kind = match fields[1] {
+                "SRK" => thermopack_rs::CubicKind::SoaveRedlichKwong,
+                "RK" => thermopack_rs::CubicKind::RedlichKwong,
+                "VDW" => thermopack_rs::CubicKind::VanDerWaals,
+                _ => thermopack_rs::CubicKind::PengRobinson,
+            };
+            let components: Vec<&str> = fields[2].split(',').collect();
+            let temperature: f64 = fields[3].parse().unwrap();
+            let model = thermopack_rs::Cubic::new(kind, &components)?;
+            let matrix = model.second_virial_coefficient_matrix(temperature)?;
+            let text: Vec<String> = matrix.iter().map(|value| format!("{value:.17e}")).collect();
+            println!("{}", text.join(","));
             continue;
         }
         if fields[0] == "VIRIAL" {

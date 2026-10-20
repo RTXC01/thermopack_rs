@@ -92,9 +92,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             && fields[0] != "PSEUDOC"
             && fields[0] != "ISOLINE"
             && fields[0] != "SPINODAL"
+            && fields[0] != "JTI"
             && fields.len() != 6
         {
             return Err("expected six fields".into());
+        }
+        if fields[0] == "JTI" {
+            let kind = match fields[1] {
+                "SRK" => thermopack_rs::CubicKind::SoaveRedlichKwong,
+                "RK" => thermopack_rs::CubicKind::RedlichKwong,
+                "VDW" => thermopack_rs::CubicKind::VanDerWaals,
+                _ => thermopack_rs::CubicKind::PengRobinson,
+            };
+            let components: Vec<&str> = fields[2].split(',').collect();
+            let volume: f64 = fields[3].parse().unwrap();
+            let guess: f64 = fields[4].parse().unwrap();
+            let model = thermopack_rs::Cubic::new(kind, &components)?;
+            let composition = vec![1.0; components.len()];
+            let point = thermopack_rs::joule_thompson::inversion_point(
+                &model,
+                volume,
+                guess,
+                &composition,
+            )?;
+            println!(
+                "{:.17e},{:.17e},{:.17e}",
+                point.temperature, point.volume, point.pressure
+            );
+            continue;
         }
         if fields[0] == "SPINODAL" {
             let kind = match fields[1] {

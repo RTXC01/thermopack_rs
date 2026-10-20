@@ -81,6 +81,7 @@ jobs:
       - run: python tools/rust_port/validate_pseudo_components.py
       - run: python tools/rust_port/validate_isolines.py
       - run: python tools/rust_port/validate_spinodal.py
+      - run: python tools/rust_port/validate_joule_thompson.py
       - run: python tools/rust_port/validate_mut_solve.py
       - run: python tools/rust_port/validate_hyperdual.py
       - run: python tools/rust_port/validate_solid_water.py

@@ -54,6 +54,45 @@ which reaches the original routine.
 The committed fixture is `tests/fixtures/spinodal.csv`; the test is
 `tests/spinodal.rs`.
 
+## The Joule-Thomson inversion
+
+The inversion curve of the source, in `src/joule_thompson_inversion.f90`, is the
+curve of the states where the Joule-Thomson coefficient vanishes. The original
+solves the condition
+
+$$
+T \left(\frac{\partial P}{\partial T}\right)_v
++ v \left(\frac{\partial P}{\partial v}\right)_T = 0
+$$
+
+for the temperature at a given molar volume, and it maps the curve with that
+solution. The native model, in `joule_thompson`, solves the same condition
+with a Newton iteration in the logarithm of the temperature, and it uses the
+same centred difference for the derivative of the condition that the original
+uses when it extrapolates along the curve.
+
+`tools/rust_port/validate_joule_thompson.py` compares the native model
+against the exact-source library. The oracle maps the inversion curve of the
+original through the Python interface of the fork, and the native model
+solves the condition at every molar volume of that curve with a perturbed
+initial guess.
+
+* 78 cases: the inversion curve of nitrogen in the Peng-Robinson and the
+  Soave-Redlich-Kwong equations of state.
+* The compared quantities are the temperature and the pressure of the point.
+  All 78 cases match with an absolute 1e-6 K on the temperature and an
+  absolute 1e-4 Pa on the pressure, together with a relative 1e-7. The
+  observed worst relative difference is 3.3e-9.
+
+The first point of the curve of the original is the zero pressure solution,
+which the original computes from the virial coefficients and not from the
+inversion condition, so the comparison starts at the second point. The
+original also fails to map the curve of methane and of carbon dioxide, and
+the nitrogen curve is the reference.
+
+The committed fixture is `tests/fixtures/joule_thompson.csv`; the test is
+`tests/joule_thompson.rs`.
+
 ## Remaining scope
 
 * The mapping of the whole limit line, the source `map_stability_limit`, is
@@ -61,5 +100,5 @@ The committed fixture is `tests/fixtures/spinodal.csv`; the test is
   curve.
 * The limit of a mixture needs the stability matrix of the mixture with its
   eigenvalues, and the native model reports the single component case only.
-* The Joule-Thomson inversion of the source, which builds on the limit line,
-  is not yet ported.
+* The curve of the Joule-Thomson inversion is not mapped by the native model,
+  and it reports a single point instead.

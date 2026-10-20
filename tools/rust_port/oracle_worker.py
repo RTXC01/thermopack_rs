@@ -190,6 +190,20 @@ def main(compiler_directory):
                                         request['ln_spec'],result,byref(status))
             print('THERMOPACK_RESULT='+json.dumps(dict(values=list(map(float,result)),status=status.value)),flush=True)
             continue
+        if request['mode']=='JTI':
+            eos,comps=request['eos'],request['components']
+            from thermopack.cubic import cubic
+            model=cubic(",".join(comps),eos)
+            model.activate()
+            z=request['feed']
+            try:
+                temperature,pressure,volume=model.joule_thompson_inversion(z,request.get('nmax',100))
+            except Exception as error:
+                print('THERMOPACK_RESULT='+json.dumps(dict(calculation_error=str(error))),flush=True)
+                continue
+            arrays=[list(map(float,values)) for values in (temperature,pressure,volume)]
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=arrays)),flush=True)
+            continue
         if request['mode']=='SPINODAL':
             eos,comps=request['eos'],request['components']
             from thermopack.cubic import cubic

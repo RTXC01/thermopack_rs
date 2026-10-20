@@ -63,6 +63,7 @@ python tools/rust_port/validate_solid_saturation.py
 python tools/rust_port/validate_pseudo_components.py
 python tools/rust_port/validate_isolines.py
 python tools/rust_port/validate_spinodal.py
+python tools/rust_port/validate_joule_thompson.py
 python tools/rust_port/validate_mut_solve.py
 python tools/rust_port/validate_hyperdual.py
 ```
@@ -284,6 +285,11 @@ equation of state. The temperature and the molar volume of the point match
 with an absolute 1e-6 K and an absolute 1e-10 cubic metre per mole, and the
 observed worst relative difference is 1.4e-9, which is the tolerance of the
 source solver.
+The [Joule-Thomson qualification](spinodal.md#the-joule-thomson-inversion)
+adds 78 cases of the original `map_jt_inversion`: the inversion curve of
+nitrogen in the Peng-Robinson and the Soave-Redlich-Kwong equations of state.
+The temperature and the pressure of the point match with an absolute 1e-6 K
+and an absolute 1e-4 Pa, and the observed worst relative difference is 3.3e-9.
 The [multiparameter density qualification](multiparameter.md#density-iteration)
 adds 1694 attempted density solves over the fourteen model configurations: 1669
 states match the exact-source library, including the density, the raw phase

@@ -32,6 +32,7 @@ mod hydrogen;
 pub mod hyperdual;
 pub mod ideal;
 pub mod isolines;
+pub mod joule_thompson;
 pub mod lee_kesler;
 pub mod mbwr;
 pub mod multiparameter;

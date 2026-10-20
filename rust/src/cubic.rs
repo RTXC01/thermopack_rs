@@ -1424,6 +1424,32 @@ impl PreparedState<'_> {
         Ok(cv)
     }
 
+    /// The second and third virial coefficients of the state.
+    ///
+    /// The coefficients follow the definition of the original, the pressure
+    /// expansion `P/(R T) = rho + B rho^2 + C rho^3` at the zero density. The
+    /// original estimates them from the residual Helmholtz energy at a large
+    /// molar volume, and the native model uses the same estimate.
+    pub fn virial_coefficients(&self) -> Result<(f64, f64)> {
+        // The large molar volume of the original estimate.
+        const LARGE_VOLUME: f64 = 1.0e7;
+        let volume = self.eos_volume(LARGE_VOLUME);
+        let (d1, d2) = self.model.kind.deltas();
+        let free = volume - self.b;
+        let denom = (volume + d1 * self.b) * (volume + d2 * self.b);
+        let slope = 2.0 * volume + (d1 + d2) * self.b;
+        let thermal = R * self.temperature;
+        // The reduced residual Helmholtz energy and its volume derivatives.
+        let first = (-thermal * self.b / (volume * free) + self.a / denom) / thermal;
+        let second = (thermal * self.b * (2.0 * volume - self.b) / (volume * volume * free * free)
+            - self.a * slope / (denom * denom))
+            / thermal;
+        Ok((
+            -LARGE_VOLUME * LARGE_VOLUME * first,
+            LARGE_VOLUME.powi(4) * (second + 2.0 * first / LARGE_VOLUME),
+        ))
+    }
+
     pub fn residual(&self, volume: f64) -> Result<Residual> {
         self.volume_check(volume)?;
         let actual_volume = volume;

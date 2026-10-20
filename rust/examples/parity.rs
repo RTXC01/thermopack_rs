@@ -93,9 +93,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             && fields[0] != "ISOLINE"
             && fields[0] != "SPINODAL"
             && fields[0] != "JTI"
+            && fields[0] != "VIRIAL"
             && fields.len() != 6
         {
             return Err("expected six fields".into());
+        }
+        if fields[0] == "VIRIAL" {
+            let kind = match fields[1] {
+                "SRK" => thermopack_rs::CubicKind::SoaveRedlichKwong,
+                "RK" => thermopack_rs::CubicKind::RedlichKwong,
+                "VDW" => thermopack_rs::CubicKind::VanDerWaals,
+                _ => thermopack_rs::CubicKind::PengRobinson,
+            };
+            let components: Vec<&str> = fields[2].split(',').collect();
+            let temperature: f64 = fields[3].parse().unwrap();
+            let composition: Vec<f64> = fields[4]
+                .split(',')
+                .map(|value| value.parse().unwrap())
+                .collect();
+            let model = thermopack_rs::Cubic::new(kind, &components)?;
+            let state = model.prepare(temperature, &composition)?;
+            let (second, third) = state.virial_coefficients()?;
+            println!("{second:.17e},{third:.17e}");
+            continue;
         }
         if fields[0] == "JTI" {
             let kind = match fields[1] {

@@ -64,6 +64,7 @@ python tools/rust_port/validate_pseudo_components.py
 python tools/rust_port/validate_isolines.py
 python tools/rust_port/validate_spinodal.py
 python tools/rust_port/validate_joule_thompson.py
+python tools/rust_port/validate_virial.py
 python tools/rust_port/validate_mut_solve.py
 python tools/rust_port/validate_hyperdual.py
 ```
@@ -290,6 +291,14 @@ adds 78 cases of the original `map_jt_inversion`: the inversion curve of
 nitrogen in the Peng-Robinson and the Soave-Redlich-Kwong equations of state.
 The temperature and the pressure of the point match with an absolute 1e-6 K
 and an absolute 1e-4 Pa, and the observed worst relative difference is 3.3e-9.
+The [virial coefficient qualification](equilibrium-response.md#virial-coefficients)
+adds 10 cases of the original `virial_coefficients`: methane, carbon dioxide
+and nitrogen, two mixtures, in the Peng-Robinson and the Soave-Redlich-Kwong
+equations of state. The second virial coefficient matches with a relative 1e-4
+and an absolute 1e-8 cubic metre per mole, and the observed worst relative
+difference is 1.8e-4, the truncation error of the finite volume estimate that
+the native model and the original share. The third virial coefficient of the
+original carries the cancellation of that estimate and is not reproduced.
 The [multiparameter density qualification](multiparameter.md#density-iteration)
 adds 1694 attempted density solves over the fourteen model configurations: 1669
 states match the exact-source library, including the density, the raw phase

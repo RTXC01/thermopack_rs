@@ -190,6 +190,15 @@ def main(compiler_directory):
                                         request['ln_spec'],result,byref(status))
             print('THERMOPACK_RESULT='+json.dumps(dict(values=list(map(float,result)),status=status.value)),flush=True)
             continue
+        if request['mode']=='VIRIAL':
+            eos,comps=request['eos'],request['components']
+            from thermopack.cubic import cubic
+            model=cubic(",".join(comps),eos)
+            model.activate()
+            second,third=model.virial_coeffcients(request['temperature'],request['feed'])
+            values=[float(second),float(third)]
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=values)),flush=True)
+            continue
         if request['mode']=='JTI':
             eos,comps=request['eos'],request['components']
             from thermopack.cubic import cubic

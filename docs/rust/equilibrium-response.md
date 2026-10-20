@@ -46,3 +46,35 @@ remain recorded failures. Independent native central differences in 72 states
 check physical H, V and U responses and `S_P = -V_T`, with nonzero kij/lij and
 volume translation. Pure latent response and zero-feed handling have separate
 tests. Broader quantum/critical/multiphase response qualification remains pending.
+
+## Virial coefficients
+
+The second and the third virial coefficients follow the definition of the
+original, the pressure expansion
+
+
+\frac{P}{R T} = \rho + B \rho^2 + C \rho^3 + O(\rho^4)
+
+
+at the zero density. The original estimates them from the residual Helmholtz
+energy at a molar volume of 1e7 cubic metre per mole, and the native method
+PreparedState::virial_coefficients uses the same estimate.
+
+	ools/rust_port/validate_virial.py compares the native model against the
+exact-source library. The oracle calls the Python interface of the fork, which
+reaches the original irial_coefficients.
+
+* 10 cases: methane, carbon dioxide and nitrogen, two mixtures, in the
+  Peng-Robinson and the Soave-Redlich-Kwong equations of state.
+* The second virial coefficient matches with a relative 1e-4 and an absolute
+  1e-8 cubic metre per mole, and the observed worst relative difference is
+  1.8e-4. The difference is the truncation error of the finite volume
+  estimate, which the native model and the original share.
+* The third virial coefficient of the original is the difference of two large
+  terms of that estimate, so it carries its cancellation and it is much larger
+  than the analytic value of the equation of state. The native value follows
+  the analytic value, and the two differ. The fixture holds the value of the
+  original as a reference and the test does not compare it.
+
+The committed fixture is 	ests/fixtures/virial.csv; the test is
+	ests/virial.rs.

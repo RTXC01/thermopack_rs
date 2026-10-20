@@ -211,6 +211,15 @@ The measurement is the median of repeated runs of the same workload on the
 same host, and the other three rows of the table above are unchanged within
 the run-to-run spread of that host.
 
+The benchmark also reports the UNIFAC mixing rule, which is the slowest
+preparation of the cubic model at 5736 nanoseconds per state. It evaluates
+the group interaction energies of every pair of subgroups and their
+temperature derivatives, so the cost grows with the square of the number of
+active subgroups. That preparation allocates twenty-five vectors per state,
+but the group sums and the exponential functions of the group interactions
+dominate the cost, so the allocation share is small and no further change is
+recorded for it.
+
 Next optimization targets are the alpha correlation evaluations, separately
 requested derivative paths and profiling the flash/SAFT hot loops once those
 implementations pass parity. No SIMD or thread-level speedups are claimed yet.

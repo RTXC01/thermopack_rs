@@ -26,6 +26,12 @@ fn main() {
             MixingRule::HuronVidal1,
             "DEFAULT",
         ),
+        (
+            "srk_unifac",
+            CubicKind::SoaveRedlichKwong,
+            MixingRule::Unifac,
+            "DEFAULT",
+        ),
     ];
     let iterations = 200_000;
     for (label, kind, rule, reference) in cases {

@@ -96,6 +96,27 @@ const LAMBDA_R: f64 = 12.0;
 /// The prefactor of the potential of the model.
 const C_FAC: f64 = 4.0;
 
+/// The state of the model at a temperature and a volume.
+#[derive(Debug, Clone, Copy)]
+pub struct LjsState {
+    /// Pressure of the state in pascal.
+    pub pressure: f64,
+    /// Compressibility factor of the state.
+    pub compressibility: f64,
+    /// Molar reduced residual Helmholtz energy of the state.
+    pub residual_helmholtz: f64,
+    /// Molar residual internal energy in joule per mole.
+    pub u_residual: f64,
+    /// Molar residual enthalpy in joule per mole.
+    pub h_residual: f64,
+    /// Molar residual entropy in joule per mole and kelvin.
+    pub s_residual: f64,
+    /// Molar enthalpy of the state in joule per mole.
+    pub h_total: f64,
+    /// Molar entropy of the state in joule per mole and kelvin.
+    pub s_total: f64,
+}
+
 /// The Lennard-Jones splined model with the Barker-Henderson perturbation
 /// theory.
 #[derive(Debug, Clone, Copy)]
@@ -213,6 +234,47 @@ impl LjsBh {
     pub fn fugacity_coefficient(&self, temperature: f64, volume: f64, moles: f64) -> Result<f64> {
         let (energy, _, mole_derivative) = self.energy_derivatives(temperature, volume, moles)?;
         Ok(energy + moles * mole_derivative)
+    }
+
+    /// The state of the model at a temperature and a volume.
+    ///
+    /// The ideal part of the state follows the original, which builds the
+    /// model on the argon record and fixes the heat capacity of the ideal gas
+    /// to a constant of 2.5 times the gas constant.
+    pub fn state(&self, temperature: f64, volume: f64, moles: f64) -> Result<LjsState> {
+        let (energy, energy_t) =
+            self.residual_helmholtz_energy_derivative(temperature, volume, moles)?;
+        let (pressure, compressibility) = self.pressure(temperature, volume, moles)?;
+        let u_residual = -crate::R * temperature * temperature * energy_t;
+        let h_residual = u_residual + crate::R * temperature * (compressibility - 1.0);
+        let s_residual =
+            -crate::R * (temperature * energy_t + energy) + crate::R * compressibility.ln();
+        let ideal = self.ideal()?;
+        let properties = ideal.properties(temperature, pressure)?;
+        Ok(LjsState {
+            pressure,
+            compressibility,
+            residual_helmholtz: energy,
+            u_residual,
+            h_residual,
+            s_residual,
+            h_total: properties.enthalpy + h_residual,
+            s_total: properties.entropy + s_residual,
+        })
+    }
+
+    /// The ideal gas part of the model.
+    ///
+    /// The original builds the model on the argon record and replaces the heat
+    /// capacity of the ideal gas with a constant of 2.5 times the gas
+    /// constant, and the reference energies stay those of the record.
+    fn ideal(&self) -> Result<crate::ideal::IdealGas> {
+        let component = crate::component::component("AR")?;
+        let mut gas = crate::ideal::IdealGas::new(component)?;
+        let mut coefficients = [0.0; 21];
+        coefficients[0] = 2.5;
+        gas.set_heat_capacity(8, &coefficients)?;
+        Ok(gas)
     }
 
     /// The pressure of the model at a temperature and a volume.

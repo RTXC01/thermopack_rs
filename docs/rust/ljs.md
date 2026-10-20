@@ -20,13 +20,14 @@ second order term.
 | `src/lj_splined.f90:calcFresLJs_bh` (volume derivative) | `ljs::LjsBh::pressure` |
 | `src/lj_splined.f90:calcFresLJs_bh` (temperature derivative) | `ljs::LjsBh::residual_helmholtz_energy_derivative` |
 | `src/lj_splined.f90:calcFresLJs_bh` (mole number derivative) | `ljs::LjsBh::fugacity_coefficient` |
+| `src/lj_splined.f90:calcFresLJs_bh` (state functions) | `ljs::LjsBh::state` |
 
 The native model provides the reduced perturbation terms and the reduced
 Barker-Henderson hard-sphere diameter, the polynomials of the spline with
 their partial derivatives, the parameters and the switches of the model, the
 reduced residual Helmholtz energy with its temperature derivative, the pressure
-of a state and the reduced residual chemical potential. The enthalpy, the
-entropy and the fugacity of a state are not yet ported.
+of a state, the reduced residual chemical potential and the caloric state. The
+fugacity of a state and the volume solve are not yet ported.
 
 ## Method
 
@@ -136,11 +137,27 @@ derivative of the native model.
 The committed fixture is `tests/fixtures/ljs_fugacity.csv`; the test is
 `tests/ljs.rs`.
 
+`tools/rust_port/validate_ljs_caloric.py` compares the caloric state against
+the exact-source library. The reference oracle asks the Python interface of the
+fork for the molar enthalpy and the molar entropy of the state.
+
+* 8 cases: the temperature, the pressure and the phase of the single
+  component over the dilute and the dense fluid.
+* The compared quantities are the molar enthalpy and the molar entropy of the
+  state. All 8 cases match with a relative 1e-8, and the observed worst
+  relative difference is 4.2e-15.
+
+The native model builds the ideal part of the state from the argon record and
+the constant heat capacity of the original, and the residual part from the
+temperature derivative of the reduced residual Helmholtz energy.
+
+The committed fixture is `tests/fixtures/ljs_caloric.csv`; the test is
+`tests/ljs.rs`.
+
 ## Remaining scope
 
-* The enthalpy, the entropy and the fugacity of a state are not yet ported,
-  because they need the ideal part of the model, which the source fixes to a
-  constant heat capacity of 2.5 times the gas constant.
+* The fugacity of a state and the volume solve of the model are not yet
+  ported.
 * The WCA and the UV variants of the source, the hard-sphere reference of the
   White Bear family and the convolution of the fundamental measure theory are
   not yet ported.

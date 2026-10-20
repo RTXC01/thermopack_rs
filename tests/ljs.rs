@@ -125,6 +125,34 @@ fn the_state_matches_the_source() {
 }
 
 #[test]
+fn the_caloric_state_matches_the_source() {
+    let model = LjsBh::new();
+    let mut checked = 0;
+    for row in include_str!("fixtures/ljs_caloric.csv").lines().skip(1) {
+        let fields: Vec<_> = row.split(';').collect();
+        let case = fields[0];
+        let parts: Vec<_> = case.split('|').collect();
+        let temperature: f64 = parts[0].parse().unwrap();
+        let source_h: f64 = fields[1].parse().unwrap();
+        let source_s: f64 = fields[2].parse().unwrap();
+        let volume: f64 = fields[3].parse().unwrap();
+        let state = model.state(temperature, volume, 1.0).unwrap();
+        assert!(
+            (source_h - state.h_total).abs() <= 1.0e-6 + 1.0e-8 * source_h.abs(),
+            "{case}: source {source_h} native {}",
+            state.h_total
+        );
+        assert!(
+            (source_s - state.s_total).abs() <= 1.0e-9 + 1.0e-8 * source_s.abs(),
+            "{case}: source {source_s} native {}",
+            state.s_total
+        );
+        checked += 1;
+    }
+    assert_eq!(checked, 8);
+}
+
+#[test]
 fn the_residual_chemical_potential_matches_the_source() {
     let model = LjsBh::new();
     let mut checked = 0;

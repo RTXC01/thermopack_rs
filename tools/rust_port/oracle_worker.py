@@ -206,6 +206,22 @@ def main(compiler_directory):
             values=[float(temperature),float(volume),float(pressure)]
             print('THERMOPACK_RESULT='+json.dumps(dict(values=values)),flush=True)
             continue
+        if request['mode']=='LJS_CALORIC':
+            from thermopack.ljs_bh import ljs_bh
+            model=ljs_bh(request.get('parameter_reference','Default'),2.0)
+            temperature=request['temperature']
+            pressure=request['pressure']
+            z=request['feed']
+            phase=model.LIQPH if request['phase']==1 else model.VAPPH
+            try:
+                enthalpy=model.enthalpy(temperature,pressure,z,phase)[0]
+                entropy=model.entropy(temperature,pressure,z,phase)[0]
+            except Exception as error:
+                print('THERMOPACK_RESULT='+json.dumps(dict(calculation_error=str(error))),flush=True)
+                continue
+            values=[float(enthalpy),float(entropy)]
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=values)),flush=True)
+            continue
         if request['mode']=='LJS_FUGACITY':
             from thermopack.ljs_bh import ljs_bh
             model=ljs_bh(request.get('parameter_reference','Default'),2.0)

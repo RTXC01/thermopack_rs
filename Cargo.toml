@@ -64,6 +64,11 @@ path = "rust/benches/mbwr_density.rs"
 harness = false
 
 [[bench]]
+name = "solid_water"
+path = "rust/benches/solid_water.rs"
+harness = false
+
+[[bench]]
 name = "preparation"
 path = "rust/benches/preparation.rs"
 harness = false

@@ -108,5 +108,8 @@ The [Multiparameter notes](multiparameter.md) cover reference-quality NIST multi
 fundamental reduced Helmholtz energy formulations, exact first/second derivative jets, and ancillary density equations.
 The [Lee-Kesler notes](lee-kesler.md) cover the Lee-Kesler corresponding states equation of state,
 Plöcker critical mixing rules, analytical compositional derivatives, and BWR generalized fluids.
+The [ice Ih notes](solid-water.md) cover owned Gibbs reference shifts,
+analytic derivatives, source/physical heat capacity and native-loop measurements.
+
 Regenerate inventory with
 `python tools/rust_port/inventory.py`.

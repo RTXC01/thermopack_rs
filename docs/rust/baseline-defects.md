@@ -207,3 +207,13 @@ contains 32 finite default initializations, 16 source terminations and 17
 undefined lookups, plus 27 direct critical-grid comparisons. See
 [MBWR initialization](mbwr-initialization.md) for the original loop rules,
 model-local cache and the distinction from analytic critical refinement.
+
+## Ice Ih heat-capacity mass conversion
+
+`sh2o_d2gdT2` multiplies its mass-specific result by the H2O molar mass.
+`sh2o_heat_capacity` then calculates `-T*sh2o_d2gdT2` and multiplies by the
+molar mass again. Its value is therefore 0.01801528 times physical molar Cp.
+Native `SolidWater::baseline_heat_capacity` preserves that source value;
+`heat_capacity` uses -T*G_TT and matches finite differences of enthalpy.
+All other public source values and reference shifts are compared directly.
+See [ice Ih qualification](solid-water.md).

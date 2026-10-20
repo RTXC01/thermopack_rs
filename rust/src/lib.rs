@@ -42,6 +42,7 @@ pub mod saft_vrmie_data;
 pub mod solid;
 pub mod solid_co2;
 pub mod solid_data;
+pub mod solid_water;
 pub mod translation;
 pub mod unifac;
 pub mod unifac_data;
@@ -98,6 +99,7 @@ pub use solid_co2::SolidCo2;
 pub use solid_data::{
     SolidCorrelation, lookup_melting_correlation, lookup_sublimation_correlation,
 };
+pub use solid_water::{PreparedSolidWater, SolidWater, SolidWaterGibbs, SolidWaterState};
 pub use translation::{TranslationKind, TranslationValue, VolumeTranslation};
 pub use unifac::{Unifac, UnifacExcessGibbs, UnifacVariant};
 pub use unifac_data::{

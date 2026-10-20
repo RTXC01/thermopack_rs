@@ -710,3 +710,23 @@ subroutine query_solid_co2(temperature,pressure,values,count) &
   values(13) = sco2_speed_of_sound(temperature,pressure)
   count = 13
 end subroutine query_solid_co2
+
+subroutine query_solid_h2o_init(sl,gl) bind(C,name='query_solid_h2o_init')
+  use, intrinsic :: iso_c_binding, only:c_double
+  use h2o_gibbs, only:sho2_init
+  implicit none
+  real(c_double),value :: sl,gl
+  call sho2_init(sl,gl)
+end subroutine query_solid_h2o_init
+
+subroutine query_solid_h2o(t,p,values) bind(C,name='query_solid_h2o')
+  use, intrinsic :: iso_c_binding, only:c_double
+  use h2o_gibbs, only:sh2o_gibbs,sh2o_dgdp,sh2o_d2gdp2,sh2o_dgdT,sh2o_d2gdT2,sh2o_d2gdtdp, &
+       sh2o_specvol,sh2o_entropy,sh2o_enthalpy,sh2o_energy,sh2o_helmholtz,sh2o_heat_capacity
+  implicit none
+  real(c_double),value :: t,p
+  real(c_double),intent(out) :: values(12)
+  values=[sh2o_gibbs(t,p),sh2o_dgdp(t,p),sh2o_d2gdp2(t,p),sh2o_dgdT(t,p),sh2o_d2gdT2(t,p), &
+       sh2o_d2gdtdp(t,p),sh2o_specvol(t,p),sh2o_entropy(t,p),sh2o_enthalpy(t,p),sh2o_energy(t,p), &
+       sh2o_helmholtz(t,p),sh2o_heat_capacity(t,p)]
+end subroutine query_solid_h2o

@@ -85,6 +85,10 @@ def load_probe():
     probe.query_solid_co2_init.restype=None
     probe.query_solid_co2.argtypes=[c_double,c_double,POINTER(c_double),POINTER(c_int)]
     probe.query_solid_co2.restype=None
+    probe.query_solid_h2o_init.argtypes=[c_double,c_double]
+    probe.query_solid_h2o_init.restype=None
+    probe.query_solid_h2o.argtypes=[c_double,c_double,POINTER(c_double)]
+    probe.query_solid_h2o.restype=None
     return probe
 
 
@@ -94,6 +98,17 @@ def main(compiler_directory):
     probe=None
     for line in sys.stdin:
         request=json.loads(line)
+        if request['mode']=='SOLID_H2O_INIT':
+            if probe is None:probe=load_probe()
+            probe.query_solid_h2o_init(request['entropy'],request['gibbs'])
+            print('THERMOPACK_RESULT='+json.dumps(dict(initialized=True)),flush=True);continue
+        if request['mode']=='SOLID_H2O':
+            if probe is None:probe=load_probe()
+            output=(c_double*12)();probe.query_solid_h2o(request['temperature'],request['pressure'],output)
+            values=list(map(float,output))
+            if all(map(math.isfinite,values)):print('THERMOPACK_RESULT='+json.dumps(dict(values=values)),flush=True)
+            else:print('THERMOPACK_RESULT='+json.dumps(dict(calculation_error='non-finite source ice state',values=list(map(str,values)))),flush=True)
+            continue
         if request['mode']=='SOLID_CO2_INIT':
             if probe is None:probe=load_probe()
             probe.query_solid_co2_init(request['liquid_entropy'],request['liquid_gibbs'],

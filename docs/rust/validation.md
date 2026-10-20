@@ -246,6 +246,12 @@ They are not a promise of bitwise identity across compilers or all states.
 The vdW baseline derivative defect is preserved by an explicit compatibility
 method; see [baseline-defects.md](baseline-defects.md).
 
+The [ice Ih qualification](solid-water.md) adds 780 finite source states with
+twelve outputs, six reference scenarios, all first/second Gibbs derivatives,
+and an explicit baseline for the source Cp mass-conversion defect. Physical Cp
+and derivative identities have independent finite-difference checks. Its
+native-loop benchmark preflights 100 source and 200 fresh/prepared native states.
+
 CI contains native Windows/Linux/macOS checks and a Linux exact-source build
 that regenerates comparisons. It has been configured locally; hosted CI has
 not run yet. Original pFUnit/Python example suites and models outside the

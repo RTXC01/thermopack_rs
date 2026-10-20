@@ -90,6 +90,45 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if fields[0] != "SOLIDCO2" && fields.len() != 6 {
             return Err("expected six fields".into());
         }
+        if fields[0] == "SOLIDH2O" {
+            let outcome = (|| -> thermopack_rs::Result<Vec<f64>> {
+                let mut model = thermopack_rs::SolidWater::new();
+                if fields[1] != "raw" {
+                    for shift in fields[1].split(':') {
+                        let a: Vec<f64> = shift.split(',').map(|v| v.parse().unwrap()).collect();
+                        model.initialize(a[0], a[1])?;
+                    }
+                }
+                let s = model.state(fields[2].parse().unwrap(), fields[3].parse().unwrap())?;
+                let g = s.gibbs;
+                Ok(vec![
+                    g.value,
+                    g.dp,
+                    g.dpp,
+                    g.dt,
+                    g.dtt,
+                    g.dtp,
+                    s.volume,
+                    s.entropy,
+                    s.enthalpy,
+                    s.internal_energy,
+                    s.helmholtz_energy,
+                    s.baseline_heat_capacity_p,
+                ])
+            })();
+            match outcome {
+                Ok(values) => println!(
+                    "{}",
+                    values
+                        .iter()
+                        .map(|v| format!("{v:.17e}"))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                ),
+                Err(e) => println!("ERROR {e}"),
+            }
+            continue;
+        }
         if fields[0] == "SOLIDCO2" {
             let mut model = thermopack_rs::solid_co2::SolidCo2::new();
             model.initialize(

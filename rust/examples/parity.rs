@@ -94,9 +94,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             && fields[0] != "SPINODAL"
             && fields[0] != "JTI"
             && fields[0] != "VIRIAL"
+            && fields[0] != "CRITICAL"
             && fields.len() != 6
         {
             return Err("expected six fields".into());
+        }
+        if fields[0] == "CRITICAL" {
+            let kind = match fields[1] {
+                "SRK" => thermopack_rs::CubicKind::SoaveRedlichKwong,
+                "RK" => thermopack_rs::CubicKind::RedlichKwong,
+                "VDW" => thermopack_rs::CubicKind::VanDerWaals,
+                _ => thermopack_rs::CubicKind::PengRobinson,
+            };
+            let components: Vec<&str> = fields[2].split(',').collect();
+            let composition: Vec<f64> = fields[3]
+                .split(',')
+                .map(|value| value.parse().unwrap())
+                .collect();
+            let model = thermopack_rs::Cubic::new(kind, &components)?;
+            let point = thermopack_rs::critical::critical_point(&model, &composition)?;
+            println!(
+                "{:.17e},{:.17e},{:.17e}",
+                point.temperature, point.volume, point.pressure
+            );
+            continue;
         }
         if fields[0] == "VIRIAL" {
             let kind = match fields[1] {

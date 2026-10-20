@@ -54,6 +54,34 @@ which reaches the original routine.
 The committed fixture is `tests/fixtures/spinodal.csv`; the test is
 `tests/spinodal.rs`.
 
+## Critical points
+
+The critical point of a pure fluid is the state where the isotherm has an
+inflection, so the first and the second volume derivative of the pressure
+vanish. The original solves the two conditions with the stability matrix of
+the mixture, in `calcCriticalTV`, and for a single component the two
+conditions of that matrix are the volume derivatives of the pressure.
+
+The native model, in `critical`, solves the two conditions with a Newton
+iteration in the temperature and the molar volume, starting from the pseudo
+critical state of the model. The Jacobian of the two conditions is a centred
+difference, as the original uses a numerical Jacobian for the mixture.
+
+`tools/rust_port/validate_critical.py` compares the native model against the
+exact-source library. The oracle calls the Python interface of the fork,
+which reaches the original routine.
+
+* 7 cases: methane, carbon dioxide, propane and water in the Peng-Robinson
+  equation of state, nitrogen and methane in the Soave-Redlich-Kwong equation
+  of state, and a mixture with a zero mole fraction of the second component.
+* The compared quantities are the temperature, the molar volume and the
+  pressure of the critical point. All 7 cases match with a relative 1e-6,
+  and the observed worst relative difference is 3.8e-7, which is the
+  tolerance of the source solver.
+
+The committed fixture is `tests/fixtures/critical.csv`; the test is
+`tests/critical.rs`.
+
 ## The Joule-Thomson inversion
 
 The inversion curve of the source, in `src/joule_thompson_inversion.f90`, is the
@@ -100,5 +128,7 @@ The committed fixture is `tests/fixtures/joule_thompson.csv`; the test is
   curve.
 * The limit of a mixture needs the stability matrix of the mixture with its
   eigenvalues, and the native model reports the single component case only.
+* The critical point of a mixture needs the same stability matrix, and the
+  native model reports the critical point of a single component only.
 * The curve of the Joule-Thomson inversion is not mapped by the native model,
   and it reports a single point instead.

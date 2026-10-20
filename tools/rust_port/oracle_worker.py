@@ -190,6 +190,22 @@ def main(compiler_directory):
                                         request['ln_spec'],result,byref(status))
             print('THERMOPACK_RESULT='+json.dumps(dict(values=list(map(float,result)),status=status.value)),flush=True)
             continue
+        if request['mode']=='CRITICAL':
+            eos,comps=request['eos'],request['components']
+            from thermopack.cubic import cubic
+            model=cubic(",".join(comps),eos)
+            model.activate()
+            try:
+                temperature,volume,pressure=model.critical(request['feed'],
+                                        request.get('temperature',0.0),
+                                        request.get('volume',0.0),
+                                        request.get('tolerance',1.0e-7))
+            except Exception as error:
+                print('THERMOPACK_RESULT='+json.dumps(dict(calculation_error=str(error))),flush=True)
+                continue
+            values=[float(temperature),float(volume),float(pressure)]
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=values)),flush=True)
+            continue
         if request['mode']=='VIRIAL':
             eos,comps=request['eos'],request['components']
             from thermopack.cubic import cubic

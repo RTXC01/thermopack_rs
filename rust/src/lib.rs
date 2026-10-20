@@ -21,6 +21,7 @@ pub mod caloric;
 pub mod component;
 pub mod cpa;
 pub mod cpa_data;
+pub mod critical;
 pub mod cubic;
 mod error;
 pub mod excess_gibbs;

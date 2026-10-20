@@ -197,6 +197,20 @@ Reproduce with:
 cargo bench --bench preparation
 ```
 
+The Huron-Vidal and NRTL preparation allocated fourteen vectors per state:
+five matrices of the pair parameters, seven component vectors of the inner
+sums and two vectors of the composition derivatives. The matrices and the
+component vectors now share two allocations, and the values and their order
+of operations are unchanged, so the parity results are identical.
+
+| Preparation | Before | After | Change |
+|---|---:|---:|---:|
+| SRK, Huron-Vidal mixing | 2130 | 1500 | -30% |
+
+The measurement is the median of repeated runs of the same workload on the
+same host, and the other three rows of the table above are unchanged within
+the run-to-run spread of that host.
+
 Next optimization targets are the alpha correlation evaluations, separately
 requested derivative paths and profiling the flash/SAFT hot loops once those
 implementations pass parity. No SIMD or thread-level speedups are claimed yet.

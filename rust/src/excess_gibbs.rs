@@ -327,12 +327,18 @@ fn hv_nrtl_kernel(
     let nc = ge_mix.nc;
     let t = temperature;
 
-    // Allocate tau, dtaudt, d2taudt2, cij, alpha (nc x nc)
-    let mut tau = vec![0.0; nc * nc];
-    let mut dtaudt = vec![0.0; nc * nc];
-    let mut d2taudt2 = vec![0.0; nc * nc];
-    let mut cij = vec![1.0; nc * nc];
-    let mut alpha = vec![0.0; nc * nc];
+    // The five nc x nc matrices and the component vectors share two
+    // allocations, so the preparation of a state does not allocate once per
+    // matrix.
+    let mut matrix_buffer = vec![0.0; 5 * nc * nc];
+    let (rest, alpha) = matrix_buffer.split_at_mut(4 * nc * nc);
+    let (rest, cij) = rest.split_at_mut(3 * nc * nc);
+    let (rest, d2taudt2) = rest.split_at_mut(2 * nc * nc);
+    let (rest, dtaudt) = rest.split_at_mut(nc * nc);
+    let tau = rest;
+    for value in cij.iter_mut() {
+        *value = 1.0;
+    }
 
     // 1. Calculate temperature-dependent tau_ji and C_ji
     for i in 0..nc {
@@ -425,13 +431,16 @@ fn hv_nrtl_kernel(
     }
 
     // 2. Inner sums gamma1 .. gamma6 and fracin1 for each component
-    let mut gamma1 = vec![0.0; nc];
-    let mut gamma2 = vec![0.0; nc];
-    let mut gamma3 = vec![0.0; nc];
-    let mut gamma4 = vec![0.0; nc];
-    let mut gamma5 = vec![0.0; nc];
-    let mut gamma6 = vec![0.0; nc];
-    let mut fracin1 = vec![0.0; nc];
+    let mut vector_buffer = vec![0.0; 9 * nc];
+    let (rest, d2g_ex_dni_dt) = vector_buffer.split_at_mut(8 * nc);
+    let (rest, dg_ex_dni) = rest.split_at_mut(7 * nc);
+    let (rest, fracin1) = rest.split_at_mut(6 * nc);
+    let (rest, gamma6) = rest.split_at_mut(5 * nc);
+    let (rest, gamma5) = rest.split_at_mut(4 * nc);
+    let (rest, gamma4) = rest.split_at_mut(3 * nc);
+    let (rest, gamma3) = rest.split_at_mut(2 * nc);
+    let (rest, gamma2) = rest.split_at_mut(nc);
+    let gamma1 = rest;
 
     for i in 0..nc {
         for j in 0..nc {
@@ -492,9 +501,6 @@ fn hv_nrtl_kernel(
     let d2g_ex_dt2 = RGAS * (2.0 * sum5i + t * (sum6i + sum7i + sum8i));
 
     // 4. Composition derivatives d(G_ex)/dni and d2(G_ex)/dni_dt
-    let mut dg_ex_dni = vec![0.0; nc];
-    let mut d2g_ex_dni_dt = vec![0.0; nc];
-
     for i in 0..nc {
         let mut sum1ji = 0.0;
         let mut sum2ji = 0.0;
@@ -551,7 +557,7 @@ fn hv_nrtl_kernel(
         gibbs: g_ex,
         dg_dt: dg_ex_dt,
         d2g_dt2: d2g_ex_dt2,
-        dg_dn: dg_ex_dni,
-        d2g_dn_dt: d2g_ex_dni_dt,
+        dg_dn: dg_ex_dni.to_vec(),
+        d2g_dn_dt: d2g_ex_dni_dt.to_vec(),
     })
 }

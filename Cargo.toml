@@ -18,6 +18,7 @@ path = "rust/examples/cubic.rs"
 name = "parity"
 path = "rust/examples/parity.rs"
 
+
 [[test]]
 name = "mbwr_source_properties"
 path = "tests/mbwr_source_properties.rs"
@@ -76,6 +77,11 @@ harness = false
 [[bench]]
 name = "preparation"
 path = "rust/benches/preparation.rs"
+harness = false
+
+[[bench]]
+name = "transcendental"
+path = "rust/benches/transcendental.rs"
 harness = false
 
 [[bench]]

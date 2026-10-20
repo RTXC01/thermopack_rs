@@ -124,8 +124,49 @@ python tools/rust_port/benchmark.py --compiler /path/to/gfortran --repeats 5
 python tools/rust_port/benchmark.py --compiler /path/to/gfortran --repeats 5 --tcpr
 ```
 
-## Mixture preparation
+## Math runtime difference on the Windows host
 
+The ideal-gas row of the table above is the only workload where the native
+model is slower than the source, and the reason is the math runtime rather
+than the model. The reference build links the MinGW universal C runtime and
+the default Windows toolchain of this crate links the MinGW GNU C runtime.
+The two elementary function libraries differ in speed, and the ideal-gas
+evaluation is dominated by transcendental calls.
+
+The [transcendental benchmark](../rust/benches/transcendental.rs) and its
+[source counterpart](../tools/rust_port/bench_transcendental.f90) measure the
+same calls on the same host:
+
+| Call | Native ns | Reference ns |
+|---|---:|---:|
+| exp | 28.7 | at most 15.6 |
+| log | 41.9 | at most 15.6 |
+| sinh | 22.4 | 31.3 |
+| log of one minus an exponential | 99.8 | 31.3 |
+
+The native ideal-gas evaluation of the DIPPR correlation calls five
+transcendental functions, the source eleven because it evaluates the heat
+capacity, the enthalpy and the entropy separately. The source still finishes
+first, so the difference is the runtime and not the number of calls.
+
+The native evaluation already shares the two exponentials between the heat
+capacity, the enthalpy and the entropy. Replacing the logarithmic helpers with
+the plain logarithm was measured and is slower on this host, so the accurate
+helpers stay.
+
+Building the Windows binary with the MSVC toolchain, which uses the same
+universal C runtime as the reference build, is the way to close the gap. The
+continuous integration runs on Linux, where both sides use the same C library,
+and it shows no such difference.
+
+Reproduce with:
+
+```
+cargo bench --bench transcendental
+gfortran -O3 -fdefault-real-8 -fdefault-double-8 tools/rust_port/bench_transcendental.f90 -o bench_transcendental
+```
+
+## Mixture preparation
 The mixture preparation dominates a single cubic property evaluation. A
 prepared state evaluates the pressure in about 13 ns, while the preparation of
 the same state costs several hundred nanoseconds. The

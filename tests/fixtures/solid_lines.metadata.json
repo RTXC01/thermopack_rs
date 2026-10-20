@@ -138,6 +138,9 @@
   ],
   "relative_tolerance": 1e-10,
   "absolute_tolerance": 0.0001,
-  "worst_difference": {},
+  "worst_difference": {
+    "absolute": 2.9103830456733704e-11,
+    "case": "SUBL|N2O|2.00000000000000000e+02|7 quantity 12"
+  },
   "convention": "the original melting_pressure_correlation and sublimation_pressure_correlation without scaling to the equation of state; the temperatures and pressures are the source grid and the source correlation values in Pa"
 }

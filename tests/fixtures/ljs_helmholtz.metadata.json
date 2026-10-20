@@ -132,9 +132,10 @@
   "cases": 8,
   "attempted_cases": 8,
   "generator": "tools/rust_port/validate_ljs_helmholtz.py",
-  "fixture_sha256": "03f6db7075442345793cdc64d644b20ad89da0886a02584ae6b2ee3e1c36a8aa",
+  "fixture_sha256": "96ba4bc3cdbb56b9f07d56d28d47470086479ce94c3e40b653d76c9625ba4600",
   "quantities": [
-    "reduced_helmholtz"
+    "reduced_helmholtz",
+    "reduced_helmholtz_t"
   ],
   "relative_tolerance": 1e-09,
   "absolute_tolerance": 1e-12,

@@ -27,7 +27,7 @@ CASES = [
     (250.0, 2.0e-4, 1.0),
     (120.0, 1.0e-3, 0.5),
 ]
-QUANTITIES = ["reduced_helmholtz"]
+QUANTITIES = ["reduced_helmholtz", "reduced_helmholtz_t"]
 RTOL = 1.0e-9
 ATOL = 1.0e-12
 
@@ -80,21 +80,29 @@ def main(directory):
             failures.append(dict(case=label, reason="native error", native=actual))
             continue
         source = expected["values"][0]
+        source_t = expected["values"][1]
         native_value = actual[0]
+        native_t = actual[1]
         if abs(source - native_value) > ATOL + RTOL * abs(source):
             failures.append(
                 dict(case=label, reason="reduced Helmholtz energy", source=source, native=native_value)
             )
             continue
+        if abs(source_t - native_t) > ATOL + RTOL * abs(source_t):
+            failures.append(
+                dict(case=label, reason="reduced Helmholtz energy derivative", source=source_t, native=native_t)
+            )
+            continue
         worst = max(worst, abs(source - native_value) / max(abs(source), 1.0e-30))
-        rows.append([label, source])
+        worst = max(worst, abs(source_t - native_t) / max(abs(source_t), 1.0e-30))
+        rows.append([label, source, source_t])
 
     path = ROOT / "tests/fixtures/ljs_helmholtz.csv"
     with path.open("w", newline="") as handle:
         writer = csv.writer(handle, delimiter=";", lineterminator="\n")
         writer.writerow(["case", *QUANTITIES])
         for row in rows:
-            writer.writerow([row[0], f"{row[1]:.17e}"])
+            writer.writerow([row[0], f"{row[1]:.17e}", f"{row[2]:.17e}"])
     metadata = json.loads((ROOT / ".reference/metadata.json").read_text())
     metadata.update(
         cases=len(rows),

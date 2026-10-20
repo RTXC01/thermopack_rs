@@ -77,13 +77,19 @@ fn the_helmholtz_energy_matches_the_source() {
         let volume: f64 = parts[1].parse().unwrap();
         let moles: f64 = parts[2].parse().unwrap();
         let source: f64 = fields[1].parse().unwrap();
-        let molar = model
-            .residual_helmholtz_energy(temperature, volume, moles)
+        let source_t: f64 = fields[2].parse().unwrap();
+        let (energy, derivative) = model
+            .residual_helmholtz_energy_derivative(temperature, volume, moles)
             .unwrap();
-        let native = molar * moles;
+        let native = energy * moles;
+        let native_t = derivative * moles;
         assert!(
             (source - native).abs() <= ATOL + RTOL * source.abs(),
             "{case}: source {source} native {native}"
+        );
+        assert!(
+            (source_t - native_t).abs() <= ATOL + RTOL * source_t.abs(),
+            "{case}: source {source_t} native {native_t}"
         );
         checked += 1;
     }

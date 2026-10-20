@@ -326,8 +326,8 @@ with a relative 1e-10, and the observed worst relative difference is 3.1e-14.
 The [Lennard-Jones Helmholtz energy qualification](ljs.md) adds 8 cases of the
 original `calcFresLJs_bh`: the reduced residual Helmholtz energy of the
 splined Lennard-Jones model over the dilute and the dense fluid. The energy
-matches with a relative 1e-9, and the observed worst relative difference is
-3.3e-14.
+and its temperature derivative match with a relative 1e-9, and the observed
+worst relative difference is 3.3e-14.
 The [Lennard-Jones state qualification](ljs.md) adds 8 cases of the original
 state of the splined Lennard-Jones model: the pressure of the state and the
 compressibility factor, with the analytic volume derivative of the reduced

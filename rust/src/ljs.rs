@@ -263,6 +263,82 @@ impl LjsBh {
         Ok((pressure, compressibility))
     }
 
+    /// The molar reduced residual Helmholtz energy of the model and its
+    /// temperature derivative.
+    ///
+    /// The temperature is in kelvin, the volume in cubic metre and the number
+    /// of moles is the amount of the single component. The energy is the
+    /// reduced residual energy of the original, the hard-sphere reference and
+    /// the three perturbation terms. The derivative follows the chain rule of
+    /// the original: the reduced temperature depends on the temperature through
+    /// the Barker-Henderson diameter, and the reduced density does not.
+    pub fn residual_helmholtz_energy_derivative(
+        &self,
+        temperature: f64,
+        volume: f64,
+        moles: f64,
+    ) -> Result<(f64, f64)> {
+        crate::error::positive(temperature, "the LJS temperature")?;
+        crate::error::positive(volume, "the LJS volume")?;
+        crate::error::positive(moles, "the LJS number of moles")?;
+        let density = moles / volume;
+        let (diameter, diameter_t, _) = self.diameter(temperature)?;
+        let tau = 1.0 - diameter / self.sigma;
+        let tau_t = -diameter_t / self.sigma;
+        let reduced_density = crate::N_A * self.sigma.powi(3) * density;
+        let eta = std::f64::consts::PI / 6.0 * crate::N_A * diameter.powi(3) * density;
+        let eta_t = std::f64::consts::PI / 6.0
+            * crate::N_A
+            * 3.0
+            * diameter
+            * diameter
+            * diameter_t
+            * density;
+        let mut energy = 0.0;
+        let mut derivative = 0.0;
+        if self.control.enable_hard_sphere {
+            energy += (4.0 * eta - 3.0 * eta * eta) / (1.0 - eta).powi(2);
+            derivative += (4.0 - 2.0 * eta) / (1.0 - eta).powi(3) * eta_t;
+        }
+        if self.control.enable_a1 {
+            let (value, _, value_x, ..) = polynomial_with_derivatives(0, tau, reduced_density, 1.0);
+            let first = 2.0 * std::f64::consts::PI * self.eps * value;
+            let first_t = 2.0 * std::f64::consts::PI * self.eps * value_x * tau_t;
+            energy += first / temperature;
+            derivative += first_t / temperature - first / (temperature * temperature);
+        }
+        if self.control.enable_a2 {
+            let (value, _, value_x, ..) = polynomial_with_derivatives(1, tau, reduced_density, 1.0);
+            let (correction, _, correction_x, ..) =
+                polynomial_with_derivatives(3, tau, reduced_density, 1.0);
+            let mut second = -std::f64::consts::PI * self.eps * self.eps * value;
+            let mut second_t = -std::f64::consts::PI * self.eps * self.eps * value_x * tau_t;
+            if self.control.enable_chi_correction {
+                let scaled = 1.0 + correction;
+                let scaled_t = correction_x * tau_t;
+                second *= scaled;
+                second_t = second_t * scaled
+                    + (-std::f64::consts::PI * self.eps * self.eps * value) * scaled_t;
+            }
+            let compressibility = khs(eta);
+            let compressibility_t = khs_eta(eta) * eta_t;
+            let unscaled = second;
+            second *= compressibility;
+            second_t = second_t * compressibility + unscaled * compressibility_t;
+            energy += second / (temperature * temperature);
+            derivative +=
+                second_t / (temperature * temperature) - 2.0 * second / temperature.powi(3);
+        }
+        if self.control.enable_a3 {
+            let (value, _, value_x, ..) = polynomial_with_derivatives(2, tau, reduced_density, 1.0);
+            let third = self.eps.powi(3) * value;
+            let third_t = self.eps.powi(3) * value_x * tau_t;
+            energy += third / temperature.powi(3);
+            derivative += third_t / temperature.powi(3) - 3.0 * third / temperature.powi(4);
+        }
+        Ok((energy, derivative))
+    }
+
     /// The molar reduced residual Helmholtz energy of the model.
     ///
     /// The temperature is in kelvin, the volume in cubic metre and the number
@@ -275,37 +351,9 @@ impl LjsBh {
         volume: f64,
         moles: f64,
     ) -> Result<f64> {
-        crate::error::positive(temperature, "the LJS temperature")?;
-        crate::error::positive(volume, "the LJS volume")?;
-        crate::error::positive(moles, "the LJS number of moles")?;
-        let density = moles / volume;
-        let (diameter, _, _) = self.diameter(temperature)?;
-        let tau = 1.0 - diameter / self.sigma;
-        let reduced_density = crate::N_A * self.sigma.powi(3) * density;
-        let mut energy = 0.0;
-        if self.control.enable_hard_sphere {
-            let eta = std::f64::consts::PI / 6.0 * crate::N_A * diameter.powi(3) * density;
-            energy += (4.0 * eta - 3.0 * eta * eta) / (1.0 - eta).powi(2);
-        }
-        if self.control.enable_a1 {
-            let first = 2.0 * std::f64::consts::PI * self.eps * polynomial(0, tau, reduced_density);
-            energy += first / temperature;
-        }
-        if self.control.enable_a2 {
-            let mut second =
-                -std::f64::consts::PI * self.eps * self.eps * polynomial(1, tau, reduced_density);
-            if self.control.enable_chi_correction {
-                second *= 1.0 + polynomial(3, tau, reduced_density);
-            }
-            let eta = std::f64::consts::PI / 6.0 * crate::N_A * diameter.powi(3) * density;
-            second *= khs(eta);
-            energy += second / (temperature * temperature);
-        }
-        if self.control.enable_a3 {
-            let third = self.eps.powi(3) * polynomial(2, tau, reduced_density);
-            energy += third / temperature.powi(3);
-        }
-        Ok(energy)
+        Ok(self
+            .residual_helmholtz_energy_derivative(temperature, volume, moles)?
+            .0)
     }
 
     /// The reduced perturbation terms of the model.

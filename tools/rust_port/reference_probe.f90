@@ -1140,21 +1140,23 @@ subroutine query_ljs_helmholtz(temperature,volume,moles,values,count) &
   use lj_splined, only: ljs_bh_eos, calcFresLJs_bh
   implicit none
   real(c_double), value :: temperature, volume, moles
-  real(c_double), intent(out) :: values(1)
+  real(c_double), intent(out) :: values(2)
   integer(c_int), intent(out) :: count
   ! Locals
   class(base_eos_param), pointer :: eos
   real :: n(1)
-  real :: F
+  real :: F, F_T
   n(1) = moles
   F = 0.0
+  F_T = 0.0
   eos => get_active_eos()
   select type(p_eos => eos)
   class is(ljs_bh_eos)
-    call calcFresLJs_bh(p_eos,nc,temperature,volume,n,F)
+    call calcFresLJs_bh(p_eos,nc,temperature,volume,n,F,F_T=F_T)
   end select
   values(1) = F
-  count = 1
+  values(2) = F_T
+  count = 2
 end subroutine query_ljs_helmholtz
 
 ! Evaluate the matrix of the third virial coefficients of the original.

@@ -139,8 +139,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let volume: f64 = fields[2].parse().unwrap();
             let moles: f64 = fields[3].parse().unwrap();
             let model = thermopack_rs::ljs::LjsBh::new();
-            let molar = model.residual_helmholtz_energy(temperature, volume, moles)?;
-            println!("{:.17e}", molar * moles);
+            let (energy, derivative) =
+                model.residual_helmholtz_energy_derivative(temperature, volume, moles)?;
+            println!("{:.17e},{:.17e}", energy * moles, derivative * moles);
             continue;
         }
         if fields[0] == "LJSSPLINE" {

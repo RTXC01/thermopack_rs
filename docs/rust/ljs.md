@@ -18,12 +18,14 @@ second order term.
 | `src/lj_splined.f90:ljs_bh_model_control` | `ljs::LjsBh::set_control`, `ljs::LjsControl` |
 | `src/lj_splined.f90:calcFresLJs_bh` | `ljs::LjsBh::residual_helmholtz_energy` |
 | `src/lj_splined.f90:calcFresLJs_bh` (volume derivative) | `ljs::LjsBh::pressure` |
+| `src/lj_splined.f90:calcFresLJs_bh` (temperature derivative) | `ljs::LjsBh::residual_helmholtz_energy_derivative` |
 
 The native model provides the reduced perturbation terms and the reduced
 Barker-Henderson hard-sphere diameter, the polynomials of the spline with
 their partial derivatives, the parameters and the switches of the model, the
-reduced residual Helmholtz energy and the pressure of a state. The temperature
-and the composition derivatives of the energy are not yet ported.
+reduced residual Helmholtz energy with its temperature derivative, and the
+pressure of a state. The composition derivative of the energy is not yet
+ported.
 
 ## Method
 
@@ -90,9 +92,9 @@ the original `calcFresLJs_bh` with the active model of the fork.
 
 * 8 cases: the temperature, the volume and the number of moles of the single
   component over the dilute and the dense fluid.
-* The compared quantity is the reduced residual Helmholtz energy of the whole
-  system. All 8 cases match with a relative 1e-9, and the observed worst
-  relative difference is 3.3e-14.
+* The compared quantities are the reduced residual Helmholtz energy of the
+  whole system and its temperature derivative. All 8 cases match with a
+  relative 1e-9, and the observed worst relative difference is 3.3e-14.
 
 The committed fixture is `tests/fixtures/ljs_helmholtz.csv`; the test is
 `tests/ljs.rs`.
@@ -114,9 +116,9 @@ The committed fixture is `tests/fixtures/ljs_state.csv`; the test is
 
 ## Remaining scope
 
-* The temperature and the composition derivatives of the residual Helmholtz
-  energy are not yet ported, so the native model does not yet evaluate the
-  enthalpy, the entropy and the fugacity of the splined Lennard-Jones fluid.
+* The composition derivative of the residual Helmholtz energy is not yet
+  ported, so the native model does not yet evaluate the enthalpy, the entropy
+  and the fugacity of the splined Lennard-Jones fluid.
 * The WCA and the UV variants of the source, the hard-sphere reference of the
   White Bear family and the convolution of the fundamental measure theory are
   not yet ported.

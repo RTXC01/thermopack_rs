@@ -130,3 +130,19 @@ Native-loop [UV/SV measurements](../docs/rust/isochoric.md#native-loop-measureme
 include common source-generated specifications and per-state parity checks;
 the qualified default/tcPR workloads show UV speedups of about 27x and SV
 speedups of 2.52x/2.34x. These are workload-specific measurements.
+
+The cubic model also carries the curve and the limit families of the source:
+`isolines::isotherm`, `isolines::isobar`, `isolines::isenthalp` and
+`isolines::isentrope` map the iso-lines, `spinodal::spinodal_point` reports
+the point of the meta stability limit at a given pressure,
+`joule_thompson::inversion_point` reports the inversion temperature at a
+given molar volume, `critical::critical_point` reports the critical point of a
+single component and `Cubic::new_pseudo` builds the equation of state from
+user supplied critical data. `state.virial_coefficients` reports the second
+and the third virial coefficient. The solid carbon dioxide model carries the
+solid-fluid line in `solid_saturation::solid_co2_saturation`, and the
+`solid_co2_with_fluid_reference` constructor places the solid on the liquid at
+the triple point of the source. See [iso-line notes](../docs/rust/isolines.md),
+[stability limit notes](../docs/rust/spinodal.md),
+[pseudo component notes](../docs/rust/pseudo-components.md) and
+[solid notes](../docs/rust/solid.md).

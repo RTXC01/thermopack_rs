@@ -188,7 +188,10 @@ pub fn solid_saturation<S: SolidGibbs>(
     phase: Phase,
 ) -> Result<SolidSaturation> {
     let (mut temperature, mut pressure) = initial;
-    positive(temperature, "the solid saturation temperature must be positive")?;
+    positive(
+        temperature,
+        "the solid saturation temperature must be positive",
+    )?;
     positive(pressure, "the solid saturation pressure must be positive")?;
     for iteration in 1..=MAX_ITERATIONS {
         let value = residual(model, solid, ideal, temperature, pressure, phase)?;

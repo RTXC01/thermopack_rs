@@ -117,6 +117,9 @@ The [Lee-Kesler notes](lee-kesler.md) cover the Lee-Kesler corresponding states 
 Plöcker critical mixing rules, analytical compositional derivatives, and BWR generalized fluids.
 The [ice Ih notes](solid-water.md) cover owned Gibbs reference shifts,
 analytic derivatives, source/physical heat capacity and native-loop measurements.
+The [pseudo component notes](pseudo-components.md) cover the user supplied
+critical data of the pseudo components and the cubic equation of state built
+from them.
 
 The [FMT notes](fmt.md) cover all three fundamental-measure functionals,
 analytic Hessians, source arithmetic compatibility and native grid measurements.

@@ -470,10 +470,88 @@ impl Cubic {
         if names.is_empty() {
             return Err(Error::InvalidInput("at least one component required"));
         }
+        let components: Vec<_> = names
+            .iter()
+            .map(|name| component(name).copied())
+            .collect::<Result<_>>()?;
+        Self::from_components(
+            kind,
+            components,
+            requested,
+            alpha_reference,
+            parameter_reference,
+            quantum,
+        )
+    }
+
+    /// Builds a cubic model with pseudo components.
+    ///
+    /// This is the native form of the source `init_cubic_pseudo`. The
+    /// components named `PSEUDO` take the critical temperature, the critical
+    /// pressure, the acentric factor and the molar mass of the corresponding
+    /// list entries, and the remaining components keep the values of the
+    /// source database. The lists are indexed by the position of the
+    /// component, as in the source.
+    pub fn new_pseudo(
+        kind: CubicKind,
+        names: &[&str],
+        critical_temperatures: &[f64],
+        critical_pressures: &[f64],
+        acentric_factors: &[f64],
+        molar_masses: Option<&[f64]>,
+    ) -> Result<Self> {
+        if names.is_empty() {
+            return Err(Error::InvalidInput("at least one component required"));
+        }
+        if critical_temperatures.len() != names.len()
+            || critical_pressures.len() != names.len()
+            || acentric_factors.len() != names.len()
+        {
+            return Err(Error::InvalidInput(
+                "the pseudo component lists must match the component list",
+            ));
+        }
+        if let Some(masses) = molar_masses
+            && masses.len() != names.len()
+        {
+            return Err(Error::InvalidInput(
+                "the molar mass list must match the component list",
+            ));
+        }
         let mut components: Vec<_> = names
             .iter()
             .map(|name| component(name).copied())
             .collect::<Result<_>>()?;
+        for (index, entry) in components.iter_mut().enumerate() {
+            if !entry.ident.eq_ignore_ascii_case("PSEUDO") {
+                continue;
+            }
+            entry.critical_temperature = critical_temperatures[index];
+            entry.critical_pressure = critical_pressures[index];
+            entry.acentric_factor = acentric_factors[index];
+            if let Some(masses) = molar_masses {
+                entry.molar_mass = masses[index];
+            }
+        }
+        Self::from_components(
+            kind,
+            components,
+            crate::AlphaCorrelation::Classic,
+            "DEFAULT",
+            "DEFAULT",
+            false,
+        )
+    }
+
+    fn from_components(
+        kind: CubicKind,
+        mut components: Vec<crate::component::Component>,
+        requested: crate::AlphaCorrelation,
+        alpha_reference: &str,
+        parameter_reference: &str,
+        quantum: bool,
+    ) -> Result<Self> {
+        let count = components.len();
         if quantum {
             for component in &mut components {
                 crate::beta::quantum_component(component);
@@ -491,8 +569,8 @@ impl Cubic {
         let mut model = Self {
             kind,
             ideal_gases,
-            a0: Vec::with_capacity(names.len()),
-            bi: Vec::with_capacity(names.len()),
+            a0: Vec::with_capacity(count),
+            bi: Vec::with_capacity(count),
             alpha,
             variable_beta: quantum,
             beta: components
@@ -505,8 +583,8 @@ impl Cubic {
                     }
                 })
                 .collect(),
-            kij: vec![0.0; names.len().pow(2)],
-            lij: vec![0.0; names.len().pow(2)],
+            kij: vec![0.0; count.pow(2)],
+            lij: vec![0.0; count.pow(2)],
             nonzero_kij: Vec::new(),
             components,
             translation_parameters: None,
@@ -526,8 +604,8 @@ impl Cubic {
                 .bi
                 .push(omega_b * R * c.critical_temperature / c.critical_pressure);
         }
-        for i in 0..names.len() {
-            for j in i + 1..names.len() {
+        for i in 0..count {
+            for j in i + 1..count {
                 let a = model.components[i].ident;
                 let b = model.components[j].ident;
                 let database_eos = if kind == CubicKind::RedlichKwong {
@@ -537,10 +615,10 @@ impl Cubic {
                 };
                 let k = interaction_with_reference(database_eos, a, b, false, parameter_reference);
                 let l = interaction_with_reference(database_eos, a, b, true, parameter_reference);
-                model.kij[i * names.len() + j] = k;
-                model.kij[j * names.len() + i] = k;
-                model.lij[i * names.len() + j] = l;
-                model.lij[j * names.len() + i] = l;
+                model.kij[i * count + j] = k;
+                model.kij[j * count + i] = k;
+                model.lij[i * count + j] = l;
+                model.lij[j * count + i] = l;
             }
         }
         model.rebuild_pairs();

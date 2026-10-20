@@ -190,6 +190,27 @@ def main(compiler_directory):
                                         request['ln_spec'],result,byref(status))
             print('THERMOPACK_RESULT='+json.dumps(dict(values=list(map(float,result)),status=status.value)),flush=True)
             continue
+        if request['mode']=='PSEUDO_COMPONENT':
+            from thermopack.cubic import cubic
+            comps=request['components']
+            model=cubic(",".join(comps),request.get('eos','PR'))
+            model.init_pseudo(",".join(comps),request['critical_temperatures'],
+                              request['critical_pressures'],request['acentric_factors'],
+                              request.get('molar_masses'))
+            model.activate()
+            t,p,z=request['temperature'],request['pressure'],request['feed']
+            phase=model.LIQPH if request['phase']==1 else model.VAPPH
+            v=model.specific_volume(t,p,z,phase)[0]
+            h=model.enthalpy(t,p,z,phase)[0]
+            s=model.entropy(t,p,z,phase)[0]
+            compressibility=model.zfac(t,p,z,phase)[0]
+            values=[float(v),float(h),float(s),float(compressibility)]
+            if not all(map(math.isfinite,values)):
+                print('THERMOPACK_RESULT='+json.dumps(dict(calculation_error='non-finite pseudo property',
+                      values=list(map(str,values)))),flush=True)
+                continue
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=values)),flush=True)
+            continue
         if request['mode']=='MU_T':
             if probe is None:probe=load_probe()
             components=request['components']

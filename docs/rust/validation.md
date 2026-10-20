@@ -60,6 +60,7 @@ python tools/rust_port/validate_unifac_cubic.py
 python tools/rust_port/validate_solid_lines.py
 python tools/rust_port/validate_solid_co2.py
 python tools/rust_port/validate_solid_saturation.py
+python tools/rust_port/validate_pseudo_components.py
 python tools/rust_port/validate_mut_solve.py
 python tools/rust_port/validate_hyperdual.py
 ```
@@ -258,6 +259,12 @@ within a relative 1e-6 and the solved temperature within an absolute 1e-8 K
 and a relative 1e-9, with an observed worst relative difference of 3.3e-8.
 The reference levels of the solid model follow the liquid at the triple point
 of the original, 216.592 K and 513602.16 Pa.
+The [pseudo component qualification](pseudo-components.md) adds 30 cases of the
+original `init_cubic_pseudo`: a single pseudo component, two pseudo components
+and a pseudo component with a real fluid, in the Peng-Robinson and the
+Soave-Redlich-Kwong equations of state. The molar volume, the enthalpy, the
+entropy and the compressibility factor match with a relative 1e-10, and the
+observed worst relative difference is 7.9e-15.
 The [multiparameter density qualification](multiparameter.md#density-iteration)
 adds 1694 attempted density solves over the fourteen model configurations: 1669
 states match the exact-source library, including the density, the raw phase

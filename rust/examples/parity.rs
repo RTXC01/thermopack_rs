@@ -87,8 +87,72 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for line in io::stdin().lock().lines() {
         let line = line?;
         let fields: Vec<_> = line.split('|').collect();
-        if fields[0] != "SOLIDCO2" && fields[0] != "HYPERDUAL" && fields.len() != 6 {
+        if fields[0] != "SOLIDCO2"
+            && fields[0] != "HYPERDUAL"
+            && fields[0] != "PSEUDOC"
+            && fields.len() != 6
+        {
             return Err("expected six fields".into());
+        }
+        if fields[0] == "PSEUDOC" {
+            let kind = match fields[1] {
+                "SRK" => thermopack_rs::CubicKind::SoaveRedlichKwong,
+                "RK" => thermopack_rs::CubicKind::RedlichKwong,
+                "VDW" => thermopack_rs::CubicKind::VanDerWaals,
+                _ => thermopack_rs::CubicKind::PengRobinson,
+            };
+            let components: Vec<&str> = fields[2].split(',').collect();
+            let critical_temperatures: Vec<f64> = fields[3]
+                .split(',')
+                .map(|value| value.parse().unwrap())
+                .collect();
+            let critical_pressures: Vec<f64> = fields[4]
+                .split(',')
+                .map(|value| value.parse().unwrap())
+                .collect();
+            let acentric_factors: Vec<f64> = fields[5]
+                .split(',')
+                .map(|value| value.parse().unwrap())
+                .collect();
+            let molar_masses: Option<Vec<f64>> = if fields[6].is_empty() {
+                None
+            } else {
+                Some(
+                    fields[6]
+                        .split(',')
+                        .map(|value| value.parse().unwrap())
+                        .collect(),
+                )
+            };
+            let temperature: f64 = fields[7].parse().unwrap();
+            let pressure: f64 = fields[8].parse().unwrap();
+            let composition: Vec<f64> = fields[9]
+                .split(',')
+                .map(|value| value.parse().unwrap())
+                .collect();
+            let phase = match fields[10].parse::<i32>().unwrap() {
+                2 => Phase::Vapor,
+                _ => Phase::Liquid,
+            };
+            let model = thermopack_rs::Cubic::new_pseudo(
+                kind,
+                &components,
+                &critical_temperatures,
+                &critical_pressures,
+                &acentric_factors,
+                molar_masses.as_deref(),
+            )?;
+            let state = model.prepare(temperature, &composition)?;
+            let volume = state.volume(pressure, phase)?;
+            let enthalpy = state.enthalpy(volume)?;
+            let entropy = state.entropy(volume)?;
+            let computed = state.pressure(volume)?.value;
+            let compressibility = computed * volume / (thermopack_rs::R * temperature);
+            println!(
+                "{:.17e},{:.17e},{:.17e},{:.17e}",
+                volume, enthalpy, entropy, compressibility
+            );
+            continue;
         }
         if fields[0] == "MEOS" {
             let outcome = (|| -> thermopack_rs::Result<Vec<f64>> {

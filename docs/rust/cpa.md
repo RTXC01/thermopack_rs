@@ -98,3 +98,30 @@ Differential qualification against `.reference/thermopack.dll` in `tests/cpa.rs`
 - `test_cpa_binary_h2o_co2`: Water + Carbon Dioxide binary mixture (associating + non-associating fluid) with $k_{ij}$ and induced interaction rules ($< 10^{-10}$ error on pressure and $\ln \phi$).
 - `test_cpa_binary_h2o_etoh`: Water + Ethanol cross-associating binary mixture with cross $k_{ij}$ interaction rules.
 - `test_cpa_pure_h2o_volume_and_saturation`: Water single-phase vapor/liquid volume roots at 1 atm and vapor-liquid saturation pressure ($P_{\text{sat}} \approx 1.002195 \times 10^5$ Pa at 373.15 K).
+
+## The hard-sphere contact radial distribution function
+
+The original `src/saft_rdf.f90` routes a request for the radial distribution
+function of a pair of components to the model of the active thermodynamic
+model. The branch of the cubic association model is the hard-sphere contact
+function of the mixture, which needs no temperature dependence:
+
+$$g = \frac{1}{1 - 1.9\,\eta} \quad \text{(simplified)}, \qquad g = \frac{1 - \eta/2}{(1 - \eta)^3} \quad \text{(original)},$$
+
+with the packing fraction $\eta = \sum_i n_i b_i / (4 V)$ of the mixture. The
+native module `rdf` provides the function and its volume and mole number
+derivatives as `rdf::cpa_rdf`; the temperature derivatives vanish, as in the
+original.
+
+`tools/rust_port/validate_cpa_rdf.py` compares the native function against the
+exact-source library. The reference probe calls the original `master_saft_rdf`
+for the active model of the cubic association model.
+
+- 5 cases: the component, the temperature, the volume and the number of moles.
+- The compared quantities are the function and its nine derivatives.
+- All 5 cases match with a relative 1e-12, and the observed worst relative
+  difference is 4.6e-16.
+
+The committed fixture is `tests/fixtures/cpa_rdf.csv`; the test is
+`tests/cpa_rdf.rs`. The branches of the remaining models of the original
+dispatcher are pending.

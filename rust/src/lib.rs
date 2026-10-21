@@ -49,6 +49,7 @@ pub mod pc_saft_data;
 pub mod pets;
 pub mod quadrature;
 pub mod quadrature_data;
+pub mod rdf;
 pub mod saft_vrmie;
 pub mod saft_vrmie_data;
 pub mod solid;

@@ -82,6 +82,7 @@ python tools/rust_port/validate_white_bear.py
 python tools/rust_port/validate_uv_phi.py
 python tools/rust_port/validate_uv_terms.py
 python tools/rust_port/validate_quadrature.py
+python tools/rust_port/validate_cpa_rdf.py
 python tools/rust_port/validate_critical.py
 python tools/rust_port/validate_mut_solve.py
 python tools/rust_port/validate_hyperdual.py

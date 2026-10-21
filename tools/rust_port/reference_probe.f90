@@ -1468,6 +1468,70 @@ subroutine query_ais_ljs(index,x0,rho,values,count) bind(C,name='query_ais_ljs')
   count = 2
 end subroutine query_ais_ljs
 
+! Evaluate the hard-sphere contact radial distribution function of the
+! original for the cubic association model.
+subroutine query_cpa_rdf(temperature,volume,moles,values,numbers) &
+     bind(C,name='query_cpa_rdf')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use thermopack_var, only: nc, get_active_eos, base_eos_param
+  use cubic_eos, only: cpa_eos
+  use saft_rdf, only: master_saft_rdf
+  implicit none
+  real(c_double), value :: temperature, volume
+  real(c_double), intent(in) :: moles(16)
+  real(c_double), intent(out) :: values(256)
+  integer(c_int), intent(out) :: numbers
+  ! Locals
+  class(base_eos_param), pointer :: eos
+  real :: g, g_T, g_V, g_TT, g_TV, g_VV
+  real, dimension(nc) :: g_n, g_Tn, g_Vn
+  real, dimension(nc,nc) :: g_nn
+  integer :: i,j,position
+  eos => get_active_eos()
+  select type(p_eos => eos)
+  class is(cpa_eos)
+    p_eos%assoc%state%T = temperature
+    p_eos%assoc%state%V = volume
+    do i = 1, nc
+      p_eos%assoc%state%n(i) = moles(i)
+    end do
+    call master_saft_rdf(p_eos,nc,1,1,g,g_T=g_T,g_V=g_V,g_n=g_n,g_TT=g_TT, &
+         g_TV=g_TV,g_Tn=g_Tn,g_VV=g_VV,g_Vn=g_Vn,g_nn=g_nn)
+  end select
+  position = 1
+  values(position) = g
+  position = position + 1
+  values(position) = g_T
+  position = position + 1
+  values(position) = g_V
+  position = position + 1
+  do i = 1, nc
+    values(position) = g_n(i)
+    position = position + 1
+  end do
+  values(position) = g_TT
+  position = position + 1
+  values(position) = g_TV
+  position = position + 1
+  do i = 1, nc
+    values(position) = g_Tn(i)
+    position = position + 1
+  end do
+  values(position) = g_VV
+  position = position + 1
+  do i = 1, nc
+    values(position) = g_Vn(i)
+    position = position + 1
+  end do
+  do i = 1, nc
+    do j = 1, nc
+      values(position) = g_nn(i,j)
+      position = position + 1
+    end do
+  end do
+  numbers = position - 1
+end subroutine query_cpa_rdf
+
 ! Evaluate the nodes and the weights of a quadrature of the original.
 subroutine query_quadrature(quad,values,count) bind(C,name='query_quadrature')
   use, intrinsic :: iso_c_binding, only: c_int,c_double

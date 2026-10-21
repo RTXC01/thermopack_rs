@@ -103,6 +103,8 @@ def load_probe():
     probe.query_hyperdual.restype=None
     probe.query_solid_saturation.argtypes=[POINTER(c_char),c_double,c_double,c_int,c_int,c_double,POINTER(c_double),POINTER(c_int)]
     probe.query_solid_saturation.restype=None
+    probe.query_cpa_rdf.argtypes=[c_double,c_double,POINTER(c_double),POINTER(c_double),POINTER(c_int)]
+    probe.query_cpa_rdf.restype=None
     return probe
 
 
@@ -228,6 +230,21 @@ def main(compiler_directory):
             values=(c_double*2)();number=c_int()
             probe.query_ais_ljs(request['index'],request['reduced_distance'],
                                request['reduced_density'],values,byref(number))
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=list(map(float,values))[:number.value])),flush=True)
+            continue
+        if request['mode']=='CPA_RDF':
+            if probe is None:probe=load_probe()
+            key=('CPA_RDF',request['component'])
+            if previous!=key:
+                from thermopack.cpa import cpa
+                model=cpa(request['component']);previous=key
+            model.activate()
+            probe.query_cpa_rdf.argtypes=[c_double,c_double,POINTER(c_double),POINTER(c_double),POINTER(c_int)]
+            probe.query_cpa_rdf.restype=None
+            count=len(request['moles'])
+            amounts=(c_double*16)(*request['moles'],*([0.0]*(16-count)))
+            values=(c_double*256)();number=c_int()
+            probe.query_cpa_rdf(request['temperature'],request['volume'],amounts,values,byref(number))
             print('THERMOPACK_RESULT='+json.dumps(dict(values=list(map(float,values))[:number.value])),flush=True)
             continue
         if request['mode']=='CHAIN_RULE':

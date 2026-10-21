@@ -113,11 +113,45 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             && fields[0] != "UVVIRIALDIFF"
             && fields[0] != "CHAINRULE"
             && fields[0] != "AISLJS"
+            && fields[0] != "CPARDF"
             && fields[0] != "QUAD"
             && fields[0] != "CRITICAL"
             && fields.len() != 6
         {
             return Err("expected six fields".into());
+        }
+        if fields[0] == "CPARDF" {
+            let component = fields[1];
+            let temperature: f64 = fields[2].parse().unwrap();
+            let volume: f64 = fields[3].parse().unwrap();
+            let moles: Vec<f64> = fields[4]
+                .split(',')
+                .map(|value| value.parse().unwrap())
+                .collect();
+            let model = thermopack_rs::Cpa::new(&[component])?;
+            let rdf = thermopack_rs::rdf::cpa_rdf(&model, temperature, volume, &moles)?;
+            let mut text = vec![
+                format!("{:.17e}", rdf.g),
+                format!("{:.17e}", rdf.temperature),
+                format!("{:.17e}", rdf.volume),
+            ];
+            for value in &rdf.moles {
+                text.push(format!("{value:.17e}"));
+            }
+            text.push(format!("{:.17e}", rdf.temperature_second));
+            text.push(format!("{:.17e}", rdf.temperature_volume));
+            for value in &rdf.temperature_moles {
+                text.push(format!("{value:.17e}"));
+            }
+            text.push(format!("{:.17e}", rdf.volume_second));
+            for value in &rdf.volume_moles {
+                text.push(format!("{value:.17e}"));
+            }
+            for value in &rdf.moles_second {
+                text.push(format!("{value:.17e}"));
+            }
+            println!("{}", text.join(","));
+            continue;
         }
         if fields[0] == "CRITICAL" {
             let kind = match fields[1] {

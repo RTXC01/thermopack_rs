@@ -1391,6 +1391,64 @@ subroutine query_uv_virial_difference(sigma,eps_divk,temperature,rho,values,coun
   count = 12
 end subroutine query_uv_virial_difference
 
+! Evaluate the chain rule of the source for a fixed test case.
+subroutine query_chain_rule(values,count) bind(C,name='query_chain_rule')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use saftvrmie_containers, only: saftvrmie_zeta, allocate_saftvrmie_zeta, &
+       cleanup_saftvrmie_zeta
+  use saftvrmie_utils, only: convert_zeta_x_to_TVn
+  implicit none
+  real(c_double), intent(out) :: values(15)
+  integer(c_int), intent(out) :: count
+  ! Locals
+  integer, parameter :: nc = 2
+  type(saftvrmie_zeta) :: zb
+  real :: a1, a1_e, a1_x, a1_ee, a1_xx, a1_ex, a1_eee, a1_eex, a1_exx
+  real :: a1_T, a1_V, a1_TT, a1_VV, a1_TV
+  real :: a1_n(nc), a1_Tn(nc), a1_Vn(nc), a1_nn(nc,nc)
+  call allocate_saftvrmie_zeta(nc,zb)
+  zb%zx = 0.1d0
+  zb%zx_T = -0.2d0
+  zb%zx_TT = 0.3d0
+  zb%zx_V = -0.4d0
+  zb%zx_VV = 0.5d0
+  zb%zx_TV = 0.6d0
+  zb%zx_n(1) = -0.7d0
+  zb%zx_n(2) = 0.8d0
+  zb%zx_nn(1,1) = 0.9d0
+  zb%zx_nn(1,2) = -1.1d0
+  zb%zx_nn(2,1) = 1.2d0
+  zb%zx_nn(2,2) = -1.3d0
+  a1 = 2.0d0
+  a1_e = 0.25d0
+  a1_x = -0.35d0
+  a1_ee = 0.45d0
+  a1_xx = -0.55d0
+  a1_ex = 0.65d0
+  a1_eee = -0.75d0
+  a1_eex = 0.85d0
+  a1_exx = -0.95d0
+  call convert_zeta_x_to_TVn(nc,0.3d0,0.15d0,-0.25d0,zb,a1,a1_e,a1_x,a1_ee,a1_xx,a1_ex, &
+       a1_eee,a1_eex,a1_exx,a1_T,a1_V,a1_n,a1_TT,a1_VV,a1_TV,a1_Tn,a1_Vn,a1_nn,difflevel=2)
+  call cleanup_saftvrmie_zeta(zb)
+  values(1) = a1_T
+  values(2) = a1_V
+  values(3) = a1_n(1)
+  values(4) = a1_n(2)
+  values(5) = a1_TT
+  values(6) = a1_VV
+  values(7) = a1_TV
+  values(8) = a1_Tn(1)
+  values(9) = a1_Tn(2)
+  values(10) = a1_Vn(1)
+  values(11) = a1_Vn(2)
+  values(12) = a1_nn(1,1)
+  values(13) = a1_nn(1,2)
+  values(14) = a1_nn(2,1)
+  values(15) = a1_nn(2,2)
+  count = 15
+end subroutine query_chain_rule
+
 ! Evaluate the nodes and the weights of a quadrature of the original.
 subroutine query_quadrature(quad,values,count) bind(C,name='query_quadrature')
   use, intrinsic :: iso_c_binding, only: c_int,c_double

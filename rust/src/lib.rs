@@ -18,6 +18,7 @@
 pub mod alpha;
 pub mod beta;
 pub mod caloric;
+pub mod chain_rule;
 pub mod component;
 pub mod cpa;
 pub mod cpa_data;

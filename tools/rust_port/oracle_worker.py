@@ -221,6 +221,14 @@ def main(compiler_directory):
             print('THERMOPACK_RESULT='+json.dumps(dict(values=rule,integral=float(integrals[0]),
                   differential=float(integrals[1]))),flush=True)
             continue
+        if request['mode']=='CHAIN_RULE':
+            if probe is None:probe=load_probe()
+            probe.query_chain_rule.argtypes=[POINTER(c_double),POINTER(c_int)]
+            probe.query_chain_rule.restype=None
+            values=(c_double*15)();number=c_int()
+            probe.query_chain_rule(values,byref(number))
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=list(map(float,values))[:number.value])),flush=True)
+            continue
         if request['mode']=='UV_VIRIAL_DIFFERENCE':
             if probe is None:probe=load_probe()
             probe.query_uv_virial_difference.argtypes=[c_double,c_double,c_double,c_double,

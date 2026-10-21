@@ -131,7 +131,9 @@ the Barker-Henderson hard-sphere diameter, the spline polynomials, the residual
 Helmholtz energy and its derivatives, the pressure, the chemical potential, the
 caloric state and the reduced interaction potential of the splined model, and the
 perturbation terms of the White Bear family with the cavity terms of its
-hard-sphere reference and the u-fraction of the UV theory.
+hard-sphere reference and the u-fraction of the UV theory, and the chain rule
+that turns the derivatives with respect to the packing fraction and the reduced
+distance into the derivatives with respect to the state variables.
 
 The [quadrature notes](quadrature.md) cover the Gauss and the Gauss-Kronrod
 rules of the source and the integration of a function with its differential.

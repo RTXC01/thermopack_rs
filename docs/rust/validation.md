@@ -76,6 +76,7 @@ python tools/rust_port/validate_ljs_potential.py
 python tools/rust_port/validate_ljs_wca_term.py
 python tools/rust_port/validate_wca_term.py
 python tools/rust_port/validate_uv_virial_difference.py
+python tools/rust_port/validate_chain_rule.py
 python tools/rust_port/validate_white_bear.py
 python tools/rust_port/validate_uv_phi.py
 python tools/rust_port/validate_uv_terms.py
@@ -394,6 +395,10 @@ original `uv_delta_b2_overall` and `calc_uv_WCA`: the difference of the second
 virial coefficient of the UV theory and the first order term of the theory with
 their partial derivatives. The twelve quantities match with a relative 1e-11,
 and the observed worst relative difference is 1.5e-15.
+The [chain rule qualification](ljs.md) adds 1 case of the original
+`convert_zeta_x_to_TVn`: the fifteen derivatives of the first and the second
+order for a fixed test case with two components. The values match with a
+relative 1e-13, and the observed worst relative difference is zero.
 The [quadrature qualification](quadrature.md) adds 14 cases of the original
 `get_quadrature_positions`, `get_quadrature_weights` and
 `integrate_with_differential`: the seven Gauss rules and the seven Gauss-Kronrod

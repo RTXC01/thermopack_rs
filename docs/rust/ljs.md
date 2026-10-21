@@ -223,6 +223,25 @@ theory against the original `uv_delta_b2_overall` and `calc_uv_WCA`.
 The committed fixture is `tests/fixtures/uv_virial_difference.csv`; the test is
 `tests/uv_phi.rs`.
 
+## The chain rule of the packing fraction
+
+The models of the source express their terms in the packing fraction and in the
+reduced distance of the hard-sphere centres, and the chain rule of
+`src/saftvrmie_utils.f90` turns the derivatives with respect to those two
+variables into the derivatives with respect to the temperature, the volume and
+the number of moles. The native module `chain_rule` provides that chain rule.
+
+`tools/rust_port/validate_chain_rule.py` compares the native chain rule
+against the exact-source library. The reference probe calls the original
+`convert_zeta_x_to_TVn` for a fixed test case with two components.
+
+* 1 case: the fifteen derivatives of the first and the second order.
+* All 15 values match with a relative 1e-13, and the observed worst relative
+  difference is zero.
+
+The committed fixture is `tests/fixtures/chain_rule.csv`; the test is
+`tests/chain_rule.rs`.
+
 ## The u-fraction of the UV theory
 
 The UV theory of the source describes the Lennard-Jones fluid with the

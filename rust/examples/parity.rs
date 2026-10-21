@@ -111,6 +111,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             && fields[0] != "UVVIRIALS"
             && fields[0] != "WCATERM"
             && fields[0] != "UVVIRIALDIFF"
+            && fields[0] != "CHAINRULE"
             && fields[0] != "QUAD"
             && fields[0] != "CRITICAL"
             && fields.len() != 6
@@ -209,6 +210,60 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .collect();
             text.push(format!("{integral:.17e}"));
             text.push(format!("{differential:.17e}"));
+            println!("{}", text.join(","));
+            continue;
+        }
+        if fields[0] == "CHAINRULE" {
+            use thermopack_rs::chain_rule::{
+                PackingFractionDerivatives, TermDerivatives, convert_zeta_x_to_tvn,
+            };
+            let zeta = PackingFractionDerivatives {
+                value: 0.1,
+                temperature: -0.2,
+                temperature_second: 0.3,
+                volume: -0.4,
+                volume_second: 0.5,
+                volume_third: 0.0,
+                temperature_volume: 0.6,
+                volume_temperature_second: 0.0,
+                volume_temperature_third: 0.0,
+                moles: vec![-0.7, 0.8],
+                moles_second: vec![0.9, -1.1, 1.2, -1.3],
+                temperature_moles: vec![0.0, 0.0],
+                volume_moles: vec![0.0, 0.0],
+                volume_moles_second: vec![0.0; 4],
+                volume_temperature_moles: vec![0.0, 0.0],
+            };
+            let term = TermDerivatives {
+                value: 2.0,
+                packing_fraction: 0.25,
+                reduced_distance: -0.35,
+                packing_fraction_second: 0.45,
+                reduced_distance_second: -0.55,
+                packing_fraction_reduced_distance: 0.65,
+                packing_fraction_third: -0.75,
+                packing_fraction_second_reduced_distance: 0.85,
+                packing_fraction_reduced_distance_second: -0.95,
+            };
+            let result = convert_zeta_x_to_tvn(&term, 0.3, 0.15, -0.25, &zeta, 2);
+            let values = [
+                result.temperature,
+                result.volume,
+                result.moles[0],
+                result.moles[1],
+                result.temperature_second,
+                result.volume_second,
+                result.temperature_volume,
+                result.temperature_moles[0],
+                result.temperature_moles[1],
+                result.volume_moles[0],
+                result.volume_moles[1],
+                result.moles_second[0],
+                result.moles_second[1],
+                result.moles_second[2],
+                result.moles_second[3],
+            ];
+            let text: Vec<String> = values.iter().map(|value| format!("{value:.17e}")).collect();
             println!("{}", text.join(","));
             continue;
         }

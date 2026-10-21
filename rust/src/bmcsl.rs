@@ -83,11 +83,11 @@ pub fn boublik_pair_correlation(zeta_2: f64, zeta_3: f64, mu: f64) -> BmcslPairC
 /// `src/hardsphere_bmcsl.f90`.
 #[derive(Debug, Clone)]
 pub struct HsDiameters {
-    /// The hard-sphere diameter of every component [m].
+    /// The hard-sphere diameter of every component \[m\].
     pub d: Vec<f64>,
-    /// The temperature derivative of the diameter [m/K].
+    /// The temperature derivative of the diameter \[m/K\].
     pub d_t: Vec<f64>,
-    /// The second temperature derivative of the diameter [m/K^2].
+    /// The second temperature derivative of the diameter \[m/K^2\].
     pub d_tt: Vec<f64>,
 }
 
@@ -160,8 +160,8 @@ pub struct PackingFractions {
 
 /// The packing fractions of the hard-sphere mixture.
 ///
-/// `volume` is the volume of the mixture [m^3], `moles` the mole numbers
-/// [mol], `diameters` the hard-sphere diameters with their temperature
+/// `volume` is the volume of the mixture \[m^3\], `moles` the mole numbers
+/// \[mol\], `diameters` the hard-sphere diameters with their temperature
 /// derivatives and `segments` the number of segments of every component.
 pub fn packing_fractions(
     volume: f64,

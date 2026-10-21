@@ -296,6 +296,9 @@ pub fn excess_gibbs_cubic_mix(
                 a_pure,
                 da_dt_pure,
                 d2a_dt2_pure,
+                // The cubic mixing of the classic rules needs the first
+                // composition derivatives only.
+                false,
             )?,
             lambda_ge,
         )
@@ -383,6 +386,9 @@ pub fn excess_gibbs_jet(
         a_pure,
         da_dt_pure,
         d2a_dt2_pure,
+        // The Wong-Sandler mixing rule consumes the second composition
+        // derivatives of the excess Gibbs energy.
+        true,
     )?;
     Ok(ExcessGibbsJet {
         gibbs: kernel.gibbs,
@@ -406,6 +412,7 @@ fn hv_nrtl_kernel(
     a_pure: &[f64],
     da_dt_pure: &[f64],
     d2a_dt2_pure: &[f64],
+    second_composition: bool,
 ) -> Result<ExcessGibbsKernel> {
     let nc = ge_mix.nc;
     let t = temperature;
@@ -673,43 +680,48 @@ fn hv_nrtl_kernel(
             + RGAS * t * (term_self_dt + sum3ji + sum4ji + sum5ji - sum6ji - 2.0 * sum7ji);
     }
 
-    // 5. Second composition derivatives of the excess Gibbs energy
-    let mut d2g_ex_dnid_nj = vec![0.0; nc * nc];
-    for i in 0..nc {
-        let bi = if matches!(ge_mix.mrule, MixingRule::Nrtl | MixingRule::WongSandler) {
-            1.0
-        } else {
-            b_pure[i]
-        };
-        for j in 0..nc {
-            let bj = if matches!(ge_mix.mrule, MixingRule::Nrtl | MixingRule::WongSandler) {
+    // 5. Second composition derivatives of the excess Gibbs energy. Only the
+    // Wong-Sandler mixing rule consumes them.
+    let mut d2g_ex_dnid_nj = Vec::new();
+    if second_composition {
+        d2g_ex_dnid_nj = vec![0.0; nc * nc];
+        for i in 0..nc {
+            let bi = if matches!(ge_mix.mrule, MixingRule::Nrtl | MixingRule::WongSandler) {
                 1.0
             } else {
-                b_pure[j]
+                b_pure[i]
             };
-            let mut sum_i = 0.0;
-            let mut sum_j = 0.0;
-            let mut sum_ij = 0.0;
-            for ii in 0..nc {
-                let gamma2_ii = gamma2[ii] * gamma2[ii];
-                let c_ii_i = cij[ii * nc + i];
-                let c_ii_j = cij[ii * nc + j];
-                let z_ii = mole_fractions[ii];
-                sum_i += z_ii * (bj * c_ii_j) * tau[ii * nc + i] * bi * c_ii_i / gamma2_ii;
-                sum_j += z_ii * (bi * c_ii_i) * tau[ii * nc + j] * bj * c_ii_j / gamma2_ii;
-                sum_ij += z_ii * bi * bj * c_ii_i * c_ii_j * gamma1[ii] / (gamma2_ii * gamma2[ii]);
+            for j in 0..nc {
+                let bj = if matches!(ge_mix.mrule, MixingRule::Nrtl | MixingRule::WongSandler) {
+                    1.0
+                } else {
+                    b_pure[j]
+                };
+                let mut sum_i = 0.0;
+                let mut sum_j = 0.0;
+                let mut sum_ij = 0.0;
+                for ii in 0..nc {
+                    let gamma2_ii = gamma2[ii] * gamma2[ii];
+                    let c_ii_i = cij[ii * nc + i];
+                    let c_ii_j = cij[ii * nc + j];
+                    let z_ii = mole_fractions[ii];
+                    sum_i += z_ii * (bj * c_ii_j) * tau[ii * nc + i] * bi * c_ii_i / gamma2_ii;
+                    sum_j += z_ii * (bi * c_ii_i) * tau[ii * nc + j] * bj * c_ii_j / gamma2_ii;
+                    sum_ij +=
+                        z_ii * bi * bj * c_ii_i * c_ii_j * gamma1[ii] / (gamma2_ii * gamma2[ii]);
+                }
+                let g2i = gamma2[i] * gamma2[i];
+                let g2j = gamma2[j] * gamma2[j];
+                d2g_ex_dnid_nj[i * nc + j] = RGAS
+                    * t
+                    * (tau[j * nc + i] * bj * cij[j * nc + i] / gamma2[i]
+                        - bj * cij[i * nc + j] * gamma1[i] / g2i
+                        + tau[i * nc + j] * bi * cij[i * nc + j] / gamma2[j]
+                        - sum_i
+                        - bi * cij[j * nc + i] * gamma1[j] / g2j
+                        - sum_j
+                        + 2.0 * sum_ij);
             }
-            let g2i = gamma2[i] * gamma2[i];
-            let g2j = gamma2[j] * gamma2[j];
-            d2g_ex_dnid_nj[i * nc + j] = RGAS
-                * t
-                * (tau[j * nc + i] * bj * cij[j * nc + i] / gamma2[i]
-                    - bj * cij[i * nc + j] * gamma1[i] / g2i
-                    + tau[i * nc + j] * bi * cij[i * nc + j] / gamma2[j]
-                    - sum_i
-                    - bi * cij[j * nc + i] * gamma1[j] / g2j
-                    - sum_j
-                    + 2.0 * sum_ij);
         }
     }
 

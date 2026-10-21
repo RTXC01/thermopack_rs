@@ -220,6 +220,13 @@ but the group sums and the exponential functions of the group interactions
 dominate the cost, so the allocation share is small and no further change is
 recorded for it.
 
+The tangent-plane analysis of the flash reuses its buffers, so the
+iterations of the stability analysis do not allocate. The measurement of the
+flash is within the run-to-run spread of the host, because the flash is
+dominated by the analytic fugacity derivatives and not by the allocator, and
+the change is therefore recorded as a preparation for the hot loop work rather
+than as a speedup.
+
 Next optimization targets are the alpha correlation evaluations, separately
 requested derivative paths and profiling the flash/SAFT hot loops once those
 implementations pass parity. No SIMD or thread-level speedups are claimed yet.

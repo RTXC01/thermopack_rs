@@ -139,6 +139,35 @@ fn evaluate(
     Ok(Evaluation { phi, dn, volume })
 }
 
+/// The tangent-plane objective of one trial.
+///
+/// The composition and the residual of the trial are written into the buffers
+/// of the caller, so that the iterations of the stability analysis do not
+/// allocate.
+#[allow(clippy::too_many_arguments)]
+fn stability_evaluate(
+    model: &Cubic,
+    t: f64,
+    p: f64,
+    x: &mut [f64],
+    residual: &mut [f64],
+    w: &[f64],
+    d: &[f64],
+    active: &[usize],
+    phase: Phase,
+    jacobian: bool,
+) -> Result<(f64, Evaluation)> {
+    x.copy_from_slice(w);
+    normalize(x)?;
+    let e = evaluate(model, t, p, x, phase, jacobian)?;
+    let mut objective = 1.0;
+    for &i in active {
+        residual[i] = w[i].ln() + e.phi[i] - d[i];
+        objective += w[i] * (residual[i] - 1.0);
+    }
+    Ok((objective, e))
+}
+
 fn normalize(values: &mut [f64]) -> Result<f64> {
     let sum: f64 = values.iter().sum();
     positive(sum, "positive finite total phase amount")?;
@@ -346,23 +375,27 @@ impl Cubic {
             .zip(k)
             .map(|(z, k)| if phase == Phase::Vapor { z * k } else { z / k })
             .collect();
-        let trial_evaluate = |w: &[f64], jacobian: bool| -> Result<(f64, Vec<f64>, Evaluation)> {
-            let mut x = w.to_vec();
-            normalize(&mut x)?;
-            let e = evaluate(self, t, p, &x, phase, jacobian)?;
-            let mut objective = 1.0;
-            let mut residual = vec![0.0; n];
-            for &i in &active {
-                residual[i] = w[i].ln() + e.phi[i] - d[i];
-                objective += w[i] * (residual[i] - 1.0);
-            }
-            Ok((objective, residual, e))
-        };
+        let mut x_buffer = vec![0.0; n];
+        let mut residual_buffer = vec![0.0; n];
+        let mut gradient: Vec<f64> = vec![0.0; active.len()];
+        let mut hessian: Vec<f64> = vec![0.0; active.len() * active.len()];
+        let mut candidate: Vec<f64> = vec![0.0; n];
         for iteration in 0..options.stability_iterations {
-            let (objective, residual, e) = trial_evaluate(&w, iteration >= 3)?;
+            let (objective, e) = stability_evaluate(
+                self,
+                t,
+                p,
+                &mut x_buffer,
+                &mut residual_buffer,
+                &w,
+                &d,
+                &active,
+                phase,
+                iteration >= 3,
+            )?;
             let error = active
                 .iter()
-                .map(|&i| residual[i].abs())
+                .map(|&i| residual_buffer[i].abs())
                 .fold(0.0, f64::max);
             if objective < -0.001 || error < 1e-10 {
                 let mut composition = w.clone();
@@ -382,8 +415,9 @@ impl Cubic {
             }
             let m = active.len();
             let total: f64 = w.iter().sum();
-            let gradient: Vec<_> = active.iter().map(|&i| w[i].sqrt() * residual[i]).collect();
-            let mut hessian = vec![0.0; m * m];
+            for (index, &i) in active.iter().enumerate() {
+                gradient[index] = w[i].sqrt() * residual_buffer[i];
+            }
             for (ii, &i) in active.iter().enumerate() {
                 for (jj, &j) in active.iter().enumerate() {
                     hessian[ii * m + jj] = e.dn[i * n + j] * w[i].sqrt() * w[j].sqrt() / total;
@@ -400,14 +434,24 @@ impl Cubic {
             }
             let mut accepted = false;
             for _ in 0..40 {
-                let mut candidate = vec![0.0; n];
                 for (ii, &i) in active.iter().enumerate() {
                     candidate[i] = (2.0 * w[i].sqrt() + length * step[ii]).powi(2) / 4.0;
                 }
-                if let Ok((value, _, _)) = trial_evaluate(&candidate, false)
-                    && value <= objective + 1e-4 * length * slope + 4e-15 * objective.abs().max(1.0)
+                if let Ok((value, _)) = stability_evaluate(
+                    self,
+                    t,
+                    p,
+                    &mut x_buffer,
+                    &mut residual_buffer,
+                    &candidate,
+                    &d,
+                    &active,
+                    phase,
+                    false,
+                ) && value
+                    <= objective + 1e-4 * length * slope + 4e-15 * objective.abs().max(1.0)
                 {
-                    w = candidate;
+                    w.copy_from_slice(&candidate);
                     accepted = true;
                     break;
                 }

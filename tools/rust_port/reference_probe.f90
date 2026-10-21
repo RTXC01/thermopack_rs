@@ -1353,6 +1353,44 @@ subroutine query_wca_term(index,eps_divk,reduced_distance,reduced_density,values
   count = 6
 end subroutine query_wca_term
 
+! Evaluate the difference of the second virial coefficient and the first order
+! term of the UV theory of the original.
+subroutine query_uv_virial_difference(sigma,eps_divk,temperature,rho,values,count) &
+     bind(C,name='query_uv_virial_difference')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use lj_splined, only: uv_delta_b2_overall, calc_uv_WCA
+  use hardsphere_wca, only: calc_dhs_WCA
+  use saftvrmie_containers, only: saftvrmie_dhs, allocate_saftvrmie_dhs, &
+       cleanup_saftvrmie_dhs
+  implicit none
+  real(c_double), value :: sigma, eps_divk, temperature, rho
+  real(c_double), intent(out) :: values(12)
+  integer(c_int), intent(out) :: count
+  ! Locals
+  type(saftvrmie_dhs) :: dhs
+  real :: b2, b2_r, b2_T, b2_rr, b2_TT, b2_rT
+  real :: a, a_r, a_t, a_rr, a_tt, a_rt
+  call allocate_saftvrmie_dhs(1,dhs)
+  call calc_dhs_WCA(1,sigma,eps_divk,temperature,dhs)
+  call uv_delta_b2_overall(sigma,eps_divk,temperature,dhs,rho,b2,b2_r,b2_T,b2_rr,b2_TT,b2_rT)
+  call calc_uv_WCA(sigma,eps_divk,rho,temperature,dhs,a,a_r,a_t,a_rr,a_tt,a_rt, &
+       .true.,.false.)
+  call cleanup_saftvrmie_dhs(dhs)
+  values(1) = b2
+  values(2) = b2_r
+  values(3) = b2_T
+  values(4) = b2_rr
+  values(5) = b2_TT
+  values(6) = b2_rT
+  values(7) = a
+  values(8) = a_r
+  values(9) = a_t
+  values(10) = a_rr
+  values(11) = a_tt
+  values(12) = a_rt
+  count = 12
+end subroutine query_uv_virial_difference
+
 ! Evaluate the nodes and the weights of a quadrature of the original.
 subroutine query_quadrature(quad,values,count) bind(C,name='query_quadrature')
   use, intrinsic :: iso_c_binding, only: c_int,c_double

@@ -210,6 +210,19 @@ form, against the original `calc_LJs_WCA_ai`.
 The committed fixture is `tests/fixtures/wca_term.csv`; the test is
 `tests/ljs_wca.rs`.
 
+`tools/rust_port/validate_uv_virial_difference.py` compares the difference of
+the second virial coefficient of the UV theory and the first order term of the
+theory against the original `uv_delta_b2_overall` and `calc_uv_WCA`.
+
+* 5 cases: the segment diameter, the well depth, the temperature and the
+  reduced density.
+* The compared quantities are the twelve values of the two routines. All 5 cases
+  match with a relative 1e-11, and the observed worst relative difference is
+  1.5e-15.
+
+The committed fixture is `tests/fixtures/uv_virial_difference.csv`; the test is
+`tests/uv_phi.rs`.
+
 ## The u-fraction of the UV theory
 
 The UV theory of the source describes the Lennard-Jones fluid with the

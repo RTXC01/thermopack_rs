@@ -110,6 +110,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             && fields[0] != "UVTERMS"
             && fields[0] != "UVVIRIALS"
             && fields[0] != "WCATERM"
+            && fields[0] != "UVVIRIALDIFF"
             && fields[0] != "QUAD"
             && fields[0] != "CRITICAL"
             && fields.len() != 6
@@ -209,6 +210,39 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             text.push(format!("{integral:.17e}"));
             text.push(format!("{differential:.17e}"));
             println!("{}", text.join(","));
+            continue;
+        }
+        if fields[0] == "UVVIRIALDIFF" {
+            let sigma: f64 = fields[1].parse().unwrap();
+            let eps_divk: f64 = fields[2].parse().unwrap();
+            let temperature: f64 = fields[3].parse().unwrap();
+            let rho: f64 = fields[4].parse().unwrap();
+            let (diameter, diameter_t, diameter_tt) =
+                thermopack_rs::hardsphere_wca::hard_sphere_diameter(sigma, eps_divk, temperature);
+            let (b2, b2_r, b2_t, b2_rr, b2_tt, b2_rt) = thermopack_rs::ljs::uv_delta_b2_overall(
+                sigma,
+                eps_divk,
+                temperature,
+                diameter,
+                diameter_t,
+                diameter_tt,
+                rho,
+            );
+            let (a, a_r, a_t, a_rr, a_tt, a_rt) = thermopack_rs::ljs::calc_uv_wca(
+                sigma,
+                eps_divk,
+                rho,
+                temperature,
+                diameter,
+                diameter_t,
+                diameter_tt,
+                true,
+                false,
+            );
+            println!(
+                "{:.17e},{:.17e},{:.17e},{:.17e},{:.17e},{:.17e},{:.17e},{:.17e},{:.17e},{:.17e},{:.17e},{:.17e}",
+                b2, b2_r, b2_t, b2_rr, b2_tt, b2_rt, a, a_r, a_t, a_rr, a_tt, a_rt
+            );
             continue;
         }
         if fields[0] == "WCATERM" {

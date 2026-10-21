@@ -1017,3 +1017,101 @@ pub fn ljs_b2(eps_divk: f64, temperature: f64) -> (f64, f64, f64) {
         + 4.0 * BI[4] * reduced.powi(3) * reduced_tt;
     (b2, b2_t, b2_tt)
 }
+
+/// The difference of the second virial coefficient of the UV theory and its
+/// derivatives.
+///
+/// The method follows the source and combines the second virial coefficient of
+/// the Lennard-Jones spline, the hard-sphere second virial coefficient and the
+/// first order term of the UV theory.
+pub fn uv_delta_b2_overall(
+    sigma: f64,
+    eps_divk: f64,
+    temperature: f64,
+    diameter: f64,
+    diameter_t: f64,
+    diameter_tt: f64,
+    rho: f64,
+) -> (f64, f64, f64, f64, f64, f64) {
+    let (a1_b2, a1_b2_t, a1_b2_tt) = uv_a1_b2(
+        sigma,
+        eps_divk,
+        temperature,
+        diameter,
+        diameter_t,
+        diameter_tt,
+    );
+    let (ljs, ljs_t, ljs_tt) = ljs_b2(eps_divk, temperature);
+    let (hs, hs_t, hs_tt) = uv_hard_sphere_b2(eps_divk, temperature);
+    let value = ljs - hs - a1_b2;
+    let value_t = ljs_t - hs_t - a1_b2_t;
+    let value_tt = ljs_tt - hs_tt - a1_b2_tt;
+    // The source scales the second virial coefficient with the reduced density
+    // after the composition and keeps the density derivative of the unscaled
+    // value.
+    (
+        value * rho,
+        value,
+        value_t * rho,
+        0.0,
+        value_tt * rho,
+        value_t,
+    )
+}
+
+/// The first order term of the UV theory and its derivatives.
+///
+/// The method follows the source and combines the first order term of the UV
+/// theory, the u-fraction of the theory and the difference of the second
+/// virial coefficient.
+#[allow(clippy::too_many_arguments)]
+pub fn calc_uv_wca(
+    sigma: f64,
+    eps_divk: f64,
+    rho: f64,
+    temperature: f64,
+    diameter: f64,
+    diameter_t: f64,
+    diameter_tt: f64,
+    enable_virial_term: bool,
+    use_temperature_dependent_u_fraction: bool,
+) -> (f64, f64, f64, f64, f64, f64) {
+    let (b2, b2_r, b2_t, b2_rr, b2_tt, b2_rt) = if enable_virial_term {
+        uv_delta_b2_overall(
+            sigma,
+            eps_divk,
+            temperature,
+            diameter,
+            diameter_t,
+            diameter_tt,
+            rho,
+        )
+    } else {
+        (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+    };
+    let (u, u_r, u_t, u_rr, u_tt, u_rt) = if enable_virial_term {
+        if use_temperature_dependent_u_fraction {
+            uv_phi_temp(eps_divk, temperature, rho)
+        } else {
+            uv_phi(eps_divk, temperature, rho)
+        }
+    } else {
+        (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+    };
+    let (a1, a1_r, a1_t, a1_rr, a1_tt, a1_rt) = uv_a1_u(
+        sigma,
+        eps_divk,
+        temperature,
+        diameter,
+        diameter_t,
+        diameter_tt,
+        rho,
+    );
+    let value = a1 + (1.0 - u) * b2;
+    let value_r = a1_r + (1.0 - u) * b2_r - u_r * b2;
+    let value_rr = a1_rr + (1.0 - u) * b2_rr - 2.0 * u_r * b2_r - u_rr * b2;
+    let value_t = a1_t + (1.0 - u) * b2_t - u_t * b2;
+    let value_tt = a1_tt + (1.0 - u) * b2_tt - 2.0 * u_t * b2_t - u_tt * b2;
+    let value_rt = a1_rt + (1.0 - u) * b2_rt - u_rt * b2 - u_t * b2_r - u_r * b2_t;
+    (value, value_r, value_t, value_rr, value_tt, value_rt)
+}

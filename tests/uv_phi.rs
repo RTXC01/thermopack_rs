@@ -5,7 +5,8 @@
 #![allow(clippy::excessive_precision)]
 
 use thermopack_rs::ljs::{
-    ljs_b2, uv_a1_b2, uv_a1_u, uv_hard_sphere_b2, uv_phi, uv_phi_temp, uv_q_of_temperature,
+    calc_uv_wca, ljs_b2, uv_a1_b2, uv_a1_u, uv_delta_b2_overall, uv_hard_sphere_b2, uv_phi,
+    uv_phi_temp, uv_q_of_temperature,
 };
 
 const ATOL: f64 = 1.0e-14;
@@ -106,6 +107,69 @@ fn uv_virials_match_the_source() {
         checked += 1;
     }
     assert_eq!(checked, 4);
+}
+
+#[test]
+fn uv_virial_difference_matches_the_source() {
+    let mut checked = 0;
+    for row in include_str!("fixtures/uv_virial_difference.csv")
+        .lines()
+        .skip(1)
+    {
+        let fields: Vec<_> = row.split(';').collect();
+        let case = fields[0];
+        let parts: Vec<_> = case.split('|').collect();
+        let sigma: f64 = parts[0].parse().unwrap();
+        let eps_divk: f64 = parts[1].parse().unwrap();
+        let temperature: f64 = parts[2].parse().unwrap();
+        let rho: f64 = parts[3].parse().unwrap();
+        let source: Vec<f64> = fields[1..].iter().map(|v| v.parse().unwrap()).collect();
+        let (diameter, diameter_t, diameter_tt) =
+            thermopack_rs::hardsphere_wca::hard_sphere_diameter(sigma, eps_divk, temperature);
+        let difference = uv_delta_b2_overall(
+            sigma,
+            eps_divk,
+            temperature,
+            diameter,
+            diameter_t,
+            diameter_tt,
+            rho,
+        );
+        let term = calc_uv_wca(
+            sigma,
+            eps_divk,
+            rho,
+            temperature,
+            diameter,
+            diameter_t,
+            diameter_tt,
+            true,
+            false,
+        );
+        let native = [
+            difference.0,
+            difference.1,
+            difference.2,
+            difference.3,
+            difference.4,
+            difference.5,
+            term.0,
+            term.1,
+            term.2,
+            term.3,
+            term.4,
+            term.5,
+        ];
+        assert_eq!(native.len(), source.len(), "{case}");
+        for (position, (source, native)) in source.iter().zip(native.iter()).enumerate() {
+            assert!(
+                (source - native).abs() <= 1.0e-14 + 1.0e-11 * source.abs(),
+                "{case} entry {position}: source {source} native {native}"
+            );
+        }
+        checked += 1;
+    }
+    assert_eq!(checked, 5);
 }
 
 #[test]

@@ -227,12 +227,12 @@ components:
 
 | Preparation | Nanoseconds per state |
 |---|---:|
-| PR, van der Waals mixing | 295 |
-| SRK, van der Waals mixing | 296 |
-| PR, tcPR reference | 793 |
-| SRK, Huron-Vidal mixing | 1848 |
-| PR, Wong-Sandler mixing | 3647 |
-| SRK, UNIFAC mixing | 5819 |
+| PR, van der Waals mixing | 299 |
+| SRK, van der Waals mixing | 310 |
+| PR, tcPR reference | 847 |
+| SRK, Huron-Vidal mixing | 1645 |
+| PR, Wong-Sandler mixing | 2266 |
+| SRK, UNIFAC mixing | 5774 |
 
 The rule evaluates the excess Gibbs energy of the infinite pressure limit
 with the parameters of the rule, as the Huron-Vidal and the NRTL models do,
@@ -250,7 +250,16 @@ operations are unchanged, so the parity results are identical.
 
 | Preparation | Before | After | Change |
 |---|---:|---:|---:|
-| PR, Wong-Sandler mixing | 3647 | 2322 | -36% |
+| PR, Wong-Sandler mixing | 3647 | 2266 | -38% |
+
+The kernel of the Huron-Vidal and the NRTL models computed the second
+composition derivatives of the excess Gibbs energy for every state, but only
+the Wong-Sandler mixing rule consumes them. The cubic path of the classic
+rules needs the first composition derivatives only and skips the second
+derivatives now. The computation is cubic in the number of components, so
+the gain grows with the size of the mixture. The preparation of the
+Huron-Vidal mixture of three components drops from about 1708 to 1645
+nanoseconds per state.
 
 The measurement is the median of repeated runs of the same workload on the
 same host, and the other five rows of the table above are unchanged within

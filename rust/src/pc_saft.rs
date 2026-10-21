@@ -201,6 +201,49 @@ impl PcSaft {
     }
 }
 
+/// The reduced Helmholtz energy of the hard-sphere model of the PC-SAFT model
+/// and its derivatives with respect to the temperature, the volume and the
+/// mole numbers.
+///
+/// The function reproduces the original
+/// `src/hardsphere_bmcsl.f90:calc_bmcsl_helmholtzenergy`, which the original
+/// applies to the hard-sphere contribution of the PC-SAFT model.
+pub fn pcsaft_hs_energy(
+    model: &PcSaft,
+    temperature: f64,
+    volume: f64,
+    moles: &[f64],
+) -> Result<crate::bmcsl::HardSphereEnergyDerivatives> {
+    positive(temperature, "the temperature")?;
+    positive(volume, "the volume")?;
+    let count = model.components().len();
+    if moles.len() != count {
+        return Err(Error::InvalidInput(
+            "the number of moles must match the components of the model",
+        ));
+    }
+    let total: f64 = moles.iter().sum();
+    if !total.is_finite() || total <= 0.0 {
+        return Err(Error::InvalidInput(
+            "the number of moles must be strictly positive",
+        ));
+    }
+    let composition: Vec<f64> = moles.iter().map(|amount| amount / total).collect();
+    let prepared = PreparedPcSaft::new(model, temperature, &composition)?;
+    let diameters = crate::bmcsl::HsDiameters {
+        d: prepared.d.clone(),
+        d_t: prepared.d_t.clone(),
+        d_tt: prepared.d_tt.clone(),
+    };
+    let segments: Vec<f64> = model
+        .components()
+        .iter()
+        .map(|component| component.m)
+        .collect();
+    let packing = crate::bmcsl::packing_fractions(volume, moles, &diameters, &segments);
+    Ok(crate::bmcsl::hard_sphere_energy(&packing))
+}
+
 /// Precomputed state of a PC-SAFT fluid/mixture at temperature $T$ and composition $\mathbf{x}$.
 #[derive(Debug, Clone)]
 pub struct PreparedPcSaft<'a> {

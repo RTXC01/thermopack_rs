@@ -115,6 +115,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             && fields[0] != "AISLJS"
             && fields[0] != "CPARDF"
             && fields[0] != "PCSAFTRDF"
+            && fields[0] != "PCSAFTHS"
             && fields[0] != "WSMIX"
             && fields[0] != "WSSTATE"
             && fields[0] != "QUAD"
@@ -303,6 +304,42 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             for value in &rdf.moles_second {
                 text.push(format!("{value:.17e}"));
+            }
+            println!("{}", text.join(","));
+            continue;
+        }
+        if fields[0] == "PCSAFTHS" {
+            let components: Vec<&str> = fields[1].split(',').collect();
+            let temperature: f64 = fields[2].parse().unwrap();
+            let volume: f64 = fields[3].parse().unwrap();
+            let moles: Vec<f64> = fields[4]
+                .split(',')
+                .map(|value| value.parse().unwrap())
+                .collect();
+            let model = thermopack_rs::PcSaft::new(&components)?;
+            let energy =
+                thermopack_rs::pc_saft::pcsaft_hs_energy(&model, temperature, volume, &moles)?;
+            let mut text = vec![
+                format!("{:.17e}", energy.value),
+                format!("{:.17e}", energy.d_t),
+                format!("{:.17e}", energy.d_v),
+            ];
+            for value in &energy.d_n {
+                text.push(format!("{value:.17e}"));
+            }
+            text.push(format!("{:.17e}", energy.d_tt));
+            text.push(format!("{:.17e}", energy.d_tv));
+            for value in &energy.d_tn {
+                text.push(format!("{value:.17e}"));
+            }
+            text.push(format!("{:.17e}", energy.d_vv));
+            for value in &energy.d_vn {
+                text.push(format!("{value:.17e}"));
+            }
+            for row in &energy.d_nn {
+                for value in row {
+                    text.push(format!("{value:.17e}"));
+                }
             }
             println!("{}", text.join(","));
             continue;

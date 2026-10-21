@@ -146,3 +146,31 @@ The chain rule is verified against central differences of the expression, with
 relative steps of the temperature, the volume and the mole numbers. The second
 derivatives of the volume and the mole numbers need a larger step, because the
 packing fractions scale with the inverse of the volume.
+
+## The reduced Helmholtz energy of the hard-sphere model
+
+The module rust/src/bmcsl.rs holds the reduced Helmholtz energy of the
+additive hard-sphere model of Boublik and its first and second derivatives
+with respect to the packing fractions, in the function
+bmcsl::boublik_helmholtz_energy. The expression and its derivatives follow
+src/hardsphere_bmcsl.f90:calc_bmcsl_dalpha_dzeta, which the original keeps
+private.
+
+The function bmcsl::hard_sphere_energy applies the chain rule of the original
+src/hardsphere_bmcsl.f90:calc_bmcsl_helmholtzenergy to the temperature, the
+volume and the mole numbers. The native function pc_saft::pcsaft_hs_energy
+delivers the energy and its derivatives for the model of the PC-SAFT model.
+
+The qualification is tools/rust_port/validate_pcsaft_hs.py. The reference
+probe tools/rust_port/reference_probe.f90 calls calc_dhs,
+calc_bmcsl_zeta_and_derivatives and calc_bmcsl_helmholtzenergy of the original
+for the active model of the PC-SAFT model.
+
+- 6 cases: the components, the temperature, the volume and the number of
+  moles.
+- The compared quantities are the energy and its nine derivatives.
+- All 6 cases match with a relative 1e-12, and the observed worst relative
+  difference is 7.7e-15.
+
+The committed fixture is tests/fixtures/pcsaft_hs.csv; the test is
+tests/pcsaft_hs.rs.

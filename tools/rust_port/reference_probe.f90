@@ -1748,6 +1748,72 @@ contains
   end subroutine test_integrand
 end subroutine query_quadrature_integral
 
+! Evaluate the reduced Helmholtz energy of the hard-sphere model of the
+! original for the PC-SAFT model.
+subroutine query_pcsaft_hs(temperature,volume,moles,values,numbers) &
+     bind(C,name='query_pcsaft_hs')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use thermopack_var, only: nc, get_active_eos, base_eos_param
+  use pc_saft_nonassoc, only: PCSAFT_eos, calc_dhs
+  use hardsphere_bmcsl, only: calc_bmcsl_zeta_and_derivatives, &
+       calc_bmcsl_helmholtzenergy
+  implicit none
+  real(c_double), value :: temperature, volume
+  real(c_double), intent(in) :: moles(16)
+  real(c_double), intent(out) :: values(256)
+  integer(c_int), intent(out) :: numbers
+  ! Locals
+  class(base_eos_param), pointer :: eos
+  real :: a, a_T, a_V, a_TT, a_TV, a_VV
+  real, dimension(nc) :: a_n, a_Tn, a_Vn
+  real, dimension(nc,nc) :: a_nn
+  real, dimension(nc) :: n
+  integer :: i,j,position
+  eos => get_active_eos()
+  select type(p_eos => eos)
+  class is(PCSAFT_eos)
+    do i = 1, nc
+      n(i) = moles(i)
+    end do
+    call calc_dhs(p_eos, temperature)
+    call calc_bmcsl_zeta_and_derivatives(nc,volume,n,p_eos%dhs,p_eos%zeta,p_eos%m)
+    call calc_bmcsl_helmholtzenergy(nc,temperature,volume,n,p_eos%zeta,a,a_T,a_V,a_n, &
+         a_TT,a_TV,a_Tn,a_VV,a_Vn,a_nn)
+  end select
+  position = 1
+  values(position) = a
+  position = position + 1
+  values(position) = a_T
+  position = position + 1
+  values(position) = a_V
+  position = position + 1
+  do i = 1, nc
+    values(position) = a_n(i)
+    position = position + 1
+  end do
+  values(position) = a_TT
+  position = position + 1
+  values(position) = a_TV
+  position = position + 1
+  do i = 1, nc
+    values(position) = a_Tn(i)
+    position = position + 1
+  end do
+  values(position) = a_VV
+  position = position + 1
+  do i = 1, nc
+    values(position) = a_Vn(i)
+    position = position + 1
+  end do
+  do i = 1, nc
+    do j = 1, nc
+      values(position) = a_nn(i,j)
+      position = position + 1
+    end do
+  end do
+  numbers = position - 1
+end subroutine query_pcsaft_hs
+
 ! Evaluate the hard-sphere contact radial distribution function of the
 ! original for the PC-SAFT model.
 subroutine query_pcsaft_rdf(temperature,volume,moles,first,second,values,numbers) &

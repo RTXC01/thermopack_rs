@@ -129,10 +129,10 @@
     "complexmodelinit": "6ffae447c3e2be271d9720f3b5217bebf669fa879cf9291be7f5d0a407a96b41",
     "external": "e57f6391c43791ae80fde558f66d9c39ed40b3d3b27859579fc11d3ef0c97f9d"
   },
-  "cases": 5,
-  "attempted_cases": 5,
+  "cases": 8,
+  "attempted_cases": 8,
   "generator": "tools/rust_port/validate_wong_sandler.py",
-  "fixture_sha256": "ac99bd4fd69e658876feb29c1507f5fa592aa98670fe615fef4aef513bbaba22",
+  "fixture_sha256": "13f331eae3179bb6a98dd5c6a1d0c4dfcab2bca046057f19740917d3b153d33f",
   "quantities": [
     "a",
     "a_t",

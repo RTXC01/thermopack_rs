@@ -77,12 +77,13 @@ reference probe `tools/rust_port/reference_probe.f90` calls the original
 `cbCalcAlphaTerm`, `excess_gibbs::gEinf` and `WongSandlerMix` and reports the
 mixture coefficients of the original.
 
-The five cases cover the Peng-Robinson and the Soave-Redlich-Kwong equation
-with the carbon dioxide and the normal butane or the propane, with and
-without binary interaction parameters, with and without the parameters of the
-second order term. The agreement holds for the attraction and the covolume,
-their temperature derivatives and their mole number derivatives, with a worst
-relative difference of `1.26e-12` against a tolerance of `1e-10`.
+The eight cases cover the Peng-Robinson, the Soave-Redlich-Kwong and the van
+der Waals equation with the carbon dioxide and the normal butane or the
+propane, with and without binary interaction parameters, with and without the
+parameters of the second order term. The agreement holds for the attraction
+and the covolume, their temperature derivatives and their mole number
+derivatives, with a worst relative difference of `1.26e-12` against a
+tolerance of `1e-10`.
 
 The fixture `tests/fixtures/wong_sandler.csv` and the test
 `tests/wong_sandler.rs` hold the qualified values.

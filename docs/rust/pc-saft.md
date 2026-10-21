@@ -71,3 +71,30 @@ Extracted from `src/pc_saft_datadb.f90` via `tools/rust_port/generate_pcsaft_dat
 - `state(rho)`: complete state bundle ($P, Z, U^{\text{res}}, H^{\text{res}}, S^{\text{res}}, A^{\text{res}}, G^{\text{res}}, H^{\text{total}}, S^{\text{total}}, C_v, C_p, w, \ln \boldsymbol{\phi}$)
 - `volume(P, phase)`: single-phase bounded $(1-\zeta)$ Newton solver from `pc_saft_nonassoc_volume_solver`, guaranteed to converge within physical limits $[10^{-10}, 0.75]$.
 - `saturation_pressure(T)`: pure fluid vapor-liquid coexistence saturation pressure with Clapeyron initialization and damped Newton root finding.
+
+## The radial distribution function is pending
+
+The original evaluates the radial distribution function of the PC-SAFT model
+in src/pc_saft_nonassoc.f90:g_pc_saft_TVn, which calls the pair correlation
+function of the Boublik hard-sphere model in
+src/hardsphere_bmcsl.f90:calc_bmcsl_gij. The port needs three pieces of
+that module:
+
+- the hard-sphere diameter of every component with its temperature
+  derivatives, src/hardsphere_bmcsl.f90:calc_dhs,
+- the packing fraction and the segment fractions of the mixture with their
+  derivatives, calc_bmcsl_zeta_and_derivatives, which the native model
+  already evaluates for the hard-chain contribution of the association term
+  in PreparedPcSaft::bmcsl_zetas,
+- the reduced Helmholtz energy of the pair and its first and second
+  derivatives with respect to the packing fractions,
+  calc_bmcsl_dgij_dzeta, with the chain rule of the original to the
+  temperature, the volume and the mole numbers.
+
+The native model evaluates the properties of the PC-SAFT model in the density
+representation, so the port of the pair correlation function follows the
+density representation of the native model rather than the volume
+representation of the original. The qualification compares the pair
+correlation function and its derivatives against the reference probe
+	ools/rust_port/reference_probe.f90, as the branch of the cubic association
+model is qualified in 	ools/rust_port/validate_cpa_rdf.py.

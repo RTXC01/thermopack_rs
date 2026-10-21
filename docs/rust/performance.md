@@ -221,6 +221,28 @@ The measurement is the median of repeated runs of the same workload on the
 same host, and the other three rows of the table above are unchanged within
 the run-to-run spread of that host.
 
+The preparation of the Wong-Sandler mixing rule was measured on the same
+workload on 2026-10-21, with the binary parameters of the pairs of the
+components:
+
+| Preparation | Nanoseconds per state |
+|---|---:|
+| PR, van der Waals mixing | 295 |
+| SRK, van der Waals mixing | 296 |
+| PR, tcPR reference | 793 |
+| SRK, Huron-Vidal mixing | 1848 |
+| PR, Wong-Sandler mixing | 3647 |
+| SRK, UNIFAC mixing | 5819 |
+
+The rule evaluates the excess Gibbs energy of the infinite pressure limit
+with the parameters of the rule, as the Huron-Vidal and the NRTL models do,
+and adds the sums `Q` and `D` of its appendix with the partial derivatives of
+the attraction and of the covolume. The preparation of the rule is the
+second slowest of the cubic model after the UNIFAC mixing rule. The
+allocation of the matrices of the second mole derivatives and of the partial
+derivatives of the coefficients of the rule is the next target of the
+allocation work of the preparation.
+
 The benchmark also reports the UNIFAC mixing rule, which is the slowest
 preparation of the cubic model at 5736 nanoseconds per state. It evaluates
 the group interaction energies of every pair of subgroups and their

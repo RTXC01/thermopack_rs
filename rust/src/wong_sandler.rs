@@ -235,10 +235,21 @@ pub fn wong_sandler_mix(
         return Err(Error::InvalidInput("the composition must be positive"));
     }
     // The reduced covolume of every component and its temperature
-    // derivatives.
-    let mut reduced = vec![0.0; count];
-    let mut reduced_t = vec![0.0; count];
-    let mut reduced_tt = vec![0.0; count];
+    // derivatives, the pair coefficients and the partial derivatives of the
+    // sums share one allocation.
+    let mut scratch = vec![0.0; 9 * count + 5 * count * count];
+    let (reduced, rest) = scratch.split_at_mut(count);
+    let (reduced_t, rest) = rest.split_at_mut(count);
+    let (reduced_tt, rest) = rest.split_at_mut(count);
+    let (pair, rest) = rest.split_at_mut(count * count);
+    let (pair_t, rest) = rest.split_at_mut(count * count);
+    let (pair_tt, rest) = rest.split_at_mut(count * count);
+    let (q_i, rest) = rest.split_at_mut(count);
+    let (q_it, rest) = rest.split_at_mut(count);
+    let (q_ij, rest) = rest.split_at_mut(count * count);
+    let (d_i, rest) = rest.split_at_mut(count);
+    let (d_it, rest) = rest.split_at_mut(count);
+    let (d_ij, _rest) = rest.split_at_mut(count * count);
     for i in 0..count {
         reduced[i] = b_pure[i] - a_pure[i] / gas_temperature;
         reduced_t[i] = -a_pure_t[i] / gas_temperature + a_pure[i] / (gas_temperature * temperature);
@@ -247,9 +258,6 @@ pub fn wong_sandler_mix(
             - 2.0 * a_pure[i] / (gas_temperature * temperature * temperature);
     }
     // The pair coefficients and their temperature derivatives.
-    let mut pair = vec![0.0; count * count];
-    let mut pair_t = vec![0.0; count * count];
-    let mut pair_tt = vec![0.0; count * count];
     for i in 0..count {
         for j in 0..count {
             let index = i * count + j;
@@ -266,9 +274,6 @@ pub fn wong_sandler_mix(
     let mut q = 0.0;
     let mut q_t = 0.0;
     let mut q_tt = 0.0;
-    let mut q_i = vec![0.0; count];
-    let mut q_it = vec![0.0; count];
-    let mut q_ij = vec![0.0; count * count];
     for i in 0..count {
         for j in 0..count {
             let index = i * count + j;
@@ -289,9 +294,6 @@ pub fn wong_sandler_mix(
     let mut d = 0.0;
     let mut d_t = 0.0;
     let mut d_tt = 0.0;
-    let mut d_i = vec![0.0; count];
-    let mut d_it = vec![0.0; count];
-    let mut d_ij = vec![0.0; count * count];
     for i in 0..count {
         d += composition[i] * a_pure[i] / b_pure[i];
         d_t += composition[i] * a_pure_t[i] / b_pure[i];

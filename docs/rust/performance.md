@@ -238,10 +238,24 @@ The rule evaluates the excess Gibbs energy of the infinite pressure limit
 with the parameters of the rule, as the Huron-Vidal and the NRTL models do,
 and adds the sums `Q` and `D` of its appendix with the partial derivatives of
 the attraction and of the covolume. The preparation of the rule is the
-second slowest of the cubic model after the UNIFAC mixing rule. The
-allocation of the matrices of the second mole derivatives and of the partial
-derivatives of the coefficients of the rule is the next target of the
-allocation work of the preparation.
+second slowest of the cubic model after the UNIFAC mixing rule.
+
+The rule allocated eighteen vectors per preparation: the reduced covolumes of
+the components with their temperature derivatives, the pair coefficients with
+their derivatives, the partial derivatives of the sums `Q` and `D` and the
+partial derivatives of the coefficients of the rule. The twelve vectors of the
+computation now share one allocation, and the values and their order of
+operations are unchanged, so the parity results are identical.
+
+| Preparation | Before | After | Change |
+|---|---:|---:|---:|
+| PR, Wong-Sandler mixing | 3647 | 2482 | -32% |
+
+The measurement is the median of repeated runs of the same workload on the
+same host, and the other five rows of the table above are unchanged within
+the run-to-run spread of that host. The allocation of the matrices of the
+second mole derivatives and of the partial derivatives of the coefficients of
+the rule is the next target of the allocation work of the preparation.
 
 The benchmark also reports the UNIFAC mixing rule, which is the slowest
 preparation of the cubic model at 5736 nanoseconds per state. It evaluates

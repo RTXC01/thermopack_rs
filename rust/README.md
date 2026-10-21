@@ -146,3 +146,13 @@ the triple point of the source. See [iso-line notes](../docs/rust/isolines.md),
 [stability limit notes](../docs/rust/spinodal.md),
 [pseudo component notes](../docs/rust/pseudo-components.md) and
 [solid notes](../docs/rust/solid.md).
+
+The splined Lennard-Jones model with the Barker-Henderson perturbation theory
+lives in `ljs`: `LjsBh::new` builds the argon record of the source database,
+`LjsBh::with_parameters` replaces the segment diameter and the well depth,
+`LjsBh::set_control` switches the terms of the model, and the model reports
+the reduced perturbation terms, the Barker-Henderson diameter, the spline
+polynomials, the reduced residual Helmholtz energy and its derivatives, the
+pressure of a state, the reduced residual chemical potential, the caloric state
+and the reduced interaction potential. See
+[Lennard-Jones splined notes](../docs/rust/ljs.md).

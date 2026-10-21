@@ -4,13 +4,14 @@
 //!
 //! The original splines the excess energy of the Lennard-Jones fluid with
 //! the Barker-Henderson perturbation theory. The spline of the excess energy
-//! is a set of polynomials in the reduced temperature and the reduced density,
-//! and the original exposes the reduced perturbation terms and the
-//! Barker-Henderson diameter through the Python interface of the fork.
+//! is a set of polynomials in the reduced temperature and the reduced density.
 //!
-//! The native model provides the same two quantities, the reduced
-//! perturbation terms and the Barker-Henderson diameter, and it prepares the
-//! parameters of the model.
+//! The native model provides the parameters and the switches of the model,
+//! the Barker-Henderson hard-sphere diameter, the polynomials of the spline
+//! with their partial derivatives, the reduced perturbation terms, the reduced
+//! residual Helmholtz energy with its temperature and mole number
+//! derivatives, the pressure of a state, the reduced residual chemical
+//! potential, the caloric state and the reduced interaction potential.
 
 use crate::Phase;
 use crate::error::{Error, Result};

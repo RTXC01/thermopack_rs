@@ -687,12 +687,6 @@ impl<'a> PreparedSaftVrMie<'a> {
                 let beta_eps = eps / t;
                 let w = (beta_eps * g1 + (beta_eps * beta_eps) * g2) / gd;
                 let g_contact = gd * w.exp();
-                if (rho - 50.0).abs() < 1e-4 {
-                    println!(
-                        "RUST: gd={}, g11={}, g12={}, g1={}, g21={}, g22={}, g2={}, gam_c={}, w={}, g_contact={}",
-                        gd, g11, g12, g1, g21, g22, g2, gam_c, w, g_contact
-                    );
-                }
 
                 a_chain -= self.mole_fractions[i] * (mi - 1.0) * g_contact.ln();
             }

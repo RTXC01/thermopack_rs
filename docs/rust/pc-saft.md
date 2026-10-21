@@ -121,3 +121,19 @@ pair and its temperature, volume and mole number derivatives only. The
 qualification against the exact source library belongs to the chain rule from
 the packing fractions to the temperature, the volume and the mole numbers,
 which is the next part of the port.
+
+The module holds the chain rule as well. The function
+bmcsl::packing_fractions evaluates the moments zeta_0 to zeta_3 of the number
+density of the mixture and their derivatives with respect to the temperature,
+the volume and the mole numbers, in the order of the original
+src/hardsphere_bmcsl.f90:calc_bmcsl_zeta_and_derivatives. The function
+bmcsl::pair_correlation applies the chain rule to the pair of components and
+returns the pair correlation function with its first and second derivatives,
+in the order of the original src/hardsphere_bmcsl.f90:calc_bmcsl_gij. The
+reduced diameter of the pair and its temperature derivatives are the ones of
+bmcsl::HsDiameters::reduced_diameter.
+
+The chain rule is verified against central differences of the expression, with
+relative steps of the temperature, the volume and the mole numbers. The second
+derivatives of the volume and the mole numbers need a larger step, because the
+packing fractions scale with the inverse of the volume.

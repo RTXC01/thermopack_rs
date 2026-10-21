@@ -134,7 +134,8 @@ caloric state and the reduced interaction potential of the splined model.
 The [quadrature notes](quadrature.md) cover the Gauss and the Gauss-Kronrod
 rules of the source and the integration of a function with its differential.
 The [Lennard-Jones splined notes](ljs.md) also cover the perturbation terms of
-the White Bear family of the model.
+the White Bear family of the model and the cavity terms of its hard-sphere
+reference.
 
 The [FMT notes](fmt.md) cover all three fundamental-measure functionals,
 analytic Hessians, source arithmetic compatibility and native grid measurements.

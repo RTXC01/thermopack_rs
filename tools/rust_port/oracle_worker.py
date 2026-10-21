@@ -221,6 +221,17 @@ def main(compiler_directory):
             print('THERMOPACK_RESULT='+json.dumps(dict(values=rule,integral=float(integrals[0]),
                   differential=float(integrals[1]))),flush=True)
             continue
+        if request['mode']=='WHITE_BEAR':
+            if probe is None:probe=load_probe()
+            probe.query_white_bear.argtypes=[c_double,c_double,c_double,c_double,c_double,c_double,
+                                            POINTER(c_double),POINTER(c_int)]
+            probe.query_white_bear.restype=None
+            values=(c_double*12)();number=c_int()
+            probe.query_white_bear(request['temperature'],request['eps_divk'],request['eta'],
+                                   request['r_star'],request['r_star_t'],request['r_star_tt'],
+                                   values,byref(number))
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=list(map(float,values))[:number.value])),flush=True)
+            continue
         if request['mode']=='LJS_WCA_TERM':
             if probe is None:probe=load_probe()
             probe.query_ljs_wca_term.argtypes=[c_int,c_double,c_double,POINTER(c_double),POINTER(c_int)]

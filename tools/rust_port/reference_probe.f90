@@ -1203,6 +1203,39 @@ subroutine query_ljs_wca_term(index,t_star,rho_star,values,count) &
   count = 1
 end subroutine query_ljs_wca_term
 
+! Evaluate the cavity terms of the White Bear reference of the original.
+subroutine query_white_bear(temperature,eps_divk,eta,r_star,r_star_t,r_star_tt,values,count) &
+     bind(C,name='query_white_bear')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use hardsphere_wca, only: cavity_distribution_function, lj_boltzmann_factor, &
+       minimum_r_cavity_int_LJ
+  implicit none
+  real(c_double), value :: temperature, eps_divk, eta, r_star, r_star_t, r_star_tt
+  real(c_double), intent(out) :: values(12)
+  integer(c_int), intent(out) :: count
+  ! Locals
+  real :: r_min, r_min_t, r_min_tt
+  real :: y_hs, y_hs_e, y_hs_ee, y_hs_t, y_hs_tt, y_hs_et
+  real :: e_lj, e_lj_t, e_lj_tt
+  call minimum_r_cavity_int_LJ(temperature,eps_divk,r_min,r_min_t,r_min_tt)
+  call cavity_distribution_function(eta,r_star,r_star_t,r_star_tt,y_hs,y_hs_e,y_hs_ee, &
+       y_hs_t,y_hs_tt,y_hs_et)
+  call lj_boltzmann_factor(r_star,r_star_t,r_star_tt,temperature,eps_divk,e_lj,e_lj_t,e_lj_tt)
+  values(1) = r_min
+  values(2) = r_min_t
+  values(3) = r_min_tt
+  values(4) = y_hs
+  values(5) = y_hs_e
+  values(6) = y_hs_ee
+  values(7) = y_hs_t
+  values(8) = y_hs_tt
+  values(9) = y_hs_et
+  values(10) = e_lj
+  values(11) = e_lj_t
+  values(12) = e_lj_tt
+  count = 12
+end subroutine query_white_bear
+
 ! Evaluate the nodes and the weights of a quadrature of the original.
 subroutine query_quadrature(quad,values,count) bind(C,name='query_quadrature')
   use, intrinsic :: iso_c_binding, only: c_int,c_double

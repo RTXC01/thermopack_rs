@@ -28,6 +28,7 @@ pub mod excess_gibbs;
 pub mod excess_gibbs_data;
 pub mod flash;
 pub mod fmt;
+pub mod hardsphere_wca;
 pub mod helmholtz;
 mod hydrogen;
 pub mod hyperdual;

@@ -197,11 +197,35 @@ the exact-source library. The reference probe calls the original
 The committed fixture is `tests/fixtures/ljs_wca_term.csv`; the test is
 `tests/ljs_wca.rs`.
 
+## The cavity terms of the White Bear reference
+
+The White Bear family adds the cavity of the hard-sphere reference and the soft
+repulsion of the model. The source evaluates the radius of the minimum of the
+cavity integral, the cavity correlation function of the hard spheres with its
+derivatives and the Boltzmann factor of the Lennard-Jones potential with its
+derivatives. The native module `hardsphere_wca` evaluates the same
+quantities.
+
+`tools/rust_port/validate_white_bear.py` compares the native terms against the
+exact-source library. The reference probe calls the original
+`minimum_r_cavity_int_LJ`, `cavity_distribution_function` and
+`lj_boltzmann_factor`.
+
+* 5 cases: the temperature, the well depth, the packing fraction and the
+  reduced separation, on both sides of the packing fraction of 0.52 where the
+  source changes the correlation.
+* The compared quantities are the twelve values of the three routines. All 5
+  cases match with a relative 1e-11, and the observed worst relative difference
+  is 1.6e-14.
+
+The committed fixture is `tests/fixtures/white_bear.csv`; the test is
+`tests/white_bear.rs`.
+
 ## Remaining scope
 
-* The White Bear model of the source, with its hard-sphere reference, its
-  cavity term and its soft repulsion, is not yet ported, and the native model
-  provides the perturbation terms only.
+* The cavity integral of the source, and with it the soft repulsion of the
+  White Bear model, is not yet ported, and the native model provides the
+  perturbation terms and the cavity terms only.
 
 * The volume solve of the model is native. The pressure of the model falls
   with the molar volume over parts of the range, because the source scales the

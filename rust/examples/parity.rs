@@ -105,6 +105,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             && fields[0] != "LJSVOLUME"
             && fields[0] != "LJSPOT"
             && fields[0] != "LJSWCATERM"
+            && fields[0] != "WHITEBEAR"
             && fields[0] != "QUAD"
             && fields[0] != "CRITICAL"
             && fields.len() != 6
@@ -203,6 +204,43 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .collect();
             text.push(format!("{integral:.17e}"));
             text.push(format!("{differential:.17e}"));
+            println!("{}", text.join(","));
+            continue;
+        }
+        if fields[0] == "WHITEBEAR" {
+            let temperature: f64 = fields[1].parse().unwrap();
+            let eps_divk: f64 = fields[2].parse().unwrap();
+            let eta: f64 = fields[3].parse().unwrap();
+            let r_star: f64 = fields[4].parse().unwrap();
+            let r_star_t: f64 = fields[5].parse().unwrap();
+            let r_star_tt: f64 = fields[6].parse().unwrap();
+            let (r_min, r_min_t, r_min_tt) =
+                thermopack_rs::hardsphere_wca::minimum_cavity_radius(temperature, eps_divk);
+            let distribution = thermopack_rs::hardsphere_wca::cavity_distribution_function(
+                eta, r_star, r_star_t, r_star_tt,
+            );
+            let (e, e_t, e_tt) = thermopack_rs::hardsphere_wca::lj_boltzmann_factor(
+                r_star,
+                r_star_t,
+                r_star_tt,
+                temperature,
+                eps_divk,
+            );
+            let values = [
+                r_min,
+                r_min_t,
+                r_min_tt,
+                distribution.value,
+                distribution.packing_fraction,
+                distribution.packing_fraction_second,
+                distribution.temperature,
+                distribution.temperature_second,
+                distribution.packing_fraction_temperature,
+                e,
+                e_t,
+                e_tt,
+            ];
+            let text: Vec<String> = values.iter().map(|value| format!("{value:.17e}")).collect();
             println!("{}", text.join(","));
             continue;
         }

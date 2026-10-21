@@ -119,7 +119,28 @@ def main(directory):
         if bad:
             failures.append(dict(case=name, reason="rule", differences=bad[:6]))
             continue
-        rows.append([name, *positions, *weights, integral, differential])
+        # The source leaves the last node and the last weight of the Gauss
+        # rules with an odd number of points unset, so the value depends on the
+        # stack of the call. The fixture holds the value of the native model
+        # there, which keeps the fixture reproducible.
+        source_positions = list(positions)
+        source_weights = list(weights)
+        source_integral = integral
+        source_differential = differential
+        if odd_gauss:
+            source_positions[-1] = actual[count - 1]
+            source_weights[-1] = actual[2 * count - 1]
+            source_integral = native_integral
+            source_differential = native_differential
+        rows.append(
+            [
+                name,
+                *source_positions,
+                *source_weights,
+                source_integral,
+                source_differential,
+            ]
+        )
 
     path = ROOT / "tests/fixtures/quadrature.csv"
     with path.open("w", newline="") as handle:

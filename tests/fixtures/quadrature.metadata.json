@@ -132,7 +132,7 @@
   "cases": 14,
   "attempted_cases": 14,
   "generator": "tools/rust_port/validate_quadrature.py",
-  "fixture_sha256": "2625c89361fdea1022a88f2ae5fe65bc050bea4c0abe4266bde27a9202b61f39",
+  "fixture_sha256": "2efc70c5bf130e07daabfcf1eb7d9bb181ea53b858e4696a18c0898c585673aa",
   "relative_tolerance": 1e-13,
   "absolute_tolerance": 1e-14,
   "worst_relative_difference": 3.330669073875471e-16,

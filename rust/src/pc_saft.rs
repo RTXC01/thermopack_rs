@@ -1056,6 +1056,34 @@ impl<'a> PreparedPcSaft<'a> {
         1.0 / (1.0 + self.m_bar * o1 + (1.0 - self.m_bar) * o2)
     }
 
+    /// The derivative of the coefficient of the dispersion term with respect to
+    /// the packing fraction.
+    fn dispersion_c1_eta(&self, eta: f64) -> f64 {
+        let e2 = eta * eta;
+        let e3 = e2 * eta;
+        let c1 = self.dispersion_c1(eta);
+        let o1_eta = (-4.0 * e2 + 20.0 * eta + 8.0) / (1.0 - eta).powi(5);
+        let o2_eta =
+            (2.0 * e3 + 12.0 * e2 - 48.0 * eta + 40.0) / (((1.0 - eta) * (2.0 - eta)).powi(3));
+        -(self.m_bar * o1_eta + (1.0 - self.m_bar) * o2_eta) * c1 * c1
+    }
+
+    /// The second derivative of the coefficient of the dispersion term with
+    /// respect to the packing fraction.
+    fn dispersion_c1_etaeta(&self, eta: f64) -> f64 {
+        let e2 = eta * eta;
+        let e3 = e2 * eta;
+        let c1 = self.dispersion_c1(eta);
+        let c1_eta = self.dispersion_c1_eta(eta);
+        let o1_etaeta = ((-8.0 * eta + 20.0) * (1.0 - eta) + (-4.0 * e2 + 20.0 * eta + 8.0) * 5.0)
+            / (1.0 - eta).powi(6);
+        let o2_etaeta = ((6.0 * e2 + 24.0 * eta - 48.0) * (1.0 - eta) * (2.0 - eta)
+            + (2.0 * e3 + 12.0 * e2 - 48.0 * eta + 40.0) * (3.0 - 2.0 * eta) * 3.0)
+            / (((1.0 - eta) * (2.0 - eta)).powi(4));
+        2.0 * c1_eta * c1_eta / c1
+            - (self.m_bar * o1_etaeta + (1.0 - self.m_bar) * o2_etaeta) * c1 * c1
+    }
+
     fn d_alpha_dispersion_drho(&self, _rho: f64, eta: f64) -> f64 {
         let (i1, i2) = self.dispersion_i1_i2(eta);
         let mut i1_eta = 0.0;
@@ -1295,27 +1323,9 @@ impl<'a> PreparedPcSaft<'a> {
             eta_k2 *= eta;
         }
 
-        let e2 = eta * eta;
-        let e3 = e2 * eta;
-        let e4 = e2 * e2;
-        let o1 = (8.0 * eta - 2.0 * e2) / (1.0 - eta).powi(4);
-        let o2 =
-            (20.0 * eta - 27.0 * e2 + 12.0 * e3 - 2.0 * e4) / (((1.0 - eta) * (2.0 - eta)).powi(2));
-        let c1 = 1.0 / (1.0 + self.m_bar * o1 + (1.0 - self.m_bar) * o2);
-
-        let o1_eta = (-4.0 * e2 + 20.0 * eta + 8.0) / (1.0 - eta).powi(5);
-        let o2_eta =
-            (2.0 * e3 + 12.0 * e2 - 48.0 * eta + 40.0) / (((1.0 - eta) * (2.0 - eta)).powi(3));
-        let c1_eta = -(self.m_bar * o1_eta + (1.0 - self.m_bar) * o2_eta) * c1 * c1;
-
-        let o1_etaeta = ((-8.0 * eta + 20.0) * (1.0 - eta) + (-4.0 * e2 + 20.0 * eta + 8.0) * 5.0)
-            / (1.0 - eta).powi(6);
-        let o2_etaeta = ((6.0 * e2 + 24.0 * eta - 48.0) * (1.0 - eta) * (2.0 - eta)
-            + (2.0 * e3 + 12.0 * e2 - 48.0 * eta + 40.0) * (3.0 - 2.0 * eta) * 3.0)
-            / (((1.0 - eta) * (2.0 - eta)).powi(4));
-
-        let c1_etaeta = 2.0 * c1_eta * c1_eta / c1
-            - (self.m_bar * o1_etaeta + (1.0 - self.m_bar) * o2_etaeta) * c1 * c1;
+        let c1 = self.dispersion_c1(eta);
+        let c1_eta = self.dispersion_c1_eta(eta);
+        let c1_etaeta = self.dispersion_c1_etaeta(eta);
 
         // eta_T derivative
         let mut sum_eta_t = 0.0;
@@ -1376,17 +1386,49 @@ impl<'a> PreparedPcSaft<'a> {
         (adisp, adisp_rho, adisp_rhorho, adisp_t, adisp_rhot)
     }
 
-    fn dispersion_tt_derivative(&self, rho: f64, _eta: f64) -> f64 {
-        // High-precision finite difference for 2nd temperature derivative of dispersion
-        let h = 1e-4 * self.temperature;
-        let prep_p =
-            PreparedPcSaft::new(self.model, self.temperature + h, &self.mole_fractions).unwrap();
-        let prep_m =
-            PreparedPcSaft::new(self.model, self.temperature - h, &self.mole_fractions).unwrap();
-        let a_p = prep_p.alpha_dispersion(rho, prep_p.packing_fraction(rho));
-        let a_0 = self.alpha_dispersion(rho, self.packing_fraction(rho));
-        let a_m = prep_m.alpha_dispersion(rho, prep_m.packing_fraction(rho));
-        (a_p - 2.0 * a_0 + a_m) / (h * h)
+    /// The second temperature derivative of the dispersion term.
+    ///
+    /// The term is a function of the packing fraction and of the mean segment
+    /// numbers, so the chain rule of the packing fraction and of the mean
+    /// segment numbers applies.
+    fn dispersion_tt_derivative(&self, rho: f64, eta: f64) -> f64 {
+        let (i1, i2) = self.dispersion_i1_i2(eta);
+        let mut i1_eta = 0.0;
+        let mut i2_eta = 0.0;
+        let mut eta_k1 = 1.0;
+        for k in 1..7 {
+            i1_eta += (k as f64) * self.a_disp[k] * eta_k1;
+            i2_eta += (k as f64) * self.b_disp[k] * eta_k1;
+            eta_k1 *= eta;
+        }
+        let mut i1_etaeta = 0.0;
+        let mut i2_etaeta = 0.0;
+        let mut eta_k2 = 1.0;
+        for k in 2..7 {
+            i1_etaeta += (k * (k - 1)) as f64 * self.a_disp[k] * eta_k2;
+            i2_etaeta += (k * (k - 1)) as f64 * self.b_disp[k] * eta_k2;
+            eta_k2 *= eta;
+        }
+
+        let c1 = self.dispersion_c1(eta);
+        let c1_eta = self.dispersion_c1_eta(eta);
+        let c1_etaeta = self.dispersion_c1_etaeta(eta);
+
+        let eta_t = self.packing_fraction_t_derivative(rho);
+        let eta_tt = self.packing_fraction_tt_derivative(rho);
+
+        let f_eta = 2.0 * i1_eta * self.m2e1s3_val
+            + self.m_bar * (c1_eta * i2 + c1 * i2_eta) * self.m2e2s3_val;
+        let f_etaeta = 2.0 * i1_etaeta * self.m2e1s3_val
+            + self.m_bar
+                * (c1_etaeta * i2 + 2.0 * c1_eta * i2_eta + c1 * i2_etaeta)
+                * self.m2e2s3_val;
+        let f_eta_t =
+            2.0 * i1_eta * self.m2e1s3_t + self.m_bar * (c1_eta * i2 + c1 * i2_eta) * self.m2e2s3_t;
+        let f_tt = 2.0 * i1 * self.m2e1s3_tt + self.m_bar * c1 * i2 * self.m2e2s3_tt;
+
+        let second = f_etaeta * eta_t * eta_t + f_eta * eta_tt + 2.0 * f_eta_t * eta_t + f_tt;
+        -(std::f64::consts::PI * N_AVOGADRO * rho) * second
     }
 
     fn helmholtz_fn_derivatives(&self, v: f64, n: &[f64]) -> Vec<f64> {

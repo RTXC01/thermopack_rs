@@ -298,17 +298,13 @@ on the host of the tables above.
 |---|---:|
 | Pressure, pure fluid | 42 |
 | Pressure, mixture | 126 |
-| State, pure fluid | 2328 |
-| State, mixture | 8711 |
+| State, pure fluid | 697 |
+| State, mixture | 7054 |
 | Chain term of the hard-sphere model, mixture | 3007 |
 
 The pressure of the model is the hot path of the flash, and it needs 42
 nanoseconds for a pure fluid and 126 nanoseconds for a mixture. The state of
-the model delivers the caloric properties, and it is dominated by the finite
-differences of the pressure derivatives and of the second temperature
-derivative of the dispersion term, which prepare the model twice per
-derivative. The analytic derivatives of those paths are the next target of the
-work on the model.
+the model delivers the caloric properties.
 
 The temperature derivative of the hard-chain contribution of a mixture follows
 the chain rule of the hard-sphere model of Boublik, which needs the packing
@@ -321,8 +317,11 @@ functions `bmcsl::packing_moments`,
 the pure fluid uses the packing fraction of the simplified model, which is
 exact for a pure fluid, and needs 4237 nanoseconds.
 
-The pressure derivatives of the model are analytic now, which drops the state
-of the pure fluid to 2328 nanoseconds per evaluation and the state of the
-mixture to 8711 nanoseconds. The remaining cost of the state is the finite
-difference of the second temperature derivative of the dispersion term, which
-prepares the model twice.
+The pressure derivatives of the model are analytic now, and the second
+temperature derivative of the dispersion term follows the chain rule of the
+packing fraction and of the mean segment numbers as well. The state of the
+pure fluid drops to 697 nanoseconds per evaluation.
+
+The state of a mixture needs 7054 nanoseconds per evaluation. The remaining
+cost is the finite difference of the mole number derivatives of the residual
+Helmholtz energy, which prepares the model twice per component.

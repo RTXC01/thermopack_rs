@@ -112,6 +112,10 @@ mixing rules in the second mole derivatives of the fugacity.
 
 The original offers the rule also for the cubic part of the cubic
 association model, `cbMixWSCPA`, and for the combination of the
-Huron-Vidal and the Wong-Sandler rules, `cbMixHVWongSandler`. The native
-library offers the rule for the cubic equation of state only.
+Huron-Vidal and the Wong-Sandler rules, `cbMixHVWongSandler`. The three
+variants of the original share the routine `WongSandlerMix` and differ in the
+excess Gibbs model of the infinite pressure limit, which the rule consumes:
+the parameters of the rule for `cbMixWongSandler` and `cbMixWSCPA`, the
+Huron-Vidal model for `cbMixHVWongSandler`. The native library offers the
+rule for the cubic equation of state with the parameters of the rule only.
 

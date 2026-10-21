@@ -339,9 +339,180 @@ pub fn pair_correlation(
     }
 }
 
+/// The reduced Helmholtz energy of the additive hard-sphere model and its
+/// derivatives with respect to the packing fractions.
+///
+/// The expression and its derivatives follow the original
+/// `src/hardsphere_bmcsl.f90:calc_bmcsl_dalpha_dzeta`, which the original
+/// keeps private.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct HardSphereEnergy {
+    /// The reduced Helmholtz energy of the mixture.
+    pub value: f64,
+    /// The first derivatives with respect to the packing fractions.
+    pub dzeta: [f64; 4],
+    /// The second derivatives with respect to the packing fractions.
+    pub d2zeta: [[f64; 4]; 4],
+}
+
+/// The reduced Helmholtz energy of the additive hard-sphere model.
+///
+/// `zeta` holds the packing fractions of the mixture, from the zeroth to the
+/// third order.
+pub fn boublik_helmholtz_energy(zeta: [f64; 4]) -> HardSphereEnergy {
+    let zeta_0 = zeta[0];
+    let zeta_1 = zeta[1];
+    let zeta_2 = zeta[2];
+    let zeta_3 = zeta[3];
+
+    let prefactor = 1.0 / zeta_0;
+    let en_m_zeta_3 = 1.0 - zeta_3;
+    let ln_term = en_m_zeta_3.abs().ln();
+
+    let value = prefactor
+        * (3.0 * zeta_1 * zeta_2 / en_m_zeta_3
+            + zeta_2.powi(3) / (zeta_3 * en_m_zeta_3.powi(2))
+            + (zeta_2.powi(3) / zeta_3.powi(2) - zeta_0) * ln_term);
+
+    // The first order derivatives with respect to the packing fractions.
+    let dzeta = [
+        -prefactor * (value + ln_term),
+        prefactor * 3.0 * zeta_2 / en_m_zeta_3,
+        prefactor
+            * (3.0 * zeta_1 / en_m_zeta_3
+                + 3.0 * zeta_2.powi(2) / (zeta_3 * en_m_zeta_3.powi(2))
+                + 3.0 * zeta_2.powi(2) / zeta_3.powi(2) * ln_term),
+        prefactor
+            * (3.0 * zeta_1 * zeta_2 / en_m_zeta_3.powi(2)
+                + zeta_2.powi(3) * (3.0 * zeta_3 - 1.0) / (zeta_3.powi(2) * en_m_zeta_3.powi(3))
+                - 2.0 * zeta_2.powi(3) / zeta_3.powi(3) * ln_term
+                - (zeta_2.powi(3) - zeta_0 * zeta_3.powi(2)) / (zeta_3.powi(2) * en_m_zeta_3)),
+    ];
+
+    // The second order derivatives with respect to the packing fractions.
+    let mut d2zeta = [[0.0; 4]; 4];
+    d2zeta[0][0] = prefactor * prefactor * (2.0 * value + 2.0 * ln_term);
+    d2zeta[1][1] = 0.0;
+    d2zeta[2][2] =
+        (prefactor * 6.0 * zeta_2 / zeta_3) * (1.0 / en_m_zeta_3.powi(2) + ln_term / zeta_3);
+    d2zeta[3][3] = prefactor
+        * (6.0 * zeta_1 * zeta_2 / en_m_zeta_3.powi(3)
+            + 3.0 * zeta_2.powi(3) / (zeta_3.powi(2) * en_m_zeta_3.powi(3))
+            + 3.0 * zeta_2.powi(3) * (3.0 * zeta_3 - 1.0) / (zeta_3.powi(2) * en_m_zeta_3.powi(4))
+            - 2.0 * zeta_2.powi(3) * (3.0 * zeta_3 - 1.0) / (zeta_3.powi(3) * en_m_zeta_3.powi(3))
+            + 2.0 * zeta_2.powi(3) / (zeta_3.powi(3) * en_m_zeta_3)
+            + 6.0 * zeta_2.powi(3) * ln_term / zeta_3.powi(4)
+            + 2.0 * zeta_0 * zeta_3 / (zeta_3.powi(2) * en_m_zeta_3)
+            + 2.0 * (zeta_2.powi(3) - zeta_0 * zeta_3.powi(2)) / (zeta_3.powi(3) * en_m_zeta_3)
+            - (zeta_2.powi(3) - zeta_0 * zeta_3.powi(2)) / (zeta_3.powi(2) * en_m_zeta_3.powi(2)));
+    d2zeta[0][1] = -prefactor * dzeta[1];
+    d2zeta[1][0] = d2zeta[0][1];
+    d2zeta[0][2] = -prefactor * dzeta[2];
+    d2zeta[2][0] = d2zeta[0][2];
+    d2zeta[0][3] = -prefactor * (dzeta[3] - 1.0 / en_m_zeta_3);
+    d2zeta[3][0] = d2zeta[0][3];
+    d2zeta[1][2] = 3.0 * prefactor / en_m_zeta_3;
+    d2zeta[2][1] = d2zeta[1][2];
+    d2zeta[2][3] = prefactor
+        * (3.0 * zeta_1 / en_m_zeta_3.powi(2)
+            + 3.0 * zeta_2.powi(2) * (3.0 * zeta_3 - 1.0) / (zeta_3.powi(2) * en_m_zeta_3.powi(3))
+            - 6.0 * zeta_2.powi(2) / zeta_3.powi(3) * ln_term
+            - 3.0 * zeta_2.powi(2) / (zeta_3.powi(2) * en_m_zeta_3));
+    d2zeta[3][2] = d2zeta[2][3];
+    d2zeta[1][3] = dzeta[1] / en_m_zeta_3;
+    d2zeta[3][1] = d2zeta[1][3];
+
+    HardSphereEnergy {
+        value,
+        dzeta,
+        d2zeta,
+    }
+}
+
+/// The reduced Helmholtz energy of the hard-sphere mixture and its
+/// derivatives with respect to the temperature, the volume and the mole
+/// numbers.
+///
+/// The chain rule is the one of the original
+/// `src/hardsphere_bmcsl.f90:calc_bmcsl_helmholtzenergy`.
+#[derive(Debug, Clone)]
+pub struct HardSphereEnergyDerivatives {
+    /// The reduced Helmholtz energy of the mixture.
+    pub value: f64,
+    /// The temperature derivative of the reduced Helmholtz energy.
+    pub d_t: f64,
+    /// The volume derivative of the reduced Helmholtz energy.
+    pub d_v: f64,
+    /// The mole number derivatives of the reduced Helmholtz energy.
+    pub d_n: Vec<f64>,
+    /// The second temperature derivative of the reduced Helmholtz energy.
+    pub d_tt: f64,
+    /// The temperature and volume derivative of the reduced Helmholtz energy.
+    pub d_tv: f64,
+    /// The temperature and mole number derivatives of the reduced Helmholtz
+    /// energy.
+    pub d_tn: Vec<f64>,
+    /// The second volume derivative of the reduced Helmholtz energy.
+    pub d_vv: f64,
+    /// The volume and mole number derivatives of the reduced Helmholtz energy.
+    pub d_vn: Vec<f64>,
+    /// The second mole number derivatives of the reduced Helmholtz energy.
+    pub d_nn: Vec<Vec<f64>>,
+}
+
+/// The reduced Helmholtz energy of the hard-sphere mixture.
+///
+/// `packing` holds the packing fractions of the mixture with their
+/// derivatives.
+pub fn hard_sphere_energy(packing: &PackingFractions) -> HardSphereEnergyDerivatives {
+    let nc = packing.nc;
+    let energy = boublik_helmholtz_energy(packing.zet);
+    let dalpha = energy.dzeta;
+    let d2alpha = energy.d2zeta;
+
+    let mut d_n = vec![0.0; nc];
+    let mut d_tn = vec![0.0; nc];
+    let mut d_vn = vec![0.0; nc];
+    let mut d_nn = vec![vec![0.0; nc]; nc];
+    for component in 0..nc {
+        let zet_n = packing.zet_n[component];
+        let zet_vn = packing.zet_vn[component];
+        let zet_tn = packing.zet_tn[component];
+
+        d_n[component] = dot4(&dalpha, &zet_n);
+        d_vn[component] = dot4(&dalpha, &zet_vn) + double_sum4(&d2alpha, &packing.zet_v, &zet_n);
+        d_tn[component] = dot4(&dalpha, &zet_tn) + double_sum4(&d2alpha, &packing.zet_t, &zet_n);
+        for (other, entry) in d_nn[component].iter_mut().enumerate() {
+            *entry = double_sum4(&d2alpha, &zet_n, &packing.zet_n[other]);
+        }
+    }
+
+    HardSphereEnergyDerivatives {
+        value: energy.value,
+        d_t: dot4(&dalpha, &packing.zet_t),
+        d_v: dot4(&dalpha, &packing.zet_v),
+        d_n,
+        d_tt: dot4(&dalpha, &packing.zet_tt)
+            + double_sum4(&d2alpha, &packing.zet_t, &packing.zet_t),
+        d_tv: dot4(&dalpha, &packing.zet_tv)
+            + double_sum4(&d2alpha, &packing.zet_t, &packing.zet_v),
+        d_tn,
+        d_vv: dot4(&dalpha, &packing.zet_vv)
+            + double_sum4(&d2alpha, &packing.zet_v, &packing.zet_v),
+        d_vn,
+        d_nn,
+    }
+}
+
 /// The scalar product of two vectors of the chain rule.
 fn dot(left: &[f64; 3], right: &[f64; 3]) -> f64 {
     left[0] * right[0] + left[1] * right[1] + left[2] * right[2]
+}
+
+/// The scalar product of two vectors of the chain rule of the packing
+/// fractions.
+fn dot4(left: &[f64; 4], right: &[f64; 4]) -> f64 {
+    left[0] * right[0] + left[1] * right[1] + left[2] * right[2] + left[3] * right[3]
 }
 
 /// The double sum of the second derivatives of the chain rule.
@@ -349,6 +520,18 @@ fn double_sum(second: &[[f64; 3]; 3], left: &[f64; 3], right: &[f64; 3]) -> f64 
     let mut sum = 0.0;
     for l in 0..3 {
         for k in 0..3 {
+            sum += second[l][k] * left[l] * right[k];
+        }
+    }
+    sum
+}
+
+/// The double sum of the second derivatives of the chain rule of the packing
+/// fractions.
+fn double_sum4(second: &[[f64; 4]; 4], left: &[f64; 4], right: &[f64; 4]) -> f64 {
+    let mut sum = 0.0;
+    for l in 0..4 {
+        for k in 0..4 {
             sum += second[l][k] * left[l] * right[k];
         }
     }
@@ -431,6 +614,113 @@ mod tests {
         let packing = packing_fractions(volume, moles, &diameters, &SEGMENTS);
         let mu = diameters.reduced_diameter(i, j);
         boublik_pair_correlation(packing.zet[2], packing.zet[3], mu.value).value
+    }
+
+    /// The reduced Helmholtz energy of the hard-sphere mixture of the test.
+    fn energy(temperature: f64, volume: f64, moles: &[f64]) -> f64 {
+        let diameters = diameters(temperature);
+        let packing = packing_fractions(volume, moles, &diameters, &SEGMENTS);
+        boublik_helmholtz_energy(packing.zet).value
+    }
+
+    /// The chain rule of the reduced Helmholtz energy of the hard-sphere
+    /// mixture is checked against a central difference of the expression.
+    /// The chain rule of the reduced Helmholtz energy of the hard-sphere
+    /// mixture is checked against a central difference of the expression.
+    #[test]
+    fn the_energy_chain_rule_matches_the_difference_quotient() {
+        let temperature = 300.0;
+        let volume = 1.0e-3;
+        let moles = [0.05, 0.05];
+
+        let diameters = diameters(temperature);
+        let packing = packing_fractions(volume, &moles, &diameters, &SEGMENTS);
+        let value = hard_sphere_energy(&packing);
+
+        let step_t = temperature * 1.0e-5;
+        let step_v = volume * 1.0e-5;
+        let step_n = moles[0] * 1.0e-5;
+
+        let quotient_t = (energy(temperature + step_t, volume, &moles)
+            - energy(temperature - step_t, volume, &moles))
+            / (2.0 * step_t);
+        assert_close(quotient_t, value.d_t, 1.0e-6, "the temperature derivative");
+
+        let quotient_v = (energy(temperature, volume + step_v, &moles)
+            - energy(temperature, volume - step_v, &moles))
+            / (2.0 * step_v);
+        assert_close(quotient_v, value.d_v, 1.0e-6, "the volume derivative");
+
+        for component in 0..2 {
+            let mut up = moles;
+            let mut down = moles;
+            up[component] += step_n;
+            down[component] -= step_n;
+            let quotient = (energy(temperature, volume, &up) - energy(temperature, volume, &down))
+                / (2.0 * step_n);
+            assert_close(
+                quotient,
+                value.d_n[component],
+                1.0e-6,
+                "the mole number derivative",
+            );
+        }
+
+        let step_t = temperature * 1.0e-3;
+        let step_v = volume * 1.0e-3;
+        let step_n = moles[0] * 1.0e-3;
+
+        let quotient_tt = (energy(temperature + step_t, volume, &moles)
+            - 2.0 * energy(temperature, volume, &moles)
+            + energy(temperature - step_t, volume, &moles))
+            / (step_t * step_t);
+        assert_close(
+            quotient_tt,
+            value.d_tt,
+            1.0e-4,
+            "the second temperature derivative",
+        );
+
+        let quotient_vv = (energy(temperature, volume + step_v, &moles)
+            - 2.0 * energy(temperature, volume, &moles)
+            + energy(temperature, volume - step_v, &moles))
+            / (step_v * step_v);
+        assert_close(
+            quotient_vv,
+            value.d_vv,
+            1.0e-4,
+            "the second volume derivative",
+        );
+
+        for component in 0..2 {
+            let mut up = moles;
+            let mut down = moles;
+            up[component] += step_n;
+            down[component] -= step_n;
+            let quotient_tn = (energy(temperature + step_t, volume, &up)
+                - energy(temperature + step_t, volume, &down)
+                - energy(temperature - step_t, volume, &up)
+                + energy(temperature - step_t, volume, &down))
+                / (4.0 * step_t * step_n);
+            assert_close(
+                quotient_tn,
+                value.d_tn[component],
+                1.0e-4,
+                "the temperature and mole number derivative",
+            );
+
+            let quotient_vn = (energy(temperature, volume + step_v, &up)
+                - energy(temperature, volume + step_v, &down)
+                - energy(temperature, volume - step_v, &up)
+                + energy(temperature, volume - step_v, &down))
+                / (4.0 * step_v * step_n);
+            assert_close(
+                quotient_vn,
+                value.d_vn[component],
+                1.0e-4,
+                "the volume and mole number derivative",
+            );
+        }
     }
 
     /// The chain rule of the pair correlation function is checked against a

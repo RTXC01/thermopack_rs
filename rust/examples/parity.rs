@@ -420,12 +420,39 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .split(',')
                 .map(|value| value.parse().unwrap())
                 .collect();
-            let model = thermopack_rs::Cubic::new(kind, &components)?;
-            let point = thermopack_rs::critical::critical_point(&model, &composition)?;
-            println!(
-                "{:.17e},{:.17e},{:.17e}",
-                point.temperature, point.volume, point.pressure
-            );
+            let config = fields.get(4).copied().unwrap_or("classic");
+            let ws = thermopack_rs::wong_sandler::WongSandlerData::new(components.len());
+            let model = thermopack_rs::Cubic::with_options(
+                kind,
+                &components,
+                thermopack_rs::CubicOptions {
+                    volume_translation: config == "translated",
+                    wong_sandler: (config == "ws").then_some(&ws),
+                    mixing_rule: if config == "ws" {
+                        thermopack_rs::MixingRule::WongSandler
+                    } else {
+                        thermopack_rs::MixingRule::VdW
+                    },
+                    ..Default::default()
+                },
+            )?;
+            let result = if fields.len() >= 7 {
+                thermopack_rs::mixture_critical::critical_point_with_guess(
+                    &model,
+                    &composition,
+                    fields[5].parse()?,
+                    fields[6].parse()?,
+                )
+            } else {
+                thermopack_rs::critical::critical_point(&model, &composition)
+            };
+            match result {
+                Ok(point) => println!(
+                    "{:.17e},{:.17e},{:.17e}",
+                    point.temperature, point.volume, point.pressure
+                ),
+                Err(error) => println!("ERROR: {error}"),
+            }
             continue;
         }
         if fields[0] == "LJSPOT" {

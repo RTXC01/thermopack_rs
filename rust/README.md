@@ -140,8 +140,8 @@ The cubic model also carries the curve and the limit families of the source:
 `isolines::isentrope` map the iso-lines, `spinodal::spinodal_point` reports
 the point of the meta stability limit at a given pressure,
 `joule_thompson::inversion_point` reports the inversion temperature at a
-given molar volume, `critical::critical_point` reports the critical point of a
-single component and `Cubic::new_pseudo` builds the equation of state from
+given molar volume, `critical::critical_point` reports a local pure or mixture
+critical point, and `Cubic::new_pseudo` builds the equation of state from
 user supplied critical data. `state.virial_coefficients` reports the second
 and the third virial coefficient. The solid carbon dioxide model carries the
 solid-fluid line in `solid_saturation::solid_co2_saturation`, and the

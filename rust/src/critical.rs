@@ -1,4 +1,4 @@
-//! Critical points of a pure fluid.
+//! Critical points of pure fluids and mixtures.
 //! Ported from `src/critical.f90`.
 //! Copyright thermotools and Contributors. Apache-2.0.
 //!
@@ -12,7 +12,7 @@ use crate::R;
 use crate::cubic::Cubic;
 use crate::error::{Error, Result};
 
-/// A critical point of a pure fluid.
+/// A local critical point at a specified composition.
 #[derive(Debug, Clone, Copy)]
 pub struct CriticalPoint {
     /// Temperature of the critical point in kelvin.
@@ -32,25 +32,25 @@ const STEP: f64 = 1.0e-6;
 /// The relative tolerance of the two conditions.
 const TOLERANCE: f64 = 1.0e-10;
 
-/// The critical point of a pure fluid.
+/// The critical point at a normalized composition.
 ///
-/// The composition holds the mole fractions, which must describe a single
-/// component. The initial guess is the pseudo critical state of the model,
+/// A pure fluid uses the pressure inflection equations. A mixture uses the
+/// Helmholtz stability eigenvalue and third directional derivative; see
+/// [`crate::mixture_critical::critical_point_with_guess`] for explicit seeds.
+/// The initial guess is the pseudo critical state of the model,
 /// and the two conditions of the critical point are solved with a Newton
 /// iteration in the temperature and the molar volume.
 pub fn critical_point(model: &Cubic, composition: &[f64]) -> Result<CriticalPoint> {
-    if composition.len() != model.components().len() {
-        return Err(Error::InvalidInput("composition mismatch"));
-    }
-    let largest = composition
-        .iter()
-        .copied()
-        .fold(f64::NEG_INFINITY, f64::max);
-    let sum: f64 = composition.iter().sum();
-    if composition.len() > 1 && largest != sum {
-        return Err(Error::Unsupported(
-            "the critical point is only ported for a single component",
+    if composition.len() != model.components().len()
+        || composition.iter().any(|&z| !z.is_finite() || z < 0.0)
+        || (composition.iter().sum::<f64>() - 1.0).abs() > 1.0e-10
+    {
+        return Err(Error::InvalidInput(
+            "normalized composition matching the model required",
         ));
+    }
+    if composition.iter().filter(|&&z| z > 0.0).count() > 1 {
+        return crate::mixture_critical::mixture_critical_point(model, composition);
     }
     let guess = model.pseudo_critical(composition)?;
     let mut temperature = guess.temperature;

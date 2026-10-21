@@ -197,7 +197,9 @@ def main(compiler_directory):
         if request['mode']=='CRITICAL':
             eos,comps=request['eos'],request['components']
             from thermopack.cubic import cubic
-            model=cubic(",".join(comps),eos)
+            model=cubic(",".join(comps),'SRK' if eos=='RK' else eos,volume_shift=request.get('volume_shift',False),
+                        mixing=request.get('mixing','vdW'),alpha='RK' if eos=='RK' else 'Classic')
+            previous=None
             model.activate()
             try:
                 temperature,volume,pressure=model.critical(request['feed'],
@@ -208,7 +210,25 @@ def main(compiler_directory):
                 print('THERMOPACK_RESULT='+json.dumps(dict(calculation_error=str(error))),flush=True)
                 continue
             values=[float(temperature),float(volume),float(pressure)]
-            print('THERMOPACK_RESULT='+json.dumps(dict(values=values)),flush=True)
+            diagnostics={}
+            if request.get('stability_diagnostics'):
+                import numpy as np
+                z=np.array(request['feed']);active=np.flatnonzero(z>0)
+                weights=np.sqrt(z[active])
+                hessian=model.fugacity_tv(temperature,volume,z,dlnphidn=True)[1]
+                matrix=hessian[np.ix_(active,active)]*weights[:,None]*weights[None,:]
+                eigenvalues,vectors=np.linalg.eigh(matrix)
+                u=vectors[:,0]
+                if u[np.argmax(abs(u))]<0:u=-u
+                direction=np.zeros(len(z));direction[active]=weights*u
+                step=min([1e-3]+[.1*z[i]/abs(direction[i]) for i in active if direction[i]!=0])
+                def contraction(s):
+                    h=model.fugacity_tv(temperature,volume,z+s*direction,dlnphidn=True)[1]
+                    return sum(direction[i]*h[i,j]*direction[j] for i in active for j in active)
+                third=(contraction(-2*step)-8*contraction(-step)+8*contraction(step)-contraction(2*step))/(12*step)
+                diagnostics=dict(hessian=[float(hessian[i,j]) for i in active for j in active],
+                                 eigenvalue=float(eigenvalues[0]),third_derivative=float(third))
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=values,**diagnostics)),flush=True)
             continue
         if request['mode']=='QUADRATURE':
             if probe is None:probe=load_probe()

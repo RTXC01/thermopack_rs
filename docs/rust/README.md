@@ -148,5 +148,8 @@ The [mixture saturation notes](mixture-saturation.md)
 cover bubble/dew T/P solves, analytic branch slopes, retrograde refinement,
 the source qualification and native-loop measurements.
 
+The [mixture critical notes](mixture-critical.md) cover local Helmholtz stability,
+analytic directional derivatives, pure/zero-component limits and qualification.
+
 Regenerate inventory with
 `python tools/rust_port/inventory.py`.

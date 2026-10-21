@@ -102,6 +102,8 @@ jobs:
       - run: python tools/rust_port/validate_uv_terms.py
       - run: python tools/rust_port/validate_quadrature.py
       - run: python tools/rust_port/validate_critical.py
+      - run: python tools/rust_port/validate_mixture_critical.py
+      - run: python tools/rust_port/benchmark_mixture_critical.py --compiler /usr/bin/gfortran-13 --preflight-only
       - run: python tools/rust_port/validate_mut_solve.py
       - run: python tools/rust_port/validate_hyperdual.py
       - run: python tools/rust_port/validate_solid_water.py

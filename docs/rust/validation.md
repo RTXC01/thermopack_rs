@@ -90,6 +90,7 @@ python tools/rust_port/validate_pcsaft_state.py
 python tools/rust_port/validate_wong_sandler.py
 python tools/rust_port/validate_wong_sandler_state.py
 python tools/rust_port/validate_critical.py
+python tools/rust_port/validate_mixture_critical.py
 python tools/rust_port/validate_mut_solve.py
 python tools/rust_port/validate_hyperdual.py
 ```
@@ -474,3 +475,13 @@ functions of the calculus and their eight components each. All 6 states agree
 with the exact-source library and the largest observed relative difference is
 zero. The third order derivative of the arc tangent reproduces the double
 power that the original writes.
+
+The [mixture critical qualification](mixture-critical.md) adds 198 attempts: all
+197 successful source T/V/P returns match at relative 1e-6 with quantity-specific
+absolute floors; one failed default VDW solve is retained separately. Source
+TV Hessians, minimum eigenvalues and third-direction derivatives qualify the
+local conditions independently of native solved coordinates. Classic PR/SRK/RK/VDW,
+translated PR/SRK, default Wong-Sandler, zero species and up to five components
+are covered. Physical derivative, null-mode, stability crossing, permutation and
+translation tests are independent of the fixture comparisons. Critical loci,
+end points, global stability and other activity Hessians remain pending.

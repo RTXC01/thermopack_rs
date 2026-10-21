@@ -64,8 +64,12 @@ conditions of that matrix are the volume derivatives of the pressure.
 
 The native model, in `critical`, solves the two conditions with a Newton
 iteration in the temperature and the molar volume, starting from the pseudo
-critical state of the model. The Jacobian of the two conditions is a centred
-difference, as the original uses a numerical Jacobian for the mixture.
+critical state of the model. The native pure Jacobian is a centred difference.
+The source mixture solver differentiates its eigenvector and uses perturbed
+composition states; its Jacobian is not the same pure pressure formulation.
+True local mixture critical points are now available through the same public
+function; see [mixture critical points](mixture-critical.md) for their separate
+Helmholtz equations and qualification.
 
 `tools/rust_port/validate_critical.py` compares the native model against the
 exact-source library. The oracle calls the Python interface of the fork,
@@ -128,7 +132,7 @@ The committed fixture is `tests/fixtures/joule_thompson.csv`; the test is
   curve.
 * The limit of a mixture needs the stability matrix of the mixture with its
   eigenvalues, and the native model reports the single component case only.
-* The critical point of a mixture needs the same stability matrix, and the
-  native model reports the critical point of a single component only.
+* Critical loci, critical end points and a global phase-stability classification
+  of mixture critical points remain pending; the local point solve is native.
 * The curve of the Joule-Thomson inversion is not mapped by the native model,
   and it reports a single point instead.

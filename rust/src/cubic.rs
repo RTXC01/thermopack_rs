@@ -161,6 +161,161 @@ pub struct PreparedState<'a> {
 }
 
 impl PreparedState<'_> {
+    // Analytic third composition derivative for classic quadratic mixing.
+    // Only a scalar direction is differentiated; no n*n*n tensor is built.
+    pub(crate) fn critical_third_directional(&self, volume: f64, direction: &[f64]) -> Option<f64> {
+        use crate::hyperdual::HyperDual;
+        if self.model.excess_gibbs.is_some() {
+            return None;
+        }
+        let n = self.composition_slice().len();
+        let mut s = HyperDual::with_order(0.0, 3);
+        s.f1 = 1.0;
+        s.f2 = 1.0;
+        s.f3 = 1.0;
+        let real = |v| HyperDual::with_order(v, 3);
+        let amount = real(1.0) + s * direction.iter().sum::<f64>();
+        let mut d1 = 0.0;
+        let mut d2 = 0.0;
+        let mut b1 = 0.0;
+        let mut b2 = 0.0;
+        let mut shift = 0.0;
+        let mut ideal = real(0.0);
+        for i in 0..n {
+            let zi = self.composition_slice()[i];
+            if zi > 0.0 {
+                let ni = real(zi) + s * direction[i];
+                ideal = ideal + ni * ni.ln();
+            }
+            d1 += 2.0 * direction[i] * self.a_partial_slice()[i];
+            b1 += direction[i] * (self.b_partial_slice()[i] + self.b);
+            shift += direction[i]
+                * self
+                    .translation
+                    .as_ref()
+                    .map_or(0.0, |c| c.components[i].value);
+            let bi = self
+                .beta
+                .as_ref()
+                .map_or(self.model.bi[i], |b| b.components[i].value);
+            for (j, &dj) in direction.iter().enumerate() {
+                let bj = self
+                    .beta
+                    .as_ref()
+                    .map_or(self.model.bi[j], |b| b.components[j].value);
+                b2 += direction[i] * dj * (1.0 - self.model.lij[i * n + j]) * (bi + bj) / 2.0;
+                d2 += direction[i]
+                    * dj
+                    * (1.0 - self.model.kij[i * n + j])
+                    * self.factors().0[i]
+                    * self.factors().0[j];
+            }
+        }
+        let attraction = real(self.a) + s * d1 + s * s * d2;
+        let covolume = (real(self.b) + s * b1 + s * s * b2) / amount;
+        let v = real(self.eos_volume(volume)) + s * shift;
+        let (delta1, delta2) = self.model.kind.deltas();
+        let integral = if delta1 == delta2 {
+            real(1.0) / v
+        } else {
+            ((v + covolume * delta1) / (v + covolume * delta2)).ln()
+                / (covolume * (delta1 - delta2))
+        };
+        Some(
+            (ideal - amount * (v - covolume).ln() - attraction * integral / (R * self.temperature))
+                .f123,
+        )
+    }
+
+    /// Log fugacities (Pa) and their mole derivatives at fixed T and total V.
+    ///
+    /// The state contains one mole, so `volume` is both its molar and total
+    /// volume. `dn` is a row-major n*n Hessian of A/(RT). Unlike TP derivatives,
+    /// this expression remains regular at a mechanical spinodal and permits
+    /// negative pressure. Absent species have log fugacity -infinity and an
+    /// infinite ideal diagonal; their off-diagonal entries remain finite.
+    /// Classic mixing and Wong-Sandler are supported; other activity rules
+    /// still require their attraction composition Hessian.
+    pub fn log_fugacity_tv_into(
+        &self,
+        volume: f64,
+        log_fugacity: &mut [f64],
+        dn: &mut [f64],
+    ) -> Result<()> {
+        let n = self.composition_slice().len();
+        if log_fugacity.len() != n || dn.len() != n * n {
+            return Err(Error::InvalidInput("TV fugacity buffer dimensions"));
+        }
+        if self.model.excess_gibbs.is_some() && self.wong_sandler.is_none() {
+            return Err(Error::Unsupported(
+                "TV attraction Hessian for this activity rule",
+            ));
+        }
+        self.volume_check(volume)?;
+        let v = self.eos_volume(volume);
+        let p = self.eos_pressure(v)?;
+        let rt = R * self.temperature;
+        let free = v - self.b;
+        let (d1, d2) = self.model.kind.deltas();
+        let denom = (v + d1 * self.b) * (v + d2 * self.b);
+        let denom_b = (d1 + d2) * v + 2.0 * d1 * d2 * self.b;
+        let (integral, ib, ibb) = self.attraction_integral_derivatives(v);
+        let pressure_n = |i: usize| {
+            rt / free + rt * self.b_partial_slice()[i] / free.powi(2)
+                - 2.0 * self.a_partial_slice()[i] / denom
+                + self.a * denom_b * self.b_partial_slice()[i] / denom.powi(2)
+        };
+        let shift = |i: usize| {
+            self.translation
+                .as_ref()
+                .map_or(0.0, |c| c.components[i].value)
+        };
+        for i in 0..n {
+            let bi = self.b_partial_slice()[i];
+            let di = 2.0 * self.a_partial_slice()[i];
+            log_fugacity[i] = (self.composition_slice()[i] * rt / free).ln() + bi / free
+                - (di * integral + self.a * ib * bi) / rt
+                - p.value * shift(i) / rt;
+            for j in 0..n {
+                let bj = self.b_partial_slice()[j];
+                let dj = 2.0 * self.a_partial_slice()[j];
+                let (bnn, dnn) = if let Some(ws) = &self.wong_sandler {
+                    (ws.b_ij[i * n + j], ws.a_ij[i * n + j])
+                } else {
+                    let bii = self
+                        .beta
+                        .as_ref()
+                        .map_or(self.model.bi[i], |b| b.components[i].value);
+                    let bjj = self
+                        .beta
+                        .as_ref()
+                        .map_or(self.model.bi[j], |b| b.components[j].value);
+                    let bij = (1.0 - self.model.lij[i * n + j]) * (bii + bjj) / 2.0;
+                    (
+                        2.0 * bij - bi - bj,
+                        2.0 * (1.0 - self.model.kij[i * n + j])
+                            * self.factors().0[i]
+                            * self.factors().0[j],
+                    )
+                };
+                dn[i * n + j] = (bi + bj + bnn) / free + bi * bj / free.powi(2)
+                    - (dnn * integral
+                        + (di * bj + dj * bi) * ib
+                        + self.a * ibb * bi * bj
+                        + self.a * ib * bnn)
+                        / rt
+                    - (shift(i) * pressure_n(j)
+                        + shift(j) * pressure_n(i)
+                        + shift(i) * shift(j) * p.dv)
+                        / rt;
+                if i == j {
+                    dn[i * n + j] += 1.0 / self.composition_slice()[i];
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Number of components of the model.
     #[inline]
     fn count(&self) -> usize {

@@ -145,6 +145,20 @@ impl WongSandlerData {
     }
 }
 
+/// The second mole derivatives of the mixture coefficients of the
+/// Wong-Sandler rule.
+///
+/// The prepared state of the cubic equation of state needs them, because the
+/// classic mixing rules derive the second mole derivatives of the fugacity
+/// from the binary coefficients of the attraction and of the covolume.
+#[derive(Debug, Clone)]
+pub struct PreparedWongSandler {
+    /// The second mole derivatives of the attraction coefficient.
+    pub a_ij: Vec<f64>,
+    /// The second mole derivatives of the covolume coefficient.
+    pub b_ij: Vec<f64>,
+}
+
 /// The mixture coefficients of the Wong-Sandler mixing rule.
 ///
 /// The attraction and the covolume are the extensive coefficients of the

@@ -85,13 +85,33 @@ and the covolume, their temperature derivatives and their mole number
 derivatives, with a worst relative difference of `1.26e-12` against a
 tolerance of `1e-10`.
 
-The fixture `tests/fixtures/wong_sandler.csv` and the test
-`tests/wong_sandler.rs` hold the qualified values.
+`tools/rust_port/validate_wong_sandler_state.py` compares the state of a
+mixture with the rule against the exact source library. The reference probe
+evaluates the pressure with its volume and temperature derivatives, the
+enthalpy, the entropy, the fugacity coefficients and their temperature,
+pressure and mole number derivatives at a molar volume.
+
+The six cases cover the three equations of state with liquid-like and
+gas-like molar volumes, with and without binary interaction parameters and
+with and without the parameters of the second order term. All ninety-six
+values agree, with a worst relative difference of `5.0e-13` against a
+tolerance of `1e-9`.
+
+The fixtures `tests/fixtures/wong_sandler.csv` and
+`tests/fixtures/wong_sandler_state.csv` and the tests
+`tests/wong_sandler.rs` and `tests/wong_sandler_state.rs` hold the qualified
+values.
 
 ## Scope
 
-The port delivers the coefficients of the rule. The state evaluation of the
-cubic equation of state still uses the classic mixing rules, so the pressure,
-the fugacity and the caloric properties of a mixture with the Wong-Sandler
-rule are not yet qualified. The port of the state evaluation and its
-validation against the original are the next step.
+The port delivers the coefficients of the rule and the state of a mixture with
+the rule. The prepared state of the cubic equation of state takes the
+attraction, the covolume and their derivatives from the rule, and the second
+mole derivatives of the rule replace the binary coefficients of the classic
+mixing rules in the second mole derivatives of the fugacity.
+
+The original offers the rule also for the cubic part of the cubic
+association model, `cbMixWSCPA`, and for the combination of the
+Huron-Vidal and the Wong-Sandler rules, `cbMixHVWongSandler`. The native
+library offers the rule for the cubic equation of state only.
+

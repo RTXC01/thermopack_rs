@@ -273,6 +273,31 @@ def main(compiler_directory):
                                      values,byref(number))
             print('THERMOPACK_RESULT='+json.dumps(dict(values=list(map(float,values))[:number.value])),flush=True)
             continue
+        if request['mode']=='WONGSANDLERSTATE':
+            if probe is None:probe=load_probe()
+            key=('WONGSANDLER',request['components'],request.get('eos','PR'))
+            if previous!=key:
+                from thermopack.cubic import cubic
+                model=cubic(request['components'],request.get('eos','PR'),mixing='WongSandler')
+                previous=key
+            model.activate()
+            probe.query_wong_sandler_state.argtypes=[c_double,c_double,POINTER(c_double),
+                                                    POINTER(c_double),POINTER(c_double),
+                                                    POINTER(c_double),POINTER(c_double),
+                                                    POINTER(c_int)]
+            probe.query_wong_sandler_state.restype=None
+            def _padded_state(values):
+                data=list(values)+[0.0]*(16-len(values))
+                return (c_double*16)(*data)
+            composition=_padded_state(request['composition'])
+            kij=_padded_state([request['kij']])
+            tauij=_padded_state([request['tauij']])
+            alpha=_padded_state([request['alpha']])
+            values=(c_double*256)();number=c_int()
+            probe.query_wong_sandler_state(request['temperature'],request['volume'],
+                                          composition,kij,tauij,alpha,values,byref(number))
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=list(map(float,values))[:number.value])),flush=True)
+            continue
         if request['mode']=='CHAIN_RULE':
             if probe is None:probe=load_probe()
             probe.query_chain_rule.argtypes=[POINTER(c_double),POINTER(c_int)]

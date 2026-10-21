@@ -155,6 +155,9 @@ pub struct PreparedState<'a> {
     ai_t: Option<Vec<f64>>,
     beta: Option<crate::beta::PreparedBeta>,
     translation: Option<crate::translation::PreparedTranslation>,
+    /// The second mole derivatives of the mixture coefficients of the
+    /// Wong-Sandler mixing rule.
+    wong_sandler: Option<crate::wong_sandler::PreparedWongSandler>,
 }
 
 impl PreparedState<'_> {
@@ -1183,7 +1186,50 @@ impl Cubic {
         }
         positive(b, "mixture covolume")?;
 
-        let (a, at, att, ai_t) = if let Some(ge) = &self.excess_gibbs {
+        let wong_sandler = self.mixing_rule == crate::excess_gibbs::MixingRule::WongSandler;
+        let mut ai_t = None;
+        let mut prepared_wong_sandler = None;
+        if wong_sandler {
+            // The Wong-Sandler rule replaces the attraction and the covolume
+            // of the mixture with its own coefficients. The partial
+            // attraction parameters of the native library are the half of the
+            // partial derivatives of the original.
+            let coefficients = self.wong_sandler_coefficients(temperature, composition)?;
+            a = coefficients.a;
+            at = coefficients.a_t;
+            att = coefficients.a_tt;
+            for (slot, &ai) in buffer[n..2 * n].iter_mut().zip(coefficients.a_i.iter()) {
+                *slot = 0.5 * ai;
+            }
+            ai_t = Some(coefficients.a_it.iter().map(|&ait| 0.5 * ait).collect());
+            b = coefficients.b;
+            for (slot, &bi) in buffer[2 * n..3 * n].iter_mut().zip(coefficients.b_i.iter()) {
+                *slot = bi;
+            }
+            // The covolume of the rule depends on the temperature. The
+            // carrier of the temperature dependent covolume of the classic
+            // rules holds the derivatives of the covolume and of its partial
+            // derivatives.
+            beta = Some(crate::beta::PreparedBeta {
+                partial_t: coefficients.b_it.clone(),
+                components: coefficients
+                    .b_i
+                    .iter()
+                    .enumerate()
+                    .map(|(index, &value)| crate::BetaValue {
+                        value,
+                        dt: coefficients.b_it[index],
+                        dtt: 0.0,
+                    })
+                    .collect(),
+                dt: coefficients.b_t,
+                dtt: coefficients.b_tt,
+            });
+            prepared_wong_sandler = Some(crate::wong_sandler::PreparedWongSandler {
+                a_ij: coefficients.a_ij,
+                b_ij: coefficients.b_ij,
+            });
+        } else if let Some(ge) = &self.excess_gibbs {
             let mut a_pure = Vec::with_capacity(n);
             let mut da_pure = Vec::with_capacity(n);
             let mut d2a_pure = Vec::with_capacity(n);
@@ -1212,11 +1258,11 @@ impl Cubic {
             for (slot, &ai) in buffer[n..2 * n].iter_mut().zip(jet.da_dni.iter()) {
                 *slot = 0.5 * ai;
             }
-            let ai_t = jet.d2a_dnid_t.iter().map(|&ait| 0.5 * ait).collect();
-            (jet.a_mix, jet.da_dt, jet.d2a_dt2, Some(ai_t))
-        } else {
-            (a, at, att, None)
-        };
+            ai_t = Some(jet.d2a_dnid_t.iter().map(|&ait| 0.5 * ait).collect());
+            a = jet.a_mix;
+            at = jet.da_dt;
+            att = jet.d2a_dt2;
+        }
 
         if !a.is_finite() || !at.is_finite() || !att.is_finite() {
             return Err(Error::InvalidInput("temperature outside numerical range"));
@@ -1264,6 +1310,7 @@ impl Cubic {
             ai_t,
             beta,
             translation,
+            wong_sandler: prepared_wong_sandler,
         })
     }
 }
@@ -1332,20 +1379,27 @@ impl PreparedState<'_> {
             for j in 0..n {
                 let bj = self.b_partial_slice()[j];
                 let dj = 2.0 * self.a_partial_slice()[j];
-                let bii = self
-                    .beta
-                    .as_ref()
-                    .map_or(self.model.bi[i], |b| b.components[i].value);
-                let bjj = self
-                    .beta
-                    .as_ref()
-                    .map_or(self.model.bi[j], |b| b.components[j].value);
-                let bij = (1.0 - self.model.lij[i * n + j]) * (bii + bjj) / 2.0;
-                let bnn = 2.0 * bij - bi - bj;
-                let dnn = 2.0
-                    * (1.0 - self.model.kij[i * n + j])
-                    * self.factors().0[i]
-                    * self.factors().0[j];
+                let (bnn, dnn) = if let Some(ws) = &self.wong_sandler {
+                    // The rule delivers the second mole derivatives of the
+                    // attraction and of the covolume.
+                    (ws.b_ij[i * n + j], ws.a_ij[i * n + j])
+                } else {
+                    let bii = self
+                        .beta
+                        .as_ref()
+                        .map_or(self.model.bi[i], |b| b.components[i].value);
+                    let bjj = self
+                        .beta
+                        .as_ref()
+                        .map_or(self.model.bi[j], |b| b.components[j].value);
+                    let bij = (1.0 - self.model.lij[i * n + j]) * (bii + bjj) / 2.0;
+                    (
+                        2.0 * bij - bi - bj,
+                        2.0 * (1.0 - self.model.kij[i * n + j])
+                            * self.factors().0[i]
+                            * self.factors().0[j],
+                    )
+                };
                 let fnn = (bi + bj + bnn) / free + bi * bj / free.powi(2)
                     - (dnn * integral
                         + (di * bj + dj * bi) * ib

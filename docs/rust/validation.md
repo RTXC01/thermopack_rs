@@ -84,6 +84,7 @@ python tools/rust_port/validate_uv_terms.py
 python tools/rust_port/validate_quadrature.py
 python tools/rust_port/validate_cpa_rdf.py
 python tools/rust_port/validate_wong_sandler.py
+python tools/rust_port/validate_wong_sandler_state.py
 python tools/rust_port/validate_critical.py
 python tools/rust_port/validate_mut_solve.py
 python tools/rust_port/validate_hyperdual.py

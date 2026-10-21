@@ -1612,7 +1612,88 @@ subroutine query_wong_sandler(temperature,composition,kij,tauij,alpha,values,num
     end do
   end select
   numbers = position - 1
-end subroutine query_wong_sandler
+  end subroutine query_wong_sandler
+
+  !> State of a mixture with the Wong-Sandler mixing rule at a molar volume.
+  subroutine query_wong_sandler_state(temperature,volume,composition,kij,tauij,alpha, &
+       values,numbers) bind(C,name='query_wong_sandler_state')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use thermopack_var, only: nc, get_active_eos, base_eos_param
+  use cubic_eos, only: cb_eos, fraction
+  use eostv, only: pressure, thermo_tvp, enthalpy_tvp, entropy_tvp
+  implicit none
+  real(c_double), value :: temperature
+  real(c_double), value :: volume
+  real(c_double), intent(in) :: composition(16), kij(16), tauij(16), alpha(16)
+  real(c_double), intent(out) :: values(256)
+  integer(c_int), intent(out) :: numbers
+  ! Locals
+  class(base_eos_param), pointer :: act_eos_ptr
+  type(fraction) :: frac
+  real :: z(nc)
+  real :: p, dpdv, dpdt, d2pdv2
+  real :: h, s
+  real :: lnfug(nc)
+  real :: dlnfugdt(nc), dlnfugdp(nc), dlnfugdn(nc,nc)
+  integer :: i,j,position
+  act_eos_ptr => get_active_eos()
+  frac%pNum = 0.0
+  frac%pDen = 0.0
+  frac%pDen(1) = 1.0
+  select type(p_eos => act_eos_ptr)
+  class is(cb_eos)
+    do i = 1, nc
+      z(i) = composition(i)
+    end do
+    ! The binary parameters of the pair of the first two components.
+    if (nc >= 2) then
+      frac%pNum(1) = kij(1)
+      p_eos%mixWS%f_kij(1,2) = frac
+      p_eos%mixWS%f_kij(2,1) = frac
+      frac%pNum(1) = tauij(1)
+      p_eos%mixWS%f_tauij(1,2) = frac
+      p_eos%mixWS%f_tauij(2,1) = frac
+      p_eos%mixWS%alphaij(1,2) = alpha(1)
+      p_eos%mixWS%alphaij(2,1) = alpha(1)
+    end if
+    p = pressure(temperature,volume,z,dpdv,dpdt,d2pdv2)
+    call thermo_tvp(temperature,volume,z,lnfug,dlnfugdt,dlnfugdp,dlnfugdn)
+    call enthalpy_tvp(temperature,volume,z,h)
+    call entropy_tvp(temperature,volume,z,s)
+    position = 1
+    values(position) = p
+    position = position + 1
+    values(position) = dpdv
+    position = position + 1
+    values(position) = dpdt
+    position = position + 1
+    values(position) = d2pdv2
+    position = position + 1
+    values(position) = h
+    position = position + 1
+    values(position) = s
+    position = position + 1
+    do i = 1, nc
+      values(position) = lnfug(i)
+      position = position + 1
+    end do
+    do i = 1, nc
+      values(position) = dlnfugdt(i)
+      position = position + 1
+    end do
+    do i = 1, nc
+      values(position) = dlnfugdp(i)
+      position = position + 1
+    end do
+    do i = 1, nc
+      do j = 1, nc
+        values(position) = dlnfugdn(i,j)
+        position = position + 1
+      end do
+    end do
+    numbers = position - 1
+  end select
+  end subroutine query_wong_sandler_state
 
 ! Evaluate the nodes and the weights of a quadrature of the original.
 subroutine query_quadrature(quad,values,count) bind(C,name='query_quadrature')

@@ -102,7 +102,7 @@ calc_bmcsl_zeta_and_derivatives, but keeps the reduced pair Helmholtz
 energy calc_bmcsl_dgij_dzeta and its derivatives with respect to the
 packing fractions private. The reference probe therefore calls the published
 pair correlation function of the original, and the qualification compares the
-pair and its temperature, volume and mole number derivatives. The qualification compares the pair
-correlation function and its derivatives against the reference probe
-	ools/rust_port/reference_probe.f90, as the branch of the cubic association
-model is qualified in 	ools/rust_port/validate_cpa_rdf.py.
+pair and its temperature, volume and mole number derivatives.
+The pair correlation function and its derivatives are compared against the reference probe
+tools/rust_port/reference_probe.f90, as the branch of the cubic association
+model is qualified in tools/rust_port/validate_cpa_rdf.py.

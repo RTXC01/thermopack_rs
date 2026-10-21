@@ -98,6 +98,11 @@ name = "pcsaft"
 path = "rust/benches/pcsaft.rs"
 harness = false
 
+[[bench]]
+name = "mixture_saturation"
+path = "rust/benches/mixture_saturation.rs"
+harness = false
+
 [profile.release]
 lto = "thin"
 codegen-units = 1

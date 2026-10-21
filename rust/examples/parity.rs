@@ -2164,6 +2164,46 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             continue;
         }
+        if matches!(
+            property_config[0].trim_start_matches("V_"),
+            "MIX_BP" | "MIX_DP" | "MIX_BT" | "MIX_DT"
+        ) {
+            let z: Vec<f64> = fields[4]
+                .split(',')
+                .map(str::parse)
+                .collect::<Result<_, _>>()?;
+            let result = match property_config[0].trim_start_matches("V_") {
+                "MIX_BP" => model.bubble_pressure(t, &z),
+                "MIX_DP" => model.dew_pressure(t, &z),
+                "MIX_BT" => model.bubble_temperature(t, &z),
+                _ => model.dew_temperature(t, &z),
+            };
+            match result {
+                Ok(s) => {
+                    let mut values = vec![
+                        s.temperature,
+                        s.pressure,
+                        s.liquid_volume,
+                        s.vapor_volume,
+                        s.dpdt,
+                        s.fugacity_residual,
+                        s.iterations as f64,
+                    ];
+                    values.extend(s.liquid);
+                    values.extend(s.vapor);
+                    println!(
+                        "{}",
+                        values
+                            .iter()
+                            .map(|v| format!("{v:.17e}"))
+                            .collect::<Vec<_>>()
+                            .join(",")
+                    );
+                }
+                Err(e) => println!("ERROR {e}"),
+            }
+            continue;
+        }
         if fields[3] == "SAT_T" {
             let sat = model.saturation_temperature(t)?;
             println!(

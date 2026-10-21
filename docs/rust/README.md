@@ -144,5 +144,9 @@ rules of the source and the integration of a function with its differential.
 The [FMT notes](fmt.md) cover all three fundamental-measure functionals,
 analytic Hessians, source arithmetic compatibility and native grid measurements.
 
+The [mixture saturation notes](mixture-saturation.md)
+cover bubble/dew T/P solves, analytic branch slopes, retrograde refinement,
+the source qualification and native-loop measurements.
+
 Regenerate inventory with
 `python tools/rust_port/inventory.py`.

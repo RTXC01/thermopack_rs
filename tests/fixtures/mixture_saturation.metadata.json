@@ -1,0 +1,1043 @@
+{
+  "baseline": "d68c794",
+  "compiler": "GNU Fortran (MinGW-W64 x86_64-ucrt-posix-seh, built by Brecht Sanders) 14.3.0",
+  "flags": [
+    "-O3",
+    "-cpp",
+    "-fdefault-real-8",
+    "-fdefault-double-8",
+    "-frecursive",
+    "-fopenmp",
+    "-fallow-argument-mismatch",
+    "-ffree-line-length-none"
+  ],
+  "lapack_commit": "3c351aad417ae1ad8552bc742a6f039d6a298f2c",
+  "library_sha256": "05c5eeb892302a0700ad079073d160fe607275ac673d7b1d6791073fca26a6ac",
+  "sources": {
+    "numconstants": "81b2771fa060b08c6dc551a32eafcb61b91f139d1864644fc25ca7d89ab4f330",
+    "stringmod": "0c2459ae3cd3a0c227b15107337d66d8c79ced4eb868ce69dd8bb5bd4af352e2",
+    "quadratures": "158894a2caa55fb4781275fb720862d0be19b03df13fba29ab21346f4d684820",
+    "thermopack_constants": "9046988b81e338f895ee05189087bbdd89a10759774e1f8021cb198ef2dc9b86",
+    "error": "5c275dd4808c6ad373c826ce5ddcab3e02e73410859afc4f4dac800a528c5706",
+    "parameters": "d7c3a50c4745afac77fc5fa031d49cab1571e24af6c8bb15878c2cada2bfdd2f",
+    "hyperdual_mod": "41b121f1b66d45325ec9f87937c95101e88bccbaac75f2d7cad06e95f32a411e",
+    "linear_numerics": "ce49eeef25d1c3e5ae0f27f26f3537b6cced8e8c0e9ab113ae8194bbd917527f",
+    "optimizer": "7648d0d88a30163e36462015db91dd189702d8c389eb3c3cb617d522d4111355",
+    "nonlinear_solvers": "693ac124cb25aa12c805ce09f8ec553087b0789dcfacaf28b79112cf1f31e063",
+    "utilities": "77d315d2eadaecf47d24ca2d92d671b86c9515672afaba369a7b8c3d6cf6981e",
+    "apparent_composition": "3536e3eab063855aefc6dab1621746f74bd7e31f28ad9f25bce74d164442c377",
+    "solid_correlation_datadb": "013f25ec37dac3fe647e00c84fef5525c0f3c6dd718a7364290e05f0c273ae82",
+    "compdata": "ce941b7b3266ec2260e1f8f9635fd3fd383e772f1b8f704c11175523451e7047",
+    "association_var": "10ecb2dac187bb8500b522bbc6aebf522a79e888baa8e04bf8a2aeb1851c5cfc",
+    "multipol_var": "2f9bf2a453b03cd3f7b784f74ba6a1b358d58906581dc2171f37366adaf00006",
+    "thermopack_var": "1e75d96aebc50ee5e9d63d63034625b46fd6fa352ffb18dd0f62bd9544627801",
+    "hyperdual_utility": "6924c70a6821989595276279d56da82a86f647830bde52d96c069dd68ce62589",
+    "fmt": "b94b7b91a454511fa5446b8f84604cc593fa5aa2d0e17dd9e154b8bee48eaafa",
+    "eosdata": "5347e25c79f23cb3752ba692bd2be2ce5b94ab3382fec1a6c379a4e5adfd804c",
+    "assocschemeutils": "06352929c097aa2864b646565e9dc591fb08d60a4d2824eb47f56820a74174ec",
+    "unifacdata": "225d321b1fe3818c20ecfcc56ca565a817a99877198c1848843204631d3c1d8a",
+    "unifac": "dd0d41c70800dc5a8a3c5c3c58b8de9b467167bc8a4c3e34484cbe93dd4dacf0",
+    "cubic_eos": "5331b361c38f23636b746d8b93446662944bce17aa676d7d43a815c8dfe82530",
+    "compdatadb": "c54497d27f95539576545cdf9ba78bfcf4159749b60dccaa709be286682148a2",
+    "compdata_init": "cd85a3e560ac24cfc7318ae4d8ab3bd491282330264f878c6a71a276fcbb31ac",
+    "volume_shift": "0de6b71bbf9f8833d335bb9b1c5619f7225cc2f17cc8a055dc9e662745edf6bd",
+    "multiparameter_base": "228e9bad560f4ee6f8d6ff9e6aab057c887df5a82d030357d461e0e7cfa13399",
+    "multiparameter_c3": "025f3e94c7abca6a1ea08e3c1a4b5cfdc972629e5879109e523199437097be44",
+    "multiparameter_para_h2": "579951c3fa36fff2e97a8bfeabe615927deb65f631082690a66452d458bbb250",
+    "multiparameter_ortho_h2": "f65855b3b2438454b2117d3e8f19eba6a67279a4139ac2485fb08ef8710a6974",
+    "multiparameter_normal_h2": "385e1d177b6def4f0cf637318380d2fc00738f1b9f7b6eb28ca956cbba073b92",
+    "multiparameter_r134a": "17740e7f977376bafd39faeac6c1d71e4467e783a8d9c3e33f8d9fcdaac007a5",
+    "multiparameter_lj": "035bae279e62dcdb7b42b358dfb3c17562bd7a8ddd178a3092ac75f0b34342cf",
+    "mbwrdata": "64f67102fbb97a0c6bd241a6430f05d00fcb5772892d62f28d7f0e2e41f82675",
+    "mbwr": "783f624958e3c1228f8433ee00965fc99f170364250d876bcd0b5d9484b4579a",
+    "mbwr_additional": "a57ea631169f2ba51282fb326038e22433cfb1dcc242e28a6debc042b4d4ec3c",
+    "pets": "2f7a472ad252f0952aa49f5491dd3c7795106c080c36079b9bea33926ab70b9c",
+    "pc_saft_datadb": "24667d3bf38092d05329762ae21ce1d829a90f0da5cf5491ebf0598dd71a7ef6",
+    "pc_saft_parameters": "39cb10930ae3f2b0f705b8ef47fd703113b0104601f0c699f053c9d1f6ae4fab",
+    "eos_parameters": "eb7b41483e973f4701008861ffd1e47e0e5a7549fe40ac34eca8c417a8f27ea8",
+    "mixdatadb": "a208994066d699b441362ca9c078dc6965c6020c29c6fe334562a97fb2df1aaa",
+    "cbalpha": "40475a554d43f8e0e2b5137460c60b7ee7fa1706b59cc1df6454c12b0c410b02",
+    "cbbeta": "f9ac7e9e686c79affc2c12ff17db5693332f294e9df8df25ec4a2d0938c085ec",
+    "excess_gibbs": "91db5a4da578e85def8b6c7c4a384ac3e8dc3370faaba29d40c12191198152b5",
+    "wong_sandler": "310e1df96f792d62a4b4c8c488a5c9501bb802853d273b7c4b1dc27e5112b208",
+    "cbmix": "14a973e85f0a768715e7896125e070c0888082c407391f60e4d4ad598dc22e7f",
+    "cbhelm": "a092ae02bbfb0f39ec227ac936366fb4394b403dc24d782206bc7bd49a28cd4b",
+    "cubic": "4fc1c75b5083500754436076a2472478a99463fffe8d578f0560baee095ea606",
+    "idealh2": "e02374dec47754a196b3102de89210df5a4c01d18a1203bf24468716b129bade",
+    "ideal": "4abeed45be71e58aebc14473b15cbf90df2c260b3152dc68e09183c148cb2fc2",
+    "cpa_parameters": "8eca97665cf0c22281bfbc0ef156022be3be0bbedf1d3f0236571ab892ac1a6b",
+    "cbselect": "4840cd70d733cfd61638b6fb59e7d0069074b71121d17977c5ec33f7fd5fbc0c",
+    "hardsphere_bmcsl": "aaa5be55f77fb1def8d15962c1e7df2d353f3b0cfd6fd47d0739ffca3620d301",
+    "pc_saft_nonassoc": "a2512afe7ad8da09c7737ab955be209734d773822a24ca4c34cd508cc9aa0db4",
+    "saftvrmie_options": "5d4b9891ea470f49dd5c4d5d624e901de4894d6642221b5a23c1ae6fd2c5b9e4",
+    "saftvrmie_datadb": "5673b761a3698429dff898135fba4675c8ce000408898ac70106f6688d119842",
+    "saftvrmie_parameters": "9f9522f18419781b75ca699240e9327d9836186922a64f033c4b30241e4fbac9",
+    "saftvrmie_containers": "ecd4aa67a916f260006c5ec87d58bc48bd08a3fe808d0cdc5ab17095a0c56447",
+    "saftvrmie_utils": "3073a53eb1e4ca53d0c99215cff5bb0374c6111f17950be79c8ff0ef738af193",
+    "saftvrmie_hardsphere": "69eadfad516eaf43bd4635b5cf9c19a794cfb862795ab3b1ea554bac3c516add",
+    "saftvrmie_dispersion": "9970200beba5b09c40675c8d815795c9e53f6cfb015264bd8323a471d2dfcb8a",
+    "saftvrmie_chain": "313951dcb61c081aee2edeabf5ad08b827475f02af3b056b3d660234039f6253",
+    "saftvrmie_association": "9ba1a54816cb0fc2eef93faa5101e953c41c30c3310926f1d376c7c0160dc8c3",
+    "saftvrmie_interface": "6bc6d39e595b7fda87a5b4ca69f4b589dd699c410c7ea8d3e10adc191b700cc6",
+    "hardsphere_wca": "568bdef8f6f16f5ff636b369e3824d1a9aea4393ccce9cc59ae0980d878e4819",
+    "lj_splined": "21b26d0e68b20281fc91b6f93d587fb7562d40036e364481e4e4384cd8cdefae",
+    "saft_globals": "cd491377b6e647ca1c8da737bd5be6761f3e994859ed9052840fa0acfb6948b9",
+    "saft_rdf": "80cd38594817aea99c75402d7e6669a1eca5d834a42428e3e091712c78d4963e",
+    "saft_association": "df3a5f9b6e871d005427fcfaf167989256395e55017110227ca0f1c8181dd5b6",
+    "multipol": "b227a20226ceb793e13c6153f3e678f2cfd0dbfa2463a93f3da012a60ae23f3a",
+    "saft_interface": "df8725cb15f2bb2b2a54898989ba1af7ae59c49dd578120a85b18d95ae471750",
+    "extcsp": "b452c5397da6e45de151caa10bbc35529742448148ad989ae43c5e71c737cc70",
+    "leekesler": "6dfcf59b3188e174f48403e435f8253dac1add0a95bdcee169a24d9c5c3f7af8",
+    "multiparameter_idealmix": "43adb5de94054eea91a54a241a4a71eb0b6b2ae1757f13d9c8d462113fb79f9f",
+    "co2_gibbs": "8b2351c798fb1b4f89a7f7e3b0ef1af34859bc65477a354b3ed0628ccdad6829",
+    "h2o_gibbs": "a12fc215f7a41fdd1d019c654b2fc4f2a0f87cac83fa4e505f7e15fe25198d0e",
+    "single_component": "329ed5bec79c4fa4e5b66ccd51c3ba28819eda6b67537477bda453e7a8ab60ba",
+    "eos_container": "cc9c69a832a85a6338a7b21d6c3372ede4cde1b2cebe971a0d2b432fad2ac8fa",
+    "single_phase": "02c00dbf65e25e014ce3d7bce8ba626435b8f928dd1d380bf22718a2d0592790",
+    "eostv": "306093cddf7098985eb729d463c966a7dfb230009c722249842c3e320b3ab7a5",
+    "eos": "befee3261d285fdcfa2c83b0cb9ab8b235ad311147d6d42c53f07fa5d26ece23",
+    "puresaturation": "70efebbb25d9659b5921770ba15d484b66df79d34502d8787c4cb790302f5888",
+    "thermo_utils": "7fa5c3db69531986d9928ce0271b36765c94080862224355cce987c1ba010eae",
+    "critical": "8ff578626a8512de7ec8c5b0b34631632e6f02662d8e0981f5a08b7e46ae3e58",
+    "stability": "e82e20c659b339477a9116648b07f03aa78090792903b68385fcbb95e18901c7",
+    "saturation": "c3841bfe67898ad420044a3191a07d7b6ff1c5e16e8c52a31900133eec1d1ea8",
+    "solideos": "2b0a45599d7faed4f166e03e630d5b8a9620f2de996d8517db0a2feb7d2787de",
+    "vls": "3ecc60a8b527374c1a6903a6f4b6b5785b0e2228c1c52da4258e0eb9367d41f8",
+    "tuning": "ea7ad3173d0e1a19f3175319dfb4536a0c9e496904babe9bdc7c259b752acb89",
+    "tp_solver": "9826e826da68e5a7058ec57b3d17e5442bfd4db628679a3bd00d15e271efbb0f",
+    "state_functions": "2ecbac8dffc1094f2350fbcbb5a0b7efa47b28c193007428751e01fa88dd6fa3",
+    "saturation_curve": "3129cc1e181bb3e67fb11000164265e1783fa3d9d0d7fa48deb898241e198406",
+    "saturation_tv": "fd1ee2d47482fc212815b2ae26fb510d11ddef704077e515940b0809e0b42887",
+    "multi_phase_envelope_tv": "0fb3a57447e34bb610c960f7476037db1031d84c1fa514f9229e6644fc13a607",
+    "solid_saturation": "75bd97d719d7d57ddefc3622b479612e941072499381cd316fa645fb4a552fa6",
+    "saturation_point_locators": "daa38b0ff695031b3d1f3e00ba354f16eed2d21e2434ea9ca22cf202df5d8bd0",
+    "joule_thompson_inversion": "e285640f5558ea4973202c0abacbf005db919c7f89da883e583251f6ad35a93e",
+    "ph_solver": "00d134e44f95c6c5521d59d86f627fb95710c3f0e176cbfe801e6ffcee7f5754",
+    "ps_solver": "34d11b86595713aba761e27163bfb8dfbcab4fe15a18a51e92b7df6be0de2c56",
+    "uv_solver": "efbd86537a6578b8f318daaaa4d0bb37cb9540ffef90392585f10838d9b4bbd6",
+    "sv_solver": "1f51cf123ff8fcbe264e1cc9d1142c70545331a8a4eab12ad49225fa49302b75",
+    "spinodal": "ae12a892a1c1f34845ba81750cdb47d93a801b3ef06df2647787163b4a58f80f",
+    "mut_solver": "6ddbb514d5d6e241b0a03478a17641decb496d10f65557838ff59132af6c3bc1",
+    "isolines": "660e6d90c2e92d4315302d1fa5b5dc62316b283a0af4d59ab32d86c93eb40d2c",
+    "binaryplot": "bc8ff596e437a41e18585a9bd67faa40cfda6a13c09cf36b65219a0f4091f622",
+    "speed_of_sound": "85fb9206528061cbdcce58c20cf824ed7455a7c5ee1f0a539a42cbd76a7f133f",
+    "saftvrmie_testing": "931b50a23a6384d10ceeb32184ae7618bc4a2e4d04fd4efd0cd321e22fc33d85",
+    "hydrate": "dffef9c31c571a3b365e72923c01812eb2edfc39f2aa36c36b6b8f81bb3653ab",
+    "hydrate_curves": "1d5a48516803bb81e64d6dd3a3d79723abf0700356ae0d662b09efcff1725731",
+    "consistency": "1ed20d6dd79e6474d237ff5795cefde81c11e4223911a30a3d6d222377f8daf8",
+    "eoslibinit": "7df67e296f5b79105714fecc897c80ab0cb1bd2844a18b01027877da87351258",
+    "complexmodelinit": "6ffae447c3e2be271d9720f3b5217bebf669fa879cf9291be7f5d0a407a96b41",
+    "external": "e57f6391c43791ae80fde558f66d9c39ed40b3d3b27859579fc11d3ef0c97f9d"
+  },
+  "cases": 959,
+  "attempted_cases": 1008,
+  "reference_errors": [
+    {
+      "case": "PR|C1,C2|220.0|0|0.8,0.2|MIX_BP",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "2.20000000000000000e2,6.11836453444399498e6,7.96866022034079988e-5,1.21082848571319403e-4,8.13809391752286028e4,2.22044604925031308e-15,1.40000000000000000e1,8.00000000000000044e-1,2.00000000000000011e-1,8.64999993719308469e-1,1.35000006280691476e-1"
+    },
+    {
+      "case": "PR|C1,C3|280.0|0|0.8,0.2|MIX_BP",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "ERROR solver did not converge: mixture bubble/dew saturation"
+    },
+    {
+      "case": "PR|CO2,C3|310.0|0|0.8,0.2|MIX_BP",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "ERROR solver did not converge: mixture bubble/dew saturation"
+    },
+    {
+      "case": "PR|CO2,C3|310.0|0|0.8,0.2|MIX_DP",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "ERROR solver did not converge: mixture bubble/dew saturation"
+    },
+    {
+      "case": "PR|C1,C2,C3|270.0|0|0.7,0.2,0.1|MIX_BP",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "ERROR solver did not converge: mixture bubble/dew saturation"
+    },
+    {
+      "case": "PR|C1,C2,C3|270.0|0|0.5,0.5,0.0|MIX_BP",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "ERROR solver did not converge: mixture bubble/dew saturation"
+    },
+    {
+      "case": "PR|C1,C2,C3|270.0|0|0.5,0.5,0.0|MIX_DP",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "ERROR solver did not converge: mixture bubble/dew saturation"
+    },
+    {
+      "case": "SRK|C1,C2|220.0|0|0.8,0.2|MIX_BP",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "2.20000000000000000e2,6.10900722519016266e6,8.67817816174689034e-5,1.32908845992918076e-4,8.21983750223957177e4,0.00000000000000000e0,1.20000000000000000e1,8.00000000000000044e-1,2.00000000000000011e-1,8.70155285226507647e-1,1.29844714773492437e-1"
+    },
+    {
+      "case": "SRK|C1,C3|280.0|0|0.8,0.2|MIX_BP",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "ERROR solver did not converge: mixture bubble/dew saturation"
+    },
+    {
+      "case": "SRK|CO2,C3|310.0|0|0.8,0.2|MIX_BP",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "ERROR solver did not converge: mixture bubble/dew saturation"
+    },
+    {
+      "case": "SRK|CO2,C3|310.0|0|0.8,0.2|MIX_DP",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "ERROR solver did not converge: mixture bubble/dew saturation"
+    },
+    {
+      "case": "SRK|C1,C2,C3|270.0|0|0.7,0.2,0.1|MIX_BP",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "ERROR solver did not converge: mixture bubble/dew saturation"
+    },
+    {
+      "case": "SRK|C1,C2,C3|270.0|0|0.5,0.5,0.0|MIX_BP",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "ERROR solver did not converge: mixture bubble/dew saturation"
+    },
+    {
+      "case": "SRK|C1,C2,C3|270.0|0|0.5,0.5,0.0|MIX_DP",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "ERROR solver did not converge: mixture bubble/dew saturation"
+    },
+    {
+      "case": "RK|C1,C2|220.0|0|0.8,0.2|MIX_BP",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "2.20000000000000000e2,6.05088087187534478e6,8.88147565931050685e-5,1.32563774403455273e-4,7.78566277325779520e4,1.99840144432528177e-15,1.50000000000000000e1,8.00000000000000044e-1,2.00000000000000011e-1,8.64256358865386765e-1,1.35743641134613208e-1"
+    },
+    {
+      "case": "RK|C1,C3|280.0|0|0.5,0.5|MIX_BP",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "2.80000000000000000e2,7.49781122094321251e6,9.29153601719785326e-5,2.00125251504311679e-4,4.35278524721664580e4,4.90718576884318812e-14,9.00000000000000000e0,5.00000000000000000e-1,5.00000000000000000e-1,7.88310240507613780e-1,2.11689759492386192e-1"
+    },
+    {
+      "case": "RK|C1,C3|280.0|0|0.8,0.2|MIX_BP",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "ERROR solver did not converge: mixture bubble/dew saturation"
+    },
+    {
+      "case": "RK|C1,C3|280.0|0|0.8,0.2|MIX_DP",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "ERROR solver did not converge: mixture bubble/dew saturation"
+    },
+    {
+      "case": "RK|CO2,C3|310.0|0|0.8,0.2|MIX_BP",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "ERROR solver did not converge: mixture bubble/dew saturation"
+    },
+    {
+      "case": "RK|CO2,C3|310.0|0|0.8,0.2|MIX_DP",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "ERROR solver did not converge: mixture bubble/dew saturation"
+    },
+    {
+      "case": "RK|C1,C2,C3|270.0|0|0.7,0.2,0.1|MIX_BP",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "ERROR solver did not converge: mixture bubble/dew saturation"
+    },
+    {
+      "case": "RK|C1,C2,C3|270.0|0|0.7,0.2,0.1|MIX_DP",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "ERROR solver did not converge: mixture bubble/dew saturation"
+    },
+    {
+      "case": "RK|C1,C2,C3|270.0|0|0.5,0.5,0.0|MIX_BP",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "ERROR solver did not converge: mixture bubble/dew saturation"
+    },
+    {
+      "case": "RK|C1,C2,C3|270.0|0|0.5,0.5,0.0|MIX_DP",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "ERROR solver did not converge: mixture bubble/dew saturation"
+    },
+    {
+      "case": "VDW|C1,C2|220.0|0|0.8,0.2|MIX_BP",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "2.20000000000000000e2,5.42266416780652292e6,1.23001103409437206e-4,1.47770382478712144e-4,5.03631018823597260e4,1.03895780867437055e-10,1.70000000000000000e1,8.00000000000000044e-1,2.00000000000000011e-1,8.23074345337819868e-1,1.76925654662180132e-1"
+    },
+    {
+      "case": "VDW|C1,C3|280.0|0|0.8,0.2|MIX_BP",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "ERROR solver did not converge: mixture bubble/dew saturation"
+    },
+    {
+      "case": "VDW|C1,C3|280.0|0|0.8,0.2|MIX_DP",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "ERROR solver did not converge: mixture bubble/dew saturation"
+    },
+    {
+      "case": "VDW|C1,C2,C3|270.0|0|0.7,0.2,0.1|MIX_BP",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "ERROR solver did not converge: mixture bubble/dew saturation"
+    },
+    {
+      "case": "VDW|C1,C2,C3|270.0|0|0.7,0.2,0.1|MIX_DP",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "ERROR solver did not converge: mixture bubble/dew saturation"
+    },
+    {
+      "case": "VDW|C1,C2,C3|270.0|0|0.5,0.5,0.0|MIX_BP",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "ERROR solver did not converge: mixture bubble/dew saturation"
+    },
+    {
+      "case": "VDW|C1,C2,C3|270.0|0|0.5,0.5,0.0|MIX_DP",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "ERROR solver did not converge: mixture bubble/dew saturation"
+    },
+    {
+      "case": "PR|C1,C2|220.0|0|0.8,0.2|V_MIX_BP@CLASSIC@DEFAULT@1",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "2.20000000000000000e2,6.11836453444397356e6,8.48542014183676594e-5,1.26224140872707220e-4,8.13809391752216616e4,1.11022302462515654e-16,1.40000000000000000e1,8.00000000000000044e-1,2.00000000000000011e-1,8.64999993719312577e-1,1.35000006280687534e-1"
+    },
+    {
+      "case": "PR|C1,C3|280.0|0|0.8,0.2|V_MIX_BP@CLASSIC@DEFAULT@1",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "ERROR solver did not converge: mixture bubble/dew saturation"
+    },
+    {
+      "case": "PR|CO2,C3|310.0|0|0.8,0.2|V_MIX_BP@CLASSIC@DEFAULT@1",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "ERROR solver did not converge: mixture bubble/dew saturation"
+    },
+    {
+      "case": "PR|CO2,C3|310.0|0|0.8,0.2|V_MIX_DP@CLASSIC@DEFAULT@1",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "ERROR solver did not converge: mixture bubble/dew saturation"
+    },
+    {
+      "case": "PR|C1,C3|280.0|0|0.8,0.2|MIX_BP@unifac",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "ERROR solver did not converge: mixture bubble/dew saturation"
+    },
+    {
+      "case": "SRK|C1,C2|220.0|0|0.8,0.2|V_MIX_BP@CLASSIC@DEFAULT@1",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "2.20000000000000000e2,6.10900722519021668e6,8.56194226724875807e-5,1.31897533973608400e-4,8.21983750224086689e4,2.77555756156289135e-16,1.20000000000000000e1,8.00000000000000044e-1,2.00000000000000011e-1,8.70155285226501762e-1,1.29844714773498127e-1"
+    },
+    {
+      "case": "SRK|C1,C3|280.0|0|0.8,0.2|V_MIX_BP@CLASSIC@DEFAULT@1",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "ERROR solver did not converge: mixture bubble/dew saturation"
+    },
+    {
+      "case": "SRK|CO2,C3|310.0|0|0.8,0.2|V_MIX_BP@CLASSIC@DEFAULT@1",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "ERROR solver did not converge: mixture bubble/dew saturation"
+    },
+    {
+      "case": "SRK|CO2,C3|310.0|0|0.8,0.2|V_MIX_DP@CLASSIC@DEFAULT@1",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "ERROR solver did not converge: mixture bubble/dew saturation"
+    },
+    {
+      "case": "SRK|C1,C3|280.0|0|0.8,0.2|MIX_BP@unifac",
+      "result": {
+        "calculation_error": "bubble_pressure calculation failed"
+      },
+      "rust": "ERROR solver did not converge: mixture bubble/dew saturation"
+    }
+  ],
+  "unqualified_reference_returns": [
+    {
+      "case": "PR|C1,C3|280.0|0|0.5,0.5|MIX_BP",
+      "result": {
+        "values": [
+          280.0,
+          8102088.261868617,
+          8.003402607072861e-05,
+          0.000176695250676561,
+          0.5,
+          0.5,
+          0.8045920593650385,
+          0.19540796706781224
+        ],
+        "fugacity_residual": 0.00015176020594931394,
+        "pressure_error": 1.7995242454121512e-08,
+        "normalization_error": 2.643285079706459e-08,
+        "phase_distance": 0.5470504964662002
+      },
+      "reasons": [
+        "fugacity does not close"
+      ],
+      "rust": "2.80000000000000000e2,8.10208860317745432e6,8.00340253096756740e-5,1.76669203737198999e-4,4.76960351257243092e4,8.21565038222615682e-15,7.00000000000000000e0,5.00000000000000000e-1,5.00000000000000000e-1,8.04526560592364048e-1,1.95473439407635979e-1"
+    },
+    {
+      "case": "VDW|C1,C2|4723572.124716964|0|0.8,0.2|MIX_DT",
+      "result": {
+        "values": [
+          212.7556889925337,
+          4723572.124716964,
+          0.00011306811326140824,
+          0.00011306824307224244,
+          0.7999998277441339,
+          0.20000017225586608,
+          0.8,
+          0.2
+        ],
+        "fugacity_residual": 3.0881490697964864e-09,
+        "pressure_error": 7.886595568147767e-16,
+        "normalization_error": 0.0,
+        "phase_distance": 1.1480750976030314e-06
+      },
+      "reasons": [
+        "coalescing phases: boundary coordinates are below log-fugacity numerical resolution"
+      ],
+      "rust": "2.19999999956804146e2,4.72357212471696362e6,9.98994097369527138e-5,2.20529343518926699e-4,1.36426430778024427e5,3.89799303945866612e-13,1.20000000000000000e1,6.80574068783727060e-1,3.19425931216272940e-1,8.00000000000000044e-1,2.00000000000000011e-1"
+    },
+    {
+      "case": "VDW|C1,C3|220.0|0|0.8,0.2|MIX_BP",
+      "result": {
+        "values": [
+          220.0,
+          5096887.555923847,
+          0.00010056592025265873,
+          0.0002107546183396663,
+          0.8,
+          0.2,
+          0.9200970189189599,
+          0.07990299074129859
+        ],
+        "fugacity_residual": 8.141293113594905e-05,
+        "pressure_error": 4.21510620775989e-09,
+        "normalization_error": 9.660258371013697e-09,
+        "phase_distance": 0.5228293403726036
+      },
+      "reasons": [
+        "fugacity does not close"
+      ],
+      "rust": "2.20000000000000000e2,5.09688758074053843e6,1.00565920071851020e-4,2.10746933248376139e-4,6.36473139470033129e4,1.33986155503858498e-11,1.40000000000000000e1,8.00000000000000044e-1,2.00000000000000011e-1,9.20087128112049735e-1,7.99128718879502653e-2"
+    },
+    {
+      "case": "VDW|C1,C3|280.0|0|0.5,0.5|MIX_BP",
+      "result": {
+        "values": [
+          280.0,
+          4127827.1465811194,
+          0.00030553305437370685,
+          0.0003070834770371977,
+          0.5,
+          0.5,
+          0.5011201643039412,
+          0.4988798358327149
+        ],
+        "fugacity_residual": 1.1596317642359466e-05,
+        "pressure_error": 4.168463499661918e-11,
+        "normalization_error": 1.3665601983348097e-10,
+        "phase_distance": 0.0050488638413555996
+      },
+      "reasons": [
+        "fugacity does not close"
+      ],
+      "rust": "2.80000000000000000e2,5.62468782042348944e6,1.31461662118011468e-4,2.57263859887442751e-4,4.03056946980753055e4,1.22124532708767219e-15,1.30000000000000000e1,5.00000000000000000e-1,5.00000000000000000e-1,6.87148198493307882e-1,3.12851801506692062e-1"
+    },
+    {
+      "case": "VDW|CO2,C3|310.0|0|0.8,0.2|MIX_BP",
+      "result": {
+        "values": [
+          310.0,
+          6189880.158766034,
+          0.00012121827309246167,
+          0.00021326901445920055,
+          0.8,
+          0.2,
+          0.8441949390211706,
+          0.15580506291079055
+        ],
+        "fugacity_residual": 2.2889155700811514e-05,
+        "pressure_error": 4.509132937515597e-10,
+        "normalization_error": 1.931961257639614e-09,
+        "phase_distance": 0.43161798069990454
+      },
+      "reasons": [
+        "fugacity does not close"
+      ],
+      "rust": "3.10000000000000000e2,6.18988016584052332e6,1.21218272843103122e-4,2.13273646920066252e-4,6.76049159347430686e4,6.48242570733224888e-11,1.00000000000000000e1,8.00000000000000044e-1,2.00000000000000011e-1,8.44200190568396569e-1,1.55799809431603459e-1"
+    },
+    {
+      "case": "VDW|C1,C2,C3|220.0|0|0.7,0.2,0.1|MIX_BP",
+      "result": {
+        "values": [
+          220.0,
+          4664966.537304785,
+          9.793248102667263e-05,
+          0.0002366012361963247,
+          0.7,
+          0.2,
+          0.1,
+          0.8454995785878751,
+          0.11800188701336488,
+          0.036498538464032136
+        ],
+        "fugacity_residual": 3.607083856449478e-05,
+        "pressure_error": 1.8158143457607894e-09,
+        "normalization_error": 4.065272118936036e-09,
+        "phase_distance": 0.5860863510222273
+      },
+      "reasons": [
+        "fugacity does not close"
+      ],
+      "rust": "2.20000000000000000e2,4.66496654134596046e6,9.79324810002494878e-5,2.36598564839331585e-4,6.27608721469299999e4,1.48769885299770976e-14,1.70000000000000000e1,7.00000000000000067e-1,2.00000000000000039e-1,1.00000000000000019e-1,8.45494876188232825e-1,1.18004827303250293e-1,3.65002965085168343e-2"
+    },
+    {
+      "case": "PR|C1,C3|280.0|0|0.5,0.5|V_MIX_BP@CLASSIC@DEFAULT@1",
+      "result": {
+        "values": [
+          280.0,
+          8102088.261868601,
+          8.564102645424685e-05,
+          0.00018198526485161616,
+          0.5,
+          0.5,
+          0.8045920593650382,
+          0.19540796706781205
+        ],
+        "fugacity_residual": 0.00015176020594820372,
+        "pressure_error": 1.8533994394841405e-08,
+        "normalization_error": 2.6432850130930774e-08,
+        "phase_distance": 0.5294068092596658
+      },
+      "reasons": [
+        "fugacity does not close"
+      ],
+      "rust": "2.80000000000000000e2,8.10208860317745432e6,8.56410256931938989e-5,1.81959286054107224e-4,4.76960351257243601e4,8.21565038222615682e-15,7.00000000000000000e0,5.00000000000000000e-1,5.00000000000000000e-1,8.04526560592364270e-1,1.95473439407635785e-1"
+    },
+    {
+      "case": "SRK|C1,C3|280.0|0|0.5,0.5|V_MIX_BP@CLASSIC@DEFAULT@1",
+      "result": {
+        "values": [
+          280.0,
+          8061104.917667139,
+          8.606085644433518e-05,
+          0.00018911775450916357,
+          0.5,
+          0.5,
+          0.8126715207022391,
+          0.18732849236203714
+        ],
+        "fugacity_residual": 0.0001041979168878715,
+        "pressure_error": 9.138648398364982e-09,
+        "normalization_error": 1.3064276327412472e-08,
+        "phase_distance": 0.5449350767319672
+      },
+      "reasons": [
+        "fugacity does not close"
+      ],
+      "rust": "2.80000000000000000e2,8.06110506009392068e6,8.60608560967915468e-5,1.89101196407095887e-4,4.73950550899866867e4,4.44089209850062616e-16,7.00000000000000000e0,5.00000000000000000e-1,5.00000000000000000e-1,8.12630251039877405e-1,1.87369748960122706e-1"
+    }
+  ],
+  "censored_reference_calls": [],
+  "reference_pressure_root_warnings": [
+    {
+      "case": "PR|CO2,C3|220.0|0|0.8,0.2|MIX_DP",
+      "result": {
+        "values": [
+          220.0,
+          287757.78206456994,
+          6.575285641315105e-05,
+          0.006061739029527315,
+          0.13370855851643573,
+          0.8662914421824364,
+          0.8,
+          0.2
+        ],
+        "fugacity_residual": 7.844466673456729e-10,
+        "pressure_error": 1.0242590959129025e-06,
+        "normalization_error": 6.988720713252405e-10,
+        "phase_distance": 0.9891528064648012
+      }
+    },
+    {
+      "case": "PR|CO2,C3|287757.78206456994|0|0.8,0.2|MIX_DT",
+      "result": {
+        "values": [
+          220.00000000464473,
+          287757.78206456994,
+          6.575285641186118e-05,
+          0.006061739029672757,
+          0.13370855855133154,
+          0.8662914418923933,
+          0.8,
+          0.2
+        ],
+        "fugacity_residual": 4.979024068041404e-10,
+        "pressure_error": 6.50317694352718e-07,
+        "normalization_error": 4.4372483465338064e-10,
+        "phase_distance": 0.9891528064652743
+      }
+    },
+    {
+      "case": "PR|CO2,C3|2061605.9562473744|0|0.8,0.2|MIX_DT",
+      "result": {
+        "values": [
+          269.9999998115046,
+          2061605.9562473744,
+          6.958550274376194e-05,
+          0.0008592427267752714,
+          0.37887267505024347,
+          0.6211273311543699,
+          0.8,
+          0.2
+        ],
+        "fugacity_residual": 4.521424790127071e-09,
+        "pressure_error": 3.1036170441037256e-07,
+        "normalization_error": 6.204613267613013e-09,
+        "phase_distance": 0.9190153136298104
+      }
+    },
+    {
+      "case": "SRK|CO2,C3|220.0|0|0.8,0.2|MIX_DP",
+      "result": {
+        "values": [
+          220.0,
+          279591.7079846699,
+          7.41866688763753e-05,
+          0.00626118689899408,
+          0.13561195958924352,
+          0.8643880408814244,
+          0.8,
+          0.2
+        ],
+        "fugacity_residual": 5.039905368042774e-10,
+        "pressure_error": 6.002849441388568e-07,
+        "normalization_error": 4.706679490595889e-10,
+        "phase_distance": 0.9881513409401188
+      }
+    },
+    {
+      "case": "SRK|CO2,C3|279591.7079846699|0|0.8,0.2|MIX_DT",
+      "result": {
+        "values": [
+          220.0000000027742,
+          279591.7079846699,
+          7.41866688755441e-05,
+          0.006261186899083385,
+          0.13561195960897932,
+          0.8643880407073372,
+          0.8,
+          0.2
+        ],
+        "fugacity_residual": 3.38622553608392e-10,
+        "pressure_error": 4.0342690565815413e-07,
+        "normalization_error": 3.163165285258174e-10,
+        "phase_distance": 0.9881513409404207
+      }
+    },
+    {
+      "case": "RK|CO2,C3|220.0|0|0.8,0.2|MIX_DP",
+      "result": {
+        "values": [
+          220.0,
+          374967.0347232845,
+          7.498914677998137e-05,
+          0.004614231905976115,
+          0.14576961775261113,
+          0.8542303825755617,
+          0.8,
+          0.2
+        ],
+        "fugacity_residual": 3.191182595951858e-10,
+        "pressure_error": 2.662794551933303e-07,
+        "normalization_error": 3.2817282225039435e-10,
+        "phase_distance": 0.9837482926068671
+      }
+    },
+    {
+      "case": "RK|CO2,C3|374967.0347232845|0|0.8,0.2|MIX_DT",
+      "result": {
+        "values": [
+          219.99999997538995,
+          374967.0347232845,
+          7.498914678645388e-05,
+          0.004614231905375116,
+          0.14576961758540735,
+          0.8542303840409324,
+          0.8,
+          0.2
+        ],
+        "fugacity_residual": 1.5747664700027642e-09,
+        "pressure_error": 1.319612201154423e-06,
+        "normalization_error": 1.6263397295546156e-09,
+        "phase_distance": 0.9837482926033477
+      }
+    },
+    {
+      "case": "VDW|C1,C2|51861.05003805623|0|0.2,0.8|MIX_DT",
+      "result": {
+        "values": [
+          129.99999997020768,
+          51861.05003805623,
+          7.59974977066483e-05,
+          0.020450975273916504,
+          0.014065530018727485,
+          0.9859344714579502,
+          0.2,
+          0.8
+        ],
+        "fugacity_residual": 2.8059957482562403e-10,
+        "pressure_error": 1.2829373130983234e-05,
+        "normalization_error": 1.4766776690322558e-09,
+        "phase_distance": 0.9962839181658208
+      }
+    },
+    {
+      "case": "VDW|C1,C2|80639.74496016702|0|0.5,0.5|MIX_DT",
+      "result": {
+        "values": [
+          129.99999998466197,
+          80639.74496016702,
+          7.51995717520434e-05,
+          0.013103595509432669,
+          0.0545072640644936,
+          0.9454927366788712,
+          0.5,
+          0.5
+        ],
+        "fugacity_residual": 1.4585056773430694e-10,
+        "pressure_error": 4.014891785250462e-06,
+        "normalization_error": 7.433649251709085e-10,
+        "phase_distance": 0.9942611497967936
+      }
+    },
+    {
+      "case": "VDW|C1,C2|180140.57325430133|0|0.8,0.2|MIX_DT",
+      "result": {
+        "values": [
+          129.99999999889707,
+          180140.57325430133,
+          7.250009083811154e-05,
+          0.005776740258957642,
+          0.19311481468592737,
+          0.806885185363415,
+          0.8,
+          0.2
+        ],
+        "fugacity_residual": 1.0912881709401745e-11,
+        "pressure_error": 1.0530189441353155e-07,
+        "normalization_error": 4.934230801723061e-11,
+        "phase_distance": 0.9874496536821626
+      }
+    },
+    {
+      "case": "VDW|C1,C3|51653.159923594554|0|0.2,0.8|MIX_DT",
+      "result": {
+        "values": [
+          159.99999999944544,
+          51653.159923594554,
+          0.00010634330045396079,
+          0.02525562452212725,
+          0.0060584705053876,
+          0.9939415295164881,
+          0.2,
+          0.8
+        ],
+        "fugacity_residual": 4.284135546317458e-12,
+        "pressure_error": 1.611237676392999e-07,
+        "normalization_error": 2.187561243260916e-11,
+        "phase_distance": 0.9957893220830556
+      }
+    },
+    {
+      "case": "VDW|C1,C3|442223.03688268986|0|0.2,0.8|MIX_DT",
+      "result": {
+        "values": [
+          219.9999995653624,
+          442223.03688268986,
+          0.0001162814710029601,
+          0.003771962882541425,
+          0.0195974398535665,
+          0.9804025701362887,
+          0.2,
+          0.8
+        ],
+        "fugacity_residual": 2.852074132420057e-11,
+        "pressure_error": 3.671106338717457e-06,
+        "normalization_error": 9.989855165315475e-09,
+        "phase_distance": 0.9691721592645649
+      }
+    },
+    {
+      "case": "VDW|C1,C3|717780.8045627471|0|0.5,0.5|MIX_DT",
+      "result": {
+        "values": [
+          219.99999977994088,
+          717780.8045627471,
+          0.00011392946630824961,
+          0.0023073804783105317,
+          0.07767059433767101,
+          0.9223294104219096,
+          0.5,
+          0.5
+        ],
+        "fugacity_residual": 3.686682903403238e-11,
+        "pressure_error": 9.972456041190357e-07,
+        "normalization_error": 4.759580729540858e-09,
+        "phase_distance": 0.9506238926006392
+      }
+    },
+    {
+      "case": "VDW|C1,C3|1850727.7316291486|0|0.8,0.2|MIX_DT",
+      "result": {
+        "values": [
+          219.99999958945864,
+          1850727.7316291486,
+          0.00010553031821767438,
+          0.0008395388959999712,
+          0.2989358985538269,
+          0.701064108679431,
+          0.8,
+          0.2
+        ],
+        "fugacity_residual": 1.1446658620961614e-09,
+        "pressure_error": 4.100283562678514e-07,
+        "normalization_error": 7.2332579925671325e-09,
+        "phase_distance": 0.8742996676860604
+      }
+    },
+    {
+      "case": "VDW|CO2,C3|423130.9390539593|0|0.2,0.8|MIX_DT",
+      "result": {
+        "values": [
+          219.9999997956924,
+          423130.9390539593,
+          0.00011414502231527616,
+          0.003930853269357673,
+          0.056899518995369644,
+          0.9431004856972718,
+          0.2,
+          0.8
+        ],
+        "fugacity_residual": 1.937269789031859e-12,
+        "pressure_error": 1.8086444618266546e-06,
+        "normalization_error": 4.692641386583318e-09,
+        "phase_distance": 0.9709617697498212
+      }
+    },
+    {
+      "case": "VDW|C1,C2,C3|114440.36083827828|0|0.2,0.3,0.5|MIX_DT",
+      "result": {
+        "values": [
+          169.99999997410643,
+          114440.36083827828,
+          0.00010417461686271677,
+          0.011954254242250646,
+          0.010739272835529409,
+          0.1326216388765089,
+          0.856639089136888,
+          0.2,
+          0.3,
+          0.5
+        ],
+        "fugacity_residual": 1.954956058147772e-10,
+        "pressure_error": 2.355394693497816e-06,
+        "normalization_error": 8.489262626198979e-10,
+        "phase_distance": 0.9912855612109598
+      }
+    },
+    {
+      "case": "PR|CO2,C3|220.0|0|0.8,0.2|V_MIX_DP@CLASSIC@DEFAULT@1",
+      "result": {
+        "values": [
+          220.0,
+          287757.7820645715,
+          7.134788026159221e-05,
+          0.006064681406173941,
+          0.13370855851643618,
+          0.8662914421824359,
+          0.8,
+          0.2
+        ],
+        "fugacity_residual": 7.844533911338658e-10,
+        "pressure_error": 1.1114150104342366e-06,
+        "normalization_error": 6.988720713252405e-10,
+        "phase_distance": 0.9882355105762095
+      }
+    },
+    {
+      "case": "PR|CO2,C3|287757.7820645715|0|0.8,0.2|V_MIX_DT@CLASSIC@DEFAULT@1",
+      "result": {
+        "values": [
+          220.00000000464493,
+          287757.7820645715,
+          7.134788026002764e-05,
+          0.006064681406319389,
+          0.13370855855133154,
+          0.866291441892393,
+          0.8,
+          0.2
+        ],
+        "fugacity_residual": 4.978968140556539e-10,
+        "pressure_error": 7.056538229454328e-07,
+        "normalization_error": 4.437246126087757e-10,
+        "phase_distance": 0.9882355105767496
+      }
+    },
+    {
+      "case": "PR|CO2,C3|2061605.9562473744|0|0.8,0.2|V_MIX_DT@CLASSIC@DEFAULT@1",
+      "result": {
+        "values": [
+          269.9999998115046,
+          2061605.9562473744,
+          7.420447638184299e-05,
+          0.0008621851034219328,
+          0.37887267505024325,
+          0.6211273311543701,
+          0.8,
+          0.2
+        ],
+        "fugacity_residual": 4.521425345238583e-09,
+        "pressure_error": 3.3096304595168167e-07,
+        "normalization_error": 6.204613267613013e-09,
+        "phase_distance": 0.9139344021517742
+      }
+    },
+    {
+      "case": "SRK|CO2,C3|220.0|0|0.8,0.2|V_MIX_DP@CLASSIC@DEFAULT@1",
+      "result": {
+        "values": [
+          220.0,
+          279591.70798466937,
+          6.922032427693281e-05,
+          0.006257651503612319,
+          0.13561195958924324,
+          0.8643880408814244,
+          0.8,
+          0.2
+        ],
+        "fugacity_residual": 5.039888784086344e-10,
+        "pressure_error": 5.600996233800289e-07,
+        "normalization_error": 4.706677270149839e-10,
+        "phase_distance": 0.9889382903095556
+      }
+    },
+    {
+      "case": "SRK|CO2,C3|279591.70798466937|0|0.8,0.2|V_MIX_DT@CLASSIC@DEFAULT@1",
+      "result": {
+        "values": [
+          220.0000000027742,
+          279591.70798466937,
+          6.922032427618923e-05,
+          0.006257651503701625,
+          0.13561195960897912,
+          0.8643880407073374,
+          0.8,
+          0.2
+        ],
+        "fugacity_residual": 3.386207425570831e-10,
+        "pressure_error": 3.7642019016417243e-07,
+        "normalization_error": 3.163165285258174e-10,
+        "phase_distance": 0.9889382903098323
+      }
+    }
+  ],
+  "fixture_sha256": "81aa8d6984bdb098afd160800dff2e157f3c0dc2ed1a08abcab813e806b80b9f",
+  "generator": "tools/rust_port/validate_mixture_saturation.py",
+  "relative_tolerance": 2e-07,
+  "absolute_tolerances": {
+    "T": 1e-06,
+    "P": 0.01,
+    "volume": 1e-12,
+    "composition": 1e-09
+  },
+  "worst_relative_differences": [
+    2.120924770371058e-09,
+    1.963653393953288e-08,
+    1.0883859961088225e-08,
+    2.5184512857405842e-08,
+    1.9504861012706907e-08
+  ],
+  "native_diagnostics": {
+    "MIX_BP": 183,
+    "MIX_BT": 183,
+    "MIX_DP": 199,
+    "MIX_DT": 198,
+    "V_MIX_BP": 46,
+    "V_MIX_BT": 46,
+    "V_MIX_DP": 52,
+    "V_MIX_DT": 52,
+    "native_solution_for_unqualified_source": 15
+  },
+  "convention": "exact-source safe bubble/dew wrappers, fixed-phase composition, phase fugacity/normalization and separation checked before boundary qualification; source volumes from the separate specific_volume routine are compared as returned and pressure-root residual warnings retained separately, not used to discard valid boundary coordinates; four classic cubics, translated PR/SRK and UNIFAC; raw failed/degenerate source returns retained separately; default native analytic Newton follows physical equality rather than raw source trajectories"
+}

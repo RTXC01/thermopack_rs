@@ -53,6 +53,10 @@ state.ln_fugacity_into(volume, &mut ln_phi)?;
 
 Pure cubic saturation: `model.saturation_pressure(temperature)` and
 `model.saturation_temperature(pressure)` for a model with one component.
+
+Mixture bubble/dew pressure and temperature solves and warm branch refinement
+are available on `Cubic`; see [mixture saturation](../docs/rust/mixture-saturation.md)
+for fixed-phase composition, analytic slopes and the qualification limits.
 Returns coexistence temperature/pressure, phase volumes and Clapeyron slope.
 `model.tp_flash(T,P,z)` performs VLE stability checks and a TP split.
 `model.ph_flash(P,z,H)` and `model.ps_flash(P,z,S)` recover temperature and

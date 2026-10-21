@@ -959,6 +959,26 @@ def main(compiler_directory):
                             **mixing_option)
             previous=key
         extra={}
+        if request['mode']=='MIXSAT':
+            import numpy as np
+            method=request['calculation'];z=request['feed'];known=request['specification']
+            try:
+                if method=='BP':p,y=model.bubble_pressure(known,z);t=known;x=np.array(z)
+                elif method=='DP':p,x=model.dew_pressure(known,z);t=known;y=np.array(z)
+                elif method=='BT':t,y=model.bubble_temperature(known,z);p=known;x=np.array(z)
+                elif method=='DT':t,x=model.dew_temperature(known,z);p=known;y=np.array(z)
+                else:raise ValueError('Unknown saturation method')
+                vl=float(model.specific_volume(t,p,x,model.LIQPH)[0]);vv=float(model.specific_volume(t,p,y,model.VAPPH)[0])
+                phi_l=model.thermo(t,p,x,model.LIQPH)[0];phi_v=model.thermo(t,p,y,model.VAPPH)[0]
+                active=[i for i,v in enumerate(z) if v>0]
+                if any(x[i]<=0 or y[i]<=0 for i in active):residual=float('inf')
+                else:residual=max(abs(math.log(x[i])+phi_l[i]-math.log(y[i])-phi_v[i]) for i in active)
+                pl=float(model.pressure_tv(t,vl,x)[0]);pv=float(model.pressure_tv(t,vv,y)[0])
+                values=[float(t),float(p),vl,vv,*map(float,x),*map(float,y)]
+                print('THERMOPACK_RESULT='+json.dumps(dict(values=values,fugacity_residual=float(residual),pressure_error=max(abs(pl-p),abs(pv-p))/max(1.,abs(p)),normalization_error=max(abs(sum(x)-1.),abs(sum(y)-1.)),phase_distance=(vv-vl)/max(vv,vl))),flush=True)
+            except Exception as exc:
+                print('THERMOPACK_RESULT='+json.dumps(dict(calculation_error=str(exc))),flush=True)
+            continue
         if request['mode'].startswith('V_'):
             for operation in request.get('operations',[]):
                 if operation[0]=='init':

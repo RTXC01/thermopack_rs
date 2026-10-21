@@ -453,6 +453,16 @@ baseline for the source's LJ sound mass units. Source snapshots run in the
 oracle's process-main context; physical identity tests also run in normal
 test threads. This supersedes the earlier loose NIST smoke-test evidence.
 
+The [mixture saturation qualification](mixture-saturation.md) compares all four
+bubble/dew T/P methods in 959 separated boundary states from 1008 attempts.
+It includes four classical cubic models, volume translation, UNIFAC, binary
+and ternary feeds, zeros and embedded pure limits. The 41 failed and eight
+unqualified source returns remain in metadata. Source pressure-root warnings
+for 21 separately returned volume pairs are retained alongside successful
+boundary-coordinate comparisons; native pressure/phase closure is checked. Independent tests cover the
+analytic Jacobian, branch slopes, inverse specifications and retrograde
+continuation; critical/envelope and raw iteration fidelity remain pending.
+
 CI contains native Windows/Linux/macOS checks and a Linux exact-source build
 that regenerates comparisons. It has been configured locally; hosted CI has
 not run yet. Original pFUnit/Python example suites and models outside the

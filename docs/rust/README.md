@@ -155,5 +155,8 @@ The [mixture spinodal notes](mixture-spinodal.md) cover local stability limits,
 full volume continuation, explicit source branch/pressure compatibility and
 physical endpoint closure.
 
+The [spinodal property notes](spinodal-properties.md) cover pure sampling,
+all six property constraints, source coordinate reporting and cached searches.
+
 Regenerate inventory with
 `python tools/rust_port/inventory.py`.

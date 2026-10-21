@@ -69,6 +69,9 @@ fixed-composition estimate, not the true critical point of a mixture.
 Mixture [spinodal points and curves](../docs/rust/mixture-spinodal.md) use the
 Helmholtz stability eigenvalue, with explicit source-compatible and physical
 branch/pressure conventions. Partial curves report their point-limit status.
+Pure grids and [property searches](../docs/rust/spinodal-properties.md) include
+fresh/source-compatible queries, reusable prepared searches and physical
+crossings of all six scalar property constraints on pure or mixture curves.
 `model.ideal_gas_mut(i)` configures owned ideal Cp parameters and H/S reference
 states for component i (zero based). A Cp setter preserves integration constants;
 reference setters recalculate them as in the source. Other models and the global

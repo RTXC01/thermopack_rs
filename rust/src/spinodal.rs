@@ -144,7 +144,11 @@ pub(crate) fn limit_volume(
     composition: &[f64],
 ) -> Result<f64> {
     let state = model.prepare(temperature, composition)?;
-    let mut lower = state.covolume() * (1.0 + 1.0e-10);
+    let mut lower = if liquid {
+        state.covolume() * (1.0 + 1.0e-10)
+    } else {
+        critical_volume - state.volume_translation().value
+    };
     let mut upper = if liquid {
         critical_volume - state.volume_translation().value
     } else {

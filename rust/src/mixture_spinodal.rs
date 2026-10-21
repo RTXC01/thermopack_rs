@@ -267,14 +267,36 @@ pub fn trace_spinodal(
 /// pressure is the input pressure even with an explicit initial temperature;
 /// a temperature-limited last point retains the pre-refinement pressure.
 /// Physical coordinates and bounded continuation still use the native solver.
-/// The source's separate pure 200-point grid is not reproduced here.
+/// Pure compositions use the source's separate 200-point temperature grid.
 pub fn baseline_trace_spinodal(
     model: &Cubic,
     z: &[f64],
     options: SpinodalTraceOptions,
 ) -> Result<SpinodalCurve> {
-    if z.iter().filter(|&&x| x > 0.0).count() < 2 {
-        return Err(Error::Unsupported("source pure spinodal sampling"));
+    if z.iter().filter(|&&x| x > 0.0).count() == 1 {
+        positive(options.log_volume_step, "spinodal volume step")?;
+        if options.maximum_points < 2 {
+            return Err(Error::InvalidInput("spinodal trace bounds"));
+        }
+        let minimum = options.minimum_vapor_temperature.unwrap_or_else(|| {
+            0.6 * z
+                .iter()
+                .zip(model.components())
+                .map(|(z, c)| z * c.critical_temperature)
+                .sum::<f64>()
+        });
+        let mut curve = crate::spinodal_properties::baseline_pure_spinodal_curve(
+            model,
+            z,
+            options.initial_pressure,
+            options.initial_liquid_temperature,
+            Some(minimum),
+        )?;
+        if curve.points.len() > options.maximum_points {
+            curve.points.truncate(options.maximum_points);
+            curve.end = SpinodalTraceEnd::PointLimit;
+        }
+        return Ok(curve);
     }
     trace_spinodal_impl(model, z, options, true)
 }

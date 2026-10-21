@@ -64,6 +64,7 @@ python tools/rust_port/validate_pseudo_components.py
 python tools/rust_port/validate_isolines.py
 python tools/rust_port/validate_spinodal.py
 python tools/rust_port/validate_mixture_spinodal.py
+python tools/rust_port/validate_spinodal_properties.py
 python tools/rust_port/validate_joule_thompson.py
 python tools/rust_port/validate_virial.py
 python tools/rust_port/validate_virial_matrix.py
@@ -493,6 +494,15 @@ complete curves. All T/V/raw-P outputs and point counts match in the explicit
 compatibility APIs. Every source state independently satisfies the local
 Helmholtz eigenvalue condition; 22 stale endpoint pressure warnings and 54
 physical vapor-branch selection differences are retained explicitly. Separate
-physical APIs close pressure at their returned coordinates. The pure source
-sampling grid, spinodal-property intersections, metastable isentropes and
-other model families remain pending.
+physical APIs close pressure at their returned coordinates. The pure grids and
+property searches below extend this coverage; mixture source-order intersection
+selection, property extrema, metastable isentropes and other model families
+remain pending.
+
+The [pure spinodal grid/property qualification](spinodal-properties.md) adds
+4000 full-grid states and all 276 successful property returns from 288 attempts.
+All six constraints, liquid/vapor/both selectors and no-crossing flags are
+covered. Twelve source failures and 145 nonclosing-coordinate warnings remain
+explicit; 31 critical-volume comparisons use documented multiple-root rounding
+radii. Fresh and cached searches share the source reporting convention, while
+independent pure/mixture physical searches close both property and stability.

@@ -604,6 +604,50 @@ def main(compiler_directory):
             arrays=[list(map(float,values)) for values in (temperature,pressure,volume)]
             print('THERMOPACK_RESULT='+json.dumps(dict(values=arrays)),flush=True)
             continue
+        if request['mode'] in ('PURE_SPINODAL_GRID','PURE_SPINODAL_PROP'):
+            from thermopack.cubic import cubic
+            import numpy as np
+            eos=request['eos'];names=request['components'];z=request['feed'];n=len(z)
+            model=cubic(','.join(names),'SRK' if eos=='RK' else eos,
+                        alpha='RK' if eos=='RK' else 'Classic',volume_shift=request.get('volume_shift',False))
+            previous=None;model.activate()
+            p0=c_double(request['pressure']);amounts=(c_double*n)(*z);status=c_int()
+            if request['mode']=='PURE_SPINODAL_GRID':
+                vt=request.get('vapor_temperature',.6*model.critical_temperature(1))
+                ts,vs,ps=model.spinodal(z,initial_pressure=request['pressure'],
+                    initial_liquid_temperature=request.get('liquid_temperature'),min_temperature_vapor=vt)
+                data=[]
+                for t,v,p in zip(ts,vs,ps):
+                    h=model.fugacity_tv(t,v,z,dlnphidn=True)[1]
+                    active=np.flatnonzero(np.array(z)>0);w=np.sqrt(np.array(z)[active])
+                    lam=float(np.linalg.eigvalsh(h[np.ix_(active,active)]*w[:,None]*w[None,:])[0])
+                    actual=float(model.pressure_tv(t,v,z)[0]);data.append([t,v,p,actual,lam])
+                result=dict(values=data,status=status.value,vapor_temperature=vt)
+            else:
+                prop=c_int(request['property']);phase=c_int(request['phase'])
+                def property_value(t,v):
+                    if prop.value==2:return v
+                    if prop.value==4:return t
+                    method={1:'entropy_tv',3:'enthalpy_tv',5:'pressure_tv',6:'internal_energy_tv'}[prop.value]
+                    return float(getattr(model,method)(t,v,z)[0])
+                target=c_double(property_value(*request['target_point']) if 'target_point' in request else request['target'])
+                # Preserve the exact specification even when the Fortran call
+                # terminates before returning its structured result.
+                print('THERMOPACK_TARGET='+repr(target.value),flush=True)
+                t=c_double();v=c_double();p=c_double();found=c_int()
+                calculate=getattr(model.tp,model.get_export_name('spinodal','locate_spinodal_prop_pure_fluid'))
+                calculate.argtypes=[POINTER(c_int),POINTER(c_double),POINTER(c_double),POINTER(c_int),*([POINTER(c_double)]*4),POINTER(c_int),POINTER(c_int),POINTER(c_double)]
+                calculate.restype=None
+                calculate(byref(prop),amounts,byref(target),byref(phase),byref(p0),byref(t),byref(v),byref(p),byref(found),byref(status),None)
+                result=dict(values=[t.value,v.value,p.value],found=bool(found.value),status=status.value,target=target.value)
+                if found.value:
+                    result['eigenvalue']=float(model.fugacity_tv(t.value,v.value,z,dlnphidn=True)[1][0,0])
+                    values=[float(model.entropy_tv(t.value,v.value,z)[0]),v.value,
+                            float(model.enthalpy_tv(t.value,v.value,z)[0]),t.value,
+                            float(model.pressure_tv(t.value,v.value,z)[0]),float(model.internal_energy_tv(t.value,v.value,z)[0])]
+                    result['property_value']=values[prop.value-1]
+            print('THERMOPACK_RESULT='+json.dumps(result),flush=True)
+            continue
         if request['mode'] in ('SPINODAL','SPINODAL_CURVE'):
             eos,comps=request['eos'],request['components']
             from thermopack.cubic import cubic

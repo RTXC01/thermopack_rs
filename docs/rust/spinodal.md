@@ -129,8 +129,10 @@ The committed fixture is `tests/fixtures/joule_thompson.csv`; the test is
 
 * [Mixture spinodal points and complete volume traces](mixture-spinodal.md)
   now use the Helmholtz stability eigenvalue, with physical and explicit source
-  compatibility APIs. The separate source pure 200-point temperature grids,
-  spinodal-property intersections and metastable isentropes remain pending.
+  compatibility APIs. [Pure grids and property searches](spinodal-properties.md)
+  now add the 200-point source sampling, pure compatibility intersections and
+  physical pure/mixture crossings. Mixture source-order intersections, property
+  extrema and metastable isentropes remain pending.
 * Critical loci, critical end points and a global phase-stability classification
   of mixture critical points remain pending; the local point solve is native.
 * The curve of the Joule-Thomson inversion is not mapped by the native model,

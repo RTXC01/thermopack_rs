@@ -1,0 +1,4158 @@
+{
+  "baseline": "d68c794",
+  "compiler": "GNU Fortran (MinGW-W64 x86_64-ucrt-posix-seh, built by Brecht Sanders) 14.3.0",
+  "flags": [
+    "-O3",
+    "-cpp",
+    "-fdefault-real-8",
+    "-fdefault-double-8",
+    "-frecursive",
+    "-fopenmp",
+    "-fallow-argument-mismatch",
+    "-ffree-line-length-none"
+  ],
+  "lapack_commit": "3c351aad417ae1ad8552bc742a6f039d6a298f2c",
+  "library_sha256": "05c5eeb892302a0700ad079073d160fe607275ac673d7b1d6791073fca26a6ac",
+  "sources": {
+    "numconstants": "81b2771fa060b08c6dc551a32eafcb61b91f139d1864644fc25ca7d89ab4f330",
+    "stringmod": "0c2459ae3cd3a0c227b15107337d66d8c79ced4eb868ce69dd8bb5bd4af352e2",
+    "quadratures": "158894a2caa55fb4781275fb720862d0be19b03df13fba29ab21346f4d684820",
+    "thermopack_constants": "9046988b81e338f895ee05189087bbdd89a10759774e1f8021cb198ef2dc9b86",
+    "error": "5c275dd4808c6ad373c826ce5ddcab3e02e73410859afc4f4dac800a528c5706",
+    "parameters": "d7c3a50c4745afac77fc5fa031d49cab1571e24af6c8bb15878c2cada2bfdd2f",
+    "hyperdual_mod": "41b121f1b66d45325ec9f87937c95101e88bccbaac75f2d7cad06e95f32a411e",
+    "linear_numerics": "ce49eeef25d1c3e5ae0f27f26f3537b6cced8e8c0e9ab113ae8194bbd917527f",
+    "optimizer": "7648d0d88a30163e36462015db91dd189702d8c389eb3c3cb617d522d4111355",
+    "nonlinear_solvers": "693ac124cb25aa12c805ce09f8ec553087b0789dcfacaf28b79112cf1f31e063",
+    "utilities": "77d315d2eadaecf47d24ca2d92d671b86c9515672afaba369a7b8c3d6cf6981e",
+    "apparent_composition": "3536e3eab063855aefc6dab1621746f74bd7e31f28ad9f25bce74d164442c377",
+    "solid_correlation_datadb": "013f25ec37dac3fe647e00c84fef5525c0f3c6dd718a7364290e05f0c273ae82",
+    "compdata": "ce941b7b3266ec2260e1f8f9635fd3fd383e772f1b8f704c11175523451e7047",
+    "association_var": "10ecb2dac187bb8500b522bbc6aebf522a79e888baa8e04bf8a2aeb1851c5cfc",
+    "multipol_var": "2f9bf2a453b03cd3f7b784f74ba6a1b358d58906581dc2171f37366adaf00006",
+    "thermopack_var": "1e75d96aebc50ee5e9d63d63034625b46fd6fa352ffb18dd0f62bd9544627801",
+    "hyperdual_utility": "6924c70a6821989595276279d56da82a86f647830bde52d96c069dd68ce62589",
+    "fmt": "b94b7b91a454511fa5446b8f84604cc593fa5aa2d0e17dd9e154b8bee48eaafa",
+    "eosdata": "5347e25c79f23cb3752ba692bd2be2ce5b94ab3382fec1a6c379a4e5adfd804c",
+    "assocschemeutils": "06352929c097aa2864b646565e9dc591fb08d60a4d2824eb47f56820a74174ec",
+    "unifacdata": "225d321b1fe3818c20ecfcc56ca565a817a99877198c1848843204631d3c1d8a",
+    "unifac": "dd0d41c70800dc5a8a3c5c3c58b8de9b467167bc8a4c3e34484cbe93dd4dacf0",
+    "cubic_eos": "5331b361c38f23636b746d8b93446662944bce17aa676d7d43a815c8dfe82530",
+    "compdatadb": "c54497d27f95539576545cdf9ba78bfcf4159749b60dccaa709be286682148a2",
+    "compdata_init": "cd85a3e560ac24cfc7318ae4d8ab3bd491282330264f878c6a71a276fcbb31ac",
+    "volume_shift": "0de6b71bbf9f8833d335bb9b1c5619f7225cc2f17cc8a055dc9e662745edf6bd",
+    "multiparameter_base": "228e9bad560f4ee6f8d6ff9e6aab057c887df5a82d030357d461e0e7cfa13399",
+    "multiparameter_c3": "025f3e94c7abca6a1ea08e3c1a4b5cfdc972629e5879109e523199437097be44",
+    "multiparameter_para_h2": "579951c3fa36fff2e97a8bfeabe615927deb65f631082690a66452d458bbb250",
+    "multiparameter_ortho_h2": "f65855b3b2438454b2117d3e8f19eba6a67279a4139ac2485fb08ef8710a6974",
+    "multiparameter_normal_h2": "385e1d177b6def4f0cf637318380d2fc00738f1b9f7b6eb28ca956cbba073b92",
+    "multiparameter_r134a": "17740e7f977376bafd39faeac6c1d71e4467e783a8d9c3e33f8d9fcdaac007a5",
+    "multiparameter_lj": "035bae279e62dcdb7b42b358dfb3c17562bd7a8ddd178a3092ac75f0b34342cf",
+    "mbwrdata": "64f67102fbb97a0c6bd241a6430f05d00fcb5772892d62f28d7f0e2e41f82675",
+    "mbwr": "783f624958e3c1228f8433ee00965fc99f170364250d876bcd0b5d9484b4579a",
+    "mbwr_additional": "a57ea631169f2ba51282fb326038e22433cfb1dcc242e28a6debc042b4d4ec3c",
+    "pets": "2f7a472ad252f0952aa49f5491dd3c7795106c080c36079b9bea33926ab70b9c",
+    "pc_saft_datadb": "24667d3bf38092d05329762ae21ce1d829a90f0da5cf5491ebf0598dd71a7ef6",
+    "pc_saft_parameters": "39cb10930ae3f2b0f705b8ef47fd703113b0104601f0c699f053c9d1f6ae4fab",
+    "eos_parameters": "eb7b41483e973f4701008861ffd1e47e0e5a7549fe40ac34eca8c417a8f27ea8",
+    "mixdatadb": "a208994066d699b441362ca9c078dc6965c6020c29c6fe334562a97fb2df1aaa",
+    "cbalpha": "40475a554d43f8e0e2b5137460c60b7ee7fa1706b59cc1df6454c12b0c410b02",
+    "cbbeta": "f9ac7e9e686c79affc2c12ff17db5693332f294e9df8df25ec4a2d0938c085ec",
+    "excess_gibbs": "91db5a4da578e85def8b6c7c4a384ac3e8dc3370faaba29d40c12191198152b5",
+    "wong_sandler": "310e1df96f792d62a4b4c8c488a5c9501bb802853d273b7c4b1dc27e5112b208",
+    "cbmix": "14a973e85f0a768715e7896125e070c0888082c407391f60e4d4ad598dc22e7f",
+    "cbhelm": "a092ae02bbfb0f39ec227ac936366fb4394b403dc24d782206bc7bd49a28cd4b",
+    "cubic": "4fc1c75b5083500754436076a2472478a99463fffe8d578f0560baee095ea606",
+    "idealh2": "e02374dec47754a196b3102de89210df5a4c01d18a1203bf24468716b129bade",
+    "ideal": "4abeed45be71e58aebc14473b15cbf90df2c260b3152dc68e09183c148cb2fc2",
+    "cpa_parameters": "8eca97665cf0c22281bfbc0ef156022be3be0bbedf1d3f0236571ab892ac1a6b",
+    "cbselect": "4840cd70d733cfd61638b6fb59e7d0069074b71121d17977c5ec33f7fd5fbc0c",
+    "hardsphere_bmcsl": "aaa5be55f77fb1def8d15962c1e7df2d353f3b0cfd6fd47d0739ffca3620d301",
+    "pc_saft_nonassoc": "a2512afe7ad8da09c7737ab955be209734d773822a24ca4c34cd508cc9aa0db4",
+    "saftvrmie_options": "5d4b9891ea470f49dd5c4d5d624e901de4894d6642221b5a23c1ae6fd2c5b9e4",
+    "saftvrmie_datadb": "5673b761a3698429dff898135fba4675c8ce000408898ac70106f6688d119842",
+    "saftvrmie_parameters": "9f9522f18419781b75ca699240e9327d9836186922a64f033c4b30241e4fbac9",
+    "saftvrmie_containers": "ecd4aa67a916f260006c5ec87d58bc48bd08a3fe808d0cdc5ab17095a0c56447",
+    "saftvrmie_utils": "3073a53eb1e4ca53d0c99215cff5bb0374c6111f17950be79c8ff0ef738af193",
+    "saftvrmie_hardsphere": "69eadfad516eaf43bd4635b5cf9c19a794cfb862795ab3b1ea554bac3c516add",
+    "saftvrmie_dispersion": "9970200beba5b09c40675c8d815795c9e53f6cfb015264bd8323a471d2dfcb8a",
+    "saftvrmie_chain": "313951dcb61c081aee2edeabf5ad08b827475f02af3b056b3d660234039f6253",
+    "saftvrmie_association": "9ba1a54816cb0fc2eef93faa5101e953c41c30c3310926f1d376c7c0160dc8c3",
+    "saftvrmie_interface": "6bc6d39e595b7fda87a5b4ca69f4b589dd699c410c7ea8d3e10adc191b700cc6",
+    "hardsphere_wca": "568bdef8f6f16f5ff636b369e3824d1a9aea4393ccce9cc59ae0980d878e4819",
+    "lj_splined": "21b26d0e68b20281fc91b6f93d587fb7562d40036e364481e4e4384cd8cdefae",
+    "saft_globals": "cd491377b6e647ca1c8da737bd5be6761f3e994859ed9052840fa0acfb6948b9",
+    "saft_rdf": "80cd38594817aea99c75402d7e6669a1eca5d834a42428e3e091712c78d4963e",
+    "saft_association": "df3a5f9b6e871d005427fcfaf167989256395e55017110227ca0f1c8181dd5b6",
+    "multipol": "b227a20226ceb793e13c6153f3e678f2cfd0dbfa2463a93f3da012a60ae23f3a",
+    "saft_interface": "df8725cb15f2bb2b2a54898989ba1af7ae59c49dd578120a85b18d95ae471750",
+    "extcsp": "b452c5397da6e45de151caa10bbc35529742448148ad989ae43c5e71c737cc70",
+    "leekesler": "6dfcf59b3188e174f48403e435f8253dac1add0a95bdcee169a24d9c5c3f7af8",
+    "multiparameter_idealmix": "43adb5de94054eea91a54a241a4a71eb0b6b2ae1757f13d9c8d462113fb79f9f",
+    "co2_gibbs": "8b2351c798fb1b4f89a7f7e3b0ef1af34859bc65477a354b3ed0628ccdad6829",
+    "h2o_gibbs": "a12fc215f7a41fdd1d019c654b2fc4f2a0f87cac83fa4e505f7e15fe25198d0e",
+    "single_component": "329ed5bec79c4fa4e5b66ccd51c3ba28819eda6b67537477bda453e7a8ab60ba",
+    "eos_container": "cc9c69a832a85a6338a7b21d6c3372ede4cde1b2cebe971a0d2b432fad2ac8fa",
+    "single_phase": "02c00dbf65e25e014ce3d7bce8ba626435b8f928dd1d380bf22718a2d0592790",
+    "eostv": "306093cddf7098985eb729d463c966a7dfb230009c722249842c3e320b3ab7a5",
+    "eos": "befee3261d285fdcfa2c83b0cb9ab8b235ad311147d6d42c53f07fa5d26ece23",
+    "puresaturation": "70efebbb25d9659b5921770ba15d484b66df79d34502d8787c4cb790302f5888",
+    "thermo_utils": "7fa5c3db69531986d9928ce0271b36765c94080862224355cce987c1ba010eae",
+    "critical": "8ff578626a8512de7ec8c5b0b34631632e6f02662d8e0981f5a08b7e46ae3e58",
+    "stability": "e82e20c659b339477a9116648b07f03aa78090792903b68385fcbb95e18901c7",
+    "saturation": "c3841bfe67898ad420044a3191a07d7b6ff1c5e16e8c52a31900133eec1d1ea8",
+    "solideos": "2b0a45599d7faed4f166e03e630d5b8a9620f2de996d8517db0a2feb7d2787de",
+    "vls": "3ecc60a8b527374c1a6903a6f4b6b5785b0e2228c1c52da4258e0eb9367d41f8",
+    "tuning": "ea7ad3173d0e1a19f3175319dfb4536a0c9e496904babe9bdc7c259b752acb89",
+    "tp_solver": "9826e826da68e5a7058ec57b3d17e5442bfd4db628679a3bd00d15e271efbb0f",
+    "state_functions": "2ecbac8dffc1094f2350fbcbb5a0b7efa47b28c193007428751e01fa88dd6fa3",
+    "saturation_curve": "3129cc1e181bb3e67fb11000164265e1783fa3d9d0d7fa48deb898241e198406",
+    "saturation_tv": "fd1ee2d47482fc212815b2ae26fb510d11ddef704077e515940b0809e0b42887",
+    "multi_phase_envelope_tv": "0fb3a57447e34bb610c960f7476037db1031d84c1fa514f9229e6644fc13a607",
+    "solid_saturation": "75bd97d719d7d57ddefc3622b479612e941072499381cd316fa645fb4a552fa6",
+    "saturation_point_locators": "daa38b0ff695031b3d1f3e00ba354f16eed2d21e2434ea9ca22cf202df5d8bd0",
+    "joule_thompson_inversion": "e285640f5558ea4973202c0abacbf005db919c7f89da883e583251f6ad35a93e",
+    "ph_solver": "00d134e44f95c6c5521d59d86f627fb95710c3f0e176cbfe801e6ffcee7f5754",
+    "ps_solver": "34d11b86595713aba761e27163bfb8dfbcab4fe15a18a51e92b7df6be0de2c56",
+    "uv_solver": "efbd86537a6578b8f318daaaa4d0bb37cb9540ffef90392585f10838d9b4bbd6",
+    "sv_solver": "1f51cf123ff8fcbe264e1cc9d1142c70545331a8a4eab12ad49225fa49302b75",
+    "spinodal": "ae12a892a1c1f34845ba81750cdb47d93a801b3ef06df2647787163b4a58f80f",
+    "mut_solver": "6ddbb514d5d6e241b0a03478a17641decb496d10f65557838ff59132af6c3bc1",
+    "isolines": "660e6d90c2e92d4315302d1fa5b5dc62316b283a0af4d59ab32d86c93eb40d2c",
+    "binaryplot": "bc8ff596e437a41e18585a9bd67faa40cfda6a13c09cf36b65219a0f4091f622",
+    "speed_of_sound": "85fb9206528061cbdcce58c20cf824ed7455a7c5ee1f0a539a42cbd76a7f133f",
+    "saftvrmie_testing": "931b50a23a6384d10ceeb32184ae7618bc4a2e4d04fd4efd0cd321e22fc33d85",
+    "hydrate": "dffef9c31c571a3b365e72923c01812eb2edfc39f2aa36c36b6b8f81bb3653ab",
+    "hydrate_curves": "1d5a48516803bb81e64d6dd3a3d79723abf0700356ae0d662b09efcff1725731",
+    "consistency": "1ed20d6dd79e6474d237ff5795cefde81c11e4223911a30a3d6d222377f8daf8",
+    "eoslibinit": "7df67e296f5b79105714fecc897c80ab0cb1bd2844a18b01027877da87351258",
+    "complexmodelinit": "6ffae447c3e2be271d9720f3b5217bebf669fa879cf9291be7f5d0a407a96b41",
+    "external": "e57f6391c43791ae80fde558f66d9c39ed40b3d3b27859579fc11d3ef0c97f9d"
+  },
+  "cases": 276,
+  "generator": "tools/rust_port/validate_spinodal_properties.py",
+  "fixture_sha256": "8571d269f82dbe2abea52f01f765907421d7ce9706a3cef8008323a18d2c1ca5",
+  "relative_tolerance": 2e-06,
+  "absolute_tolerances": [
+    2e-05,
+    1e-11,
+    2.0
+  ],
+  "reference_errors": [
+    {
+      "configuration": [
+        "VDW",
+        "C3",
+        "classic"
+      ],
+      "property": 1,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_TARGET=232.34896225972125",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    364.96045455155809        6.9523228997035288E-307",
+            "#0  0xc407b41a",
+            "#1  0xa4be77a4",
+            "#2  0xa4c7c3de",
+            "#3  0xa4e1457d",
+            "#4  0xa4e15f9f",
+            "#5  0xa4e248f2",
+            "#6  0xa4ec13e5",
+            "#7  0xa4ec6dee",
+            "#8  0xf84c4790",
+            "#9  0xf84c449f",
+            "#10  0xf84c4351",
+            "#11  0xf0133ec5",
+            "#12  0xf013297a",
+            "#13  0xf0132584",
+            "#14  0x561626fd",
+            "#15  0x56162158",
+            "#16  0x56163685",
+            "#17  0x561db8ab",
+            "#18  0x561db775",
+            "#19  0x561c4247",
+            "#20  0x561b8efb",
+            "#21  0x561f263f",
+            "#22  0x561f1c79",
+            "#23  0x561f2ca8",
+            "#24  0x5621b541",
+            "#25  0x5621b5e6",
+            "#26  0x5621c4c6",
+            "#27  0x5621c277",
+            "#28  0x5621c96a",
+            "#29  0xd142122f",
+            "#30  0x218d7123",
+            "#31  0x21e5cc90",
+            "#32  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        }
+      },
+      "target": 232.34896225972125,
+      "case": "SPINPROP|VDW|C3|classic|ROOT:1:0:232.34896225972125|1000000.0",
+      "native": "1.00000000000000000e0,3.32707023138850730e2,1.95066924719208574e-4,1.77346393041529506e6"
+    },
+    {
+      "configuration": [
+        "VDW",
+        "C3",
+        "classic"
+      ],
+      "property": 1,
+      "phase": 0,
+      "index": 120,
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_TARGET=242.80585201499483",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    364.96045455155809        6.9523228997035288E-307",
+            "#0  0xc407b41a",
+            "#1  0xa4be77a4",
+            "#2  0xa4c7c3de",
+            "#3  0xa4e1457d",
+            "#4  0xa4e15f9f",
+            "#5  0xa4e248f2",
+            "#6  0xa4ec13e5",
+            "#7  0xa4ec6dee",
+            "#8  0xf84c4790",
+            "#9  0xf84c449f",
+            "#10  0xf84c4351",
+            "#11  0xf0133ec5",
+            "#12  0xf013297a",
+            "#13  0xf0132584",
+            "#14  0x561626fd",
+            "#15  0x56162158",
+            "#16  0x56163685",
+            "#17  0x561db8ab",
+            "#18  0x561db775",
+            "#19  0x561c4247",
+            "#20  0x561b8efb",
+            "#21  0x561f263f",
+            "#22  0x561f1c79",
+            "#23  0x561f2ca8",
+            "#24  0x5621b541",
+            "#25  0x5621b5e6",
+            "#26  0x5621c4c6",
+            "#27  0x5621c277",
+            "#28  0x5621c96a",
+            "#29  0xd142122f",
+            "#30  0x218d7123",
+            "#31  0x21e5cc90",
+            "#32  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        }
+      },
+      "target": 242.80585201499483,
+      "case": "SPINPROP|VDW|C3|classic|ROOT:1:0:242.80585201499483|1000000.0",
+      "native": "1.00000000000000000e0,3.66249007825828812e2,2.43475128945223310e-4,4.06286121492377296e6"
+    },
+    {
+      "configuration": [
+        "VDW",
+        "C3",
+        "classic"
+      ],
+      "property": 1,
+      "phase": 2,
+      "index": 20,
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_TARGET=232.34896225972125",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    364.96045455155809        6.9523228997035288E-307",
+            "#0  0xc407b41a",
+            "#1  0xa4be77a4",
+            "#2  0xa4c7c3de",
+            "#3  0xa4e1457d",
+            "#4  0xa4e15f9f",
+            "#5  0xa4e248f2",
+            "#6  0xa4ec13e5",
+            "#7  0xa4ec6dee",
+            "#8  0xf84c4790",
+            "#9  0xf84c449f",
+            "#10  0xf84c4351",
+            "#11  0xf0133ec5",
+            "#12  0xf013297a",
+            "#13  0xf0132584",
+            "#14  0x561626fd",
+            "#15  0x56162158",
+            "#16  0x56163685",
+            "#17  0x561db8ab",
+            "#18  0x561db775",
+            "#19  0x561c4247",
+            "#20  0x561b8efb",
+            "#21  0x561f263f",
+            "#22  0x561f1c79",
+            "#23  0x561f2ca8",
+            "#24  0x5621b541",
+            "#25  0x5621b5e6",
+            "#26  0x5621c4c6",
+            "#27  0x5621c277",
+            "#28  0x5621c96a",
+            "#29  0xd142122f",
+            "#30  0x218d7123",
+            "#31  0x21e5cc90",
+            "#32  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        }
+      },
+      "target": 232.34896225972125,
+      "case": "SPINPROP|VDW|C3|classic|ROOT:1:2:232.34896225972125|1000000.0",
+      "native": "0.00000000000000000e0,0.00000000000000000e0,0.00000000000000000e0,0.00000000000000000e0"
+    },
+    {
+      "configuration": [
+        "VDW",
+        "C3",
+        "classic"
+      ],
+      "property": 1,
+      "phase": 2,
+      "index": 120,
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_TARGET=242.80585201499483",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    364.96045455155809        6.9523228997035288E-307",
+            "#0  0xc407b41a",
+            "#1  0xa4be77a4",
+            "#2  0xa4c7c3de",
+            "#3  0xa4e1457d",
+            "#4  0xa4e15f9f",
+            "#5  0xa4e248f2",
+            "#6  0xa4ec13e5",
+            "#7  0xa4ec6dee",
+            "#8  0xf84c4790",
+            "#9  0xf84c449f",
+            "#10  0xf84c4351",
+            "#11  0xf0133ec5",
+            "#12  0xf013297a",
+            "#13  0xf0132584",
+            "#14  0x561626fd",
+            "#15  0x56162158",
+            "#16  0x56163685",
+            "#17  0x561db8ab",
+            "#18  0x561db775",
+            "#19  0x561c4247",
+            "#20  0x561b8efb",
+            "#21  0x561f263f",
+            "#22  0x561f1c79",
+            "#23  0x561f2ca8",
+            "#24  0x5621b541",
+            "#25  0x5621b5e6",
+            "#26  0x5621c4c6",
+            "#27  0x5621c277",
+            "#28  0x5621c96a",
+            "#29  0xd142122f",
+            "#30  0x218d7123",
+            "#31  0x21e5cc90",
+            "#32  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        }
+      },
+      "target": 242.80585201499483,
+      "case": "SPINPROP|VDW|C3|classic|ROOT:1:2:242.80585201499483|1000000.0",
+      "native": "0.00000000000000000e0,0.00000000000000000e0,0.00000000000000000e0,0.00000000000000000e0"
+    },
+    {
+      "configuration": [
+        "VDW",
+        "C3",
+        "classic"
+      ],
+      "property": 3,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_TARGET=-109271.3711855102",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    364.96045455155809        9.4112252349475110E-309",
+            "#0  0xc407b41a",
+            "#1  0xa4be77a4",
+            "#2  0xa4c7c3de",
+            "#3  0xa4e1457d",
+            "#4  0xa4e15f9f",
+            "#5  0xa4e23d56",
+            "#6  0xa4ec1435",
+            "#7  0xa4ec6dee",
+            "#8  0xf84c4790",
+            "#9  0xf84c449f",
+            "#10  0xf84c4351",
+            "#11  0xf0133ec5",
+            "#12  0xf013297a",
+            "#13  0xf0132584",
+            "#14  0x561626fd",
+            "#15  0x56162158",
+            "#16  0x56163685",
+            "#17  0x561db8ab",
+            "#18  0x561db775",
+            "#19  0x561c4247",
+            "#20  0x561b8efb",
+            "#21  0x561f263f",
+            "#22  0x561f1c79",
+            "#23  0x561f2ca8",
+            "#24  0x5621b541",
+            "#25  0x5621b5e6",
+            "#26  0x5621c4c6",
+            "#27  0x5621c277",
+            "#28  0x5621c96a",
+            "#29  0xd142122f",
+            "#30  0x218d7123",
+            "#31  0x21e5cc90",
+            "#32  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        }
+      },
+      "target": -109271.3711855102,
+      "case": "SPINPROP|VDW|C3|classic|ROOT:3:0:-109271.3711855102|1000000.0",
+      "native": "1.00000000000000000e0,3.32707022293224270e2,1.95066924047867011e-4,1.77346386315988377e6"
+    },
+    {
+      "configuration": [
+        "VDW",
+        "C3",
+        "classic"
+      ],
+      "property": 3,
+      "phase": 0,
+      "index": 120,
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_TARGET=-105363.91727609717",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    364.96045455155809        1.2279616197999256E-308",
+            "#0  0xc407b41a",
+            "#1  0xa4be77a4",
+            "#2  0xa4c7c3de",
+            "#3  0xa4e1457d",
+            "#4  0xa4e15f9f",
+            "#5  0xa4e23d56",
+            "#6  0xa4ec1435",
+            "#7  0xa4ec6dee",
+            "#8  0xf84c4790",
+            "#9  0xf84c449f",
+            "#10  0xf84c4351",
+            "#11  0xf0133ec5",
+            "#12  0xf013297a",
+            "#13  0xf0132584",
+            "#14  0x561626fd",
+            "#15  0x56162158",
+            "#16  0x56163685",
+            "#17  0x561db8ab",
+            "#18  0x561db775",
+            "#19  0x561c4247",
+            "#20  0x561b8efb",
+            "#21  0x561f263f",
+            "#22  0x561f1c79",
+            "#23  0x561f2ca8",
+            "#24  0x5621b541",
+            "#25  0x5621b5e6",
+            "#26  0x5621c4c6",
+            "#27  0x5621c277",
+            "#28  0x5621c96a",
+            "#29  0xd142122f",
+            "#30  0x218d7123",
+            "#31  0x21e5cc90",
+            "#32  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        }
+      },
+      "target": -105363.91727609717,
+      "case": "SPINPROP|VDW|C3|classic|ROOT:3:0:-105363.91727609717|1000000.0",
+      "native": "1.00000000000000000e0,3.64718625877601482e2,2.38524009727074664e-4,3.97824528452487476e6"
+    },
+    {
+      "configuration": [
+        "VDW",
+        "C3",
+        "classic"
+      ],
+      "property": 3,
+      "phase": 2,
+      "index": 20,
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_TARGET=-109271.3711855102",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    364.96045455155809        1.3873977675576464E-308",
+            "#0  0xc407b41a",
+            "#1  0xa4be77a4",
+            "#2  0xa4c7c3de",
+            "#3  0xa4e1457d",
+            "#4  0xa4e15f9f",
+            "#5  0xa4e23d56",
+            "#6  0xa4ec1435",
+            "#7  0xa4ec6dee",
+            "#8  0xf84c4790",
+            "#9  0xf84c449f",
+            "#10  0xf84c4351",
+            "#11  0xf0133ec5",
+            "#12  0xf013297a",
+            "#13  0xf0132584",
+            "#14  0x561626fd",
+            "#15  0x56162158",
+            "#16  0x56163685",
+            "#17  0x561db8ab",
+            "#18  0x561db775",
+            "#19  0x561c4247",
+            "#20  0x561b8efb",
+            "#21  0x561f263f",
+            "#22  0x561f1c79",
+            "#23  0x561f2ca8",
+            "#24  0x5621b541",
+            "#25  0x5621b5e6",
+            "#26  0x5621c4c6",
+            "#27  0x5621c277",
+            "#28  0x5621c96a",
+            "#29  0xd142122f",
+            "#30  0x218d7123",
+            "#31  0x21e5cc90",
+            "#32  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        }
+      },
+      "target": -109271.3711855102,
+      "case": "SPINPROP|VDW|C3|classic|ROOT:3:2:-109271.3711855102|1000000.0",
+      "native": "0.00000000000000000e0,0.00000000000000000e0,0.00000000000000000e0,0.00000000000000000e0"
+    },
+    {
+      "configuration": [
+        "VDW",
+        "C3",
+        "classic"
+      ],
+      "property": 3,
+      "phase": 2,
+      "index": 120,
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_TARGET=-105363.91727609717",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    364.96045455155809        1.2530737596983030E-308",
+            "#0  0xc407b41a",
+            "#1  0xa4be77a4",
+            "#2  0xa4c7c3de",
+            "#3  0xa4e1457d",
+            "#4  0xa4e15f9f",
+            "#5  0xa4e23d56",
+            "#6  0xa4ec1435",
+            "#7  0xa4ec6dee",
+            "#8  0xf84c4790",
+            "#9  0xf84c449f",
+            "#10  0xf84c4351",
+            "#11  0xf0133ec5",
+            "#12  0xf013297a",
+            "#13  0xf0132584",
+            "#14  0x561626fd",
+            "#15  0x56162158",
+            "#16  0x56163685",
+            "#17  0x561db8ab",
+            "#18  0x561db775",
+            "#19  0x561c4247",
+            "#20  0x561b8efb",
+            "#21  0x561f263f",
+            "#22  0x561f1c79",
+            "#23  0x561f2ca8",
+            "#24  0x5621b541",
+            "#25  0x5621b5e6",
+            "#26  0x5621c4c6",
+            "#27  0x5621c277",
+            "#28  0x5621c96a",
+            "#29  0xd142122f",
+            "#30  0x218d7123",
+            "#31  0x21e5cc90",
+            "#32  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        }
+      },
+      "target": -105363.91727609717,
+      "case": "SPINPROP|VDW|C3|classic|ROOT:3:2:-105363.91727609717|1000000.0",
+      "native": "0.00000000000000000e0,0.00000000000000000e0,0.00000000000000000e0,0.00000000000000000e0"
+    },
+    {
+      "configuration": [
+        "VDW",
+        "C3",
+        "classic"
+      ],
+      "property": 6,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_TARGET=-109617.31833289168",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    366.57363636770526        8.0866357391530171E-309",
+            "#0  0xc407b41a",
+            "#1  0xa4be77a4",
+            "#2  0xa4c7c3de",
+            "#3  0xa4e1457d",
+            "#4  0xa4e15f9f",
+            "#5  0xa4e25c9b",
+            "#6  0xa4ec13a5",
+            "#7  0xa4ec6dee",
+            "#8  0xf84c4790",
+            "#9  0xf84c449f",
+            "#10  0xf84c4351",
+            "#11  0xf0133ec5",
+            "#12  0xf013297a",
+            "#13  0xf0132584",
+            "#14  0x561626fd",
+            "#15  0x56162158",
+            "#16  0x56163685",
+            "#17  0x561db8ab",
+            "#18  0x561db775",
+            "#19  0x561c4247",
+            "#20  0x561b8efb",
+            "#21  0x561f263f",
+            "#22  0x561f1c79",
+            "#23  0x561f2ca8",
+            "#24  0x5621b541",
+            "#25  0x5621b5e6",
+            "#26  0x5621c4c6",
+            "#27  0x5621c277",
+            "#28  0x5621c96a",
+            "#29  0xd142122f",
+            "#30  0x218d7123",
+            "#31  0x21e5cc90",
+            "#32  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        }
+      },
+      "target": -109617.31833289168,
+      "case": "SPINPROP|VDW|C3|classic|ROOT:6:0:-109617.31833289168|1000000.0",
+      "native": "ERROR: solver did not converge: spinodal scalar backtracking"
+    },
+    {
+      "configuration": [
+        "VDW",
+        "C3",
+        "classic"
+      ],
+      "property": 6,
+      "phase": 0,
+      "index": 120,
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_TARGET=-106652.07726266493",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    366.57363636770526        1.0207922695559110E-308",
+            "#0  0xc407b41a",
+            "#1  0xa4be77a4",
+            "#2  0xa4c7c3de",
+            "#3  0xa4e1457d",
+            "#4  0xa4e15f9f",
+            "#5  0xa4e25c9b",
+            "#6  0xa4ec13a5",
+            "#7  0xa4ec6dee",
+            "#8  0xf84c4790",
+            "#9  0xf84c449f",
+            "#10  0xf84c4351",
+            "#11  0xf0133ec5",
+            "#12  0xf013297a",
+            "#13  0xf0132584",
+            "#14  0x561626fd",
+            "#15  0x56162158",
+            "#16  0x56163685",
+            "#17  0x561db8ab",
+            "#18  0x561db775",
+            "#19  0x561c4247",
+            "#20  0x561b8efb",
+            "#21  0x561f263f",
+            "#22  0x561f1c79",
+            "#23  0x561f2ca8",
+            "#24  0x5621b541",
+            "#25  0x5621b5e6",
+            "#26  0x5621c4c6",
+            "#27  0x5621c277",
+            "#28  0x5621c96a",
+            "#29  0xd142122f",
+            "#30  0x218d7123",
+            "#31  0x21e5cc90",
+            "#32  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        }
+      },
+      "target": -106652.07726266493,
+      "case": "SPINPROP|VDW|C3|classic|ROOT:6:0:-106652.07726266493|1000000.0",
+      "native": "ERROR: solver did not converge: spinodal scalar backtracking"
+    },
+    {
+      "configuration": [
+        "VDW",
+        "C3",
+        "classic"
+      ],
+      "property": 6,
+      "phase": 2,
+      "index": 20,
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_TARGET=-109617.31833289168",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    366.57363636770526        1.3262512836891638E-308",
+            "#0  0xc407b41a",
+            "#1  0xa4be77a4",
+            "#2  0xa4c7c3de",
+            "#3  0xa4e1457d",
+            "#4  0xa4e15f9f",
+            "#5  0xa4e25c9b",
+            "#6  0xa4ec13a5",
+            "#7  0xa4ec6dee",
+            "#8  0xf84c4790",
+            "#9  0xf84c449f",
+            "#10  0xf84c4351",
+            "#11  0xf0133ec5",
+            "#12  0xf013297a",
+            "#13  0xf0132584",
+            "#14  0x561626fd",
+            "#15  0x56162158",
+            "#16  0x56163685",
+            "#17  0x561db8ab",
+            "#18  0x561db775",
+            "#19  0x561c4247",
+            "#20  0x561b8efb",
+            "#21  0x561f263f",
+            "#22  0x561f1c79",
+            "#23  0x561f2ca8",
+            "#24  0x5621b541",
+            "#25  0x5621b5e6",
+            "#26  0x5621c4c6",
+            "#27  0x5621c277",
+            "#28  0x5621c96a",
+            "#29  0xd142122f",
+            "#30  0x218d7123",
+            "#31  0x21e5cc90",
+            "#32  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        }
+      },
+      "target": -109617.31833289168,
+      "case": "SPINPROP|VDW|C3|classic|ROOT:6:2:-109617.31833289168|1000000.0",
+      "native": "ERROR: solver did not converge: spinodal scalar backtracking"
+    },
+    {
+      "configuration": [
+        "VDW",
+        "C3",
+        "classic"
+      ],
+      "property": 6,
+      "phase": 2,
+      "index": 120,
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_TARGET=-106652.07726266493",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    366.57363636770526        9.1243930617510326E-309",
+            "#0  0xc407b41a",
+            "#1  0xa4be77a4",
+            "#2  0xa4c7c3de",
+            "#3  0xa4e1457d",
+            "#4  0xa4e15f9f",
+            "#5  0xa4e25c9b",
+            "#6  0xa4ec13a5",
+            "#7  0xa4ec6dee",
+            "#8  0xf84c4790",
+            "#9  0xf84c449f",
+            "#10  0xf84c4351",
+            "#11  0xf0133ec5",
+            "#12  0xf013297a",
+            "#13  0xf0132584",
+            "#14  0x561626fd",
+            "#15  0x56162158",
+            "#16  0x56163685",
+            "#17  0x561db8ab",
+            "#18  0x561db775",
+            "#19  0x561c4247",
+            "#20  0x561b8efb",
+            "#21  0x561f263f",
+            "#22  0x561f1c79",
+            "#23  0x561f2ca8",
+            "#24  0x5621b541",
+            "#25  0x5621b5e6",
+            "#26  0x5621c4c6",
+            "#27  0x5621c277",
+            "#28  0x5621c96a",
+            "#29  0xd142122f",
+            "#30  0x218d7123",
+            "#31  0x21e5cc90",
+            "#32  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        }
+      },
+      "target": -106652.07726266493,
+      "case": "SPINPROP|VDW|C3|classic|ROOT:6:2:-106652.07726266493|1000000.0",
+      "native": "ERROR: solver did not converge: spinodal scalar backtracking"
+    }
+  ],
+  "censored_calls": [],
+  "source_reported_coordinate_warnings": [
+    {
+      "configuration": [
+        "PR",
+        "C1",
+        "classic"
+      ],
+      "property": 1,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          177.63489939537115,
+          7.048442795817898e-05,
+          1875801.4977648333
+        ],
+        "found": true,
+        "status": 0,
+        "target": 114.30101312377104,
+        "eigenvalue": 1.579530735495993e-05,
+        "property_value": 114.30080680804258
+      },
+      "case": "SPINPROP|PR|C1|classic|ROOT:1:0:114.30101312377104|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "C1",
+        "classic"
+      ],
+      "property": 1,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          177.63489939537115,
+          7.048442795817898e-05,
+          1875801.4977648333
+        ],
+        "found": true,
+        "status": 0,
+        "target": 114.30101312377104,
+        "eigenvalue": 1.579530735495993e-05,
+        "property_value": 114.30080680804258
+      },
+      "case": "SPINPROP|PR|C1|classic|ROOT:1:1:114.30101312377104|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "C1",
+        "classic"
+      ],
+      "property": 2,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          177.63489675988015,
+          7.048442529906639e-05,
+          1875800.81919007
+        ],
+        "found": true,
+        "status": 0,
+        "target": 7.048522850636467e-05,
+        "eigenvalue": 1.5794799931967418e-05,
+        "property_value": 7.048442529906639e-05
+      },
+      "case": "SPINPROP|PR|C1|classic|ROOT:2:0:7.048522850636467e-05|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "C1",
+        "classic"
+      ],
+      "property": 2,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          177.63489675988015,
+          7.048442529906639e-05,
+          1875800.81919007
+        ],
+        "found": true,
+        "status": 0,
+        "target": 7.048522850636467e-05,
+        "eigenvalue": 1.5794799931967418e-05,
+        "property_value": 7.048442529906639e-05
+      },
+      "case": "SPINPROP|PR|C1|classic|ROOT:2:1:7.048522850636467e-05|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "C1",
+        "classic"
+      ],
+      "property": 3,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          177.6348994590455,
+          7.048442802242403e-05,
+          1875801.514159426
+        ],
+        "found": true,
+        "status": 0,
+        "target": -84164.72595624768,
+        "eigenvalue": 1.579531961359848e-05,
+        "property_value": -84164.76262049028
+      },
+      "case": "SPINPROP|PR|C1|classic|ROOT:3:0:-84164.72595624768|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "C1",
+        "classic"
+      ],
+      "property": 3,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          177.6348994590455,
+          7.048442802242403e-05,
+          1875801.514159426
+        ],
+        "found": true,
+        "status": 0,
+        "target": -84164.72595624768,
+        "eigenvalue": 1.579531961359848e-05,
+        "property_value": -84164.76262049028
+      },
+      "case": "SPINPROP|PR|C1|classic|ROOT:3:1:-84164.72595624768|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "C1",
+        "classic"
+      ],
+      "property": 4,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          177.63490057651623,
+          0.00017350821488745224,
+          3440578.519154473
+        ],
+        "found": true,
+        "status": 0,
+        "target": 177.63490057651623,
+        "eigenvalue": 7.234802942623908e-06,
+        "property_value": 177.63490057651623
+      },
+      "case": "SPINPROP|PR|C1|classic|ROOT:4:0:177.63490057651623|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "C1",
+        "classic"
+      ],
+      "property": 4,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          177.6349005765162,
+          7.048442914991053e-05,
+          1875801.8018808924
+        ],
+        "found": true,
+        "status": 0,
+        "target": 177.63490057651623,
+        "eigenvalue": 1.5795534767271135e-05,
+        "property_value": 177.6349005765162
+      },
+      "case": "SPINPROP|PR|C1|classic|ROOT:4:1:177.63490057651623|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "C1",
+        "classic"
+      ],
+      "property": 4,
+      "phase": 1,
+      "index": 120,
+      "result": {
+        "values": [
+          175.15661616161657,
+          6.81288837565066e-05,
+          1218355.799613107
+        ],
+        "found": true,
+        "status": 0,
+        "target": 175.15661616161657,
+        "eigenvalue": 1.0337698690854324e-05,
+        "property_value": 175.15661616161657
+      },
+      "case": "SPINPROP|PR|C1|classic|ROOT:4:1:175.15661616161657|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "C1",
+        "classic"
+      ],
+      "property": 4,
+      "phase": 2,
+      "index": 20,
+      "result": {
+        "values": [
+          177.63490057651623,
+          0.00017350821488745224,
+          3440578.519154473
+        ],
+        "found": true,
+        "status": 0,
+        "target": 177.63490057651623,
+        "eigenvalue": 7.234802942623908e-06,
+        "property_value": 177.63490057651623
+      },
+      "case": "SPINPROP|PR|C1|classic|ROOT:4:2:177.63490057651623|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "C1",
+        "classic"
+      ],
+      "property": 5,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          147.0326711380203,
+          0.00029242085419343636,
+          1875801.7992788726
+        ],
+        "found": true,
+        "status": 0,
+        "target": 1875801.8000041358,
+        "eigenvalue": -4.955248784632715e-06,
+        "property_value": 1875801.7992788726
+      },
+      "case": "SPINPROP|PR|C1|classic|ROOT:5:0:1875801.8000041358|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "C1",
+        "classic"
+      ],
+      "property": 5,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          177.63490057652274,
+          7.04844291499171e-05,
+          1875801.8018825725
+        ],
+        "found": true,
+        "status": 0,
+        "target": 1875801.8000041358,
+        "eigenvalue": 1.5795534769047492e-05,
+        "property_value": 1875801.8018825725
+      },
+      "case": "SPINPROP|PR|C1|classic|ROOT:5:1:1875801.8000041358|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "C1",
+        "classic"
+      ],
+      "property": 5,
+      "phase": 1,
+      "index": 120,
+      "result": {
+        "values": [
+          183.49134335962643,
+          7.785398556451618e-05,
+          3271196.872732831
+        ],
+        "found": true,
+        "status": 0,
+        "target": 3271196.870107582,
+        "eigenvalue": 1.5041218455191796e-05,
+        "property_value": 3271196.872732831
+      },
+      "case": "SPINPROP|PR|C1|classic|ROOT:5:1:3271196.870107582|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "C1",
+        "classic"
+      ],
+      "property": 5,
+      "phase": 2,
+      "index": 20,
+      "result": {
+        "values": [
+          147.0326711380203,
+          0.00029242085419343636,
+          1875801.7992788726
+        ],
+        "found": true,
+        "status": 0,
+        "target": 1875801.8000041358,
+        "eigenvalue": -4.955248784632715e-06,
+        "property_value": 1875801.7992788726
+      },
+      "case": "SPINPROP|PR|C1|classic|ROOT:5:2:1875801.8000041358|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "C1",
+        "classic"
+      ],
+      "property": 6,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          177.6348993194719,
+          7.048442788159948e-05,
+          1875801.4782226272
+        ],
+        "found": true,
+        "status": 0,
+        "target": -84296.94227475362,
+        "eigenvalue": 1.579529274220448e-05,
+        "property_value": -84296.97742751062
+      },
+      "case": "SPINPROP|PR|C1|classic|ROOT:6:0:-84296.94227475362|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "C1",
+        "classic"
+      ],
+      "property": 6,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          177.6348993194719,
+          7.048442788159948e-05,
+          1875801.4782226272
+        ],
+        "found": true,
+        "status": 0,
+        "target": -84296.94227475362,
+        "eigenvalue": 1.579529274220448e-05,
+        "property_value": -84296.97742751062
+      },
+      "case": "SPINPROP|PR|C1|classic|ROOT:6:1:-84296.94227475362|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "CO2",
+        "classic"
+      ],
+      "property": 1,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          285.7245594770662,
+          6.90386144946971e-05,
+          2570009.134293817
+        ],
+        "found": true,
+        "status": 0,
+        "target": 148.83821292785603,
+        "eigenvalue": 1.7948276875401348e-05,
+        "property_value": 148.8379462334615
+      },
+      "case": "SPINPROP|PR|CO2|classic|ROOT:1:0:148.83821292785603|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "CO2",
+        "classic"
+      ],
+      "property": 1,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          285.7245594770662,
+          6.90386144946971e-05,
+          2570009.134293817
+        ],
+        "found": true,
+        "status": 0,
+        "target": 148.83821292785603,
+        "eigenvalue": 1.7948276875401348e-05,
+        "property_value": 148.8379462334615
+      },
+      "case": "SPINPROP|PR|CO2|classic|ROOT:1:1:148.83821292785603|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "CO2",
+        "classic"
+      ],
+      "property": 2,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          285.7245555450039,
+          6.903861171060417e-05,
+          2570007.868150875
+        ],
+        "found": true,
+        "status": 0,
+        "target": 6.903944196371763e-05,
+        "eigenvalue": 1.7947675350793446e-05,
+        "property_value": 6.903861171060417e-05
+      },
+      "case": "SPINPROP|PR|CO2|classic|ROOT:2:0:6.903944196371763e-05|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "CO2",
+        "classic"
+      ],
+      "property": 2,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          285.7245555450039,
+          6.903861171060417e-05,
+          2570007.868150875
+        ],
+        "found": true,
+        "status": 0,
+        "target": 6.903944196371763e-05,
+        "eigenvalue": 1.7947675350793446e-05,
+        "property_value": 6.903861171060417e-05
+      },
+      "case": "SPINPROP|PR|CO2|classic|ROOT:2:1:6.903944196371763e-05|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "CO2",
+        "classic"
+      ],
+      "property": 3,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          285.72455960671437,
+          6.903861458649438e-05,
+          2570009.176041171
+        ],
+        "found": true,
+        "status": 0,
+        "target": -403811.9368494675,
+        "eigenvalue": 1.7948296709757727e-05,
+        "property_value": -403812.01307542954
+      },
+      "case": "SPINPROP|PR|CO2|classic|ROOT:3:0:-403811.9368494675|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "CO2",
+        "classic"
+      ],
+      "property": 3,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          285.72455960671437,
+          6.903861458649438e-05,
+          2570009.176041171
+        ],
+        "found": true,
+        "status": 0,
+        "target": -403811.9368494675,
+        "eigenvalue": 1.7948296709757727e-05,
+        "property_value": -403812.01307542954
+      },
+      "case": "SPINPROP|PR|CO2|classic|ROOT:3:1:-403811.9368494675|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "CO2",
+        "classic"
+      ],
+      "property": 4,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          285.724561332754,
+          0.00017685369703500706,
+          5468044.13354082
+        ],
+        "found": true,
+        "status": 0,
+        "target": 285.724561332754,
+        "eigenvalue": 1.873368461713376e-05,
+        "property_value": 285.724561332754
+      },
+      "case": "SPINPROP|PR|CO2|classic|ROOT:4:0:285.724561332754|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "CO2",
+        "classic"
+      ],
+      "property": 4,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          285.724561332754,
+          6.903861580861509e-05,
+          2570009.731834162
+        ],
+        "found": true,
+        "status": 0,
+        "target": 285.724561332754,
+        "eigenvalue": 1.7948560759428744e-05,
+        "property_value": 285.724561332754
+      },
+      "case": "SPINPROP|PR|CO2|classic|ROOT:4:1:285.724561332754|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "CO2",
+        "classic"
+      ],
+      "property": 4,
+      "phase": 2,
+      "index": 20,
+      "result": {
+        "values": [
+          285.724561332754,
+          0.00017685369703500706,
+          5468044.13354082
+        ],
+        "found": true,
+        "status": 0,
+        "target": 285.724561332754,
+        "eigenvalue": 1.873368461713376e-05,
+        "property_value": 285.724561332754
+      },
+      "case": "SPINPROP|PR|CO2|classic|ROOT:4:2:285.724561332754|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "CO2",
+        "classic"
+      ],
+      "property": 5,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          230.6695438293122,
+          0.0003410819805447084,
+          2570009.7250307663
+        ],
+        "found": true,
+        "status": 0,
+        "target": 2570009.728138879,
+        "eigenvalue": -2.7869421330706245e-06,
+        "property_value": 2570009.7250307663
+      },
+      "case": "SPINPROP|PR|CO2|classic|ROOT:5:0:2570009.728138879|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "CO2",
+        "classic"
+      ],
+      "property": 5,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          285.72456133276535,
+          6.903861580862314e-05,
+          2570009.731837824
+        ],
+        "found": true,
+        "status": 0,
+        "target": 2570009.728138879,
+        "eigenvalue": 1.794856076164919e-05,
+        "property_value": 2570009.731837824
+      },
+      "case": "SPINPROP|PR|CO2|classic|ROOT:5:1:2570009.728138879|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "CO2",
+        "classic"
+      ],
+      "property": 5,
+      "phase": 2,
+      "index": 20,
+      "result": {
+        "values": [
+          230.6695438293122,
+          0.0003410819805447084,
+          2570009.7250307663
+        ],
+        "found": true,
+        "status": 0,
+        "target": 2570009.728138879,
+        "eigenvalue": -2.7869421330706245e-06,
+        "property_value": 2570009.7250307663
+      },
+      "case": "SPINPROP|PR|CO2|classic|ROOT:5:2:2570009.728138879|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "CO2",
+        "classic"
+      ],
+      "property": 6,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          285.72455937083396,
+          6.90386144194795e-05,
+          2570009.100086555
+        ],
+        "found": true,
+        "status": 0,
+        "target": -403989.3688869396,
+        "eigenvalue": 1.7948260623068535e-05,
+        "property_value": -403989.44297217403
+      },
+      "case": "SPINPROP|PR|CO2|classic|ROOT:6:0:-403989.3688869396|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "CO2",
+        "classic"
+      ],
+      "property": 6,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          285.72455937083396,
+          6.90386144194795e-05,
+          2570009.100086555
+        ],
+        "found": true,
+        "status": 0,
+        "target": -403989.3688869396,
+        "eigenvalue": 1.7948260623068535e-05,
+        "property_value": -403989.44297217403
+      },
+      "case": "SPINPROP|PR|CO2|classic|ROOT:6:1:-403989.3688869396|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "C1",
+        "classic"
+      ],
+      "property": 1,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          177.21798109927084,
+          7.815324953306886e-05,
+          1870763.6866968311
+        ],
+        "found": true,
+        "status": 0,
+        "target": 113.95712518025174,
+        "eigenvalue": 1.7284760096991647e-05,
+        "property_value": 113.95692071474788
+      },
+      "case": "SPINPROP|SRK|C1|classic|ROOT:1:0:113.95712518025174|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "C1",
+        "classic"
+      ],
+      "property": 1,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          177.21798109927084,
+          7.815324953306886e-05,
+          1870763.6866968311
+        ],
+        "found": true,
+        "status": 0,
+        "target": 113.95712518025174,
+        "eigenvalue": 1.7284760096991647e-05,
+        "property_value": 113.95692071474788
+      },
+      "case": "SPINPROP|SRK|C1|classic|ROOT:1:1:113.95712518025174|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "C1",
+        "classic"
+      ],
+      "property": 2,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          177.21797843237832,
+          7.81532468040065e-05,
+          1870763.0244250335
+        ],
+        "found": true,
+        "status": 0,
+        "target": 7.81540721143857e-05,
+        "eigenvalue": 1.7284215681812043e-05,
+        "property_value": 7.81532468040065e-05
+      },
+      "case": "SPINPROP|SRK|C1|classic|ROOT:2:0:7.81540721143857e-05|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "C1",
+        "classic"
+      ],
+      "property": 2,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          177.21797843237832,
+          7.81532468040065e-05,
+          1870763.0244250335
+        ],
+        "found": true,
+        "status": 0,
+        "target": 7.81540721143857e-05,
+        "eigenvalue": 1.7284215681812043e-05,
+        "property_value": 7.81532468040065e-05
+      },
+      "case": "SPINPROP|SRK|C1|classic|ROOT:2:1:7.81540721143857e-05|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "C1",
+        "classic"
+      ],
+      "property": 3,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          177.21798116341486,
+          7.815324959870818e-05,
+          1870763.7026257627
+        ],
+        "found": true,
+        "status": 0,
+        "target": -84194.42560454828,
+        "eigenvalue": 1.728477319140609e-05,
+        "property_value": -84194.46185525469
+      },
+      "case": "SPINPROP|SRK|C1|classic|ROOT:3:0:-84194.42560454828|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "C1",
+        "classic"
+      ],
+      "property": 3,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          177.21798116341486,
+          7.815324959870818e-05,
+          1870763.7026257627
+        ],
+        "found": true,
+        "status": 0,
+        "target": -84194.42560454828,
+        "eigenvalue": 1.728477319140609e-05,
+        "property_value": -84194.46185525469
+      },
+      "case": "SPINPROP|SRK|C1|classic|ROOT:3:1:-84194.42560454828|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "C1",
+        "classic"
+      ],
+      "property": 4,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          177.2179822294905,
+          0.0001846970419780565,
+          3416468.1877113134
+        ],
+        "found": true,
+        "status": 0,
+        "target": 177.2179822294905,
+        "eigenvalue": 1.6328351972405564e-05,
+        "property_value": 177.2179822294905
+      },
+      "case": "SPINPROP|SRK|C1|classic|ROOT:4:0:177.2179822294905|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "C1",
+        "classic"
+      ],
+      "property": 4,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          177.2179822294905,
+          7.815325068963587e-05,
+          1870763.9673652686
+        ],
+        "found": true,
+        "status": 0,
+        "target": 177.2179822294905,
+        "eigenvalue": 1.7284990819543822e-05,
+        "property_value": 177.2179822294905
+      },
+      "case": "SPINPROP|SRK|C1|classic|ROOT:4:1:177.2179822294905|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "C1",
+        "classic"
+      ],
+      "property": 4,
+      "phase": 1,
+      "index": 120,
+      "result": {
+        "values": [
+          175.15661616161657,
+          7.613882521694382e-05,
+          1346777.1080261543
+        ],
+        "found": true,
+        "status": 0,
+        "target": 175.15661616161657,
+        "eigenvalue": 9.971311512479986e-06,
+        "property_value": 175.15661616161657
+      },
+      "case": "SPINPROP|SRK|C1|classic|ROOT:4:1:175.15661616161657|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "C1",
+        "classic"
+      ],
+      "property": 4,
+      "phase": 2,
+      "index": 20,
+      "result": {
+        "values": [
+          177.2179822294905,
+          0.0001846970419780565,
+          3416468.1877113134
+        ],
+        "found": true,
+        "status": 0,
+        "target": 177.2179822294905,
+        "eigenvalue": 1.6328351972405564e-05,
+        "property_value": 177.2179822294905
+      },
+      "case": "SPINPROP|SRK|C1|classic|ROOT:4:2:177.2179822294905|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "C1",
+        "classic"
+      ],
+      "property": 5,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          177.21798222949639,
+          7.815325068964188e-05,
+          1870763.9673667364
+        ],
+        "found": true,
+        "status": 0,
+        "target": 1870763.9656527154,
+        "eigenvalue": 1.728499082132018e-05,
+        "property_value": 1870763.9673667364
+      },
+      "case": "SPINPROP|SRK|C1|classic|ROOT:5:1:1870763.9656527154|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "C1",
+        "classic"
+      ],
+      "property": 6,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          177.21798101218883,
+          7.81532494439568e-05,
+          1870763.6650716737
+        ],
+        "found": true,
+        "status": 0,
+        "target": -84340.6334264289,
+        "eigenvalue": 1.7284742320100577e-05,
+        "property_value": -84340.66812890633
+      },
+      "case": "SPINPROP|SRK|C1|classic|ROOT:6:0:-84340.6334264289|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "C1",
+        "classic"
+      ],
+      "property": 6,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          177.21798101218883,
+          7.81532494439568e-05,
+          1870763.6650716737
+        ],
+        "found": true,
+        "status": 0,
+        "target": -84340.6334264289,
+        "eigenvalue": 1.7284742320100577e-05,
+        "property_value": -84340.66812890633
+      },
+      "case": "SPINPROP|SRK|C1|classic|ROOT:6:1:-84340.6334264289|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "N2",
+        "classic"
+      ],
+      "property": 1,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          118.2578742697471,
+          7.111579315901108e-05,
+          1575659.2718967684
+        ],
+        "found": true,
+        "status": 0,
+        "target": 112.28946718909152,
+        "eigenvalue": 1.5409398418597675e-05,
+        "property_value": 112.28926842950167
+      },
+      "case": "SPINPROP|SRK|N2|classic|ROOT:1:0:112.28946718909152|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "N2",
+        "classic"
+      ],
+      "property": 1,
+      "phase": 0,
+      "index": 120,
+      "result": {
+        "values": [
+          115.96617173423363,
+          0.00017396560472020777,
+          2402938.5279754573
+        ],
+        "found": true,
+        "status": 0,
+        "target": 125.93049937690127,
+        "eigenvalue": 3.5626984717929133e-06,
+        "property_value": 125.93057453982796
+      },
+      "case": "SPINPROP|SRK|N2|classic|ROOT:1:0:125.93049937690127|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "N2",
+        "classic"
+      ],
+      "property": 1,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          118.2578742697471,
+          7.111579315901108e-05,
+          1575659.2718967684
+        ],
+        "found": true,
+        "status": 0,
+        "target": 112.28946718909152,
+        "eigenvalue": 1.5409398418597675e-05,
+        "property_value": 112.28926842950167
+      },
+      "case": "SPINPROP|SRK|N2|classic|ROOT:1:1:112.28946718909152|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "N2",
+        "classic"
+      ],
+      "property": 1,
+      "phase": 2,
+      "index": 120,
+      "result": {
+        "values": [
+          115.96617173423363,
+          0.00017396560472020777,
+          2402938.5279754573
+        ],
+        "found": true,
+        "status": 0,
+        "target": 125.93049937690127,
+        "eigenvalue": 3.5626984717929133e-06,
+        "property_value": 125.93057453982796
+      },
+      "case": "SPINPROP|SRK|N2|classic|ROOT:1:2:125.93049937690127|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "N2",
+        "classic"
+      ],
+      "property": 2,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          118.25787281488276,
+          7.11157909545199e-05,
+          1575658.8682170734
+        ],
+        "found": true,
+        "status": 0,
+        "target": 7.111650886955019e-05,
+        "eigenvalue": 1.540895153251398e-05,
+        "property_value": 7.11157909545199e-05
+      },
+      "case": "SPINPROP|SRK|N2|classic|ROOT:2:0:7.111650886955019e-05|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "N2",
+        "classic"
+      ],
+      "property": 2,
+      "phase": 0,
+      "index": 120,
+      "result": {
+        "values": [
+          115.96614990033794,
+          0.0001739657166840225,
+          2402936.89721545
+        ],
+        "found": true,
+        "status": 0,
+        "target": 0.0001739645984227886,
+        "eigenvalue": 3.5622342577923405e-06,
+        "property_value": 0.0001739657166840225
+      },
+      "case": "SPINPROP|SRK|N2|classic|ROOT:2:0:0.0001739645984227886|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "N2",
+        "classic"
+      ],
+      "property": 2,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          118.25787281488276,
+          7.11157909545199e-05,
+          1575658.8682170734
+        ],
+        "found": true,
+        "status": 0,
+        "target": 7.111650886955019e-05,
+        "eigenvalue": 1.540895153251398e-05,
+        "property_value": 7.11157909545199e-05
+      },
+      "case": "SPINPROP|SRK|N2|classic|ROOT:2:1:7.111650886955019e-05|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "N2",
+        "classic"
+      ],
+      "property": 2,
+      "phase": 2,
+      "index": 120,
+      "result": {
+        "values": [
+          115.96614990033794,
+          0.0001739657166840225,
+          2402936.89721545
+        ],
+        "found": true,
+        "status": 0,
+        "target": 0.0001739645984227886,
+        "eigenvalue": 3.5622342577923405e-06,
+        "property_value": 0.0001739657166840225
+      },
+      "case": "SPINPROP|SRK|N2|classic|ROOT:2:2:0.0001739645984227886|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "N2",
+        "classic"
+      ],
+      "property": 3,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          118.25787434277481,
+          7.111579326966671e-05,
+          1575659.2921596933
+        ],
+        "found": true,
+        "status": 0,
+        "target": -8703.07880326917,
+        "eigenvalue": 1.540942085176411e-05,
+        "property_value": -8703.1023160035
+      },
+      "case": "SPINPROP|SRK|N2|classic|ROOT:3:0:-8703.07880326917|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "N2",
+        "classic"
+      ],
+      "property": 3,
+      "phase": 0,
+      "index": 120,
+      "result": {
+        "values": [
+          115.96617195471444,
+          0.00017396560358958618,
+          2402938.5444430406
+        ],
+        "found": true,
+        "status": 0,
+        "target": -7018.446820300151,
+        "eigenvalue": 3.562703159709635e-06,
+        "property_value": -7018.4381054693695
+      },
+      "case": "SPINPROP|SRK|N2|classic|ROOT:3:0:-7018.446820300151|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "N2",
+        "classic"
+      ],
+      "property": 3,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          118.25787434277481,
+          7.111579326966671e-05,
+          1575659.2921596933
+        ],
+        "found": true,
+        "status": 0,
+        "target": -8703.07880326917,
+        "eigenvalue": 1.540942085176411e-05,
+        "property_value": -8703.1023160035
+      },
+      "case": "SPINPROP|SRK|N2|classic|ROOT:3:1:-8703.07880326917|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "N2",
+        "classic"
+      ],
+      "property": 3,
+      "phase": 2,
+      "index": 120,
+      "result": {
+        "values": [
+          115.96617195471444,
+          0.00017396560358958618,
+          2402938.5444430406
+        ],
+        "found": true,
+        "status": 0,
+        "target": -7018.446820300151,
+        "eigenvalue": 3.562703159709635e-06,
+        "property_value": -7018.4381054693695
+      },
+      "case": "SPINPROP|SRK|N2|classic|ROOT:3:2:-7018.446820300151|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "N2",
+        "classic"
+      ],
+      "property": 4,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          118.2578750269176,
+          0.0001621096975903421,
+          2582087.814492427
+        ],
+        "found": true,
+        "status": 0,
+        "target": 118.2578750269176,
+        "eigenvalue": 1.08773416653829e-05,
+        "property_value": 118.2578750269176
+      },
+      "case": "SPINPROP|SRK|N2|classic|ROOT:4:0:118.2578750269176|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "N2",
+        "classic"
+      ],
+      "property": 4,
+      "phase": 0,
+      "index": 120,
+      "result": {
+        "values": [
+          115.96617171717189,
+          0.0001739656048077,
+          2402938.526701124
+        ],
+        "found": true,
+        "status": 0,
+        "target": 115.96617171717189,
+        "eigenvalue": 3.5626981093050958e-06,
+        "property_value": 115.96617171717189
+      },
+      "case": "SPINPROP|SRK|N2|classic|ROOT:4:0:115.96617171717189|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "N2",
+        "classic"
+      ],
+      "property": 4,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          118.2578750269176,
+          7.111579430631782e-05,
+          1575659.4819880594
+        ],
+        "found": true,
+        "status": 0,
+        "target": 118.2578750269176,
+        "eigenvalue": 1.5409630998775015e-05,
+        "property_value": 118.2578750269176
+      },
+      "case": "SPINPROP|SRK|N2|classic|ROOT:4:1:118.2578750269176|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "N2",
+        "classic"
+      ],
+      "property": 4,
+      "phase": 2,
+      "index": 20,
+      "result": {
+        "values": [
+          118.2578750269176,
+          0.0001621096975903421,
+          2582087.814492427
+        ],
+        "found": true,
+        "status": 0,
+        "target": 118.2578750269176,
+        "eigenvalue": 1.08773416653829e-05,
+        "property_value": 118.2578750269176
+      },
+      "case": "SPINPROP|SRK|N2|classic|ROOT:4:2:118.2578750269176|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "N2",
+        "classic"
+      ],
+      "property": 4,
+      "phase": 2,
+      "index": 120,
+      "result": {
+        "values": [
+          115.96617171717189,
+          0.0001739656048077,
+          2402938.526701124
+        ],
+        "found": true,
+        "status": 0,
+        "target": 115.96617171717189,
+        "eigenvalue": 3.5626981093050958e-06,
+        "property_value": 115.96617171717189
+      },
+      "case": "SPINPROP|SRK|N2|classic|ROOT:4:2:115.96617171717189|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "N2",
+        "classic"
+      ],
+      "property": 5,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          102.08944814339262,
+          0.0002480804529148207,
+          1575659.4806305792
+        ],
+        "found": true,
+        "status": 0,
+        "target": 1575659.4809176996,
+        "eigenvalue": -3.4989181101341416e-06,
+        "property_value": 1575659.4806305792
+      },
+      "case": "SPINPROP|SRK|N2|classic|ROOT:5:0:1575659.4809176996|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "N2",
+        "classic"
+      ],
+      "property": 5,
+      "phase": 0,
+      "index": 120,
+      "result": {
+        "values": [
+          115.96617171670191,
+          0.0001739656048101101,
+          2402938.5266660233
+        ],
+        "found": true,
+        "status": 0,
+        "target": 2402938.52675824,
+        "eigenvalue": 3.562698099535133e-06,
+        "property_value": 2402938.5266660233
+      },
+      "case": "SPINPROP|SRK|N2|classic|ROOT:5:0:2402938.52675824|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "N2",
+        "classic"
+      ],
+      "property": 5,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          118.2578750269206,
+          7.111579430632238e-05,
+          1575659.48198889
+        ],
+        "found": true,
+        "status": 0,
+        "target": 1575659.4809176996,
+        "eigenvalue": 1.5409630999663193e-05,
+        "property_value": 1575659.48198889
+      },
+      "case": "SPINPROP|SRK|N2|classic|ROOT:5:1:1575659.4809176996|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "N2",
+        "classic"
+      ],
+      "property": 5,
+      "phase": 1,
+      "index": 120,
+      "result": {
+        "values": [
+          121.43423286234004,
+          7.6919557363826e-05,
+          2402938.527719224
+        ],
+        "found": true,
+        "status": 0,
+        "target": 2402938.52675824,
+        "eigenvalue": 1.2164915029533319e-05,
+        "property_value": 2402938.527719224
+      },
+      "case": "SPINPROP|SRK|N2|classic|ROOT:5:1:2402938.52675824|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "N2",
+        "classic"
+      ],
+      "property": 5,
+      "phase": 2,
+      "index": 20,
+      "result": {
+        "values": [
+          102.08944814339262,
+          0.0002480804529148207,
+          1575659.4806305792
+        ],
+        "found": true,
+        "status": 0,
+        "target": 1575659.4809176996,
+        "eigenvalue": -3.4989181101341416e-06,
+        "property_value": 1575659.4806305792
+      },
+      "case": "SPINPROP|SRK|N2|classic|ROOT:5:2:1575659.4809176996|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "N2",
+        "classic"
+      ],
+      "property": 5,
+      "phase": 2,
+      "index": 120,
+      "result": {
+        "values": [
+          115.96617171670191,
+          0.0001739656048101101,
+          2402938.5266660233
+        ],
+        "found": true,
+        "status": 0,
+        "target": 2402938.52675824,
+        "eigenvalue": 3.562698099535133e-06,
+        "property_value": 2402938.5266660233
+      },
+      "case": "SPINPROP|SRK|N2|classic|ROOT:5:2:2402938.52675824|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "N2",
+        "classic"
+      ],
+      "property": 6,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          118.25787424486738,
+          7.111579312131194e-05,
+          1575659.2649934068
+        ],
+        "found": true,
+        "status": 0,
+        "target": -8815.134204719247,
+        "eigenvalue": 1.540939077715464e-05,
+        "property_value": -8815.156583730202
+      },
+      "case": "SPINPROP|SRK|N2|classic|ROOT:6:0:-8815.134204719247|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "N2",
+        "classic"
+      ],
+      "property": 6,
+      "phase": 0,
+      "index": 120,
+      "result": {
+        "values": [
+          115.96617182169308,
+          0.00017396560427171732,
+          2402938.5345077515
+        ],
+        "found": true,
+        "status": 0,
+        "target": -7436.473056142295,
+        "eigenvalue": 3.5627003313054573e-06,
+        "property_value": -7436.466758604323
+      },
+      "case": "SPINPROP|SRK|N2|classic|ROOT:6:0:-7436.473056142295|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "N2",
+        "classic"
+      ],
+      "property": 6,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          118.25787424486738,
+          7.111579312131194e-05,
+          1575659.2649934068
+        ],
+        "found": true,
+        "status": 0,
+        "target": -8815.134204719247,
+        "eigenvalue": 1.540939077715464e-05,
+        "property_value": -8815.156583730202
+      },
+      "case": "SPINPROP|SRK|N2|classic|ROOT:6:1:-8815.134204719247|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "N2",
+        "classic"
+      ],
+      "property": 6,
+      "phase": 2,
+      "index": 120,
+      "result": {
+        "values": [
+          115.96617182169308,
+          0.00017396560427171732,
+          2402938.5345077515
+        ],
+        "found": true,
+        "status": 0,
+        "target": -7436.473056142295,
+        "eigenvalue": 3.5627003313054573e-06,
+        "property_value": -7436.466758604323
+      },
+      "case": "SPINPROP|SRK|N2|classic|ROOT:6:2:-7436.473056142295|1000000.0"
+    },
+    {
+      "configuration": [
+        "RK",
+        "C1",
+        "classic"
+      ],
+      "property": 1,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          177.37451935601888,
+          7.81787775127831e-05,
+          1878289.1211573184
+        ],
+        "found": true,
+        "status": 0,
+        "target": 113.56848494748978,
+        "eigenvalue": 1.7150793627962457e-05,
+        "property_value": 113.56827816306449
+      },
+      "case": "SPINPROP|RK|C1|classic|ROOT:1:0:113.56848494748978|1000000.0"
+    },
+    {
+      "configuration": [
+        "RK",
+        "C1",
+        "classic"
+      ],
+      "property": 1,
+      "phase": 0,
+      "index": 120,
+      "result": {
+        "values": [
+          175.15661558947258,
+          0.0001929943916170098,
+          3267712.1796656568
+        ],
+        "found": true,
+        "status": 0,
+        "target": 127.40951233753385,
+        "eigenvalue": 1.100788182717416e-06,
+        "property_value": 127.40953564996474
+      },
+      "case": "SPINPROP|RK|C1|classic|ROOT:1:0:127.40951233753385|1000000.0"
+    },
+    {
+      "configuration": [
+        "RK",
+        "C1",
+        "classic"
+      ],
+      "property": 1,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          177.37451935601888,
+          7.81787775127831e-05,
+          1878289.1211573184
+        ],
+        "found": true,
+        "status": 0,
+        "target": 113.56848494748978,
+        "eigenvalue": 1.7150793627962457e-05,
+        "property_value": 113.56827816306449
+      },
+      "case": "SPINPROP|RK|C1|classic|ROOT:1:1:113.56848494748978|1000000.0"
+    },
+    {
+      "configuration": [
+        "RK",
+        "C1",
+        "classic"
+      ],
+      "property": 1,
+      "phase": 2,
+      "index": 120,
+      "result": {
+        "values": [
+          175.15661558947258,
+          0.0001929943916170098,
+          3267712.1796656568
+        ],
+        "found": true,
+        "status": 0,
+        "target": 127.40951233753385,
+        "eigenvalue": 1.100788182717416e-06,
+        "property_value": 127.40953564996474
+      },
+      "case": "SPINPROP|RK|C1|classic|ROOT:1:2:127.40951233753385|1000000.0"
+    },
+    {
+      "configuration": [
+        "RK",
+        "C1",
+        "classic"
+      ],
+      "property": 2,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          177.3745165226403,
+          7.817877455533356e-05,
+          1878288.4050098509
+        ],
+        "found": true,
+        "status": 0,
+        "target": 7.817959497652096e-05,
+        "eigenvalue": 1.7150212927585784e-05,
+        "property_value": 7.817877455533356e-05
+      },
+      "case": "SPINPROP|RK|C1|classic|ROOT:2:0:7.817959497652096e-05|1000000.0"
+    },
+    {
+      "configuration": [
+        "RK",
+        "C1",
+        "classic"
+      ],
+      "property": 2,
+      "phase": 0,
+      "index": 120,
+      "result": {
+        "values": [
+          175.1565292591523,
+          0.00019299471724173916,
+          3267706.3854082385
+        ],
+        "found": true,
+        "status": 0,
+        "target": 0.00019299404282334965,
+        "eigenvalue": 1.100293146927278e-06,
+        "property_value": 0.00019299471724173916
+      },
+      "case": "SPINPROP|RK|C1|classic|ROOT:2:0:0.00019299404282334965|1000000.0"
+    },
+    {
+      "configuration": [
+        "RK",
+        "C1",
+        "classic"
+      ],
+      "property": 2,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          177.3745165226403,
+          7.817877455533356e-05,
+          1878288.4050098509
+        ],
+        "found": true,
+        "status": 0,
+        "target": 7.817959497652096e-05,
+        "eigenvalue": 1.7150212927585784e-05,
+        "property_value": 7.817877455533356e-05
+      },
+      "case": "SPINPROP|RK|C1|classic|ROOT:2:1:7.817959497652096e-05|1000000.0"
+    },
+    {
+      "configuration": [
+        "RK",
+        "C1",
+        "classic"
+      ],
+      "property": 2,
+      "phase": 2,
+      "index": 120,
+      "result": {
+        "values": [
+          175.1565292591523,
+          0.00019299471724173916,
+          3267706.3854082385
+        ],
+        "found": true,
+        "status": 0,
+        "target": 0.00019299404282334965,
+        "eigenvalue": 1.100293146927278e-06,
+        "property_value": 0.00019299471724173916
+      },
+      "case": "SPINPROP|RK|C1|classic|ROOT:2:2:0.00019299404282334965|1000000.0"
+    },
+    {
+      "configuration": [
+        "RK",
+        "C1",
+        "classic"
+      ],
+      "property": 3,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          177.37451935936863,
+          7.817877751627952e-05,
+          1878289.12200398
+        ],
+        "found": true,
+        "status": 0,
+        "target": -84265.64144890392,
+        "eigenvalue": 1.7150794315856643e-05,
+        "property_value": -84265.6781428489
+      },
+      "case": "SPINPROP|RK|C1|classic|ROOT:3:0:-84265.64144890392|1000000.0"
+    },
+    {
+      "configuration": [
+        "RK",
+        "C1",
+        "classic"
+      ],
+      "property": 3,
+      "phase": 0,
+      "index": 120,
+      "result": {
+        "values": [
+          175.15670626650942,
+          0.00019299404959713216,
+          3267718.2656759936
+        ],
+        "found": true,
+        "status": 0,
+        "target": -81665.52500903356,
+        "eigenvalue": 1.1013082834576693e-06,
+        "property_value": -81665.52106854541
+      },
+      "case": "SPINPROP|RK|C1|classic|ROOT:3:0:-81665.52500903356|1000000.0"
+    },
+    {
+      "configuration": [
+        "RK",
+        "C1",
+        "classic"
+      ],
+      "property": 3,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          177.37451935936863,
+          7.817877751627952e-05,
+          1878289.12200398
+        ],
+        "found": true,
+        "status": 0,
+        "target": -84265.64144890392,
+        "eigenvalue": 1.7150794315856643e-05,
+        "property_value": -84265.6781428489
+      },
+      "case": "SPINPROP|RK|C1|classic|ROOT:3:1:-84265.64144890392|1000000.0"
+    },
+    {
+      "configuration": [
+        "RK",
+        "C1",
+        "classic"
+      ],
+      "property": 3,
+      "phase": 2,
+      "index": 120,
+      "result": {
+        "values": [
+          175.15670626650942,
+          0.00019299404959713216,
+          3267718.2656759936
+        ],
+        "found": true,
+        "status": 0,
+        "target": -81665.52500903356,
+        "eigenvalue": 1.1013082834576693e-06,
+        "property_value": -81665.52106854541
+      },
+      "case": "SPINPROP|RK|C1|classic|ROOT:3:2:-81665.52500903356|1000000.0"
+    },
+    {
+      "configuration": [
+        "RK",
+        "C1",
+        "classic"
+      ],
+      "property": 4,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          177.37452017243092,
+          0.00018460183617019998,
+          3420737.9851097614
+        ],
+        "found": true,
+        "status": 0,
+        "target": 177.37452017243092,
+        "eigenvalue": 6.636474594645669e-06,
+        "property_value": 177.37452017243092
+      },
+      "case": "SPINPROP|RK|C1|classic|ROOT:4:0:177.37452017243092|1000000.0"
+    },
+    {
+      "configuration": [
+        "RK",
+        "C1",
+        "classic"
+      ],
+      "property": 4,
+      "phase": 0,
+      "index": 120,
+      "result": {
+        "values": [
+          175.15661616161657,
+          0.00019299438945897043,
+          3267712.218066452
+        ],
+        "found": true,
+        "status": 0,
+        "target": 175.15661616161657,
+        "eigenvalue": 1.1007914643146322e-06,
+        "property_value": 175.15661616161657
+      },
+      "case": "SPINPROP|RK|C1|classic|ROOT:4:0:175.15661616161657|1000000.0"
+    },
+    {
+      "configuration": [
+        "RK",
+        "C1",
+        "classic"
+      ],
+      "property": 4,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          177.37452017243092,
+          7.817877836494504e-05,
+          1878289.3275086395
+        ],
+        "found": true,
+        "status": 0,
+        "target": 177.37452017243092,
+        "eigenvalue": 1.71509609536713e-05,
+        "property_value": 177.37452017243092
+      },
+      "case": "SPINPROP|RK|C1|classic|ROOT:4:1:177.37452017243092|1000000.0"
+    },
+    {
+      "configuration": [
+        "RK",
+        "C1",
+        "classic"
+      ],
+      "property": 4,
+      "phase": 1,
+      "index": 120,
+      "result": {
+        "values": [
+          175.15661616161657,
+          7.597675421644182e-05,
+          1302262.691691909
+        ],
+        "found": true,
+        "status": 0,
+        "target": 175.15661616161657,
+        "eigenvalue": 7.888488205765043e-06,
+        "property_value": 175.15661616161657
+      },
+      "case": "SPINPROP|RK|C1|classic|ROOT:4:1:175.15661616161657|1000000.0"
+    },
+    {
+      "configuration": [
+        "RK",
+        "C1",
+        "classic"
+      ],
+      "property": 4,
+      "phase": 2,
+      "index": 20,
+      "result": {
+        "values": [
+          177.37452017243092,
+          0.00018460183617019998,
+          3420737.9851097614
+        ],
+        "found": true,
+        "status": 0,
+        "target": 177.37452017243092,
+        "eigenvalue": 6.636474594645669e-06,
+        "property_value": 177.37452017243092
+      },
+      "case": "SPINPROP|RK|C1|classic|ROOT:4:2:177.37452017243092|1000000.0"
+    },
+    {
+      "configuration": [
+        "RK",
+        "C1",
+        "classic"
+      ],
+      "property": 4,
+      "phase": 2,
+      "index": 120,
+      "result": {
+        "values": [
+          175.15661616161657,
+          0.00019299438945897043,
+          3267712.218066452
+        ],
+        "found": true,
+        "status": 0,
+        "target": 175.15661616161657,
+        "eigenvalue": 1.1007914643146322e-06,
+        "property_value": 175.15661616161657
+      },
+      "case": "SPINPROP|RK|C1|classic|ROOT:4:2:175.15661616161657|1000000.0"
+    },
+    {
+      "configuration": [
+        "RK",
+        "C1",
+        "classic"
+      ],
+      "property": 5,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          147.96126324934042,
+          0.0003048325798262757,
+          1878289.3240084392
+        ],
+        "found": true,
+        "status": 0,
+        "target": 1878289.3258189298,
+        "eigenvalue": -2.6619224649415685e-05,
+        "property_value": 1878289.3240084392
+      },
+      "case": "SPINPROP|RK|C1|classic|ROOT:5:0:1878289.3258189298|1000000.0"
+    },
+    {
+      "configuration": [
+        "RK",
+        "C1",
+        "classic"
+      ],
+      "property": 5,
+      "phase": 0,
+      "index": 120,
+      "result": {
+        "values": [
+          175.1566161314007,
+          0.00019299438957293998,
+          3267712.2160384366
+        ],
+        "found": true,
+        "status": 0,
+        "target": 3267712.218073909,
+        "eigenvalue": 1.1007912907867734e-06,
+        "property_value": 3267712.2160384366
+      },
+      "case": "SPINPROP|RK|C1|classic|ROOT:5:0:3267712.218073909|1000000.0"
+    },
+    {
+      "configuration": [
+        "RK",
+        "C1",
+        "classic"
+      ],
+      "property": 5,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          177.3745201724379,
+          7.817877836495235e-05,
+          1878289.3275104128
+        ],
+        "found": true,
+        "status": 0,
+        "target": 1878289.3258189298,
+        "eigenvalue": 1.715096095544766e-05,
+        "property_value": 1878289.3275104128
+      },
+      "case": "SPINPROP|RK|C1|classic|ROOT:5:1:1878289.3258189298|1000000.0"
+    },
+    {
+      "configuration": [
+        "RK",
+        "C1",
+        "classic"
+      ],
+      "property": 5,
+      "phase": 1,
+      "index": 120,
+      "result": {
+        "values": [
+          183.3234567500547,
+          8.58660295374569e-05,
+          3267712.219109429
+        ],
+        "found": true,
+        "status": 0,
+        "target": 3267712.218073909,
+        "eigenvalue": 1.085591787353124e-05,
+        "property_value": 3267712.219109429
+      },
+      "case": "SPINPROP|RK|C1|classic|ROOT:5:1:3267712.218073909|1000000.0"
+    },
+    {
+      "configuration": [
+        "RK",
+        "C1",
+        "classic"
+      ],
+      "property": 5,
+      "phase": 2,
+      "index": 20,
+      "result": {
+        "values": [
+          147.96126324934042,
+          0.0003048325798262757,
+          1878289.3240084392
+        ],
+        "found": true,
+        "status": 0,
+        "target": 1878289.3258189298,
+        "eigenvalue": -2.6619224649415685e-05,
+        "property_value": 1878289.3240084392
+      },
+      "case": "SPINPROP|RK|C1|classic|ROOT:5:2:1878289.3258189298|1000000.0"
+    },
+    {
+      "configuration": [
+        "RK",
+        "C1",
+        "classic"
+      ],
+      "property": 5,
+      "phase": 2,
+      "index": 120,
+      "result": {
+        "values": [
+          175.1566161314007,
+          0.00019299438957293998,
+          3267712.2160384366
+        ],
+        "found": true,
+        "status": 0,
+        "target": 3267712.218073909,
+        "eigenvalue": 1.1007912907867734e-06,
+        "property_value": 3267712.2160384366
+      },
+      "case": "SPINPROP|RK|C1|classic|ROOT:5:2:3267712.218073909|1000000.0"
+    },
+    {
+      "configuration": [
+        "RK",
+        "C1",
+        "classic"
+      ],
+      "property": 6,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          177.37451926101926,
+          7.817877741362354e-05,
+          1878289.097145807
+        ],
+        "found": true,
+        "status": 0,
+        "target": -84412.48534764517,
+        "eigenvalue": 1.715077415731514e-05,
+        "property_value": -84412.52049817606
+      },
+      "case": "SPINPROP|RK|C1|classic|ROOT:6:0:-84412.48534764517|1000000.0"
+    },
+    {
+      "configuration": [
+        "RK",
+        "C1",
+        "classic"
+      ],
+      "property": 6,
+      "phase": 0,
+      "index": 120,
+      "result": {
+        "values": [
+          175.15663526212353,
+          0.00019299431741478723,
+          3267713.500042432
+        ],
+        "found": true,
+        "status": 0,
+        "target": -82296.17400078289,
+        "eigenvalue": 1.1009010081330928e-06,
+        "property_value": -82296.17109894757
+      },
+      "case": "SPINPROP|RK|C1|classic|ROOT:6:0:-82296.17400078289|1000000.0"
+    },
+    {
+      "configuration": [
+        "RK",
+        "C1",
+        "classic"
+      ],
+      "property": 6,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          177.37451926101926,
+          7.817877741362354e-05,
+          1878289.097145807
+        ],
+        "found": true,
+        "status": 0,
+        "target": -84412.48534764517,
+        "eigenvalue": 1.715077415731514e-05,
+        "property_value": -84412.52049817606
+      },
+      "case": "SPINPROP|RK|C1|classic|ROOT:6:1:-84412.48534764517|1000000.0"
+    },
+    {
+      "configuration": [
+        "RK",
+        "C1",
+        "classic"
+      ],
+      "property": 6,
+      "phase": 2,
+      "index": 120,
+      "result": {
+        "values": [
+          175.15663526212353,
+          0.00019299431741478723,
+          3267713.500042432
+        ],
+        "found": true,
+        "status": 0,
+        "target": -82296.17400078289,
+        "eigenvalue": 1.1009010081330928e-06,
+        "property_value": -82296.17109894757
+      },
+      "case": "SPINPROP|RK|C1|classic|ROOT:6:2:-82296.17400078289|1000000.0"
+    },
+    {
+      "configuration": [
+        "VDW",
+        "C3",
+        "classic"
+      ],
+      "property": 1,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          332.70702315564915,
+          0.00019506692464716827,
+          1773463.9317514524
+        ],
+        "found": true,
+        "status": 0,
+        "target": 232.34896225972125,
+        "eigenvalue": 2.188816318726694e-05,
+        "property_value": 232.34882866030046
+      },
+      "case": "SPINPROP|VDW|C3|classic|ROOT:1:1:232.34896225972125|1000000.0"
+    },
+    {
+      "configuration": [
+        "VDW",
+        "C3",
+        "classic"
+      ],
+      "property": 1,
+      "phase": 1,
+      "index": 120,
+      "result": {
+        "values": [
+          366.24900831679014,
+          0.0002434751306643494,
+          4062861.2416112237
+        ],
+        "found": true,
+        "status": 0,
+        "target": 242.80585201499483,
+        "eigenvalue": 2.266610843970618e-05,
+        "property_value": 242.8052076423763
+      },
+      "case": "SPINPROP|VDW|C3|classic|ROOT:1:1:242.80585201499483|1000000.0"
+    },
+    {
+      "configuration": [
+        "VDW",
+        "C3",
+        "classic"
+      ],
+      "property": 2,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          332.7070148783184,
+          0.00019506691807580787,
+          1773463.273428494
+        ],
+        "found": true,
+        "status": 0,
+        "target": 0.00019506860096635,
+        "eigenvalue": 2.188739415931451e-05,
+        "property_value": 0.00019506691807580787
+      },
+      "case": "SPINPROP|VDW|C3|classic|ROOT:2:0:0.00019506860096635|1000000.0"
+    },
+    {
+      "configuration": [
+        "VDW",
+        "C3",
+        "classic"
+      ],
+      "property": 2,
+      "phase": 0,
+      "index": 120,
+      "result": {
+        "values": [
+          339.91598663547364,
+          0.00039496960081551074,
+          3261434.830409258
+        ],
+        "found": true,
+        "status": 0,
+        "target": 0.0003949633428968376,
+        "eigenvalue": 4.938818425670455e-06,
+        "property_value": 0.00039496960081551074
+      },
+      "case": "SPINPROP|VDW|C3|classic|ROOT:2:0:0.0003949633428968376|1000000.0"
+    },
+    {
+      "configuration": [
+        "VDW",
+        "C3",
+        "classic"
+      ],
+      "property": 2,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          332.7070148783184,
+          0.00019506691807580787,
+          1773463.273428494
+        ],
+        "found": true,
+        "status": 0,
+        "target": 0.00019506860096635,
+        "eigenvalue": 2.188739415931451e-05,
+        "property_value": 0.00019506691807580787
+      },
+      "case": "SPINPROP|VDW|C3|classic|ROOT:2:1:0.00019506860096635|1000000.0"
+    },
+    {
+      "configuration": [
+        "VDW",
+        "C3",
+        "classic"
+      ],
+      "property": 2,
+      "phase": 2,
+      "index": 120,
+      "result": {
+        "values": [
+          339.91598663547364,
+          0.00039496960081551074,
+          3261434.830409258
+        ],
+        "found": true,
+        "status": 0,
+        "target": 0.0003949633428968376,
+        "eigenvalue": 4.938818425670455e-06,
+        "property_value": 0.00039496960081551074
+      },
+      "case": "SPINPROP|VDW|C3|classic|ROOT:2:2:0.0003949633428968376|1000000.0"
+    },
+    {
+      "configuration": [
+        "VDW",
+        "C3",
+        "classic"
+      ],
+      "property": 3,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          332.70702230764124,
+          0.00019506692397393608,
+          1773463.8643066399
+        ],
+        "found": true,
+        "status": 0,
+        "target": -109271.3711855102,
+        "eigenvalue": 2.1888084400067953e-05,
+        "property_value": -109271.41574674047
+      },
+      "case": "SPINPROP|VDW|C3|classic|ROOT:3:1:-109271.3711855102|1000000.0"
+    },
+    {
+      "configuration": [
+        "VDW",
+        "C3",
+        "classic"
+      ],
+      "property": 3,
+      "phase": 1,
+      "index": 120,
+      "result": {
+        "values": [
+          364.7186258779839,
+          0.0002385240097281582,
+          3978245.284546355
+        ],
+        "found": true,
+        "status": 0,
+        "target": -105363.91727609717,
+        "eigenvalue": 2.8766635271626484e-06,
+        "property_value": -105363.94151861114
+      },
+      "case": "SPINPROP|VDW|C3|classic|ROOT:3:1:-105363.91727609717|1000000.0"
+    },
+    {
+      "configuration": [
+        "VDW",
+        "C3",
+        "classic"
+      ],
+      "property": 4,
+      "phase": 0,
+      "index": 120,
+      "result": {
+        "values": [
+          339.917171717173,
+          0.00039496621213208714,
+          3261467.1960920678
+        ],
+        "found": true,
+        "status": 0,
+        "target": 339.917171717173,
+        "eigenvalue": 4.954342030516479e-06,
+        "property_value": 339.917171717173
+      },
+      "case": "SPINPROP|VDW|C3|classic|ROOT:4:0:339.917171717173|1000000.0"
+    },
+    {
+      "configuration": [
+        "VDW",
+        "C3",
+        "classic"
+      ],
+      "property": 4,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          332.70702441966364,
+          0.00019506692565066748,
+          1773464.0322826244
+        ],
+        "found": true,
+        "status": 0,
+        "target": 332.70702441966364,
+        "eigenvalue": 2.1888280625326217e-05,
+        "property_value": 332.70702441966364
+      },
+      "case": "SPINPROP|VDW|C3|classic|ROOT:4:1:332.70702441966364|1000000.0"
+    },
+    {
+      "configuration": [
+        "VDW",
+        "C3",
+        "classic"
+      ],
+      "property": 4,
+      "phase": 1,
+      "index": 120,
+      "result": {
+        "values": [
+          339.917171717173,
+          0.0002012926895793612,
+          2330897.064961018
+        ],
+        "found": true,
+        "status": 0,
+        "target": 339.917171717173,
+        "eigenvalue": 3.157406333720303e-06,
+        "property_value": 339.917171717173
+      },
+      "case": "SPINPROP|VDW|C3|classic|ROOT:4:1:339.917171717173|1000000.0"
+    },
+    {
+      "configuration": [
+        "VDW",
+        "C3",
+        "classic"
+      ],
+      "property": 4,
+      "phase": 2,
+      "index": 120,
+      "result": {
+        "values": [
+          339.917171717173,
+          0.00039496621213208714,
+          3261467.1960920678
+        ],
+        "found": true,
+        "status": 0,
+        "target": 339.917171717173,
+        "eigenvalue": 4.954342030516479e-06,
+        "property_value": 339.917171717173
+      },
+      "case": "SPINPROP|VDW|C3|classic|ROOT:4:2:339.917171717173|1000000.0"
+    },
+    {
+      "configuration": [
+        "VDW",
+        "C3",
+        "classic"
+      ],
+      "property": 5,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          268.5367647268287,
+          0.000610395808560945,
+          1773464.0305514054
+        ],
+        "found": true,
+        "status": 0,
+        "target": 1773464.0309496503,
+        "eigenvalue": -2.0384311343324413e-06,
+        "property_value": 1773464.0305514054
+      },
+      "case": "SPINPROP|VDW|C3|classic|ROOT:5:0:1773464.0309496503|1000000.0"
+    },
+    {
+      "configuration": [
+        "VDW",
+        "C3",
+        "classic"
+      ],
+      "property": 5,
+      "phase": 0,
+      "index": 120,
+      "result": {
+        "values": [
+          339.9171716414488,
+          0.00039496621234861673,
+          3261467.1940239593
+        ],
+        "found": true,
+        "status": 0,
+        "target": 3261467.196220808,
+        "eigenvalue": 4.95434103775505e-06,
+        "property_value": 3261467.1940239593
+      },
+      "case": "SPINPROP|VDW|C3|classic|ROOT:5:0:3261467.196220808|1000000.0"
+    },
+    {
+      "configuration": [
+        "VDW",
+        "C3",
+        "classic"
+      ],
+      "property": 5,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          332.7070244196758,
+          0.00019506692565067713,
+          1773464.032283593
+        ],
+        "found": true,
+        "status": 0,
+        "target": 1773464.0309496503,
+        "eigenvalue": 2.1888280625770307e-05,
+        "property_value": 1773464.032283593
+      },
+      "case": "SPINPROP|VDW|C3|classic|ROOT:5:1:1773464.0309496503|1000000.0"
+    },
+    {
+      "configuration": [
+        "VDW",
+        "C3",
+        "classic"
+      ],
+      "property": 5,
+      "phase": 1,
+      "index": 120,
+      "result": {
+        "values": [
+          353.0707165730077,
+          0.00021608395610099544,
+          3261467.1963036247
+        ],
+        "found": true,
+        "status": 0,
+        "target": 3261467.196220808,
+        "eigenvalue": 4.959791096492694e-06,
+        "property_value": 3261467.1963036247
+      },
+      "case": "SPINPROP|VDW|C3|classic|ROOT:5:1:3261467.196220808|1000000.0"
+    },
+    {
+      "configuration": [
+        "VDW",
+        "C3",
+        "classic"
+      ],
+      "property": 5,
+      "phase": 2,
+      "index": 20,
+      "result": {
+        "values": [
+          268.5367647268287,
+          0.000610395808560945,
+          1773464.0305514054
+        ],
+        "found": true,
+        "status": 0,
+        "target": 1773464.0309496503,
+        "eigenvalue": -2.0384311343324413e-06,
+        "property_value": 1773464.0305514054
+      },
+      "case": "SPINPROP|VDW|C3|classic|ROOT:5:2:1773464.0309496503|1000000.0"
+    },
+    {
+      "configuration": [
+        "VDW",
+        "C3",
+        "classic"
+      ],
+      "property": 5,
+      "phase": 2,
+      "index": 120,
+      "result": {
+        "values": [
+          339.9171716414488,
+          0.00039496621234861673,
+          3261467.1940239593
+        ],
+        "found": true,
+        "status": 0,
+        "target": 3261467.196220808,
+        "eigenvalue": 4.95434103775505e-06,
+        "property_value": 3261467.1940239593
+      },
+      "case": "SPINPROP|VDW|C3|classic|ROOT:5:2:3261467.196220808|1000000.0"
+    },
+    {
+      "configuration": [
+        "VDW",
+        "C3",
+        "classic"
+      ],
+      "property": 6,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          332.70702211055067,
+          0.00019506692381746616,
+          1773463.8486313894
+        ],
+        "found": true,
+        "status": 0,
+        "target": -109617.31833289168,
+        "eigenvalue": 2.1888066088493474e-05,
+        "property_value": -109617.35990567312
+      },
+      "case": "SPINPROP|VDW|C3|classic|ROOT:6:1:-109617.31833289168|1000000.0"
+    },
+    {
+      "configuration": [
+        "VDW",
+        "C3",
+        "classic"
+      ],
+      "property": 6,
+      "phase": 1,
+      "index": 120,
+      "result": {
+        "values": [
+          361.9433424465197,
+          0.0002314500470716373,
+          3818308.632936351
+        ],
+        "found": true,
+        "status": 0,
+        "target": -106652.07726266493,
+        "eigenvalue": 4.542810951635445e-06,
+        "property_value": -106652.10126619287
+      },
+      "case": "SPINPROP|VDW|C3|classic|ROOT:6:1:-106652.07726266493|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "CO2",
+        "translated"
+      ],
+      "property": 1,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          285.724559477606,
+          7.11847488260466e-05,
+          2570009.134467654
+        ],
+        "found": true,
+        "status": 0,
+        "target": 148.8382129278561,
+        "eigenvalue": 1.908150176976875e-05,
+        "property_value": 148.83794623364855
+      },
+      "case": "SPINPROP|PR|CO2|translated|ROOT:1:0:148.8382129278561|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "CO2",
+        "translated"
+      ],
+      "property": 1,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          285.724559477606,
+          7.11847488260466e-05,
+          2570009.134467654
+        ],
+        "found": true,
+        "status": 0,
+        "target": 148.8382129278561,
+        "eigenvalue": 1.908150176976875e-05,
+        "property_value": 148.83794623364855
+      },
+      "case": "SPINPROP|PR|CO2|translated|ROOT:1:1:148.8382129278561|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "CO2",
+        "translated"
+      ],
+      "property": 2,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          285.72455554585395,
+          7.118474604217324e-05,
+          2570007.8684246168
+        ],
+        "found": true,
+        "status": 0,
+        "target": 7.118557629470348e-05,
+        "eigenvalue": 1.9080862365794538e-05,
+        "property_value": 7.118474604217324e-05
+      },
+      "case": "SPINPROP|PR|CO2|translated|ROOT:2:0:7.118557629470348e-05|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "CO2",
+        "translated"
+      ],
+      "property": 2,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          285.72455554585395,
+          7.118474604217324e-05,
+          2570007.8684246168
+        ],
+        "found": true,
+        "status": 0,
+        "target": 7.118557629470348e-05,
+        "eigenvalue": 1.9080862365794538e-05,
+        "property_value": 7.118474604217324e-05
+      },
+      "case": "SPINPROP|PR|CO2|translated|ROOT:2:1:7.118557629470348e-05|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "CO2",
+        "translated"
+      ],
+      "property": 3,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          285.72455963037277,
+          7.118474893421293e-05,
+          2570009.1836592853
+        ],
+        "found": true,
+        "status": 0,
+        "target": -403806.421263359,
+        "eigenvalue": 1.908152661367346e-05,
+        "property_value": -403806.4974875395
+      },
+      "case": "SPINPROP|PR|CO2|translated|ROOT:3:0:-403806.421263359|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "CO2",
+        "translated"
+      ],
+      "property": 3,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          285.72455963037277,
+          7.118474893421293e-05,
+          2570009.1836592853
+        ],
+        "found": true,
+        "status": 0,
+        "target": -403806.421263359,
+        "eigenvalue": 1.908152661367346e-05,
+        "property_value": -403806.4974875395
+      },
+      "case": "SPINPROP|PR|CO2|translated|ROOT:3:1:-403806.421263359|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "CO2",
+        "translated"
+      ],
+      "property": 4,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          285.724561332754,
+          0.00017899983136588003,
+          5468044.13354082
+        ],
+        "found": true,
+        "status": 0,
+        "target": 285.724561332754,
+        "eigenvalue": 1.9191112647809483e-05,
+        "property_value": 285.724561332754
+      },
+      "case": "SPINPROP|PR|CO2|translated|ROOT:4:0:285.724561332754|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "CO2",
+        "translated"
+      ],
+      "property": 4,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          285.724561332754,
+          7.118475013958232e-05,
+          2570009.731834177
+        ],
+        "found": true,
+        "status": 0,
+        "target": 285.724561332754,
+        "eigenvalue": 1.9081803469211955e-05,
+        "property_value": 285.724561332754
+      },
+      "case": "SPINPROP|PR|CO2|translated|ROOT:4:1:285.724561332754|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "CO2",
+        "translated"
+      ],
+      "property": 4,
+      "phase": 2,
+      "index": 20,
+      "result": {
+        "values": [
+          285.724561332754,
+          0.00017899983136588003,
+          5468044.13354082
+        ],
+        "found": true,
+        "status": 0,
+        "target": 285.724561332754,
+        "eigenvalue": 1.9191112647809483e-05,
+        "property_value": 285.724561332754
+      },
+      "case": "SPINPROP|PR|CO2|translated|ROOT:4:2:285.724561332754|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "CO2",
+        "translated"
+      ],
+      "property": 5,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          230.66954382931172,
+          0.0003432281148756825,
+          2570009.7250307514
+        ],
+        "found": true,
+        "status": 0,
+        "target": 2570009.7281388678,
+        "eigenvalue": -2.8221241414883025e-06,
+        "property_value": 2570009.7250307514
+      },
+      "case": "SPINPROP|PR|CO2|translated|ROOT:5:0:2570009.7281388678|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "CO2",
+        "translated"
+      ],
+      "property": 5,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          285.7245613327653,
+          7.118475013959034e-05,
+          2570009.7318378463
+        ],
+        "found": true,
+        "status": 0,
+        "target": 2570009.7281388678,
+        "eigenvalue": 1.9081803470988312e-05,
+        "property_value": 2570009.7318378463
+      },
+      "case": "SPINPROP|PR|CO2|translated|ROOT:5:1:2570009.7281388678|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "CO2",
+        "translated"
+      ],
+      "property": 5,
+      "phase": 2,
+      "index": 20,
+      "result": {
+        "values": [
+          230.66954382931172,
+          0.0003432281148756825,
+          2570009.7250307514
+        ],
+        "found": true,
+        "status": 0,
+        "target": 2570009.7281388678,
+        "eigenvalue": -2.8221241414883025e-06,
+        "property_value": 2570009.7250307514
+      },
+      "case": "SPINPROP|PR|CO2|translated|ROOT:5:2:2570009.7281388678|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "CO2",
+        "translated"
+      ],
+      "property": 6,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          285.7245593713692,
+          7.118474875082569e-05,
+          2570009.1002588943
+        ],
+        "found": true,
+        "status": 0,
+        "target": -403989.3688869396,
+        "eigenvalue": 1.908148449347724e-05,
+        "property_value": -403989.4429721218
+      },
+      "case": "SPINPROP|PR|CO2|translated|ROOT:6:0:-403989.3688869396|1000000.0"
+    },
+    {
+      "configuration": [
+        "PR",
+        "CO2",
+        "translated"
+      ],
+      "property": 6,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          285.7245593713692,
+          7.118474875082569e-05,
+          2570009.1002588943
+        ],
+        "found": true,
+        "status": 0,
+        "target": -403989.3688869396,
+        "eigenvalue": 1.908148449347724e-05,
+        "property_value": -403989.4429721218
+      },
+      "case": "SPINPROP|PR|CO2|translated|ROOT:6:1:-403989.3688869396|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "C1",
+        "translated"
+      ],
+      "property": 1,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          177.21798109917438,
+          7.742149799039484e-05,
+          1870763.6866728775
+        ],
+        "found": true,
+        "status": 0,
+        "target": 113.95712518025172,
+        "eigenvalue": 1.6962599581837878e-05,
+        "property_value": 113.95692071470918
+      },
+      "case": "SPINPROP|SRK|C1|translated|ROOT:1:0:113.95712518025172|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "C1",
+        "translated"
+      ],
+      "property": 1,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          177.21798109917438,
+          7.742149799039484e-05,
+          1870763.6866728775
+        ],
+        "found": true,
+        "status": 0,
+        "target": 113.95712518025172,
+        "eigenvalue": 1.6962599581837878e-05,
+        "property_value": 113.95692071470918
+      },
+      "case": "SPINPROP|SRK|C1|translated|ROOT:1:1:113.95712518025172|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "C1",
+        "translated"
+      ],
+      "property": 2,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          177.2179784322173,
+          7.742149526126641e-05,
+          1870763.02438505
+        ],
+        "found": true,
+        "status": 0,
+        "target": 7.742232057180118e-05,
+        "eigenvalue": 1.6962065291670214e-05,
+        "property_value": 7.742149526126641e-05
+      },
+      "case": "SPINPROP|SRK|C1|translated|ROOT:2:0:7.742232057180118e-05|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "C1",
+        "translated"
+      ],
+      "property": 2,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          177.2179784322173,
+          7.742149526126641e-05,
+          1870763.02438505
+        ],
+        "found": true,
+        "status": 0,
+        "target": 7.742232057180118e-05,
+        "eigenvalue": 1.6962065291670214e-05,
+        "property_value": 7.742149526126641e-05
+      },
+      "case": "SPINPROP|SRK|C1|translated|ROOT:2:1:7.742232057180118e-05|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "C1",
+        "translated"
+      ],
+      "property": 3,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          177.21798115828187,
+          7.742149805088022e-05,
+          1870763.7013510913
+        ],
+        "found": true,
+        "status": 0,
+        "target": -84195.79453896596,
+        "eigenvalue": 1.696261142503097e-05,
+        "property_value": -84195.8307899634
+      },
+      "case": "SPINPROP|SRK|C1|translated|ROOT:3:0:-84195.79453896596|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "C1",
+        "translated"
+      ],
+      "property": 3,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          177.21798115828187,
+          7.742149805088022e-05,
+          1870763.7013510913
+        ],
+        "found": true,
+        "status": 0,
+        "target": -84195.79453896596,
+        "eigenvalue": 1.696261142503097e-05,
+        "property_value": -84195.8307899634
+      },
+      "case": "SPINPROP|SRK|C1|translated|ROOT:3:1:-84195.79453896596|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "C1",
+        "translated"
+      ],
+      "property": 4,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          177.21798222949047,
+          0.00018396529043537613,
+          3416468.1877113087
+        ],
+        "found": true,
+        "status": 0,
+        "target": 177.21798222949047,
+        "eigenvalue": 1.619922531737039e-05,
+        "property_value": 177.21798222949047
+      },
+      "case": "SPINPROP|SRK|C1|translated|ROOT:4:0:177.21798222949047|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "C1",
+        "translated"
+      ],
+      "property": 4,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          177.21798222949047,
+          7.742149914706053e-05,
+          1870763.967365276
+        ],
+        "found": true,
+        "status": 0,
+        "target": 177.21798222949047,
+        "eigenvalue": 1.6962826030808564e-05,
+        "property_value": 177.21798222949047
+      },
+      "case": "SPINPROP|SRK|C1|translated|ROOT:4:1:177.21798222949047|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "C1",
+        "translated"
+      ],
+      "property": 4,
+      "phase": 1,
+      "index": 120,
+      "result": {
+        "values": [
+          175.15661616161657,
+          7.540707367436082e-05,
+          1346777.1080261655
+        ],
+        "found": true,
+        "status": 0,
+        "target": 175.15661616161657,
+        "eigenvalue": 9.780568842709947e-06,
+        "property_value": 175.15661616161657
+      },
+      "case": "SPINPROP|SRK|C1|translated|ROOT:4:1:175.15661616161657|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "C1",
+        "translated"
+      ],
+      "property": 4,
+      "phase": 2,
+      "index": 20,
+      "result": {
+        "values": [
+          177.21798222949047,
+          0.00018396529043537613,
+          3416468.1877113087
+        ],
+        "found": true,
+        "status": 0,
+        "target": 177.21798222949047,
+        "eigenvalue": 1.619922531737039e-05,
+        "property_value": 177.21798222949047
+      },
+      "case": "SPINPROP|SRK|C1|translated|ROOT:4:2:177.21798222949047|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "C1",
+        "translated"
+      ],
+      "property": 5,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          177.2179822294963,
+          7.742149914706648e-05,
+          1870763.9673667029
+        ],
+        "found": true,
+        "status": 0,
+        "target": 1870763.9656526968,
+        "eigenvalue": 1.6962826031474698e-05,
+        "property_value": 1870763.9673667029
+      },
+      "case": "SPINPROP|SRK|C1|translated|ROOT:5:1:1870763.9656526968|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "C1",
+        "translated"
+      ],
+      "property": 6,
+      "phase": 0,
+      "index": 20,
+      "result": {
+        "values": [
+          177.21798101209365,
+          7.74214979012841e-05,
+          1870763.665048048
+        ],
+        "found": true,
+        "status": 0,
+        "target": -84340.6334264289,
+        "eigenvalue": 1.696258213679247e-05,
+        "property_value": -84340.6681289129
+      },
+      "case": "SPINPROP|SRK|C1|translated|ROOT:6:0:-84340.6334264289|1000000.0"
+    },
+    {
+      "configuration": [
+        "SRK",
+        "C1",
+        "translated"
+      ],
+      "property": 6,
+      "phase": 1,
+      "index": 20,
+      "result": {
+        "values": [
+          177.21798101209365,
+          7.74214979012841e-05,
+          1870763.665048048
+        ],
+        "found": true,
+        "status": 0,
+        "target": -84340.6334264289,
+        "eigenvalue": 1.696258213679247e-05,
+        "property_value": -84340.6681289129
+      },
+      "case": "SPINPROP|SRK|C1|translated|ROOT:6:1:-84340.6334264289|1000000.0"
+    }
+  ],
+  "worst_relative_differences": [
+    1.3405123715172033e-09,
+    8.751801377112484e-09,
+    6.568634545927843e-09
+  ]
+}

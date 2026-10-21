@@ -32,7 +32,8 @@ also use logarithmic variables. Residuals must be below 2e-10. Continuation
 predicts the temperature slope implicitly, corrects the zero eigenvalue at the
 new volume, and refines either endpoint to its specification. Pressure outputs
 are evaluated from the returned physical state. Pure curves use the same volume
-continuation; the fork's separate pure 200-point temperature grids are pending.
+continuation; the source's separate pure 200-point temperature grids are now
+available through [the pure grid and property APIs](spinodal-properties.md).
 
 ```rust
 use thermopack_rs::{Cubic, CubicKind, Phase};
@@ -71,7 +72,8 @@ endpoint the fork replaces T and V but retains P evaluated before refinement.
 The native compatibility curve retains that pressure too; `trace_spinodal`
 reports P evaluated at the final T/V. These conventions are explicit because
 those raw source pressure entries do not close against the EOS. The baseline
-curve rejects the separate unported pure sampling convention.
+curve now uses the separate 200-point source grid for pure compositions; see
+[the pure grid qualification](spinodal-properties.md).
 
 ## Qualification and limits
 
@@ -94,7 +96,8 @@ pure/zero-species/translated limits and invalid input.
 
 This is local stability, not a global equilibrium or nucleation calculation.
 Other activity-rule Hessians, other EOS families, critical degeneracies,
-spinodal-property intersections, metastable isentropes and full raw trajectory
+mixture source-order property intersections, property extrema, metastable
+isentropes and full raw trajectory
 fidelity remain pending. Default pressure initialization requires a mechanical
 seed below the fixed-composition pseudo-critical pressure; explicit local
 seeds can address other roots without promising their global classification.

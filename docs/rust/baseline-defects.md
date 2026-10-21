@@ -338,3 +338,17 @@ qualified mixture curves contain a stale endpoint pressure. Raw source P and
 evaluated EOS P are both retained in the fixtures. The compatibility curve
 preserves reporting; the physical curve evaluates the final pressure. See
 [mixture spinodal qualification](mixture-spinodal.md) for scope and limits.
+
+## Spinodal property intersection returned volume
+
+`propertyFunctionWrapperSpinodal` predicts T from the scalar trial volume,
+corrects its local V at fixed T to evaluate the property, and stores only T
+back into the parameter vector. `bracketSolveForPropertySpinodal` returns the
+uncorrected trial as Vs. Thus a successful source result can fail both the
+spinodal and property conditions at its reported coordinates. The new pure
+compatibility search preserves this convention; all successful raw coordinates
+are retained and compared. In the qualified grid 145 returns have a minimum
+Helmholtz eigenvalue exceeding 1e-6 in magnitude. Physical searches refine
+temperature at fixed volume and close both constraints. See
+[spinodal property notes](spinodal-properties.md) for near-grid ties and the
+separate critical multiple-root rounding allowance.

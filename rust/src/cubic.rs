@@ -161,6 +161,78 @@ pub struct PreparedState<'a> {
 }
 
 impl PreparedState<'_> {
+    /// The fork's gflag=1 cubic compressibility iteration, including its raw
+    /// last iterate at a nearly multiple root. This compatibility result is
+    /// not filtered by mechanical stability or pressure closure; use `volume`
+    /// for physical root selection. Minimum-Gibbs selection is not this path.
+    pub fn baseline_volume(&self, pressure: f64, phase: Phase) -> Result<f64> {
+        positive(pressure, "cubic pressure")?;
+        if phase == Phase::MinimumGibbs {
+            return Err(Error::InvalidInput("baseline cubic phase"));
+        }
+        let t = self.temperature;
+        let a = self.a * pressure / (t * R * t * R);
+        let b = self.b * pressure / (t * R);
+        let (d1, d2) = self.model.kind.deltas();
+        let (m1, m2) = (-d2, -d1);
+        let pp = b * (-m1 - m2 - 1.0) - 1.0;
+        let qq = b * ((m1 + m2) * (b + 1.0) + b * m1 * m2) + a;
+        let rr = -(b * b * b + b * b) * (m1 * m2) - a * b;
+        let (_, ob, qc) = omega_with_critical_ratio(self.model.kind);
+        let zc = ob * qc;
+        let f3 = rr + zc * (qq + zc * (pp + zc));
+        let discriminant = (2.0 * pp).powi(2) - 12.0 * qq;
+        let mut liquid = f3 > 0.0;
+        if discriminant > 0.0 {
+            let z1 = (-2.0 * pp - discriminant.sqrt()) / 6.0;
+            let z2 = (-2.0 * pp + discriminant.sqrt()) / 6.0;
+            let f1 = rr + z1 * (qq + z1 * (pp + z1));
+            let f2 = rr + z2 * (qq + z2 * (pp + z2));
+            if f1 * f2 <= 0.0 {
+                liquid = phase == Phase::Liquid;
+            }
+        }
+        let solve = |mut z: f64| {
+            let eps = 10.0 * f64::EPSILON;
+            let mut dz = 1e10 * eps;
+            let mut f = rr + z * (qq + z * (pp + z));
+            let mut iteration = 0;
+            while iteration < 50 && (dz / z).abs() >= eps {
+                let df = qq + z * (2.0 * pp + 3.0 * z);
+                let ddf = 2.0 * pp + 6.0 * z;
+                let arg = 1.0 - 2.0 * f * ddf / (df * df);
+                let arg = if arg < 0.0 { 1.0 } else { arg.sqrt() };
+                dz = -(f / df) * 2.0 / (1.0 + arg);
+                let mut next = z + dz;
+                if (dz / z).abs() < eps {
+                    z = next;
+                } else {
+                    let mut fn_ = rr + next * (qq + next * (pp + next));
+                    let mut relax = 0;
+                    while fn_.abs() >= f.abs() && relax < 15 {
+                        relax += 1;
+                        dz *= 0.5;
+                        next = z + dz;
+                        fn_ = rr + next * (qq + next * (pp + next));
+                    }
+                    z = next;
+                    f = fn_;
+                    iteration += 1;
+                }
+            }
+            z
+        };
+        let mut z = solve(if liquid { b } else { 2.0_f64.max(b * 1.001) });
+        if liquid && z < b {
+            z = solve(2.0_f64.max(b * 1.001));
+        }
+        let volume = z * R * t / pressure - self.volume_translation().value;
+        if !volume.is_finite() || volume <= 0.0 {
+            return Err(Error::NotConverged("baseline cubic volume"));
+        }
+        Ok(volume)
+    }
+
     // Analytic third composition derivative for classic quadratic mixing.
     // Only a scalar direction is differentiated; no n*n*n tensor is built.
     pub(crate) fn critical_third_directional(&self, volume: f64, direction: &[f64]) -> Option<f64> {

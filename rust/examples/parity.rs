@@ -990,6 +990,75 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             continue;
         }
+        if fields[0] == "SPINPROP" {
+            use thermopack_rs::spinodal_properties::*;
+            let kind = match fields[1] {
+                "SRK" => CubicKind::SoaveRedlichKwong,
+                "RK" => CubicKind::RedlichKwong,
+                "VDW" => CubicKind::VanDerWaals,
+                _ => CubicKind::PengRobinson,
+            };
+            let names: Vec<_> = fields[2].split(',').collect();
+            let mut z = vec![0.0; names.len()];
+            z[0] = 1.0;
+            let model = Cubic::with_options(
+                kind,
+                &names,
+                thermopack_rs::CubicOptions {
+                    volume_translation: fields[3] == "translated",
+                    ..Default::default()
+                },
+            )?;
+            let config: Vec<_> = fields[4].split(':').collect();
+            let p = fields[5].parse()?;
+            let result: thermopack_rs::Result<Vec<f64>> = if config[0] == "GRID" {
+                baseline_pure_spinodal_curve(
+                    &model,
+                    &z,
+                    p,
+                    None,
+                    config.get(1).map(|s| s.parse()).transpose()?,
+                )
+                .map(|c| {
+                    c.points
+                        .iter()
+                        .flat_map(|p| [p.temperature, p.volume, p.pressure])
+                        .collect()
+                })
+            } else {
+                let property = match config[1] {
+                    "1" => SpinodalProperty::Entropy,
+                    "2" => SpinodalProperty::Volume,
+                    "3" => SpinodalProperty::Enthalpy,
+                    "4" => SpinodalProperty::Temperature,
+                    "5" => SpinodalProperty::Pressure,
+                    _ => SpinodalProperty::InternalEnergy,
+                };
+                let target = config[3].parse()?;
+                let phase = match config[2] {
+                    "1" => Some(Phase::Liquid),
+                    "2" => Some(Phase::Vapor),
+                    _ => None,
+                };
+                baseline_pure_spinodal_intersection(&model, &z, property, target, p, phase, None)
+                    .map(|found| match found {
+                        Some(p) => vec![1.0, p.temperature, p.volume, p.pressure],
+                        None => vec![0.0, 0.0, 0.0, 0.0],
+                    })
+            };
+            match result {
+                Ok(values) => println!(
+                    "{}",
+                    values
+                        .iter()
+                        .map(|v| format!("{v:.17e}"))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                ),
+                Err(e) => println!("ERROR: {e}"),
+            };
+            continue;
+        }
         if fields[0] == "ISOLINE" {
             let kind = match fields[1] {
                 "SRK" => thermopack_rs::CubicKind::SoaveRedlichKwong,

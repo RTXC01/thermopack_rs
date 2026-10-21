@@ -130,7 +130,13 @@ fn embedded_pure_translation_and_invalid_inputs() {
     }
     let curve = trace_spinodal(&pure, &[1.0], Default::default()).unwrap();
     assert_ne!(curve.end, SpinodalTraceEnd::PointLimit);
-    assert!(baseline_trace_spinodal(&pure, &[1.0], Default::default()).is_err());
+    assert_eq!(
+        baseline_trace_spinodal(&pure, &[1.0], Default::default())
+            .unwrap()
+            .points
+            .len(),
+        200
+    );
     for z in [
         vec![1.0],
         vec![0.0, 0.0],

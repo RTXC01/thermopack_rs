@@ -119,3 +119,14 @@ the parameters of the rule for `cbMixWongSandler` and `cbMixWSCPA`, the
 Huron-Vidal model for `cbMixHVWongSandler`. The native library offers the
 rule for the cubic equation of state with the parameters of the rule only.
 
+The original loads the interaction parameters of the pairs only for the
+mixing rules of its selection, `src/cbselect.f90:tpSelectInteractionParameters`.
+Neither `cbMixWSCPA` nor `cbMixHVWongSandler` has a branch there, so the
+records of the excess Gibbs model stay empty and the binary interaction
+parameters stay zero for those two variants. The Huron-Vidal model of
+`cbMixHVWongSandler` therefore delivers an excess Gibbs energy of zero and
+the rule reduces to the sum `D` of its appendix A9 without the correction of
+the excess Gibbs energy. The native library offers the rule with the
+parameters of the rule, which the original does not load for those two
+variants either.
+

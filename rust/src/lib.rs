@@ -16,8 +16,10 @@
 //!   isenthalpies, the Joule-Thomson inversion and the spinodal,
 //! * the cubic association model and the cubic plus association model,
 //! * the PC-SAFT and the SAFT-VR Mie models with their parameter databases,
-//!   the radial distribution function of the cubic association model and the
-//!   quantum corrections of the hydrogen, the helium and the neon,
+//!   the radial distribution function of the cubic association model, the
+//!   hard-sphere model of Boublik with its packing fractions and its pair
+//!   correlation function, and the quantum corrections of the hydrogen, the
+//!   helium and the neon,
 //! * the pure fluid equations of state of the Lee-Kesler tables, the
 //!   multiparameter models, the MBWR model of the IAPWS, the PeTS model of
 //!   the liquid hydrogen and the solid phases of the carbon dioxide and of the

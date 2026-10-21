@@ -3,6 +3,49 @@
 //! All quantities use SI molar units. See `docs/rust/coverage.md` for the
 //! explicit migration status; this crate is not yet a complete replacement.
 //!
+//! # The scope
+//!
+//! The crate holds the equations of state, the mixing rules, the phase
+//! equilibrium and the property kernels of the fork:
+//!
+//! * the cubic equations of state with the van der Waals, the Huron-Vidal,
+//!   the NRTL, the UNIFAC and the Wong-Sandler mixing rules, the pseudo
+//!   components, the volume translation and the temperature dependent beta
+//!   coefficient, together with the flash, the stability analysis, the
+//!   saturation states, the isotherms, the isobars, the isentropes and the
+//!   isenthalpies, the Joule-Thomson inversion and the spinodal,
+//! * the cubic association model and the cubic plus association model,
+//! * the PC-SAFT and the SAFT-VR Mie models with their parameter databases,
+//!   the radial distribution function of the cubic association model and the
+//!   quantum corrections of the hydrogen, the helium and the neon,
+//! * the pure fluid equations of state of the Lee-Kesler tables, the
+//!   multiparameter models, the MBWR model of the IAPWS, the PeTS model of
+//!   the liquid hydrogen and the solid phases of the carbon dioxide and of the
+//!   water,
+//! * the utilities of the original: the Gauss and the Gauss-Kronrod rules,
+//!   the hyperdual numbers, the chain rule and the ideal gas properties.
+//!
+//! # The parity
+//!
+//! Every kernel is ported from the original and qualified against the exact
+//! source library. The reference probe `tools/rust_port/reference_probe.f90`
+//! calls the original routines and reports their results, the validators of
+//! `tools/rust_port` compare them with the native model and store the
+//! qualified values in `tests/fixtures`. The Rust tests read those fixtures,
+//! so the test suite fails without the reference library. The migration
+//! status of every kernel, with the number of qualified cases and the largest
+//! observed difference, is in `docs/rust/coverage.md`.
+//!
+//! # The performance
+//!
+//! The models prepare their state once and evaluate the properties of the
+//! prepared state without an allocation. The preparation of a state is
+//! dominated by the alpha correlation of the components and by the mixing
+//! rule, and the property evaluation of the prepared state costs about
+//! 20 ns for the pressure. The measured comparison with the source, the
+//! implemented optimizations and the open targets are in
+//! `docs/rust/performance.md`.
+//!
 //! ```
 //! use thermopack_rs::{Cubic, CubicKind, Phase};
 //! # fn main() -> Result<(), thermopack_rs::Error> {

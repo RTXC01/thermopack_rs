@@ -286,3 +286,37 @@ than as a speedup.
 Next optimization targets are the alpha correlation evaluations, separately
 requested derivative paths and profiling the flash/SAFT hot loops once those
 implementations pass parity. No SIMD or thread-level speedups are claimed yet.
+
+## The PC-SAFT model
+
+The benchmark `rust/benches/pcsaft.rs` reports the pressure and the state of
+the PC-SAFT model of a pure fluid and of a mixture, and the chain rule of the
+hard-sphere model of Boublik. The measurements are nanoseconds per evaluation
+on the host of the tables above.
+
+| Evaluation | Nanoseconds per evaluation |
+|---|---:|
+| Pressure, pure fluid | 42 |
+| Pressure, mixture | 126 |
+| State, pure fluid | 4237 |
+| State, mixture | 10576 |
+| Chain term of the hard-sphere model, mixture | 3007 |
+
+The pressure of the model is the hot path of the flash, and it needs 42
+nanoseconds for a pure fluid and 126 nanoseconds for a mixture. The state of
+the model delivers the caloric properties, and it is dominated by the finite
+differences of the pressure derivatives and of the second temperature
+derivative of the dispersion term, which prepare the model twice per
+derivative. The analytic derivatives of those paths are the next target of the
+work on the model.
+
+The temperature derivative of the hard-chain contribution of a mixture follows
+the chain rule of the hard-sphere model of Boublik, which needs the packing
+fractions of the mixture and the pair correlation function of every component
+with itself. The chain rule is evaluated without an allocation, through the
+functions `bmcsl::packing_moments`,
+`bmcsl::hard_sphere_energy_t_derivatives` and
+`bmcsl::pair_correlation_t_derivatives`. The state of the mixture drops from
+11571 to 10576 nanoseconds per evaluation with the allocation-free path, and
+the pure fluid uses the packing fraction of the simplified model, which is
+exact for a pure fluid, and needs 4237 nanoseconds.

@@ -93,6 +93,11 @@ name = "meos"
 path = "rust/benches/meos.rs"
 harness = false
 
+[[bench]]
+name = "pcsaft"
+path = "rust/benches/pcsaft.rs"
+harness = false
+
 [profile.release]
 lto = "thin"
 codegen-units = 1

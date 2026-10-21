@@ -117,6 +117,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             && fields[0] != "PCSAFTRDF"
             && fields[0] != "PCSAFTHS"
             && fields[0] != "PCSAFTCHAIN"
+            && fields[0] != "PCSAFTSTATE"
             && fields[0] != "WSMIX"
             && fields[0] != "WSSTATE"
             && fields[0] != "QUAD"
@@ -379,6 +380,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             println!("{}", text.join(","));
+            continue;
+        }
+        if fields[0] == "PCSAFTSTATE" {
+            let components: Vec<&str> = fields[1].split(',').collect();
+            let temperature: f64 = fields[2].parse().unwrap();
+            let volume: f64 = fields[3].parse().unwrap();
+            let moles: Vec<f64> = fields[4]
+                .split(',')
+                .map(|value| value.parse().unwrap())
+                .collect();
+            let total: f64 = moles.iter().sum();
+            let composition: Vec<f64> = moles.iter().map(|amount| amount / total).collect();
+            let rho = total / volume;
+            let model = thermopack_rs::PcSaft::new(&components)?;
+            let prepared = model.prepare(temperature, &composition)?;
+            let alpha = prepared.residual_helmholtz_energy(rho);
+            let compressibility = prepared.compressibility_factor(rho);
+            let alpha_rho = (compressibility - 1.0) / rho;
+            let state = prepared.state(rho)?;
+            let alpha_t =
+                -state.u_residual / (thermopack_rs::pc_saft::RGAS * temperature * temperature);
+            println!("{:.17e},{:.17e},{:.17e}", alpha, alpha_rho, alpha_t);
             continue;
         }
         if fields[0] == "CRITICAL" {

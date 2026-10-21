@@ -1748,6 +1748,46 @@ contains
   end subroutine test_integrand
 end subroutine query_quadrature_integral
 
+! Evaluate the reduced residual Helmholtz energy of the PC-SAFT model of the
+! original and its temperature and volume derivatives.
+subroutine query_pcsaft_state(temperature,volume,moles,values,numbers) &
+     bind(C,name='query_pcsaft_state')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use thermopack_var, only: nc, get_active_eos, base_eos_param
+  use pc_saft_nonassoc, only: PCSAFT_eos, F_PC_SAFT_TVn
+  implicit none
+  real(c_double), value :: temperature, volume
+  real(c_double), intent(in) :: moles(16)
+  real(c_double), intent(out) :: values(256)
+  integer(c_int), intent(out) :: numbers
+  ! Locals
+  class(base_eos_param), pointer :: eos
+  real :: F, F_T, F_V
+  real, dimension(nc) :: F_n
+  real, dimension(nc) :: n
+  integer :: i, position
+  eos => get_active_eos()
+  select type(p_eos => eos)
+  class is(PCSAFT_eos)
+    do i = 1, nc
+      n(i) = moles(i)
+    end do
+    call F_PC_SAFT_TVn(p_eos,temperature,volume,n,F,F_T,F_V,F_n)
+  end select
+  position = 1
+  values(position) = F
+  position = position + 1
+  values(position) = F_T
+  position = position + 1
+  values(position) = F_V
+  position = position + 1
+  do i = 1, nc
+    values(position) = F_n(i)
+    position = position + 1
+  end do
+  numbers = position - 1
+end subroutine query_pcsaft_state
+
 ! Evaluate the reduced Helmholtz energy of the chain term of the PC-SAFT
 ! model of the original.
 subroutine query_pcsaft_chain(temperature,volume,moles,values,numbers) &

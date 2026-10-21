@@ -207,3 +207,42 @@ derivative of the hard-chain contribution with the expressions of the
 simplified PC-SAFT model, which are exact for a pure fluid only. The port of
 the chain term and of the hard-sphere energy is the first piece of the work
 that replaces them for a mixture.
+
+## The state of the PC-SAFT model
+
+The original evaluates the reduced residual Helmholtz energy of the PC-SAFT
+model and its derivatives in src/pc_saft_nonassoc.f90:F_PC_SAFT_TVn. The
+native model works in the density representation, so the qualification
+compares the quantities after the change of variables:
+
+- the reduced residual Helmholtz energy of the mixture is F/sumn,
+- the derivative with respect to the density is -F_V/rho^2,
+- the derivative with respect to the temperature is F_T/sumn.
+
+The qualification is tools/rust_port/validate_pcsaft_state.py. The reference
+probe tools/rust_port/reference_probe.f90 calls F_PC_SAFT_TVn of the original
+for the active model of the PC-SAFT model.
+
+- 6 cases: the components, the temperature, the volume and the number of
+  moles.
+- The compared quantities are the reduced residual Helmholtz energy of the
+  mixture, its density derivative and its temperature derivative.
+- All 6 cases match with a relative 1e-12, and the observed worst relative
+  difference is 7.2e-15.
+
+The committed fixture is tests/fixtures/pcsaft_state.csv; the test is
+tests/pcsaft_state.rs.
+
+The qualification found a deviation of the temperature derivative of a
+mixture of about one per mille, because the native model evaluated the
+hard-chain contribution with the expressions of the simplified PC-SAFT model.
+The model now applies the chain rule of the hard-sphere model of Boublik for
+a mixture, and the qualification matches again. The pure fluid keeps the
+expressions of the simplified model, which are exact for a pure fluid, and
+which are cheaper.
+
+The chain rule needs the packing fractions of the mixture and the pair
+correlation function of every component with itself. The evaluation of the
+temperature derivatives is free of an allocation, through the functions
+bmcsl::packing_moments, bmcsl::hard_sphere_energy_t_derivatives and
+bmcsl::pair_correlation_t_derivatives of the native module.

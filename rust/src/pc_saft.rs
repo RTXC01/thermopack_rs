@@ -584,16 +584,15 @@ impl<'a> PreparedPcSaft<'a> {
     /// Pressure and its derivatives at density rho [mol/m^3].
     pub fn pressure_and_derivatives(&self, rho: f64) -> PcSaftPressureJet {
         let eta = self.packing_fraction(rho);
-        let (ahc, ahc_rho, ahc_rhorho, ahc_t, ahc_rhot) =
-            self.hard_chain_rho_t_derivatives(rho, eta);
+        let (ahc, ahc_rho) = self.hard_chain_rho_derivatives(rho, eta);
         let (adisp, adisp_rho, adisp_rhorho, adisp_t, adisp_rhot) =
             self.dispersion_rho_t_derivatives(rho, eta);
 
         let a_res = ahc + adisp;
         let a_rho = ahc_rho + adisp_rho;
-        let _a_rhorho = ahc_rhorho + adisp_rhorho;
-        let _a_t = ahc_t + adisp_t;
-        let _a_rhot = ahc_rhot + adisp_rhot;
+        let _a_rhorho = adisp_rhorho;
+        let _a_t = adisp_t;
+        let _a_rhot = adisp_rhot;
 
         let z = 1.0 + rho * a_rho;
         let p = rho * RGAS * self.temperature * z;
@@ -628,12 +627,11 @@ impl<'a> PreparedPcSaft<'a> {
         let eta = self.packing_fraction(rho);
 
         // Temperature derivatives of alpha
-        let (_, _, _, ahc_t, _) = self.hard_chain_rho_t_derivatives(rho, eta);
+        let (ahc_t, ahc_tt) = self.hard_chain_t_derivatives(rho, eta);
         let (_, _, _, adisp_t, _) = self.dispersion_rho_t_derivatives(rho, eta);
         let a_t = ahc_t + adisp_t;
 
         // Second temperature derivative of alpha for heat capacities
-        let ahc_tt = self.hard_chain_tt_derivative(rho, eta);
         let adisp_tt = self.dispersion_tt_derivative(rho, eta);
         let a_tt = ahc_tt + adisp_tt;
 
@@ -1074,11 +1072,64 @@ impl<'a> PreparedPcSaft<'a> {
         -(std::f64::consts::PI * N_AVOGADRO) * (term1 + term2)
     }
 
-    fn hard_chain_rho_t_derivatives(&self, rho: f64, eta: f64) -> (f64, f64, f64, f64, f64) {
-        let ahc = self.alpha_hard_chain(rho, eta);
-        let ahc_rho = self.d_alpha_hard_chain_drho(rho, eta);
+    /// The reduced Helmholtz energy of the hard-chain contribution and its
+    /// density derivative.
+    fn hard_chain_rho_derivatives(&self, rho: f64, eta: f64) -> (f64, f64) {
+        (
+            self.alpha_hard_chain(rho, eta),
+            self.d_alpha_hard_chain_drho(rho, eta),
+        )
+    }
 
-        // eta_T derivative
+    /// The temperature derivatives of the hard-chain contribution.
+    ///
+    /// The model of the PC-SAFT model uses the chain rule of the hard-sphere
+    /// model of Boublik, which is exact for a pure fluid and for a mixture.
+    /// The simplified model uses the packing fraction of the mixture, which
+    /// is exact for its own hard-sphere contribution.
+    fn hard_chain_t_derivatives(&self, rho: f64, eta: f64) -> (f64, f64) {
+        match self.model.kind {
+            // The hard-sphere model of Boublik collapses to the expression of
+            // the simplified model for a pure fluid, so the packing fraction
+            // of the pure fluid is exact and cheaper.
+            PcSaftKind::PcSaft if self.model.components.len() == 1 => {
+                let (ahc_eta, ahc_etaeta) = self.simplified_hard_chain_eta_derivatives(eta);
+                let eta_t = self.packing_fraction_t_derivative(rho);
+                let eta_tt = self.packing_fraction_tt_derivative(rho);
+                (
+                    ahc_eta * eta_t,
+                    ahc_eta * eta_tt + ahc_etaeta * eta_t * eta_t,
+                )
+            }
+            PcSaftKind::PcSaft => self.hard_chain_bmcsl_t_derivatives(rho),
+            PcSaftKind::SPcSaft => {
+                let (ahc_eta, ahc_etaeta) = self.simplified_hard_chain_eta_derivatives(eta);
+                let eta_t = self.packing_fraction_t_derivative(rho);
+                let eta_tt = self.packing_fraction_tt_derivative(rho);
+                (
+                    ahc_eta * eta_t,
+                    ahc_eta * eta_tt + ahc_etaeta * eta_t * eta_t,
+                )
+            }
+        }
+    }
+
+    /// The second derivative of the packing fraction of the mixture with
+    /// respect to the temperature.
+    fn packing_fraction_tt_derivative(&self, rho: f64) -> f64 {
+        let mut sum_eta_tt = 0.0;
+        for i in 0..self.model.components.len() {
+            let segments = self.model.components[i].m;
+            sum_eta_tt += self.mole_fractions[i]
+                * segments
+                * (6.0 * self.d[i] * self.d_t[i].powi(2) + 3.0 * self.d[i].powi(2) * self.d_tt[i]);
+        }
+        (std::f64::consts::PI * N_AVOGADRO / 6.0) * rho * sum_eta_tt
+    }
+
+    /// The derivative of the packing fraction of the mixture with respect to
+    /// the temperature.
+    fn packing_fraction_t_derivative(&self, rho: f64) -> f64 {
         let mut sum_eta_t = 0.0;
         for i in 0..self.model.components.len() {
             sum_eta_t += self.mole_fractions[i]
@@ -1087,8 +1138,12 @@ impl<'a> PreparedPcSaft<'a> {
                 * self.d[i].powi(2)
                 * self.d_t[i];
         }
-        let eta_t = (std::f64::consts::PI * N_AVOGADRO / 6.0) * rho * sum_eta_t;
+        (std::f64::consts::PI * N_AVOGADRO / 6.0) * rho * sum_eta_t
+    }
 
+    /// The derivatives of the hard-chain contribution of the simplified model
+    /// with respect to the packing fraction of the mixture.
+    fn simplified_hard_chain_eta_derivatives(&self, eta: f64) -> (f64, f64) {
         let alpha_hs_eta = 2.0 * (2.0 - eta) / (1.0 - eta).powi(3);
         let alpha_hs_etaeta = 2.0 * (5.0 - 2.0 * eta) / (1.0 - eta).powi(4);
         let g = (1.0 - 0.5 * eta) / (1.0 - eta).powi(3);
@@ -1103,12 +1158,49 @@ impl<'a> PreparedPcSaft<'a> {
         let ahc_eta = self.m_bar * alpha_hs_eta - sum_m_m1 * g_eta / g;
         let ahc_etaeta =
             self.m_bar * alpha_hs_etaeta - sum_m_m1 * (g_etaeta / g - (g_eta / g).powi(2));
+        (ahc_eta, ahc_etaeta)
+    }
 
-        let ahc_t = ahc_eta * eta_t;
-        let ahc_rhorho = ahc_etaeta * self.eta_factor.powi(2);
-        let ahc_rhot = ahc_eta * (eta_t / rho) + ahc_etaeta * self.eta_factor * eta_t;
+    /// The temperature derivatives of the hard-chain contribution of the
+    /// PC-SAFT model.
+    ///
+    /// The chain rule of the hard-sphere model of Boublik is applied in the
+    /// volume representation of the original, on the molar basis, where the
+    /// derivatives with respect to the temperature at a fixed volume and mole
+    /// numbers are the derivatives at a fixed density and composition.
+    fn hard_chain_bmcsl_t_derivatives(&self, rho: f64) -> (f64, f64) {
+        let volume = 1.0 / rho;
+        let moles = &self.mole_fractions;
+        let diameters = crate::bmcsl::HsDiameters {
+            d: self.d.clone(),
+            d_t: self.d_t.clone(),
+            d_tt: self.d_tt.clone(),
+        };
+        let segments: Vec<f64> = self
+            .model
+            .components
+            .iter()
+            .map(|component| component.m)
+            .collect();
+        let moments = crate::bmcsl::packing_moments(volume, moles, &diameters, &segments);
+        let (hard_sphere_t, hard_sphere_tt) =
+            crate::bmcsl::hard_sphere_energy_t_derivatives(&moments);
 
-        (ahc, ahc_rho, ahc_rhorho, ahc_t, ahc_rhot)
+        let mut ahc_t = self.m_bar * hard_sphere_t;
+        let mut ahc_tt = self.m_bar * hard_sphere_tt;
+        for component in 0..self.model.components.len() {
+            let segments = self.model.components[component].m;
+            if segments <= 1.0 {
+                continue;
+            }
+            let pair = crate::bmcsl::pair_correlation_t_derivatives(
+                &moments, &diameters, component, component,
+            );
+            let weight = self.mole_fractions[component] * (segments - 1.0);
+            ahc_t -= weight * pair.log_d_t;
+            ahc_tt -= weight * pair.log_d_tt;
+        }
+        (ahc_t, ahc_tt)
     }
 
     fn dispersion_rho_t_derivatives(&self, rho: f64, eta: f64) -> (f64, f64, f64, f64, f64) {
@@ -1206,38 +1298,6 @@ impl<'a> PreparedPcSaft<'a> {
                 + self.m_bar * (c1 * i2 + eta * (c1_eta * i2 + c1 * i2_eta)) * self.m2e2s3_t);
 
         (adisp, adisp_rho, adisp_rhorho, adisp_t, adisp_rhot)
-    }
-
-    fn hard_chain_tt_derivative(&self, rho: f64, eta: f64) -> f64 {
-        let mut sum_eta_t = 0.0;
-        let mut sum_eta_tt = 0.0;
-        for i in 0..self.model.components.len() {
-            let mi = self.model.components[i].m;
-            sum_eta_t += self.mole_fractions[i] * mi * 3.0 * self.d[i].powi(2) * self.d_t[i];
-            sum_eta_tt += self.mole_fractions[i]
-                * mi
-                * (6.0 * self.d[i] * self.d_t[i].powi(2) + 3.0 * self.d[i].powi(2) * self.d_tt[i]);
-        }
-        let pref = (std::f64::consts::PI * N_AVOGADRO / 6.0) * rho;
-        let eta_t = pref * sum_eta_t;
-        let eta_tt = pref * sum_eta_tt;
-
-        let alpha_hs_eta = 2.0 * (2.0 - eta) / (1.0 - eta).powi(3);
-        let alpha_hs_etaeta = 2.0 * (5.0 - 2.0 * eta) / (1.0 - eta).powi(4);
-        let g = (1.0 - 0.5 * eta) / (1.0 - eta).powi(3);
-        let g_eta = (5.0 - 2.0 * eta) / (2.0 * (1.0 - eta).powi(4));
-        let g_etaeta = 3.0 * (3.0 - eta) / (1.0 - eta).powi(5);
-
-        let mut sum_m_m1 = 0.0;
-        for i in 0..self.model.components.len() {
-            sum_m_m1 += self.mole_fractions[i] * (self.model.components[i].m - 1.0);
-        }
-
-        let ahc_eta = self.m_bar * alpha_hs_eta - sum_m_m1 * g_eta / g;
-        let ahc_etaeta =
-            self.m_bar * alpha_hs_etaeta - sum_m_m1 * (g_etaeta / g - (g_eta / g).powi(2));
-
-        ahc_eta * eta_tt + ahc_etaeta * eta_t.powi(2)
     }
 
     fn dispersion_tt_derivative(&self, rho: f64, _eta: f64) -> f64 {

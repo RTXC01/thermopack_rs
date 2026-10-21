@@ -129,13 +129,15 @@ pub struct ReducedDiameter {
     pub d_tt: f64,
 }
 
-/// The packing fractions of the hard-sphere mixture and their derivatives.
+/// The moments of the number density of the hard-sphere mixture and their
+/// derivatives with respect to the temperature and the volume.
 ///
 /// The moments are the ones of the original
 /// `src/hardsphere_bmcsl.f90:calc_bmcsl_zeta_and_derivatives`, in the order
-/// zeta_0 to zeta_3.
+/// zeta_0 to zeta_3. The container holds no derivative with respect to the
+/// mole numbers, so the evaluation needs no allocation.
 #[derive(Debug, Clone)]
-pub struct PackingFractions {
+pub struct PackingMoments {
     /// The number of components of the mixture.
     pub nc: usize,
     /// The moments zeta_0 to zeta_3 of the number density.
@@ -150,6 +152,16 @@ pub struct PackingFractions {
     pub zet_vv: [f64; 4],
     /// The temperature and volume derivatives of the moments.
     pub zet_tv: [f64; 4],
+}
+
+/// The packing fractions of the hard-sphere mixture and their derivatives.
+#[derive(Debug, Clone)]
+pub struct PackingFractions {
+    /// The number of components of the mixture.
+    pub nc: usize,
+    /// The moments of the number density with their temperature and volume
+    /// derivatives.
+    pub moments: PackingMoments,
     /// The mole number derivatives of the moments.
     pub zet_n: Vec<[f64; 4]>,
     /// The volume and mole number derivatives of the moments.
@@ -163,12 +175,12 @@ pub struct PackingFractions {
 /// `volume` is the volume of the mixture \[m^3\], `moles` the mole numbers
 /// \[mol\], `diameters` the hard-sphere diameters with their temperature
 /// derivatives and `segments` the number of segments of every component.
-pub fn packing_fractions(
+pub fn packing_moments(
     volume: f64,
     moles: &[f64],
     diameters: &HsDiameters,
     segments: &[f64],
-) -> PackingFractions {
+) -> PackingMoments {
     let nc = moles.len();
     let prefactor = std::f64::consts::PI * crate::pc_saft::N_AVOGADRO / (6.0 * volume);
 
@@ -176,9 +188,6 @@ pub fn packing_fractions(
     let mut zet_t = [0.0; 4];
     let mut zet_tt = [0.0; 4];
     let mut zet_tv = [0.0; 4];
-    let mut zet_n = vec![[0.0; 4]; nc];
-    let mut zet_vn = vec![[0.0; 4]; nc];
-    let mut zet_tn = vec![[0.0; 4]; nc];
 
     for component in 0..nc {
         let m = segments[component];
@@ -187,18 +196,13 @@ pub fn packing_fractions(
         let d_tt = diameters.d_tt[component];
         let n = moles[component];
         for l in 0..4 {
-            let power = d.powi(l as i32);
-            let contribution = m * n * power;
-            zet[l] += contribution;
-            zet_n[component][l] = m * power;
-            zet_vn[component][l] = -m * power / volume;
+            zet[l] += m * n * d.powi(l as i32);
             if l > 0 {
                 let exponent = l as i32 - 1;
                 let d_previous = d.powi(exponent);
                 zet_t[l] += l as f64 * m * n * d_previous * d_t;
                 zet_tt[l] += l as f64 * m * n * d_previous * d_tt;
                 zet_tv[l] -= l as f64 * m * n * d_previous * d_t / volume;
-                zet_tn[component][l] = l as f64 * m * d_previous * d_t;
                 if l > 1 {
                     zet_tt[l] +=
                         l as f64 * (l as f64 - 1.0) * m * n * d.powi(exponent - 1) * d_t * d_t;
@@ -216,14 +220,9 @@ pub fn packing_fractions(
         zet_tv[l] *= prefactor;
         zet_v[l] = -zet[l] / volume;
         zet_vv[l] = 2.0 * zet[l] / (volume * volume);
-        for component in 0..nc {
-            zet_n[component][l] *= prefactor;
-            zet_vn[component][l] *= prefactor;
-            zet_tn[component][l] *= prefactor;
-        }
     }
 
-    PackingFractions {
+    PackingMoments {
         nc,
         zet,
         zet_t,
@@ -231,6 +230,44 @@ pub fn packing_fractions(
         zet_v,
         zet_vv,
         zet_tv,
+    }
+}
+
+/// The packing fractions of the hard-sphere mixture.
+///
+/// `volume` is the volume of the mixture \[m^3\], `moles` the mole numbers
+/// \[mol\], `diameters` the hard-sphere diameters with their temperature
+/// derivatives and `segments` the number of segments of every component.
+pub fn packing_fractions(
+    volume: f64,
+    moles: &[f64],
+    diameters: &HsDiameters,
+    segments: &[f64],
+) -> PackingFractions {
+    let nc = moles.len();
+    let moments = packing_moments(volume, moles, diameters, segments);
+    let prefactor = std::f64::consts::PI * crate::pc_saft::N_AVOGADRO / (6.0 * volume);
+
+    let mut zet_n = vec![[0.0; 4]; nc];
+    let mut zet_vn = vec![[0.0; 4]; nc];
+    let mut zet_tn = vec![[0.0; 4]; nc];
+    for component in 0..nc {
+        let m = segments[component];
+        let d = diameters.d[component];
+        let d_t = diameters.d_t[component];
+        for l in 0..4 {
+            let power = d.powi(l as i32);
+            zet_n[component][l] = prefactor * m * power;
+            zet_vn[component][l] = -prefactor * m * power / volume;
+            if l > 0 {
+                zet_tn[component][l] = prefactor * l as f64 * m * d.powi(l as i32 - 1) * d_t;
+            }
+        }
+    }
+
+    PackingFractions {
+        nc,
+        moments,
         zet_n,
         zet_vn,
         zet_tn,
@@ -278,8 +315,8 @@ pub fn pair_correlation(
     j: usize,
 ) -> PairCorrelation {
     let nc = packing.nc;
-    let zeta_2 = packing.zet[2];
-    let zeta_3 = packing.zet[3];
+    let zeta_2 = packing.moments.zet[2];
+    let zeta_3 = packing.moments.zet[3];
     let mu = diameters.reduced_diameter(i, j);
 
     let kernel = boublik_pair_correlation(zeta_2, zeta_3, mu.value);
@@ -289,11 +326,15 @@ pub fn pair_correlation(
     // The derivatives of the three variables of the kernel, in the order of
     // the packing fraction of the second order, the packing fraction of the
     // third order and the reduced diameter of the pair.
-    let zet_t = [packing.zet_t[2], packing.zet_t[3], mu.d_t];
-    let zet_tt = [packing.zet_tt[2], packing.zet_tt[3], mu.d_tt];
-    let zet_v = [packing.zet_v[2], packing.zet_v[3], 0.0];
-    let zet_vv = [packing.zet_vv[2], packing.zet_vv[3], 0.0];
-    let zet_tv = [packing.zet_tv[2], packing.zet_tv[3], 0.0];
+    let zet_t = [packing.moments.zet_t[2], packing.moments.zet_t[3], mu.d_t];
+    let zet_tt = [
+        packing.moments.zet_tt[2],
+        packing.moments.zet_tt[3],
+        mu.d_tt,
+    ];
+    let zet_v = [packing.moments.zet_v[2], packing.moments.zet_v[3], 0.0];
+    let zet_vv = [packing.moments.zet_vv[2], packing.moments.zet_vv[3], 0.0];
+    let zet_tv = [packing.moments.zet_tv[2], packing.moments.zet_tv[3], 0.0];
 
     let mut d_n = vec![0.0; nc];
     let mut d_tn = vec![0.0; nc];
@@ -492,6 +533,69 @@ pub fn boublik_helmholtz_energy(zeta: [f64; 4]) -> HardSphereEnergy {
     }
 }
 
+/// The temperature derivatives of the reduced Helmholtz energy of the
+/// hard-sphere mixture.
+///
+/// The function delivers the first and the second derivative with respect to
+/// the temperature at a fixed volume and fixed mole numbers, and needs no
+/// allocation.
+pub fn hard_sphere_energy_t_derivatives(moments: &PackingMoments) -> (f64, f64) {
+    let energy = boublik_helmholtz_energy(moments.zet);
+    let d_t = dot4(&energy.dzeta, &moments.zet_t);
+    let d_tt = dot4(&energy.dzeta, &moments.zet_tt)
+        + double_sum4(&energy.d2zeta, &moments.zet_t, &moments.zet_t);
+    (d_t, d_tt)
+}
+
+/// The pair correlation function of a pair of components and its temperature
+/// derivatives.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PairTemperatureDerivatives {
+    /// The pair correlation function.
+    pub value: f64,
+    /// The temperature derivative of the pair correlation function.
+    pub d_t: f64,
+    /// The second temperature derivative of the pair correlation function.
+    pub d_tt: f64,
+    /// The logarithm of the pair correlation function.
+    pub log_value: f64,
+    /// The temperature derivative of the logarithm.
+    pub log_d_t: f64,
+    /// The second temperature derivative of the logarithm.
+    pub log_d_tt: f64,
+}
+
+/// The pair correlation function of the pair of the components `i` and `j`
+/// and its temperature derivatives.
+///
+/// The function delivers the first and the second derivative with respect to
+/// the temperature at a fixed volume and fixed mole numbers, and needs no
+/// allocation.
+pub fn pair_correlation_t_derivatives(
+    moments: &PackingMoments,
+    diameters: &HsDiameters,
+    i: usize,
+    j: usize,
+) -> PairTemperatureDerivatives {
+    let mu = diameters.reduced_diameter(i, j);
+    let kernel = boublik_pair_correlation(moments.zet[2], moments.zet[3], mu.value);
+    let zet_t = [moments.zet_t[2], moments.zet_t[3], mu.d_t];
+    let zet_tt = [moments.zet_tt[2], moments.zet_tt[3], mu.d_tt];
+
+    let d_t = dot(&kernel.dzeta, &zet_t);
+    let d_tt = dot(&kernel.dzeta, &zet_tt) + double_sum(&kernel.d2zeta, &zet_t, &zet_t);
+
+    let g = kernel.value;
+    PairTemperatureDerivatives {
+        value: g,
+        d_t,
+        d_tt,
+        log_value: g.ln(),
+        log_d_t: d_t / g,
+        log_d_tt: d_tt / g - d_t * d_t / (g * g),
+    }
+}
+
 /// The reduced Helmholtz energy of the hard-sphere mixture and its
 /// derivatives with respect to the temperature, the volume and the mole
 /// numbers.
@@ -529,7 +633,7 @@ pub struct HardSphereEnergyDerivatives {
 /// derivatives.
 pub fn hard_sphere_energy(packing: &PackingFractions) -> HardSphereEnergyDerivatives {
     let nc = packing.nc;
-    let energy = boublik_helmholtz_energy(packing.zet);
+    let energy = boublik_helmholtz_energy(packing.moments.zet);
     let dalpha = energy.dzeta;
     let d2alpha = energy.d2zeta;
 
@@ -543,8 +647,10 @@ pub fn hard_sphere_energy(packing: &PackingFractions) -> HardSphereEnergyDerivat
         let zet_tn = packing.zet_tn[component];
 
         d_n[component] = dot4(&dalpha, &zet_n);
-        d_vn[component] = dot4(&dalpha, &zet_vn) + double_sum4(&d2alpha, &packing.zet_v, &zet_n);
-        d_tn[component] = dot4(&dalpha, &zet_tn) + double_sum4(&d2alpha, &packing.zet_t, &zet_n);
+        d_vn[component] =
+            dot4(&dalpha, &zet_vn) + double_sum4(&d2alpha, &packing.moments.zet_v, &zet_n);
+        d_tn[component] =
+            dot4(&dalpha, &zet_tn) + double_sum4(&d2alpha, &packing.moments.zet_t, &zet_n);
         for (other, entry) in d_nn[component].iter_mut().enumerate() {
             *entry = double_sum4(&d2alpha, &zet_n, &packing.zet_n[other]);
         }
@@ -552,16 +658,16 @@ pub fn hard_sphere_energy(packing: &PackingFractions) -> HardSphereEnergyDerivat
 
     HardSphereEnergyDerivatives {
         value: energy.value,
-        d_t: dot4(&dalpha, &packing.zet_t),
-        d_v: dot4(&dalpha, &packing.zet_v),
+        d_t: dot4(&dalpha, &packing.moments.zet_t),
+        d_v: dot4(&dalpha, &packing.moments.zet_v),
         d_n,
-        d_tt: dot4(&dalpha, &packing.zet_tt)
-            + double_sum4(&d2alpha, &packing.zet_t, &packing.zet_t),
-        d_tv: dot4(&dalpha, &packing.zet_tv)
-            + double_sum4(&d2alpha, &packing.zet_t, &packing.zet_v),
+        d_tt: dot4(&dalpha, &packing.moments.zet_tt)
+            + double_sum4(&d2alpha, &packing.moments.zet_t, &packing.moments.zet_t),
+        d_tv: dot4(&dalpha, &packing.moments.zet_tv)
+            + double_sum4(&d2alpha, &packing.moments.zet_t, &packing.moments.zet_v),
         d_tn,
-        d_vv: dot4(&dalpha, &packing.zet_vv)
-            + double_sum4(&d2alpha, &packing.zet_v, &packing.zet_v),
+        d_vv: dot4(&dalpha, &packing.moments.zet_vv)
+            + double_sum4(&d2alpha, &packing.moments.zet_v, &packing.moments.zet_v),
         d_vn,
         d_nn,
     }
@@ -676,14 +782,14 @@ mod tests {
         let diameters = diameters(temperature);
         let packing = packing_fractions(volume, moles, &diameters, &SEGMENTS);
         let mu = diameters.reduced_diameter(i, j);
-        boublik_pair_correlation(packing.zet[2], packing.zet[3], mu.value).value
+        boublik_pair_correlation(packing.moments.zet[2], packing.moments.zet[3], mu.value).value
     }
 
     /// The reduced Helmholtz energy of the hard-sphere mixture of the test.
     fn energy(temperature: f64, volume: f64, moles: &[f64]) -> f64 {
         let diameters = diameters(temperature);
         let packing = packing_fractions(volume, moles, &diameters, &SEGMENTS);
-        boublik_helmholtz_energy(packing.zet).value
+        boublik_helmholtz_energy(packing.moments.zet).value
     }
 
     /// The chain rule of the reduced Helmholtz energy of the hard-sphere

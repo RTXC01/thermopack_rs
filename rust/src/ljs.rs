@@ -924,3 +924,96 @@ fn uv_a1_u_multiple(eps_divk: f64, d: f64, rho: f64) -> (f64, f64, f64, f64, f64
         a1_rdd * eps_divk,
     )
 }
+/// The q-function of the UV theory and its temperature derivatives.
+///
+/// The temperature is in kelvin and the well depth is divided by the
+/// Boltzmann constant. The method returns the function, its first and its
+/// second temperature derivatives, in the order of the source.
+pub fn uv_q_of_temperature(eps_divk: f64, temperature: f64) -> (f64, f64, f64) {
+    const M: f64 = 12.0;
+    const N: f64 = 6.0;
+    // The matrix of the source, in the order of its columns.
+    const C_MATRIX: [[f64; 3]; 4] = [
+        [1.92840364363978, 5.20120816141761e-01, 0.0],
+        [
+            4.43165896265079e-01,
+            1.82526759234412e-01,
+            1.29885156087242e-02,
+        ],
+        [0.0, 1.10319989659929e-02, 6.41039871789327e-03],
+        [0.0, -7.97813995328348e-05, 1.85866741090323e-05],
+    ];
+    let m_matrix = [1.0, (M - 7.0), (M - 7.0) * (M - 7.0), (M - 7.0).powi(3)];
+    let mut coefficients = [0.0; 4];
+    coefficients[0] = (2.0 * std::f64::consts::PI * M / N).sqrt();
+    for row in 0..3 {
+        let mut sum = 0.0;
+        for column in 0..4 {
+            sum += C_MATRIX[column][row] * m_matrix[column];
+        }
+        coefficients[row + 1] = sum;
+    }
+    let reduced_temperature = temperature / eps_divk;
+    let root = reduced_temperature.sqrt();
+    let exponent = -1.0 / (2.0 * M);
+    let f = 1.0
+        + coefficients[0] * root
+        + coefficients[1] * reduced_temperature
+        + coefficients[2] * reduced_temperature * root
+        + coefficients[3] * reduced_temperature * reduced_temperature;
+    let f_t = 0.5 * coefficients[0] / root
+        + coefficients[1]
+        + 1.5 * coefficients[2] * root
+        + 2.0 * coefficients[3] * reduced_temperature;
+    let f_tt = -0.25 * coefficients[0] / (reduced_temperature * root)
+        + 0.75 * coefficients[2] / root
+        + 2.0 * coefficients[3];
+    let q = f.powf(exponent);
+    let q_t = exponent * f.powf(exponent - 1.0) * f_t;
+    let q_tt = exponent * (exponent - 1.0) * f.powf(exponent - 2.0) * f_t * f_t
+        + exponent * f.powf(exponent - 1.0) * f_tt;
+    let scale = 2.0f64.powf(1.0 / 6.0);
+    (
+        scale * q,
+        scale * q_t / eps_divk,
+        scale * q_tt / (eps_divk * eps_divk),
+    )
+}
+
+/// The hard-sphere second virial coefficient of the UV theory and its
+/// temperature derivatives.
+pub fn uv_hard_sphere_b2(eps_divk: f64, temperature: f64) -> (f64, f64, f64) {
+    let (q, q_t, q_tt) = uv_q_of_temperature(eps_divk, temperature);
+    let prefactor = 2.0 * std::f64::consts::PI / 3.0;
+    (
+        prefactor * q * q * q,
+        3.0 * prefactor * q * q * q_t,
+        6.0 * prefactor * q * q_t * q_t + 3.0 * prefactor * q * q * q_tt,
+    )
+}
+
+/// The second virial coefficient of the Lennard-Jones spline and its
+/// temperature derivatives.
+pub fn ljs_b2(eps_divk: f64, temperature: f64) -> (f64, f64, f64) {
+    const BI: [f64; 5] = [1.345, -1.336, -3.85, 1.295, -0.416];
+    let reduced = eps_divk / temperature;
+    let reduced_t = -eps_divk / (temperature * temperature);
+    let reduced_tt = 2.0 * eps_divk / temperature.powi(3);
+    let b2 = BI[0]
+        + BI[1] * reduced
+        + BI[2] * reduced * reduced
+        + BI[3] * reduced.powi(3)
+        + BI[4] * reduced.powi(4);
+    let b2_t = BI[1] * reduced_t
+        + 2.0 * BI[2] * reduced * reduced_t
+        + 3.0 * BI[3] * reduced * reduced * reduced_t
+        + 4.0 * BI[4] * reduced.powi(3) * reduced_t;
+    let b2_tt = BI[1] * reduced_tt
+        + 2.0 * BI[2] * reduced_t * reduced_t
+        + 2.0 * BI[2] * reduced * reduced_tt
+        + 6.0 * BI[3] * reduced * reduced_t * reduced_t
+        + 3.0 * BI[3] * reduced * reduced * reduced_tt
+        + 12.0 * BI[4] * reduced * reduced * reduced_t * reduced_t
+        + 4.0 * BI[4] * reduced.powi(3) * reduced_tt;
+    (b2, b2_t, b2_tt)
+}

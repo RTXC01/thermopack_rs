@@ -1304,6 +1304,33 @@ subroutine query_uv_terms(sigma,eps_divk,temperature,rho,values,count) &
   count = 9
 end subroutine query_uv_terms
 
+! Evaluate the q-function and the second virial coefficients of the UV theory
+! and of the Lennard-Jones spline of the original.
+subroutine query_uv_virials(eps_divk,temperature,values,count) &
+     bind(C,name='query_uv_virials')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use lj_splined, only: uv_q_of_T, uv_hs_b2, ljs_b2
+  implicit none
+  real(c_double), value :: eps_divk, temperature
+  real(c_double), intent(out) :: values(9)
+  integer(c_int), intent(out) :: count
+  ! Locals
+  real :: q, q_T, q_TT, hs2, hs2_T, hs2_TT, ljs2, ljs2_T, ljs2_TT
+  call uv_q_of_T(temperature,1.0d0,eps_divk,q,q_T,q_TT)
+  call uv_hs_b2(temperature,1.0d0,eps_divk,hs2,hs2_T,hs2_TT)
+  call ljs_b2(temperature,eps_divk,ljs2,ljs2_T,ljs2_TT)
+  values(1) = q
+  values(2) = q_T
+  values(3) = q_TT
+  values(4) = hs2
+  values(5) = hs2_T
+  values(6) = hs2_TT
+  values(7) = ljs2
+  values(8) = ljs2_T
+  values(9) = ljs2_TT
+  count = 9
+end subroutine query_uv_virials
+
 ! Evaluate the nodes and the weights of a quadrature of the original.
 subroutine query_quadrature(quad,values,count) bind(C,name='query_quadrature')
   use, intrinsic :: iso_c_binding, only: c_int,c_double

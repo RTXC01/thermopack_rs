@@ -41,6 +41,51 @@ def native(lines):
 
 
 def main(directory):
+    virial_values = []
+    with ReferenceProcess(directory) as oracle:
+        for case in [(124.0, 100.0), (124.0, 200.0), (95.0, 300.0), (124.0, 150.0)]:
+            result = oracle.call(
+                {
+                    "mode": "UV_VIRIALS",
+                    "eps_divk": case[0],
+                    "temperature": case[1],
+                }
+            )
+            if "values" not in result:
+                raise SystemExit(f"the source did not report the virials: {result}")
+            virial_values.append(result)
+    virial_lines = [
+        f"UVVIRIALS|{eps_divk:.17e}|{temperature:.17e}" for eps_divk, temperature in
+        [(124.0, 100.0), (124.0, 200.0), (95.0, 300.0), (124.0, 150.0)]
+    ]
+    native_virials = native(virial_lines)
+    virial_failures = []
+    virial_rows = []
+    virial_worst = 0.0
+    virial_names = [
+        "q", "q_T", "q_TT", "hs_b2", "hs_b2_T", "hs_b2_TT", "ljs_b2", "ljs_b2_T", "ljs_b2_TT",
+    ]
+    for index, (eps_divk, temperature) in enumerate(
+        [(124.0, 100.0), (124.0, 200.0), (95.0, 300.0), (124.0, 150.0)]
+    ):
+        source = virial_values[index]["values"]
+        actual = native_virials[index]
+        label = f"{eps_divk:.17e}|{temperature:.17e}"
+        if isinstance(actual, str):
+            virial_failures.append(dict(case=label, reason="native error", native=actual))
+            continue
+        bad = []
+        for position, (source_value, native_value) in enumerate(zip(source, actual)):
+            if abs(source_value - native_value) > ATOL + RTOL * abs(source_value):
+                bad.append((virial_names[position], source_value, native_value))
+            else:
+                virial_worst = max(
+                    virial_worst, abs(source_value - native_value) / max(abs(source_value), 1.0e-30)
+                )
+        if bad:
+            virial_failures.append(dict(case=label, reason="virials", differences=bad[:6]))
+            continue
+        virial_rows.append([label, *source])
     with ReferenceProcess(directory) as oracle:
         reference_values = []
         for case in CASES:
@@ -62,9 +107,9 @@ def main(directory):
     ]
     native_values = native(lines)
 
-    failures = []
-    rows = []
-    worst = 0.0
+    failures = list(virial_failures)
+    term_rows = []
+    worst = virial_worst
     for index, case in enumerate(CASES):
         label = "|".join(f"{value:.17e}" for value in case)
         source = reference_values[index]["values"]
@@ -83,17 +128,23 @@ def main(directory):
         if bad:
             failures.append(dict(case=label, reason="terms", differences=bad[:6]))
             continue
-        rows.append([label, *source])
+        term_rows.append([label, *source])
 
+    virial_path = ROOT / "tests/fixtures/uv_virials.csv"
+    with virial_path.open("w", newline="") as handle:
+        writer = csv.writer(handle, delimiter=";", lineterminator="\n")
+        writer.writerow(["case", *virial_names])
+        for row in virial_rows:
+            writer.writerow([row[0], *[f"{value:.17e}" for value in row[1:]]])
     path = ROOT / "tests/fixtures/uv_terms.csv"
     with path.open("w", newline="") as handle:
         writer = csv.writer(handle, delimiter=";", lineterminator="\n")
         writer.writerow(["case", *QUANTITIES])
-        for row in rows:
+        for row in term_rows:
             writer.writerow([row[0], *[f"{value:.17e}" for value in row[1:]]])
     metadata = json.loads((ROOT / ".reference/metadata.json").read_text())
     metadata.update(
-        cases=len(rows),
+        cases=len(term_rows),
         attempted_cases=len(CASES),
         generator="tools/rust_port/validate_uv_terms.py",
         fixture_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
@@ -111,13 +162,32 @@ def main(directory):
     (ROOT / ".reference/uv_terms_failures.json").write_text(
         json.dumps(failures, indent=2) + "\n"
     )
+    virial_metadata = json.loads((ROOT / ".reference/metadata.json").read_text())
+    virial_metadata.update(
+        cases=len(virial_rows),
+        attempted_cases=len(virial_rows),
+        generator="tools/rust_port/validate_uv_terms.py",
+        fixture_sha256=hashlib.sha256(virial_path.read_bytes()).hexdigest(),
+        quantities=virial_names,
+        relative_tolerance=RTOL,
+        absolute_tolerance=ATOL,
+        worst_relative_difference=virial_worst,
+        convention=(
+            "the original uv_q_of_T, uv_hs_b2 and ljs_b2, which evaluate the q-function of the UV "
+            "theory, the hard-sphere second virial coefficient and the second virial coefficient of "
+            "the Lennard-Jones spline with their temperature derivatives"
+        ),
+    )
+    virial_path.with_suffix(".metadata.json").write_text(
+        json.dumps(virial_metadata, indent=2) + "\n"
+    )
     print(
         json.dumps(
             {
                 "attempts": len(CASES),
-                "compared": len(rows),
+                "compared": len(term_rows) + len(virial_rows),
                 "failures": len(failures),
-                "worst_relative_difference": worst,
+                "worst_relative_difference": max(worst, virial_worst),
             },
             indent=2,
         )

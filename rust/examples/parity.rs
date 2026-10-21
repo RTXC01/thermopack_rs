@@ -108,6 +108,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             && fields[0] != "WHITEBEAR"
             && fields[0] != "UVPHI"
             && fields[0] != "UVTERMS"
+            && fields[0] != "UVVIRIALS"
             && fields[0] != "QUAD"
             && fields[0] != "CRITICAL"
             && fields.len() != 6
@@ -207,6 +208,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             text.push(format!("{integral:.17e}"));
             text.push(format!("{differential:.17e}"));
             println!("{}", text.join(","));
+            continue;
+        }
+        if fields[0] == "UVVIRIALS" {
+            let eps_divk: f64 = fields[1].parse().unwrap();
+            let temperature: f64 = fields[2].parse().unwrap();
+            let (q, q_t, q_tt) = thermopack_rs::ljs::uv_q_of_temperature(eps_divk, temperature);
+            let (hs2, hs2_t, hs2_tt) = thermopack_rs::ljs::uv_hard_sphere_b2(eps_divk, temperature);
+            let (ljs2, ljs2_t, ljs2_tt) = thermopack_rs::ljs::ljs_b2(eps_divk, temperature);
+            println!(
+                "{:.17e},{:.17e},{:.17e},{:.17e},{:.17e},{:.17e},{:.17e},{:.17e},{:.17e}",
+                q, q_t, q_tt, hs2, hs2_t, hs2_tt, ljs2, ljs2_t, ljs2_tt
+            );
             continue;
         }
         if fields[0] == "UVTERMS" {

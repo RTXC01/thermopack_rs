@@ -4,7 +4,9 @@
 
 #![allow(clippy::excessive_precision)]
 
-use thermopack_rs::ljs::{uv_a1_b2, uv_a1_u, uv_phi, uv_phi_temp};
+use thermopack_rs::ljs::{
+    ljs_b2, uv_a1_b2, uv_a1_u, uv_hard_sphere_b2, uv_phi, uv_phi_temp, uv_q_of_temperature,
+};
 
 const ATOL: f64 = 1.0e-14;
 const RTOL: f64 = 1.0e-12;
@@ -78,6 +80,32 @@ fn uv_terms_match_the_source() {
         checked += 1;
     }
     assert_eq!(checked, 5);
+}
+
+#[test]
+fn uv_virials_match_the_source() {
+    let mut checked = 0;
+    for row in include_str!("fixtures/uv_virials.csv").lines().skip(1) {
+        let fields: Vec<_> = row.split(';').collect();
+        let case = fields[0];
+        let parts: Vec<_> = case.split('|').collect();
+        let eps_divk: f64 = parts[0].parse().unwrap();
+        let temperature: f64 = parts[1].parse().unwrap();
+        let source: Vec<f64> = fields[1..].iter().map(|v| v.parse().unwrap()).collect();
+        let (q, q_t, q_tt) = uv_q_of_temperature(eps_divk, temperature);
+        let (hs2, hs2_t, hs2_tt) = uv_hard_sphere_b2(eps_divk, temperature);
+        let (ljs2, ljs2_t, ljs2_tt) = ljs_b2(eps_divk, temperature);
+        let native = [q, q_t, q_tt, hs2, hs2_t, hs2_tt, ljs2, ljs2_t, ljs2_tt];
+        assert_eq!(native.len(), source.len(), "{case}");
+        for (position, (source, native)) in source.iter().zip(native.iter()).enumerate() {
+            assert!(
+                (source - native).abs() <= ATOL + RTOL * source.abs(),
+                "{case} entry {position}: source {source} native {native}"
+            );
+        }
+        checked += 1;
+    }
+    assert_eq!(checked, 4);
 }
 
 #[test]

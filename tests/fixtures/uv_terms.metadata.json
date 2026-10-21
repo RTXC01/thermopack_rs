@@ -146,6 +146,6 @@
   ],
   "relative_tolerance": 1e-11,
   "absolute_tolerance": 1e-14,
-  "worst_relative_difference": 2.4798722464833953e-16,
+  "worst_relative_difference": 3.7026104934902127e-16,
   "convention": "the original uv_a1_u and uv_a1_b2, which evaluate the first and the second order terms of the UV theory of the splined Lennard-Jones model with their partial derivatives; the probe uses the hard-sphere diameter of the Barker-Henderson reference"
 }

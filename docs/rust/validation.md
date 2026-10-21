@@ -377,6 +377,12 @@ The [UV theory term qualification](ljs.md) adds 5 cases of the original
 `uv_a1_u` and `uv_a1_b2`: the first and the second order terms of the UV
 theory and their partial derivatives. The nine quantities match with a relative
 1e-11, and the observed worst relative difference is 2.5e-16.
+The [UV theory virial qualification](ljs.md) adds 4 cases of the original
+`uv_q_of_T`, `uv_hs_b2` and `ljs_b2`: the q-function of the UV theory, the
+hard-sphere second virial coefficient and the second virial coefficient of the
+Lennard-Jones spline with their temperature derivatives. The nine quantities
+match with a relative 1e-11, and the observed worst relative difference is
+3.7e-16.
 The [quadrature qualification](quadrature.md) adds 14 cases of the original
 `get_quadrature_positions`, `get_quadrature_weights` and
 `integrate_with_differential`: the seven Gauss rules and the seven Gauss-Kronrod

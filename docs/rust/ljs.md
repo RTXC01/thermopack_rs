@@ -230,6 +230,19 @@ the Barker-Henderson reference.
 The committed fixture is `tests/fixtures/uv_terms.csv`; the test is
 `tests/uv_phi.rs`.
 
+`tools/rust_port/validate_uv_terms.py` also compares the q-function of the UV
+theory, the hard-sphere second virial coefficient and the second virial
+coefficient of the Lennard-Jones spline against the original `uv_q_of_T`,
+`uv_hs_b2` and `ljs_b2`.
+
+* 4 cases: the well depth and the temperature.
+* The compared quantities are the nine values of the three routines. All 4 cases
+  match with a relative 1e-11, and the observed worst relative difference is
+  3.7e-16.
+
+The committed fixture is `tests/fixtures/uv_virials.csv`; the test is
+`tests/uv_phi.rs`.
+
 ## The cavity terms of the White Bear reference
 
 The White Bear family adds the cavity of the hard-sphere reference and the soft

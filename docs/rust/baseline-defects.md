@@ -301,3 +301,22 @@ The native model reproduces the not-a-number value, because the parity of the
 grid depends on it, and the qualification compares the not-a-number values of
 both models.
 See [iso-line qualification](isolines.md).
+
+## The pressure of a molar volume of the cubic equation of state
+
+src/cubic.f90:cbCalcPressure takes the molar volume as the argument  and
+computes the pressure with p = cbPress(cbeos,T,V), where V is neither a
+local variable of the routine nor an argument of it. The module does not
+switch off the implicit typing of the routine, so V is an uninitialized
+implicit real. The pressure of the routine therefore does not follow from the
+supplied volume, and the derivatives dpdv, dpdt and d2pdv2 follow the
+mixture parameters of the recalculated state, not the state of the argument.
+
+The state of a mixture with the Wong-Sandler mixing rule is therefore not
+evaluated with cbCalcPressure in the reference probe. The probe uses the
+generic routine eostv::pressure, which evaluates the pressure of the state
+from the volume and the mole numbers, as the fugacity and the caloric
+properties of the same state do. The native library evaluates the pressure
+from the volume of the prepared state and is qualified against the generic
+route.
+See [Wong-Sandler notes](wong-sandler.md).

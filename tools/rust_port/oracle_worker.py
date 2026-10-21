@@ -249,6 +249,23 @@ def main(compiler_directory):
             probe.query_cpa_rdf(request['temperature'],request['volume'],amounts,values,byref(number))
             print('THERMOPACK_RESULT='+json.dumps(dict(values=list(map(float,values))[:number.value])),flush=True)
             continue
+        if request['mode']=='PCSAFT_CHAIN':
+            if probe is None:probe=load_probe()
+            key=('PCSAFT_CHAIN',request['components'])
+            if previous!=key:
+                from thermopack.pcsaft import pcsaft
+                model=pcsaft(request['components']);previous=key
+            model.activate()
+            probe.query_pcsaft_chain.argtypes=[c_double,c_double,POINTER(c_double),
+                                                POINTER(c_double),POINTER(c_int)]
+            probe.query_pcsaft_chain.restype=None
+            count=len(request['moles'])
+            amounts=(c_double*16)(*request['moles'],*([0.0]*(16-count)))
+            values=(c_double*256)();number=c_int()
+            probe.query_pcsaft_chain(request['temperature'],request['volume'],amounts,
+                                     values,byref(number))
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=list(map(float,values))[:number.value])),flush=True)
+            continue
         if request['mode']=='PCSAFT_HS':
             if probe is None:probe=load_probe()
             key=('PCSAFT_HS',request['components'])

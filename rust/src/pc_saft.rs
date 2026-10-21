@@ -244,6 +244,124 @@ pub fn pcsaft_hs_energy(
     Ok(crate::bmcsl::hard_sphere_energy(&packing))
 }
 
+/// The reduced Helmholtz energy of the chain term of the PC-SAFT model and
+/// its derivatives with respect to the temperature, the volume and the mole
+/// numbers.
+///
+/// The function reproduces the original
+/// `src/pc_saft_nonassoc.f90:F_chain_PC_SAFT_TVn`.
+#[derive(Debug, Clone)]
+pub struct PcSaftChainEnergy {
+    /// The reduced Helmholtz energy of the chain term.
+    pub value: f64,
+    /// The temperature derivative of the energy.
+    pub d_t: f64,
+    /// The volume derivative of the energy.
+    pub d_v: f64,
+    /// The mole number derivatives of the energy.
+    pub d_n: Vec<f64>,
+    /// The second temperature derivative of the energy.
+    pub d_tt: f64,
+    /// The temperature and volume derivative of the energy.
+    pub d_tv: f64,
+    /// The temperature and mole number derivatives of the energy.
+    pub d_tn: Vec<f64>,
+    /// The second volume derivative of the energy.
+    pub d_vv: f64,
+    /// The volume and mole number derivatives of the energy.
+    pub d_vn: Vec<f64>,
+    /// The second mole number derivatives of the energy.
+    pub d_nn: Vec<Vec<f64>>,
+}
+
+/// The reduced Helmholtz energy of the chain term of the PC-SAFT model.
+///
+/// The volume is in cubic metre and the number of moles is the amount of each
+/// component.
+pub fn pcsaft_chain_energy(
+    model: &PcSaft,
+    temperature: f64,
+    volume: f64,
+    moles: &[f64],
+) -> Result<PcSaftChainEnergy> {
+    positive(temperature, "the temperature")?;
+    positive(volume, "the volume")?;
+    let count = model.components().len();
+    if moles.len() != count {
+        return Err(Error::InvalidInput(
+            "the number of moles must match the components of the model",
+        ));
+    }
+    let total: f64 = moles.iter().sum();
+    if !total.is_finite() || total <= 0.0 {
+        return Err(Error::InvalidInput(
+            "the number of moles must be strictly positive",
+        ));
+    }
+    let composition: Vec<f64> = moles.iter().map(|amount| amount / total).collect();
+    let prepared = PreparedPcSaft::new(model, temperature, &composition)?;
+    let diameters = crate::bmcsl::HsDiameters {
+        d: prepared.d.clone(),
+        d_t: prepared.d_t.clone(),
+        d_tt: prepared.d_tt.clone(),
+    };
+    let segments: Vec<f64> = model
+        .components()
+        .iter()
+        .map(|component| component.m)
+        .collect();
+    let packing = crate::bmcsl::packing_fractions(volume, moles, &diameters, &segments);
+
+    let mut energy = PcSaftChainEnergy {
+        value: 0.0,
+        d_t: 0.0,
+        d_v: 0.0,
+        d_n: vec![0.0; count],
+        d_tt: 0.0,
+        d_tv: 0.0,
+        d_tn: vec![0.0; count],
+        d_vv: 0.0,
+        d_vn: vec![0.0; count],
+        d_nn: vec![vec![0.0; count]; count],
+    };
+
+    for (component, amount) in moles.iter().enumerate() {
+        let segments = model.components()[component].m;
+        if segments <= 1.0 {
+            continue;
+        }
+        let correlation =
+            crate::bmcsl::pair_correlation(&packing, &diameters, component, component);
+        let lng = correlation.logarithm();
+        let weight = amount * (segments - 1.0);
+
+        energy.value -= weight * lng.value;
+        energy.d_t -= weight * lng.d_t;
+        energy.d_v -= weight * lng.d_v;
+        energy.d_tt -= weight * lng.d_tt;
+        energy.d_tv -= weight * lng.d_tv;
+        energy.d_vv -= weight * lng.d_vv;
+
+        energy.d_n[component] -= (segments - 1.0) * lng.value;
+        energy.d_tn[component] -= (segments - 1.0) * lng.d_t;
+        energy.d_vn[component] -= (segments - 1.0) * lng.d_v;
+        for other in 0..count {
+            energy.d_n[other] -= weight * lng.d_n[other];
+            energy.d_tn[other] -= weight * lng.d_tn[other];
+            energy.d_vn[other] -= weight * lng.d_vn[other];
+            energy.d_nn[component][other] -= (segments - 1.0) * lng.d_n[other];
+            energy.d_nn[other][component] -= (segments - 1.0) * lng.d_n[other];
+        }
+        for other in 0..count {
+            for last in 0..count {
+                energy.d_nn[other][last] -= weight * lng.d_nn[other][last];
+            }
+        }
+    }
+
+    Ok(energy)
+}
+
 /// Precomputed state of a PC-SAFT fluid/mixture at temperature $T$ and composition $\mathbf{x}$.
 #[derive(Debug, Clone)]
 pub struct PreparedPcSaft<'a> {

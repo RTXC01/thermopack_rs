@@ -174,3 +174,36 @@ for the active model of the PC-SAFT model.
 
 The committed fixture is tests/fixtures/pcsaft_hs.csv; the test is
 tests/pcsaft_hs.rs.
+
+## The chain term of the PC-SAFT model
+
+The chain term of the PC-SAFT model is the sum over the components with more
+than one segment of the logarithm of the pair correlation function of the
+component with itself. The original evaluates it in
+src/pc_saft_nonassoc.f90:F_chain_PC_SAFT_TVn, which calls the published
+routine calc_bmcsl_lngij of the hard-sphere module.
+
+The native function pc_saft::pcsaft_chain_energy reproduces the original. The
+logarithm of the pair correlation function and its derivatives follow the
+original src/hardsphere_bmcsl.f90:calc_bmcsl_lngij and are the function
+bmcsl::PairCorrelation::logarithm of the native module.
+
+The qualification is tools/rust_port/validate_pcsaft_chain.py. The reference
+probe tools/rust_port/reference_probe.f90 calls calc_dhs,
+calc_bmcsl_zeta_and_derivatives and F_chain_PC_SAFT_TVn of the original for
+the active model of the PC-SAFT model.
+
+- 6 cases: the components, the temperature, the volume and the number of
+  moles.
+- The compared quantities are the energy and its nine derivatives.
+- All 6 cases match with a relative 1e-12, and the observed worst relative
+  difference is 3.2e-16.
+
+The committed fixture is tests/fixtures/pcsaft_chain.csv; the test is
+tests/pcsaft_chain.rs.
+
+The native model of the PC-SAFT model still evaluates the temperature
+derivative of the hard-chain contribution with the expressions of the
+simplified PC-SAFT model, which are exact for a pure fluid only. The port of
+the chain term and of the hard-sphere energy is the first piece of the work
+that replaces them for a mixture.

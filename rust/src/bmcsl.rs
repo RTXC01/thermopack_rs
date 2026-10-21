@@ -339,6 +339,69 @@ pub fn pair_correlation(
     }
 }
 
+/// The logarithm of the pair correlation function and its derivatives.
+///
+/// The expression follows the original
+/// `src/hardsphere_bmcsl.f90:calc_bmcsl_lngij`.
+#[derive(Debug, Clone)]
+pub struct LogPairCorrelation {
+    /// The logarithm of the pair correlation function.
+    pub value: f64,
+    /// The temperature derivative of the logarithm.
+    pub d_t: f64,
+    /// The volume derivative of the logarithm.
+    pub d_v: f64,
+    /// The mole number derivatives of the logarithm.
+    pub d_n: Vec<f64>,
+    /// The second temperature derivative of the logarithm.
+    pub d_tt: f64,
+    /// The temperature and volume derivative of the logarithm.
+    pub d_tv: f64,
+    /// The temperature and mole number derivatives of the logarithm.
+    pub d_tn: Vec<f64>,
+    /// The second volume derivative of the logarithm.
+    pub d_vv: f64,
+    /// The volume and mole number derivatives of the logarithm.
+    pub d_vn: Vec<f64>,
+    /// The second mole number derivatives of the logarithm.
+    pub d_nn: Vec<Vec<f64>>,
+}
+
+impl PairCorrelation {
+    /// The logarithm of the pair correlation function and its derivatives.
+    pub fn logarithm(&self) -> LogPairCorrelation {
+        let g = self.value;
+        let g_t = self.d_t;
+        let g_v = self.d_v;
+        let count = self.d_n.len();
+        let mut d_n = Vec::with_capacity(count);
+        let mut d_tn = Vec::with_capacity(count);
+        let mut d_vn = Vec::with_capacity(count);
+        let mut d_nn = vec![vec![0.0; count]; count];
+        for (component, row) in d_nn.iter_mut().enumerate() {
+            let g_n = self.d_n[component];
+            d_n.push(g_n / g);
+            d_tn.push(self.d_tn[component] / g - g_t * g_n / (g * g));
+            d_vn.push(self.d_vn[component] / g - g_v * g_n / (g * g));
+            for (other, entry) in row.iter_mut().enumerate() {
+                *entry = self.d_nn[component][other] / g - g_n * self.d_n[other] / (g * g);
+            }
+        }
+        LogPairCorrelation {
+            value: g.ln(),
+            d_t: g_t / g,
+            d_v: g_v / g,
+            d_n,
+            d_tt: self.d_tt / g - g_t * g_t / (g * g),
+            d_tv: self.d_tv / g - g_t * g_v / (g * g),
+            d_tn,
+            d_vv: self.d_vv / g - g_v * g_v / (g * g),
+            d_vn,
+            d_nn,
+        }
+    }
+}
+
 /// The reduced Helmholtz energy of the additive hard-sphere model and its
 /// derivatives with respect to the packing fractions.
 ///

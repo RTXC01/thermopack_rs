@@ -1748,6 +1748,70 @@ contains
   end subroutine test_integrand
 end subroutine query_quadrature_integral
 
+! Evaluate the reduced Helmholtz energy of the chain term of the PC-SAFT
+! model of the original.
+subroutine query_pcsaft_chain(temperature,volume,moles,values,numbers) &
+     bind(C,name='query_pcsaft_chain')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use thermopack_var, only: nc, get_active_eos, base_eos_param
+  use pc_saft_nonassoc, only: PCSAFT_eos, calc_dhs, F_chain_PC_SAFT_TVn
+  use hardsphere_bmcsl, only: calc_bmcsl_zeta_and_derivatives
+  implicit none
+  real(c_double), value :: temperature, volume
+  real(c_double), intent(in) :: moles(16)
+  real(c_double), intent(out) :: values(256)
+  integer(c_int), intent(out) :: numbers
+  ! Locals
+  class(base_eos_param), pointer :: eos
+  real :: F, F_T, F_V, F_TT, F_TV, F_VV
+  real, dimension(nc) :: F_n, F_Tn, F_Vn
+  real, dimension(nc,nc) :: F_nn
+  real, dimension(nc) :: n
+  integer :: i,j,position
+  eos => get_active_eos()
+  select type(p_eos => eos)
+  class is(PCSAFT_eos)
+    do i = 1, nc
+      n(i) = moles(i)
+    end do
+    call calc_dhs(p_eos, temperature)
+    call calc_bmcsl_zeta_and_derivatives(nc,volume,n,p_eos%dhs,p_eos%zeta,p_eos%m)
+    call F_chain_PC_SAFT_TVn(p_eos,temperature,volume,n,F,F_T,F_V,F_n,F_TT,F_TV,F_Tn,F_VV,F_Vn,F_nn)
+  end select
+  position = 1
+  values(position) = F
+  position = position + 1
+  values(position) = F_T
+  position = position + 1
+  values(position) = F_V
+  position = position + 1
+  do i = 1, nc
+    values(position) = F_n(i)
+    position = position + 1
+  end do
+  values(position) = F_TT
+  position = position + 1
+  values(position) = F_TV
+  position = position + 1
+  do i = 1, nc
+    values(position) = F_Tn(i)
+    position = position + 1
+  end do
+  values(position) = F_VV
+  position = position + 1
+  do i = 1, nc
+    values(position) = F_Vn(i)
+    position = position + 1
+  end do
+  do i = 1, nc
+    do j = 1, nc
+      values(position) = F_nn(i,j)
+      position = position + 1
+    end do
+  end do
+  numbers = position - 1
+end subroutine query_pcsaft_chain
+
 ! Evaluate the reduced Helmholtz energy of the hard-sphere model of the
 ! original for the PC-SAFT model.
 subroutine query_pcsaft_hs(temperature,volume,moles,values,numbers) &

@@ -1198,12 +1198,15 @@ impl Cubic {
             a = coefficients.a;
             at = coefficients.a_t;
             att = coefficients.a_tt;
-            for (slot, &ai) in buffer[n..2 * n].iter_mut().zip(coefficients.a_i.iter()) {
+            for (slot, &ai) in buffer[n..2 * n].iter_mut().zip(coefficients.a_i().iter()) {
                 *slot = 0.5 * ai;
             }
-            ai_t = Some(coefficients.a_it.iter().map(|&ait| 0.5 * ait).collect());
+            ai_t = Some(coefficients.a_it().iter().map(|&ait| 0.5 * ait).collect());
             b = coefficients.b;
-            for (slot, &bi) in buffer[2 * n..3 * n].iter_mut().zip(coefficients.b_i.iter()) {
+            for (slot, &bi) in buffer[2 * n..3 * n]
+                .iter_mut()
+                .zip(coefficients.b_i().iter())
+            {
                 *slot = bi;
             }
             // The covolume of the rule depends on the temperature. The
@@ -1211,14 +1214,14 @@ impl Cubic {
             // rules holds the derivatives of the covolume and of its partial
             // derivatives.
             beta = Some(crate::beta::PreparedBeta {
-                partial_t: coefficients.b_it.clone(),
+                partial_t: coefficients.b_it().to_vec(),
                 components: coefficients
-                    .b_i
+                    .b_i()
                     .iter()
                     .enumerate()
                     .map(|(index, &value)| crate::BetaValue {
                         value,
-                        dt: coefficients.b_it[index],
+                        dt: coefficients.b_it()[index],
                         dtt: 0.0,
                     })
                     .collect(),
@@ -1226,8 +1229,8 @@ impl Cubic {
                 dtt: coefficients.b_tt,
             });
             prepared_wong_sandler = Some(crate::wong_sandler::PreparedWongSandler {
-                a_ij: coefficients.a_ij,
-                b_ij: coefficients.b_ij,
+                a_ij: coefficients.a_ij().to_vec(),
+                b_ij: coefficients.b_ij().to_vec(),
             });
         } else if let Some(ge) = &self.excess_gibbs {
             let mut a_pure = Vec::with_capacity(n);

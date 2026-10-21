@@ -244,12 +244,13 @@ The rule allocated eighteen vectors per preparation: the reduced covolumes of
 the components with their temperature derivatives, the pair coefficients with
 their derivatives, the partial derivatives of the sums `Q` and `D` and the
 partial derivatives of the coefficients of the rule. The twelve vectors of the
-computation now share one allocation, and the values and their order of
+computation now share one allocation, and the six partial derivative vectors
+of the coefficients share a second one. The values and their order of
 operations are unchanged, so the parity results are identical.
 
 | Preparation | Before | After | Change |
 |---|---:|---:|---:|
-| PR, Wong-Sandler mixing | 3647 | 2482 | -32% |
+| PR, Wong-Sandler mixing | 3647 | 2322 | -36% |
 
 The measurement is the median of repeated runs of the same workload on the
 same host, and the other five rows of the table above are unchanged within

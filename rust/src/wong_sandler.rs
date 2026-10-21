@@ -172,25 +172,50 @@ pub struct WongSandlerCoefficients {
     pub a_t: f64,
     /// The second temperature derivative of the attraction coefficient.
     pub a_tt: f64,
-    /// The partial derivatives of the attraction coefficient.
-    pub a_i: Vec<f64>,
-    /// The mixed temperature and mole derivatives of the attraction
-    /// coefficient.
-    pub a_it: Vec<f64>,
-    /// The second mole derivatives of the attraction coefficient.
-    pub a_ij: Vec<f64>,
     /// The covolume coefficient.
     pub b: f64,
     /// The temperature derivative of the covolume coefficient.
     pub b_t: f64,
     /// The second temperature derivative of the covolume coefficient.
     pub b_tt: f64,
+    /// The partial derivatives of the coefficients, one allocation.
+    values: Vec<f64>,
+    count: usize,
+}
+
+impl WongSandlerCoefficients {
+    /// The partial derivatives of the attraction coefficient.
+    pub fn a_i(&self) -> &[f64] {
+        &self.values[..self.count]
+    }
+
+    /// The mixed temperature and mole derivatives of the attraction
+    /// coefficient.
+    pub fn a_it(&self) -> &[f64] {
+        &self.values[self.count..2 * self.count]
+    }
+
+    /// The second mole derivatives of the attraction coefficient.
+    pub fn a_ij(&self) -> &[f64] {
+        &self.values[2 * self.count..2 * self.count + self.count * self.count]
+    }
+
     /// The partial derivatives of the covolume coefficient.
-    pub b_i: Vec<f64>,
+    pub fn b_i(&self) -> &[f64] {
+        &self.values
+            [2 * self.count + self.count * self.count..3 * self.count + self.count * self.count]
+    }
+
     /// The mixed temperature and mole derivatives of the covolume coefficient.
-    pub b_it: Vec<f64>,
+    pub fn b_it(&self) -> &[f64] {
+        &self.values
+            [3 * self.count + self.count * self.count..4 * self.count + self.count * self.count]
+    }
+
     /// The second mole derivatives of the covolume coefficient.
-    pub b_ij: Vec<f64>,
+    pub fn b_ij(&self) -> &[f64] {
+        &self.values[4 * self.count + self.count * self.count..]
+    }
 }
 
 /// The mixture coefficients of the Wong-Sandler mixing rule.
@@ -313,13 +338,18 @@ pub fn wong_sandler_mix(
     let b = q / denominator;
     let b_t = (q_t + d_t * b) / denominator;
     let b_tt = (q_tt + 2.0 * d_t * b_t + d_tt * b) / denominator;
-    let mut b_i = vec![0.0; count];
-    let mut b_it = vec![0.0; count];
+    // The partial derivatives of the coefficients share one allocation.
+    let mut values = vec![0.0; 4 * count + 2 * count * count];
+    let (a_i, rest) = values.split_at_mut(count);
+    let (a_it, rest) = rest.split_at_mut(count);
+    let (a_ij, rest) = rest.split_at_mut(count * count);
+    let (b_i, rest) = rest.split_at_mut(count);
+    let (b_it, rest) = rest.split_at_mut(count);
+    let (b_ij, _rest) = rest.split_at_mut(count * count);
     for i in 0..count {
         b_i[i] = (q_i[i] + b * (d_i[i] - 1.0)) / denominator;
         b_it[i] = (q_it[i] + b_i[i] * d_t + b_t * (d_i[i] - 1.0) + b * d_it[i]) / denominator;
     }
-    let mut b_ij = vec![0.0; count * count];
     for i in 0..count {
         for j in 0..count {
             b_ij[i * count + j] = (q_ij[i * count + j]
@@ -338,8 +368,6 @@ pub fn wong_sandler_mix(
             + 2.0 * b_t * d
             + 2.0 * b * d_t
             + b * d_tt * temperature);
-    let mut a_i = vec![0.0; count];
-    let mut a_it = vec![0.0; count];
     for k in 0..count {
         a_i[k] = gas_temperature * (b_i[k] * d + b * d_i[k]);
         a_it[k] = gas_constant
@@ -350,7 +378,6 @@ pub fn wong_sandler_mix(
                 + b * d_it[k] * temperature
                 + b * d_i[k]);
     }
-    let mut a_ij = vec![0.0; count * count];
     for i in 0..count {
         for j in 0..count {
             a_ij[i * count + j] = gas_temperature
@@ -364,14 +391,10 @@ pub fn wong_sandler_mix(
         a,
         a_t,
         a_tt,
-        a_i,
-        a_it,
-        a_ij,
         b,
         b_t,
         b_tt,
-        b_i,
-        b_it,
-        b_ij,
+        values,
+        count,
     })
 }

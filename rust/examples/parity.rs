@@ -158,19 +158,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 format!("{:.17e}", coefficients.a_t),
                 format!("{:.17e}", coefficients.a_tt),
             ];
-            for value in &coefficients.a_i {
+            for value in coefficients.a_i() {
                 text.push(format!("{value:.17e}"));
             }
-            for value in &coefficients.a_it {
+            for value in coefficients.a_it() {
                 text.push(format!("{value:.17e}"));
             }
             text.push(format!("{:.17e}", coefficients.b));
             text.push(format!("{:.17e}", coefficients.b_t));
             text.push(format!("{:.17e}", coefficients.b_tt));
-            for value in &coefficients.b_i {
+            for value in coefficients.b_i() {
                 text.push(format!("{value:.17e}"));
             }
-            for value in &coefficients.b_it {
+            for value in coefficients.b_it() {
                 text.push(format!("{value:.17e}"));
             }
             println!("{}", text.join(","));

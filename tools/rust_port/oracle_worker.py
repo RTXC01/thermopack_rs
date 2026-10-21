@@ -206,6 +206,21 @@ def main(compiler_directory):
             values=[float(temperature),float(volume),float(pressure)]
             print('THERMOPACK_RESULT='+json.dumps(dict(values=values)),flush=True)
             continue
+        if request['mode']=='QUADRATURE':
+            if probe is None:probe=load_probe()
+            probe.query_quadrature.argtypes=[c_int,POINTER(c_double),POINTER(c_int)]
+            probe.query_quadrature.restype=None
+            probe.query_quadrature_integral.argtypes=[c_int,c_double,c_double,POINTER(c_double),POINTER(c_int)]
+            probe.query_quadrature_integral.restype=None
+            quad=request['quadrature']
+            values=(c_double*202)();number=c_int()
+            probe.query_quadrature(quad,values,byref(number))
+            rule=list(map(float,values))[:number.value]
+            integrals=(c_double*2)();count=c_int()
+            probe.query_quadrature_integral(quad,request['lower'],request['upper'],integrals,byref(count))
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=rule,integral=float(integrals[0]),
+                  differential=float(integrals[1]))),flush=True)
+            continue
         if request['mode']=='LJS_POTENTIAL':
             if probe is None:probe=load_probe()
             probe.query_ljs_potential.argtypes=[c_int,POINTER(c_double),POINTER(c_double),POINTER(c_int)]

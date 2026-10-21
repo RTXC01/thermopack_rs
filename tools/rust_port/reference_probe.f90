@@ -1185,6 +1185,59 @@ subroutine query_ljs_potential(count,radii,values,numbers) &
   end do
 end subroutine query_ljs_potential
 
+! Evaluate the nodes and the weights of a quadrature of the original.
+subroutine query_quadrature(quad,values,count) bind(C,name='query_quadrature')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use quadratures, only: get_quadrature_positions, get_quadrature_weights
+  use quadratures, only: max_n_quadrature
+  implicit none
+  integer(c_int), value :: quad
+  real(c_double), intent(out) :: values(2*max_n_quadrature)
+  integer(c_int), intent(out) :: count
+  ! Locals
+  real :: x(max_n_quadrature), w(max_n_quadrature)
+  integer :: n, i
+  call get_quadrature_positions(quad,x,n)
+  call get_quadrature_weights(quad,w,n)
+  count = 2*n
+  do i=1,n
+    values(i) = x(i)
+    values(n+i) = w(i)
+  end do
+end subroutine query_quadrature
+
+! Evaluate the integral and the differential of a test integrand with a
+! quadrature of the original.
+subroutine query_quadrature_integral(quad,lower,upper,values,count) &
+     bind(C,name='query_quadrature_integral')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use quadratures, only: integrate_with_differential
+  implicit none
+  integer(c_int), value :: quad
+  real(c_double), value :: lower, upper
+  real(c_double), intent(out) :: values(2)
+  integer(c_int), intent(out) :: count
+  ! Locals
+  real :: integral, differential
+  real :: param(1)
+  param(1) = 0.0
+  call integrate_with_differential(quad,test_integrand,1,param,lower,upper,lower,upper, &
+       .false.,integral,differential)
+  values(1) = integral
+  values(2) = differential
+  count = 2
+contains
+  subroutine test_integrand(r,n,param,fun,fun_T,fun_r)
+    real, intent(in) :: r
+    integer, intent(in) :: n
+    real, intent(in) :: param(n)
+    real, intent(out) :: fun, fun_T, fun_r
+    fun = r*r
+    fun_T = 2.0*r
+    fun_r = 2.0
+  end subroutine test_integrand
+end subroutine query_quadrature_integral
+
 ! Evaluate the matrix of the third virial coefficients of the original.
 subroutine query_binary_third_virial_matrix(temperature,values,count) &
      bind(C,name='query_binary_third_virial_matrix')

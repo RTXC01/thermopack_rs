@@ -73,6 +73,7 @@ python tools/rust_port/validate_ljs_state.py
 python tools/rust_port/validate_ljs_fugacity.py
 python tools/rust_port/validate_ljs_caloric.py
 python tools/rust_port/validate_ljs_potential.py
+python tools/rust_port/validate_quadrature.py
 python tools/rust_port/validate_critical.py
 python tools/rust_port/validate_mut_solve.py
 python tools/rust_port/validate_hyperdual.py
@@ -352,6 +353,11 @@ original `ljs_potential_reduced`: the reduced interaction potential and the
 reduced force over the attractive branch, the minimum and the smoothing of the
 cutoff. The two quantities match with a relative 1e-12, and the observed worst
 relative difference is 2.8e-15.
+The [quadrature qualification](quadrature.md) adds 14 cases of the original
+`get_quadrature_positions`, `get_quadrature_weights` and
+`integrate_with_differential`: the seven Gauss rules and the seven Gauss-Kronrod
+rules. The nodes, the weights, the integral and the differential match with a
+relative 1e-13, and the observed worst relative difference is 3.3e-16.
 The [critical point qualification](spinodal.md#critical-points) adds 7 cases of
 the original `calcCriticalTV`: methane, carbon dioxide, propane and water in
 the Peng-Robinson equation of state, nitrogen and methane in the

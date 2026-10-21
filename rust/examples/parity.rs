@@ -104,6 +104,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             && fields[0] != "LJSCALORIC"
             && fields[0] != "LJSVOLUME"
             && fields[0] != "LJSPOT"
+            && fields[0] != "QUAD"
             && fields[0] != "CRITICAL"
             && fields.len() != 6
         {
@@ -163,6 +164,45 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let model = thermopack_rs::ljs::LjsBh::new();
             let state = model.state(temperature, volume, moles)?;
             println!("{:.17e},{:.17e}", state.h_total, state.s_total);
+            continue;
+        }
+        if fields[0] == "QUAD" {
+            let index: usize = fields[1].parse().unwrap();
+            let rules = [
+                thermopack_rs::quadrature::Quadrature::Gauss10,
+                thermopack_rs::quadrature::Quadrature::Kronrod21,
+                thermopack_rs::quadrature::Quadrature::Gauss15,
+                thermopack_rs::quadrature::Quadrature::Kronrod31,
+                thermopack_rs::quadrature::Quadrature::Gauss20,
+                thermopack_rs::quadrature::Quadrature::Kronrod41,
+                thermopack_rs::quadrature::Quadrature::Gauss25,
+                thermopack_rs::quadrature::Quadrature::Kronrod51,
+                thermopack_rs::quadrature::Quadrature::Gauss30,
+                thermopack_rs::quadrature::Quadrature::Kronrod61,
+                thermopack_rs::quadrature::Quadrature::Gauss40,
+                thermopack_rs::quadrature::Quadrature::Kronrod81,
+                thermopack_rs::quadrature::Quadrature::Gauss50,
+                thermopack_rs::quadrature::Quadrature::Kronrod101,
+            ];
+            let rule = rules[index];
+            let positions = rule.positions();
+            let weights = rule.weights();
+            let (integral, differential) = thermopack_rs::quadrature::integrate_with_differential(
+                rule,
+                |point| Ok((point * point, 2.0 * point, 2.0)),
+                0.0,
+                1.0,
+                0.0,
+                1.0,
+            )?;
+            let mut text: Vec<String> = positions
+                .iter()
+                .chain(weights.iter())
+                .map(|value| format!("{value:.17e}"))
+                .collect();
+            text.push(format!("{integral:.17e}"));
+            text.push(format!("{differential:.17e}"));
+            println!("{}", text.join(","));
             continue;
         }
         if fields[0] == "LJSFUGACITY" {

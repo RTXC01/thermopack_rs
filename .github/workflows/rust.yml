@@ -92,6 +92,7 @@ jobs:
       - run: python tools/rust_port/validate_ljs_caloric.py
       - run: python tools/rust_port/validate_ljs_potential.py
       - run: python tools/rust_port/validate_ljs_wca_term.py
+      - run: python tools/rust_port/validate_wca_term.py
       - run: python tools/rust_port/validate_white_bear.py
       - run: python tools/rust_port/validate_uv_phi.py
       - run: python tools/rust_port/validate_uv_terms.py

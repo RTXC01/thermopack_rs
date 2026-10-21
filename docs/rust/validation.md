@@ -74,6 +74,7 @@ python tools/rust_port/validate_ljs_fugacity.py
 python tools/rust_port/validate_ljs_caloric.py
 python tools/rust_port/validate_ljs_potential.py
 python tools/rust_port/validate_ljs_wca_term.py
+python tools/rust_port/validate_wca_term.py
 python tools/rust_port/validate_white_bear.py
 python tools/rust_port/validate_uv_phi.py
 python tools/rust_port/validate_uv_terms.py
@@ -383,6 +384,10 @@ hard-sphere second virial coefficient and the second virial coefficient of the
 Lennard-Jones spline with their temperature derivatives. The nine quantities
 match with a relative 1e-11, and the observed worst relative difference is
 3.7e-16.
+The [White Bear term qualification](ljs.md) adds 5 cases of the original
+`calc_LJs_WCA_ai`: the same perturbation terms with the prefactor of the
+source and their five partial derivatives. The quantities match with a relative
+1e-12, and the observed worst relative difference is 1.0e-15.
 The [quadrature qualification](quadrature.md) adds 14 cases of the original
 `get_quadrature_positions`, `get_quadrature_weights` and
 `integrate_with_differential`: the seven Gauss rules and the seven Gauss-Kronrod

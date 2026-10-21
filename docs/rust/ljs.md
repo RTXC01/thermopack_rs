@@ -197,6 +197,19 @@ the exact-source library. The reference probe calls the original
 The committed fixture is `tests/fixtures/ljs_wca_term.csv`; the test is
 `tests/ljs_wca.rs`.
 
+`tools/rust_port/validate_wca_term.py` compares the same terms with the
+prefactor of the source, the well depth of the model instead of the reduced
+form, against the original `calc_LJs_WCA_ai`.
+
+* 5 cases: the index of the term, the well depth, the reduced distance and the
+  reduced density.
+* The compared quantities are the term and its five partial derivatives. All 5
+  cases match with a relative 1e-12, and the observed worst relative difference
+  is 1.0e-15.
+
+The committed fixture is `tests/fixtures/wca_term.csv`; the test is
+`tests/ljs_wca.rs`.
+
 ## The u-fraction of the UV theory
 
 The UV theory of the source describes the Lennard-Jones fluid with the

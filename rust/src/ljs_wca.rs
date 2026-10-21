@@ -98,6 +98,7 @@ fn density_basis(rho: f64) -> [[f64; 3]; 4] {
     let mut basis = [[0.0; 3]; 4];
     basis[0][0] = rho;
     basis[0][1] = 1.0;
+    basis[1][2] = 2.0;
     for index in 1..4 {
         let order = (index + 1) as f64;
         basis[index][0] = basis[index - 1][0] * rho;
@@ -382,4 +383,46 @@ pub fn perturbation_term(
         }
     };
     Ok((value, a_r, a_y, a_rr, a_yy, a_ry))
+}
+
+/// One perturbation term of the White Bear family with the prefactor of the
+/// source and its derivatives.
+///
+/// The index selects the term and follows the source, the first order term is
+/// one and the fourth order term is four. The well depth is divided by the
+/// Boltzmann constant, the reduced distance and the reduced density are
+/// dimensionless. The method returns the term, its derivative with respect to
+/// the reduced density, its derivative with respect to the reduced distance
+/// and the second derivatives, in the order of the source.
+pub fn wca_term(
+    index: usize,
+    eps_divk: f64,
+    reduced_distance: f64,
+    reduced_density: f64,
+) -> Result<(f64, f64, f64, f64, f64, f64), crate::Error> {
+    let (value, value_r, value_y, value_rr, value_yy, value_ry) = match index {
+        1 => first_order(reduced_distance, reduced_density),
+        2 => second_order(reduced_distance, reduced_density),
+        3 => third_order(reduced_distance, reduced_density),
+        4 => fourth_order(reduced_distance, reduced_density),
+        _ => {
+            return Err(crate::Error::InvalidInput(
+                "the perturbation term index must be one to four",
+            ));
+        }
+    };
+    let prefactor = match index {
+        1 => 2.0 * std::f64::consts::PI * eps_divk,
+        2 => eps_divk * eps_divk,
+        3 => eps_divk * eps_divk * eps_divk,
+        _ => eps_divk * eps_divk * eps_divk * eps_divk,
+    };
+    Ok((
+        prefactor * value,
+        prefactor * value_r,
+        prefactor * value_y,
+        prefactor * value_rr,
+        prefactor * value_yy,
+        prefactor * value_ry,
+    ))
 }

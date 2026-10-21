@@ -32,6 +32,34 @@ fn white_bear_terms_match_the_source() {
 }
 
 #[test]
+fn white_bear_terms_with_the_prefactor_match_the_source() {
+    let mut checked = 0;
+    for row in include_str!("fixtures/wca_term.csv").lines().skip(1) {
+        let fields: Vec<_> = row.split(';').collect();
+        let case = fields[0];
+        let parts: Vec<_> = case.split('|').collect();
+        let index: usize = parts[0].parse().unwrap();
+        let eps_divk: f64 = parts[1].parse().unwrap();
+        let reduced_distance: f64 = parts[2].parse().unwrap();
+        let reduced_density: f64 = parts[3].parse().unwrap();
+        let source: Vec<f64> = fields[1..].iter().map(|v| v.parse().unwrap()).collect();
+        let native =
+            thermopack_rs::ljs_wca::wca_term(index, eps_divk, reduced_distance, reduced_density)
+                .unwrap();
+        let native = [native.0, native.1, native.2, native.3, native.4, native.5];
+        assert_eq!(native.len(), source.len(), "{case}");
+        for (position, (source, native)) in source.iter().zip(native.iter()).enumerate() {
+            assert!(
+                (source - native).abs() <= 1.0e-14 + 1.0e-12 * source.abs(),
+                "{case} entry {position}: source {source} native {native}"
+            );
+        }
+        checked += 1;
+    }
+    assert_eq!(checked, 5);
+}
+
+#[test]
 fn the_term_index_is_bounded() {
     let error = perturbation_term(0, 1.0, 0.5).unwrap_err();
     assert!(matches!(error, thermopack_rs::Error::InvalidInput(_)));

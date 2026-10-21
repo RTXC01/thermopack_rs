@@ -1331,6 +1331,28 @@ subroutine query_uv_virials(eps_divk,temperature,values,count) &
   count = 9
 end subroutine query_uv_virials
 
+! Evaluate one perturbation term of the White Bear family of the original.
+subroutine query_wca_term(index,eps_divk,reduced_distance,reduced_density,values,count) &
+     bind(C,name='query_wca_term')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use lj_splined, only: calc_LJs_WCA_ai
+  implicit none
+  integer(c_int), value :: index
+  real(c_double), value :: eps_divk, reduced_distance, reduced_density
+  real(c_double), intent(out) :: values(6)
+  integer(c_int), intent(out) :: count
+  ! Locals
+  real :: a, a_r, a_y, a_rr, a_yy, a_ry
+  call calc_LJs_WCA_ai(index,eps_divk,reduced_distance,reduced_density,a,a_r,a_y,a_rr,a_yy,a_ry)
+  values(1) = a
+  values(2) = a_r
+  values(3) = a_y
+  values(4) = a_rr
+  values(5) = a_yy
+  values(6) = a_ry
+  count = 6
+end subroutine query_wca_term
+
 ! Evaluate the nodes and the weights of a quadrature of the original.
 subroutine query_quadrature(quad,values,count) bind(C,name='query_quadrature')
   use, intrinsic :: iso_c_binding, only: c_int,c_double

@@ -109,6 +109,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             && fields[0] != "UVPHI"
             && fields[0] != "UVTERMS"
             && fields[0] != "UVVIRIALS"
+            && fields[0] != "WCATERM"
             && fields[0] != "QUAD"
             && fields[0] != "CRITICAL"
             && fields.len() != 6
@@ -208,6 +209,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             text.push(format!("{integral:.17e}"));
             text.push(format!("{differential:.17e}"));
             println!("{}", text.join(","));
+            continue;
+        }
+        if fields[0] == "WCATERM" {
+            let index: usize = fields[1].parse().unwrap();
+            let eps_divk: f64 = fields[2].parse().unwrap();
+            let reduced_distance: f64 = fields[3].parse().unwrap();
+            let reduced_density: f64 = fields[4].parse().unwrap();
+            let (value, value_r, value_y, value_rr, value_yy, value_ry) =
+                thermopack_rs::ljs_wca::wca_term(
+                    index,
+                    eps_divk,
+                    reduced_distance,
+                    reduced_density,
+                )?;
+            println!(
+                "{:.17e},{:.17e},{:.17e},{:.17e},{:.17e},{:.17e}",
+                value, value_r, value_y, value_rr, value_yy, value_ry
+            );
             continue;
         }
         if fields[0] == "UVVIRIALS" {

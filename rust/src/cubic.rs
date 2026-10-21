@@ -58,6 +58,8 @@ pub struct Cubic {
     pub(crate) caloric_maximum: f64,
     pub mixing_rule: crate::excess_gibbs::MixingRule,
     pub excess_gibbs: Option<crate::excess_gibbs::ExcessGibbsMixture>,
+    /// The binary parameters of the Wong-Sandler mixing rule.
+    pub wong_sandler: Option<crate::wong_sandler::WongSandlerData>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -66,6 +68,8 @@ pub struct CubicOptions<'a> {
     pub parameter_reference: &'a str,
     pub volume_translation: bool,
     pub mixing_rule: crate::excess_gibbs::MixingRule,
+    /// The binary parameters of the Wong-Sandler mixing rule.
+    pub wong_sandler: Option<&'a crate::wong_sandler::WongSandlerData>,
 }
 impl Default for CubicOptions<'_> {
     fn default() -> Self {
@@ -74,6 +78,7 @@ impl Default for CubicOptions<'_> {
             parameter_reference: "DEFAULT",
             volume_translation: false,
             mixing_rule: crate::excess_gibbs::MixingRule::VdW,
+            wong_sandler: None,
         }
     }
 }
@@ -429,6 +434,13 @@ impl Cubic {
         if tcpr || quantum || options.volume_translation {
             model.enable_volume_translation(parameter_reference)?;
         }
+        if options.wong_sandler.is_some()
+            && options.mixing_rule != crate::excess_gibbs::MixingRule::WongSandler
+        {
+            return Err(Error::InvalidInput(
+                "the Wong-Sandler parameters need the Wong-Sandler mixing rule",
+            ));
+        }
         if options.mixing_rule.is_excess_gibbs() {
             let comp_idents: Vec<&str> = model.components.iter().map(|c| c.ident).collect();
             let database_eos = if kind == CubicKind::RedlichKwong {
@@ -443,9 +455,133 @@ impl Cubic {
                 Some(parameter_reference),
                 &model.kij,
             )?);
+            if let Some(data) = options.wong_sandler {
+                model.excess_gibbs.as_mut().unwrap().wong_sandler = Some(data.clone());
+                model.wong_sandler = Some(data.clone());
+            }
             model.mixing_rule = options.mixing_rule;
         }
         Ok(model)
+    }
+
+    /// The pure component attraction parameters of the model.
+    ///
+    /// The values are the products of the critical attraction and the alpha
+    /// function at the given temperature.
+    pub fn pure_attraction(&self, temperature: f64) -> Result<Vec<f64>> {
+        let count = self.components.len();
+        let mut values = Vec::with_capacity(count);
+        for i in 0..count {
+            let critical_temperature = self.components[i].critical_temperature;
+            let crate::AlphaValue { value: alpha, .. } =
+                self.alpha[i].evaluate(temperature, critical_temperature)?;
+            values.push(self.a0[i] * alpha);
+        }
+        Ok(values)
+    }
+
+    /// The excess Gibbs energy of the mixture at the infinite pressure limit.
+    ///
+    /// The values are the ones of the original excess_gibbs::gEinf.
+    pub fn excess_gibbs_jet(
+        &self,
+        temperature: f64,
+        composition: &[f64],
+    ) -> Result<crate::excess_gibbs::ExcessGibbsJet> {
+        let count = self.components.len();
+        if composition.len() != count {
+            return Err(Error::InvalidInput("composition mismatch"));
+        }
+        let mixture = self.excess_gibbs.as_ref().ok_or(Error::Unsupported(
+            "the excess Gibbs model needs the mixing rule of the model",
+        ))?;
+        let mut a_pure = Vec::with_capacity(count);
+        let mut da_dt_pure = Vec::with_capacity(count);
+        let mut d2a_dt2_pure = Vec::with_capacity(count);
+        for i in 0..count {
+            let critical_temperature = self.components[i].critical_temperature;
+            let crate::AlphaValue {
+                value: alpha,
+                dt: alpha_t,
+                dtt: alpha_tt,
+            } = self.alpha[i].evaluate(temperature, critical_temperature)?;
+            a_pure.push(self.a0[i] * alpha);
+            da_dt_pure.push(self.a0[i] * alpha_t);
+            d2a_dt2_pure.push(self.a0[i] * alpha_tt);
+        }
+        crate::excess_gibbs::excess_gibbs_jet(
+            mixture,
+            self.kind,
+            temperature,
+            composition,
+            &self.bi,
+            &a_pure,
+            &da_dt_pure,
+            &d2a_dt2_pure,
+        )
+    }
+
+    /// The mixture coefficients of the Wong-Sandler mixing rule.
+    ///
+    /// The rule replaces the binary attraction and the binary covolume of the
+    /// cubic equation of state with its own coefficients. The excess Gibbs
+    /// energy at the infinite pressure limit comes from the excess Gibbs
+    /// model of the mixture, which the Wong-Sandler rule shares with the
+    /// Huron-Vidal and the NRTL models.
+    pub fn wong_sandler_coefficients(
+        &self,
+        temperature: f64,
+        composition: &[f64],
+    ) -> Result<crate::wong_sandler::WongSandlerCoefficients> {
+        let count = self.components.len();
+        if composition.len() != count {
+            return Err(Error::InvalidInput("composition mismatch"));
+        }
+        let data = self.wong_sandler.as_ref().ok_or(Error::Unsupported(
+            "the Wong-Sandler mixing rule needs the binary parameters",
+        ))?;
+        let mixture = self.excess_gibbs.as_ref().ok_or(Error::Unsupported(
+            "the Wong-Sandler mixing rule needs the excess Gibbs model",
+        ))?;
+        let mut a_pure = Vec::with_capacity(count);
+        let mut da_dt_pure = Vec::with_capacity(count);
+        let mut d2a_dt2_pure = Vec::with_capacity(count);
+        for i in 0..count {
+            let critical_temperature = self.components[i].critical_temperature;
+            let crate::AlphaValue {
+                value: alpha,
+                dt: alpha_t,
+                dtt: alpha_tt,
+            } = self.alpha[i].evaluate(temperature, critical_temperature)?;
+            a_pure.push(self.a0[i] * alpha);
+            da_dt_pure.push(self.a0[i] * alpha_t);
+            d2a_dt2_pure.push(self.a0[i] * alpha_tt);
+        }
+        let jet = crate::excess_gibbs::excess_gibbs_jet(
+            mixture,
+            self.kind,
+            temperature,
+            composition,
+            &self.bi,
+            &a_pure,
+            &da_dt_pure,
+            &d2a_dt2_pure,
+        )?;
+        let limit_c = crate::excess_gibbs::excess_gibbs_limit(
+            self.kind,
+            crate::excess_gibbs::GeLimit::Infinite,
+        );
+        crate::wong_sandler::wong_sandler_mix(
+            data,
+            temperature,
+            composition,
+            &a_pure,
+            &da_dt_pure,
+            &d2a_dt2_pure,
+            &self.bi,
+            limit_c,
+            &jet,
+        )
     }
 
     /// Initialize alpha as in tpInitAlphaCorr. The reference selects alpha
@@ -593,6 +729,7 @@ impl Cubic {
             caloric_maximum: 999.,
             mixing_rule: crate::excess_gibbs::MixingRule::VdW,
             excess_gibbs: None,
+            wong_sandler: None,
         };
         for c in &model.components {
             positive(c.critical_temperature, "critical temperature")?;

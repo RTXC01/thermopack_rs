@@ -1532,6 +1532,88 @@ subroutine query_cpa_rdf(temperature,volume,moles,values,numbers) &
   numbers = position - 1
 end subroutine query_cpa_rdf
 
+! Evaluate the mixture coefficients of the Wong-Sandler mixing rule of the
+! original.
+subroutine query_wong_sandler(temperature,composition,kij,tauij,alpha,values,numbers) &
+     bind(C,name='query_wong_sandler')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use thermopack_var, only: nc, get_active_eos, base_eos_param
+  use cubic_eos, only: cb_eos, fraction
+  use wong_sandler, only: WongSandlerMix
+  use cbalpha, only: cbCalcAlphaTerm
+  use excess_gibbs, only: gEinf
+  implicit none
+  real(c_double), value :: temperature
+  real(c_double), intent(in) :: composition(16), kij(16), tauij(16), alpha(16)
+  real(c_double), intent(out) :: values(256)
+  integer(c_int), intent(out) :: numbers
+  ! Locals
+  class(base_eos_param), pointer :: act_eos_ptr
+  type(fraction) :: frac
+  real :: z(nc)
+  real :: gExInf, dgExInfdT, d2gExinfdT2
+  real, dimension(nc) :: dGExInfdNi, d2GExInfdNidT
+  real, dimension(nc,nc) :: d2AExInfdNidNj
+  integer :: i,j,position
+  act_eos_ptr => get_active_eos()
+  frac%pNum = 0.0
+  frac%pDen = 0.0
+  frac%pDen(1) = 1.0
+  select type(p_eos => act_eos_ptr)
+  class is(cb_eos)
+    do i = 1, nc
+      z(i) = composition(i)
+    end do
+    ! The binary parameters of the pair of the first two components. The
+    ! diagonal keeps the zero fraction of the original.
+    if (nc >= 2) then
+      frac%pNum(1) = kij(1)
+      p_eos%mixWS%f_kij(1,2) = frac
+      p_eos%mixWS%f_kij(2,1) = frac
+      frac%pNum(1) = tauij(1)
+      p_eos%mixWS%f_tauij(1,2) = frac
+      p_eos%mixWS%f_tauij(2,1) = frac
+      p_eos%mixWS%alphaij(1,2) = alpha(1)
+      p_eos%mixWS%alphaij(2,1) = alpha(1)
+    end if
+    ! The alpha function of the components is evaluated during a state
+    ! evaluation. The mixing rule needs it.
+    call cbCalcAlphaTerm(nc,p_eos,temperature)
+    call gEinf(p_eos,temperature,z,gExInf,dgExInfdT,d2gExinfdT2,dGExInfdNi,d2GExInfdNidT,d2AExInfdNidNj)
+    call WongSandlerMix(p_eos,temperature,z)
+    position = 1
+    values(position) = p_eos%a
+    position = position + 1
+    values(position) = p_eos%at
+    position = position + 1
+    values(position) = p_eos%att
+    position = position + 1
+    do i = 1, nc
+      values(position) = p_eos%ai(i)
+      position = position + 1
+    end do
+    do i = 1, nc
+      values(position) = p_eos%ait(i)
+      position = position + 1
+    end do
+    values(position) = p_eos%b
+    position = position + 1
+    values(position) = p_eos%bt
+    position = position + 1
+    values(position) = p_eos%btt
+    position = position + 1
+    do i = 1, nc
+      values(position) = p_eos%bi(i)
+      position = position + 1
+    end do
+    do i = 1, nc
+      values(position) = p_eos%bit(i)
+      position = position + 1
+    end do
+  end select
+  numbers = position - 1
+end subroutine query_wong_sandler
+
 ! Evaluate the nodes and the weights of a quadrature of the original.
 subroutine query_quadrature(quad,values,count) bind(C,name='query_quadrature')
   use, intrinsic :: iso_c_binding, only: c_int,c_double

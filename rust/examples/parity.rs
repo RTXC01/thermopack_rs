@@ -114,11 +114,66 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             && fields[0] != "CHAINRULE"
             && fields[0] != "AISLJS"
             && fields[0] != "CPARDF"
+            && fields[0] != "WSMIX"
             && fields[0] != "QUAD"
             && fields[0] != "CRITICAL"
             && fields.len() != 6
         {
             return Err("expected six fields".into());
+        }
+        if fields[0] == "WSMIX" {
+            let kind = match fields[1] {
+                "SRK" => thermopack_rs::CubicKind::SoaveRedlichKwong,
+                "RK" => thermopack_rs::CubicKind::RedlichKwong,
+                "VDW" => thermopack_rs::CubicKind::VanDerWaals,
+                _ => thermopack_rs::CubicKind::PengRobinson,
+            };
+            let components: Vec<&str> = fields[2].split(',').collect();
+            let temperature: f64 = fields[3].parse().unwrap();
+            let composition: Vec<f64> = fields[4]
+                .split(',')
+                .map(|value| value.parse().unwrap())
+                .collect();
+            let kij: f64 = fields[5].parse().unwrap();
+            let tauij: f64 = fields[6].parse().unwrap();
+            let alpha: f64 = fields[7].parse().unwrap();
+            use thermopack_rs::wong_sandler::{Fraction, WongSandlerData};
+            let mut data = WongSandlerData::new(components.len());
+            data.set_kij(0, 1, Fraction::constant(kij)).unwrap();
+            data.set_kij(1, 0, Fraction::constant(kij)).unwrap();
+            data.set_tauij(0, 1, Fraction::constant(tauij)).unwrap();
+            data.set_tauij(1, 0, Fraction::constant(tauij)).unwrap();
+            data.set_alphaij(0, 1, alpha).unwrap();
+            data.set_alphaij(1, 0, alpha).unwrap();
+            let options = thermopack_rs::CubicOptions {
+                mixing_rule: thermopack_rs::excess_gibbs::MixingRule::WongSandler,
+                wong_sandler: Some(&data),
+                ..Default::default()
+            };
+            let model = thermopack_rs::Cubic::with_options(kind, &components, options)?;
+            let coefficients = model.wong_sandler_coefficients(temperature, &composition)?;
+            let mut text = vec![
+                format!("{:.17e}", coefficients.a),
+                format!("{:.17e}", coefficients.a_t),
+                format!("{:.17e}", coefficients.a_tt),
+            ];
+            for value in &coefficients.a_i {
+                text.push(format!("{value:.17e}"));
+            }
+            for value in &coefficients.a_it {
+                text.push(format!("{value:.17e}"));
+            }
+            text.push(format!("{:.17e}", coefficients.b));
+            text.push(format!("{:.17e}", coefficients.b_t));
+            text.push(format!("{:.17e}", coefficients.b_tt));
+            for value in &coefficients.b_i {
+                text.push(format!("{value:.17e}"));
+            }
+            for value in &coefficients.b_it {
+                text.push(format!("{value:.17e}"));
+            }
+            println!("{}", text.join(","));
+            continue;
         }
         if fields[0] == "CPARDF" {
             let component = fields[1];

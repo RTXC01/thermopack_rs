@@ -20,6 +20,8 @@ pub enum MixingRule {
     Nrtl,
     /// UNIFAC with the Flory-Huggins and Staverman-Guggenheim combinatorial terms.
     Unifac,
+    /// The Wong-Sandler mixing rule of the cubic equation of state.
+    WongSandler,
 }
 
 impl MixingRule {
@@ -31,6 +33,7 @@ impl MixingRule {
             Self::HuronVidal2 => "HV2",
             Self::Nrtl => "NRTL",
             Self::Unifac => "UNIFAC",
+            Self::WongSandler => "WONG-SANDLER",
         }
     }
 
@@ -39,7 +42,7 @@ impl MixingRule {
     pub fn is_excess_gibbs(self) -> bool {
         matches!(
             self,
-            Self::HuronVidal1 | Self::HuronVidal2 | Self::Nrtl | Self::Unifac
+            Self::HuronVidal1 | Self::HuronVidal2 | Self::Nrtl | Self::Unifac | Self::WongSandler
         )
     }
 }
@@ -61,6 +64,9 @@ pub enum GeLimit {
 /// infinite-pressure limit.
 pub fn excess_gibbs_limit(kind: crate::cubic::CubicKind, limit: GeLimit) -> f64 {
     use crate::cubic::CubicKind;
+    // The original `excess_gibbs::getInfinitLimitC` selects the constant of
+    // the infinite pressure limit, `excess_gibbs::getZeroLimitC` the one of
+    // the zero pressure limit.
     match limit {
         GeLimit::Infinite => match kind {
             CubicKind::VanDerWaals => 1.0,
@@ -109,6 +115,8 @@ pub struct ExcessGibbsMixture {
     pub pairs: Vec<ExcessGibbsPair>,
     /// Active UNIFAC parameter set, present for the UNIFAC mixing rule.
     pub unifac: Option<crate::unifac::Unifac>,
+    /// The binary parameters of the Wong-Sandler mixing rule.
+    pub wong_sandler: Option<crate::wong_sandler::WongSandlerData>,
 }
 
 impl ExcessGibbsMixture {
@@ -187,6 +195,7 @@ impl ExcessGibbsMixture {
             nc,
             pairs,
             unifac,
+            wong_sandler: None,
         })
     }
 }
@@ -208,6 +217,28 @@ struct ExcessGibbsKernel {
     d2g_dt2: f64,
     dg_dn: Vec<f64>,
     d2g_dn_dt: Vec<f64>,
+    d2g_dn_dn: Vec<f64>,
+}
+
+/// The excess Gibbs energy of a mixture at the infinite pressure limit and
+/// its derivatives.
+///
+/// The values are the ones of the original `excess_gibbs::gEinf`, which the
+/// Wong-Sandler mixing rule consumes.
+#[derive(Debug, Clone)]
+pub struct ExcessGibbsJet {
+    /// The excess Gibbs energy.
+    pub gibbs: f64,
+    /// The temperature derivative of the excess Gibbs energy.
+    pub dg_dt: f64,
+    /// The second temperature derivative of the excess Gibbs energy.
+    pub d2g_dt2: f64,
+    /// The derivatives with respect to the number of moles.
+    pub dg_dn: Vec<f64>,
+    /// The mixed temperature and mole derivatives.
+    pub d2g_dn_dt: Vec<f64>,
+    /// The second mole derivatives.
+    pub d2g_dn_dn: Vec<f64>,
 }
 
 /// Computes the mixture cubic parameter a(T, x) and its exact derivatives via
@@ -239,6 +270,7 @@ pub fn excess_gibbs_cubic_mix(
             "UNIFAC mixing rule without a group database",
         ))?;
         let ge = database.excess_gibbs(temperature, mole_fractions)?;
+        let count = ge.dg_dn.len();
         (
             ExcessGibbsKernel {
                 gibbs: ge.gibbs,
@@ -246,6 +278,9 @@ pub fn excess_gibbs_cubic_mix(
                 d2g_dt2: ge.d2g_dt2,
                 dg_dn: ge.dg_dn,
                 d2g_dn_dt: ge.d2g_dn_dt,
+                // The UNIFAC model does not deliver the second composition
+                // derivatives, and no mixing rule consumes them.
+                d2g_dn_dn: vec![0.0; count * count],
             },
             excess_gibbs_limit(kind, GeLimit::Zero),
         )
@@ -311,6 +346,54 @@ pub fn excess_gibbs_cubic_mix(
     })
 }
 
+/// The excess Gibbs energy of a mixture at the infinite pressure limit and
+/// its derivatives.
+///
+/// The original `excess_gibbs::gEinf` evaluates the excess Gibbs energy of
+/// the Huron-Vidal, the NRTL and the Wong-Sandler models. The Wong-Sandler
+/// mixing rule consumes the values.
+#[allow(clippy::too_many_arguments)]
+pub fn excess_gibbs_jet(
+    ge_mix: &ExcessGibbsMixture,
+    kind: crate::cubic::CubicKind,
+    temperature: f64,
+    mole_fractions: &[f64],
+    b_pure: &[f64],
+    a_pure: &[f64],
+    da_dt_pure: &[f64],
+    d2a_dt2_pure: &[f64],
+) -> Result<ExcessGibbsJet> {
+    let nc = ge_mix.nc;
+    if nc == 0 || mole_fractions.len() != nc {
+        return Err(Error::InvalidInput(
+            "component count mismatch in ExcessGibbs",
+        ));
+    }
+    if ge_mix.mrule == MixingRule::Unifac {
+        return Err(Error::Unsupported(
+            "the UNIFAC model does not deliver the excess Gibbs energy of the limit",
+        ));
+    }
+    let kernel = hv_nrtl_kernel(
+        ge_mix,
+        excess_gibbs_limit(kind, GeLimit::Infinite),
+        temperature,
+        mole_fractions,
+        b_pure,
+        a_pure,
+        da_dt_pure,
+        d2a_dt2_pure,
+    )?;
+    Ok(ExcessGibbsJet {
+        gibbs: kernel.gibbs,
+        dg_dt: kernel.dg_dt,
+        d2g_dt2: kernel.d2g_dt2,
+        dg_dn: kernel.dg_dn,
+        d2g_dn_dt: kernel.d2g_dn_dt,
+        d2g_dn_dn: kernel.d2g_dn_dn,
+    })
+}
+
 /// Huron-Vidal and NRTL excess Gibbs energy with analytical derivatives.
 /// Follows `gEinf` from `src/excess_gibbs.f90`.
 #[allow(clippy::too_many_arguments)]
@@ -330,7 +413,7 @@ fn hv_nrtl_kernel(
     // The five nc x nc matrices and the component vectors share two
     // allocations, so the preparation of a state does not allocate once per
     // matrix.
-    let mut matrix_buffer = vec![0.0; 5 * nc * nc];
+    let mut matrix_buffer: Vec<f64> = vec![0.0; 5 * nc * nc];
     let (rest, alpha) = matrix_buffer.split_at_mut(4 * nc * nc);
     let (rest, cij) = rest.split_at_mut(3 * nc * nc);
     let (rest, d2taudt2) = rest.split_at_mut(2 * nc * nc);
@@ -341,91 +424,128 @@ fn hv_nrtl_kernel(
     }
 
     // 1. Calculate temperature-dependent tau_ji and C_ji
-    for i in 0..nc {
-        let bi = b_pure[i];
-        for j in 0..nc {
-            if i == j {
-                continue;
-            }
-            let idx_ji = j * nc + i; // interaction of j in i
-            let bj = b_pure[j];
-            let pair = &ge_mix.pairs[idx_ji];
-
-            if pair.has_record {
-                alpha[idx_ji] = pair.alpha_ij;
-                match pair.correlation {
-                    GeCorrelation::Polynomial => {
-                        let p = pair.poly_ij;
-                        if ge_mix.mrule == MixingRule::HuronVidal1
-                            || ge_mix.mrule == MixingRule::Nrtl
-                        {
-                            tau[idx_ji] = p[0] / t + p[1];
-                            dtaudt[idx_ji] = -p[0] / (t * t);
-                            d2taudt2[idx_ji] = 2.0 * p[0] / (t * t * t);
-                        } else {
-                            // HV2 2nd order polynomial: a/T + b + cT
-                            tau[idx_ji] = p[0] / t + p[1] + p[2] * t;
-                            dtaudt[idx_ji] = -p[0] / (t * t) + p[2];
-                            d2taudt2[idx_ji] = 2.0 * p[0] / (t * t * t);
-                        }
-                    }
-                    GeCorrelation::MariboMogensen => {
-                        let p = pair.poly_ij;
-                        let tc = p[2];
-                        let t_ref = 298.15;
-                        let diff_term = (1.0 - t / tc).powi(2) - (1.0 - t_ref / tc).powi(2);
-                        let tau_val = (p[0] + p[1] * diff_term) / t;
-                        let dtau_val = -tau_val / t - 2.0 * p[1] * (1.0 - t / tc) / (tc * t);
-                        let d2tau_val = -2.0 * (dtau_val - p[1] / (tc * tc)) / t;
-
-                        tau[idx_ji] = tau_val;
-                        dtaudt[idx_ji] = dtau_val;
-                        d2taudt2[idx_ji] = d2tau_val;
-                    }
+    if ge_mix.mrule == MixingRule::WongSandler {
+        // The Wong-Sandler parameters come from the user, as in the original.
+        // The original stores the parameters of the pair (i, j) and uses them
+        // in the sums of the component j in the component i, so the matrices
+        // are filled in transposed order.
+        let ws = ge_mix
+            .wong_sandler
+            .as_ref()
+            .ok_or(crate::Error::InvalidInput(
+                "the Wong-Sandler mixing rule without binary parameters",
+            ))?;
+        for i in 0..nc {
+            for j in 0..nc {
+                if i == j {
+                    continue;
+                }
+                let idx_ji = j * nc + i;
+                let source = i * nc + j;
+                let exponent = ws.alphaij[source];
+                if exponent.abs() > 1.0e-20 {
+                    let (value, derivative, second) = ws.tauij[source].evaluate(t);
+                    tau[idx_ji] = value;
+                    dtaudt[idx_ji] = derivative;
+                    d2taudt2[idx_ji] = second;
+                    alpha[idx_ji] = exponent;
+                } else {
+                    // The original reverts to a vanishing interaction.
+                    tau[idx_ji] = 0.0;
+                    dtaudt[idx_ji] = 0.0;
+                    d2taudt2[idx_ji] = 0.0;
+                    alpha[idx_ji] = 1.0;
                 }
                 cij[idx_ji] = (-alpha[idx_ji] * tau[idx_ji]).exp();
-            } else {
-                // Revert to classic vdW mixing rule matching
-                let kij = pair.kij;
-                let t1 = -2.0 * (bi * bj).sqrt() / (bi + bj);
-                let gii = -a_pure[i] * lambda_ge / bi;
-                let t2 = (a_pure[i] / bi) * lambda_ge;
-                let t3 = t2 * (a_pure[j] / bj) * lambda_ge;
-                let t4 = (t3 * a_pure[i] * a_pure[j]).sqrt();
+            }
+        }
+    } else {
+        for i in 0..nc {
+            let bi = b_pure[i];
+            for j in 0..nc {
+                if i == j {
+                    continue;
+                }
+                let idx_ji = j * nc + i; // interaction of j in i
+                let bj = b_pure[j];
+                let pair = &ge_mix.pairs[idx_ji];
 
-                tau[idx_ji] = (t1 * t4 * (1.0 - kij) - gii) / (RGAS * t);
+                if pair.has_record {
+                    alpha[idx_ji] = pair.alpha_ij;
+                    match pair.correlation {
+                        GeCorrelation::Polynomial => {
+                            let p = pair.poly_ij;
+                            if ge_mix.mrule == MixingRule::HuronVidal1
+                                || ge_mix.mrule == MixingRule::Nrtl
+                            {
+                                tau[idx_ji] = p[0] / t + p[1];
+                                dtaudt[idx_ji] = -p[0] / (t * t);
+                                d2taudt2[idx_ji] = 2.0 * p[0] / (t * t * t);
+                            } else {
+                                // HV2 2nd order polynomial: a/T + b + cT
+                                tau[idx_ji] = p[0] / t + p[1] + p[2] * t;
+                                dtaudt[idx_ji] = -p[0] / (t * t) + p[2];
+                                d2taudt2[idx_ji] = 2.0 * p[0] / (t * t * t);
+                            }
+                        }
+                        GeCorrelation::MariboMogensen => {
+                            let p = pair.poly_ij;
+                            let tc = p[2];
+                            let t_ref = 298.15;
+                            let diff_term = (1.0 - t / tc).powi(2) - (1.0 - t_ref / tc).powi(2);
+                            let tau_val = (p[0] + p[1] * diff_term) / t;
+                            let dtau_val = -tau_val / t - 2.0 * p[1] * (1.0 - t / tc) / (tc * t);
+                            let d2tau_val = -2.0 * (dtau_val - p[1] / (tc * tc)) / t;
 
-                let dt4_dt = if t4 > 1e-30 {
-                    t3 * (a_pure[i] * da_dt_pure[j] + a_pure[j] * da_dt_pure[i]) / (2.0 * t4)
+                            tau[idx_ji] = tau_val;
+                            dtaudt[idx_ji] = dtau_val;
+                            d2taudt2[idx_ji] = d2tau_val;
+                        }
+                    }
+                    cij[idx_ji] = (-alpha[idx_ji] * tau[idx_ji]).exp();
                 } else {
-                    0.0
-                };
+                    // Revert to classic vdW mixing rule matching
+                    let kij = pair.kij;
+                    let t1 = -2.0 * (bi * bj).sqrt() / (bi + bj);
+                    let gii = -a_pure[i] * lambda_ge / bi;
+                    let t2 = (a_pure[i] / bi) * lambda_ge;
+                    let t3 = t2 * (a_pure[j] / bj) * lambda_ge;
+                    let t4 = (t3 * a_pure[i] * a_pure[j]).sqrt();
 
-                let d2t4_dt2 = if t4 > 1e-30 {
-                    t3 * (a_pure[i] * d2a_dt2_pure[j]
-                        + 2.0 * da_dt_pure[i] * da_dt_pure[j]
-                        + a_pure[j] * d2a_dt2_pure[i])
-                        / (2.0 * t4)
-                        - dt4_dt * dt4_dt / t4
-                } else {
-                    0.0
-                };
+                    tau[idx_ji] = (t1 * t4 * (1.0 - kij) - gii) / (RGAS * t);
 
-                let dgii_dt = -t2 * da_dt_pure[i];
-                let d2gii_dt2 = -t2 * d2a_dt2_pure[i];
+                    let dt4_dt = if t4 > 1e-30 {
+                        t3 * (a_pure[i] * da_dt_pure[j] + a_pure[j] * da_dt_pure[i]) / (2.0 * t4)
+                    } else {
+                        0.0
+                    };
 
-                dtaudt[idx_ji] = ((1.0 - kij) * t1 * dt4_dt - dgii_dt) / (RGAS * t)
-                    - ((1.0 - kij) * t1 * t4 - gii) / (RGAS * t * t);
+                    let d2t4_dt2 = if t4 > 1e-30 {
+                        t3 * (a_pure[i] * d2a_dt2_pure[j]
+                            + 2.0 * da_dt_pure[i] * da_dt_pure[j]
+                            + a_pure[j] * d2a_dt2_pure[i])
+                            / (2.0 * t4)
+                            - dt4_dt * dt4_dt / t4
+                    } else {
+                        0.0
+                    };
 
-                d2taudt2[idx_ji] = ((1.0 - kij) * t1 * d2t4_dt2 - d2gii_dt2) / (RGAS * t)
-                    - 2.0 * ((1.0 - kij) * t1 * dt4_dt - dgii_dt) / (RGAS * t * t)
-                    + 2.0 * ((1.0 - kij) * t1 * t4 - gii) / (RGAS * t * t * t);
+                    let dgii_dt = -t2 * da_dt_pure[i];
+                    let d2gii_dt2 = -t2 * d2a_dt2_pure[i];
 
-                cij[idx_ji] = if ge_mix.mrule == MixingRule::Nrtl {
-                    bj
-                } else {
-                    1.0
-                };
+                    dtaudt[idx_ji] = ((1.0 - kij) * t1 * dt4_dt - dgii_dt) / (RGAS * t)
+                        - ((1.0 - kij) * t1 * t4 - gii) / (RGAS * t * t);
+
+                    d2taudt2[idx_ji] = ((1.0 - kij) * t1 * d2t4_dt2 - d2gii_dt2) / (RGAS * t)
+                        - 2.0 * ((1.0 - kij) * t1 * dt4_dt - dgii_dt) / (RGAS * t * t)
+                        + 2.0 * ((1.0 - kij) * t1 * t4 - gii) / (RGAS * t * t * t);
+
+                    cij[idx_ji] = if ge_mix.mrule == MixingRule::Nrtl {
+                        bj
+                    } else {
+                        1.0
+                    };
+                }
             }
         }
     }
@@ -445,7 +565,7 @@ fn hv_nrtl_kernel(
     for i in 0..nc {
         for j in 0..nc {
             let idx_ji = j * nc + i;
-            let bj = if ge_mix.mrule == MixingRule::Nrtl {
+            let bj = if matches!(ge_mix.mrule, MixingRule::Nrtl | MixingRule::WongSandler) {
                 1.0
             } else {
                 b_pure[j]
@@ -510,7 +630,7 @@ fn hv_nrtl_kernel(
         let mut sum6ji = 0.0;
         let mut sum7ji = 0.0;
 
-        let bi = if ge_mix.mrule == MixingRule::Nrtl {
+        let bi = if matches!(ge_mix.mrule, MixingRule::Nrtl | MixingRule::WongSandler) {
             1.0
         } else {
             b_pure[i]
@@ -553,11 +673,52 @@ fn hv_nrtl_kernel(
             + RGAS * t * (term_self_dt + sum3ji + sum4ji + sum5ji - sum6ji - 2.0 * sum7ji);
     }
 
+    // 5. Second composition derivatives of the excess Gibbs energy
+    let mut d2g_ex_dnid_nj = vec![0.0; nc * nc];
+    for i in 0..nc {
+        let bi = if matches!(ge_mix.mrule, MixingRule::Nrtl | MixingRule::WongSandler) {
+            1.0
+        } else {
+            b_pure[i]
+        };
+        for j in 0..nc {
+            let bj = if matches!(ge_mix.mrule, MixingRule::Nrtl | MixingRule::WongSandler) {
+                1.0
+            } else {
+                b_pure[j]
+            };
+            let mut sum_i = 0.0;
+            let mut sum_j = 0.0;
+            let mut sum_ij = 0.0;
+            for ii in 0..nc {
+                let gamma2_ii = gamma2[ii] * gamma2[ii];
+                let c_ii_i = cij[ii * nc + i];
+                let c_ii_j = cij[ii * nc + j];
+                let z_ii = mole_fractions[ii];
+                sum_i += z_ii * (bj * c_ii_j) * tau[ii * nc + i] * bi * c_ii_i / gamma2_ii;
+                sum_j += z_ii * (bi * c_ii_i) * tau[ii * nc + j] * bj * c_ii_j / gamma2_ii;
+                sum_ij += z_ii * bi * bj * c_ii_i * c_ii_j * gamma1[ii] / (gamma2_ii * gamma2[ii]);
+            }
+            let g2i = gamma2[i] * gamma2[i];
+            let g2j = gamma2[j] * gamma2[j];
+            d2g_ex_dnid_nj[i * nc + j] = RGAS
+                * t
+                * (tau[j * nc + i] * bj * cij[j * nc + i] / gamma2[i]
+                    - bj * cij[i * nc + j] * gamma1[i] / g2i
+                    + tau[i * nc + j] * bi * cij[i * nc + j] / gamma2[j]
+                    - sum_i
+                    - bi * cij[j * nc + i] * gamma1[j] / g2j
+                    - sum_j
+                    + 2.0 * sum_ij);
+        }
+    }
+
     Ok(ExcessGibbsKernel {
         gibbs: g_ex,
         dg_dt: dg_ex_dt,
         d2g_dt2: d2g_ex_dt2,
         dg_dn: dg_ex_dni.to_vec(),
         d2g_dn_dt: d2g_ex_dni_dt.to_vec(),
+        d2g_dn_dn: d2g_ex_dnid_nj,
     })
 }

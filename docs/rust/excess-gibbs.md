@@ -47,12 +47,24 @@ To preserve the zero-allocation performance and exact thermodynamic consistency 
    $$\frac{\partial^2 a_{mix}}{\partial T^2} = b_{mix} \left( \sum_i x_i \frac{\partial^2 a_i / \partial T^2}{b_i} - \frac{\partial^2 g_\infty^E / \partial T^2}{C^*} \right)$$
    $$\frac{\partial a_{mix}}{\partial n_k} = b_k \left( \sum_i x_i \frac{a_i}{b_i} - \frac{g_\infty^E}{C^*} \right) + b_{mix} \left( \frac{a_k}{b_k} - \frac{\partial (n g_\infty^E) / \partial n_k}{C^*} \right)$$
 
+### 4. The Second Composition Derivatives
+
+The Huron-Vidal and the NRTL models deliver the second composition
+derivatives of the excess Gibbs energy,
+$$\frac{\partial^2 g_\infty^E}{\partial n_i \partial n_j},$$
+which the Wong-Sandler mixing rule consumes in the sum `D` of its appendix
+A9. They are evaluated analytically in the same kernel and are exposed
+together with the remaining derivatives in the `ExcessGibbsJet` type and in
+the function `excess_gibbs::excess_gibbs_jet`.
+
 ## Architecture and Database
 
 - `rust/src/excess_gibbs.rs`: Core analytical $g_\infty^E$ equations, exact first and second derivatives, and cubic parameter combination.
 - `rust/src/excess_gibbs_data.rs`: All 19 source-derived binary interaction parameters extracted from `src/mixdatadb.f90` via `tools/rust_port/generate_excess_gibbs_data.py`.
 - `rust/src/cubic.rs`: Integration into `CubicKind::PengRobinson`, `CubicKind::SoaveRedlichKwong`, and `PreparedState`.
+- `rust/src/wong_sandler.rs`: The Wong-Sandler mixing rule, which consumes the excess Gibbs energy of the infinite pressure limit; see the [Wong-Sandler notes](wong-sandler.md).
 - `tests/excess_gibbs.rs`: Automated verification against `.reference/thermopack.dll` across SRK, PR, HV1, HV2, and NRTL.
+- `tests/wong_sandler.rs`: Automated verification of the mixture coefficients of the Wong-Sandler rule against `.reference/thermopack.dll`.
 
 ## Performance Characteristics
 

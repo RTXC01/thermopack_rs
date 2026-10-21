@@ -105,6 +105,8 @@ def load_probe():
     probe.query_solid_saturation.restype=None
     probe.query_cpa_rdf.argtypes=[c_double,c_double,POINTER(c_double),POINTER(c_double),POINTER(c_int)]
     probe.query_cpa_rdf.restype=None
+    probe.query_wong_sandler.argtypes=[c_double,POINTER(c_double),POINTER(c_double),POINTER(c_double),POINTER(c_double),POINTER(c_double),POINTER(c_int)]
+    probe.query_wong_sandler.restype=None
     return probe
 
 
@@ -245,6 +247,30 @@ def main(compiler_directory):
             amounts=(c_double*16)(*request['moles'],*([0.0]*(16-count)))
             values=(c_double*256)();number=c_int()
             probe.query_cpa_rdf(request['temperature'],request['volume'],amounts,values,byref(number))
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=list(map(float,values))[:number.value])),flush=True)
+            continue
+        if request['mode']=='WONGSANDLER':
+            if probe is None:probe=load_probe()
+            key=('WONGSANDLER',request['components'],request.get('eos','PR'))
+            if previous!=key:
+                from thermopack.cubic import cubic
+                model=cubic(request['components'],request.get('eos','PR'),mixing='WongSandler')
+                previous=key
+            model.activate()
+            probe.query_wong_sandler.argtypes=[c_double,POINTER(c_double),POINTER(c_double),
+                                               POINTER(c_double),POINTER(c_double),POINTER(c_double),
+                                               POINTER(c_int)]
+            probe.query_wong_sandler.restype=None
+            def _padded(values):
+                data=list(values)+[0.0]*(16-len(values))
+                return (c_double*16)(*data)
+            composition=_padded(request['composition'])
+            kij=_padded([request['kij']])
+            tauij=_padded([request['tauij']])
+            alpha=_padded([request['alpha']])
+            values=(c_double*256)();number=c_int()
+            probe.query_wong_sandler(request['temperature'],composition,kij,tauij,alpha,
+                                     values,byref(number))
             print('THERMOPACK_RESULT='+json.dumps(dict(values=list(map(float,values))[:number.value])),flush=True)
             continue
         if request['mode']=='CHAIN_RULE':

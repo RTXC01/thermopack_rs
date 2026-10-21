@@ -61,6 +61,7 @@ pub mod spinodal;
 pub mod translation;
 pub mod unifac;
 pub mod unifac_data;
+pub mod wong_sandler;
 
 pub use alpha::{Alpha, AlphaCorrelation, AlphaValue};
 pub use beta::{Beta, BetaCorrelation, BetaValue};

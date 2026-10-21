@@ -88,6 +88,7 @@ pub mod ljs_wca;
 pub mod mbwr;
 pub mod mixture_critical;
 pub mod mixture_saturation;
+pub mod mixture_spinodal;
 pub mod multiparameter;
 pub mod multiparameter_data;
 pub mod mut_flash;

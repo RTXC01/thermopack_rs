@@ -63,6 +63,7 @@ python tools/rust_port/validate_solid_saturation.py
 python tools/rust_port/validate_pseudo_components.py
 python tools/rust_port/validate_isolines.py
 python tools/rust_port/validate_spinodal.py
+python tools/rust_port/validate_mixture_spinodal.py
 python tools/rust_port/validate_joule_thompson.py
 python tools/rust_port/validate_virial.py
 python tools/rust_port/validate_virial_matrix.py
@@ -485,3 +486,13 @@ translated PR/SRK, default Wong-Sandler, zero species and up to five components
 are covered. Physical derivative, null-mode, stability crossing, permutation and
 translation tests are independent of the fixture comparisons. Critical loci,
 end points, global stability and other activity Hessians remain pending.
+
+The [mixture spinodal qualification](mixture-spinodal.md) compares all 1310
+states from 130 successful source calls: 108 fixed-pressure points and 22
+complete curves. All T/V/raw-P outputs and point counts match in the explicit
+compatibility APIs. Every source state independently satisfies the local
+Helmholtz eigenvalue condition; 22 stale endpoint pressure warnings and 54
+physical vapor-branch selection differences are retained explicitly. Separate
+physical APIs close pressure at their returned coordinates. The pure source
+sampling grid, spinodal-property intersections, metastable isentropes and
+other model families remain pending.

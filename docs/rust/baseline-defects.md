@@ -320,3 +320,21 @@ properties of the same state do. The native library evaluates the pressure
 from the volume of the prepared state and is qualified against the generic
 route.
 See [Wong-Sandler notes](wong-sandler.md).
+
+## Mixture spinodal pressure walk and curve endpoint pressures
+
+`src/spinodal.f90::nestedLoopVT` selects the volume-step sign from the pressure
+error alone, even on the vapor branch where pressure has the opposite slope.
+All 54 vapor requests in the mixture spinodal grid return the liquid-side
+boundary. `baseline_mixture_spinodal_point` follows this source seed/walk
+selection; the physical API starts from the requested mechanical branch.
+Both roots satisfy local stability and pressure equations, so closure alone
+cannot establish branch-selection parity.
+
+`map_stability_limit` replaces T/V at a temperature-limited last point but
+retains the pressure evaluated before refinement, and assigns the input P0
+to the first point even with an explicit starting temperature. All 22 complete
+qualified mixture curves contain a stale endpoint pressure. Raw source P and
+evaluated EOS P are both retained in the fixtures. The compatibility curve
+preserves reporting; the physical curve evaluates the final pressure. See
+[mixture spinodal qualification](mixture-spinodal.md) for scope and limits.

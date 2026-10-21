@@ -151,5 +151,9 @@ the source qualification and native-loop measurements.
 The [mixture critical notes](mixture-critical.md) cover local Helmholtz stability,
 analytic directional derivatives, pure/zero-component limits and qualification.
 
+The [mixture spinodal notes](mixture-spinodal.md) cover local stability limits,
+full volume continuation, explicit source branch/pressure compatibility and
+physical endpoint closure.
+
 Regenerate inventory with
 `python tools/rust_port/inventory.py`.

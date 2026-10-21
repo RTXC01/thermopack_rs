@@ -6,7 +6,54 @@
 //! inflection. A local critical point need not be globally stable against other
 //! phases; critical loci and critical end points require additional equations.
 
-use crate::{Cubic, Error, Result, critical::CriticalPoint, error::positive};
+use crate::{Cubic, Error, PreparedState, Result, critical::CriticalPoint, error::positive};
+
+/// Minimum local Helmholtz stability eigenpair at fixed T and total V.
+#[derive(Debug, Clone)]
+pub struct MixtureStability {
+    pub eigenvalue: f64,
+    /// Unit direction in sqrt(z)-scaled coordinates, with absent species zero.
+    pub eigenvector: Vec<f64>,
+}
+
+impl PreparedState<'_> {
+    /// Evaluate local mixture stability without the critical third derivative.
+    /// A positive eigenvalue means local stability at fixed T/V; this does not
+    /// establish global equilibrium against finite composition changes.
+    pub fn mixture_stability(&self, volume: f64) -> Result<MixtureStability> {
+        let z = self.composition();
+        let n = z.len();
+        let mut h = vec![0.0; n * n];
+        self.log_fugacity_tv_into(volume, &mut vec![0.0; n], &mut h)?;
+        let active: Vec<_> = z
+            .iter()
+            .enumerate()
+            .filter_map(|(i, &v)| (v > 0.0).then_some(i))
+            .collect();
+        let (eigenvalue, u) = scaled_eigenpair(z, &active, &h)?;
+        let mut eigenvector = vec![0.0; n];
+        for (i, &a) in active.iter().enumerate() {
+            eigenvector[a] = u[i];
+        }
+        Ok(MixtureStability {
+            eigenvalue,
+            eigenvector,
+        })
+    }
+}
+
+fn scaled_eigenpair(z: &[f64], active: &[usize], hessian: &[f64]) -> Result<(f64, Vec<f64>)> {
+    let n = z.len();
+    let m = active.len();
+    let mut matrix = vec![0.0; m * m];
+    for (i, &a) in active.iter().enumerate() {
+        for (j, &b) in active.iter().enumerate() {
+            matrix[i * m + j] =
+                z[a].sqrt() * z[b].sqrt() * 0.5 * (hessian[a * n + b] + hessian[b * n + a]);
+        }
+    }
+    smallest_eigenpair(&mut matrix, m)
+}
 
 /// Local stability of a one-mole homogeneous state at fixed T and total V.
 #[derive(Debug, Clone)]
@@ -42,17 +89,7 @@ impl Cubic {
             .enumerate()
             .filter_map(|(i, &z)| (z > 0.0).then_some(i))
             .collect();
-        let m = active.len();
-        let mut matrix = vec![0.0; m * m];
-        for (i, &a) in active.iter().enumerate() {
-            for (j, &b) in active.iter().enumerate() {
-                matrix[i * m + j] = composition[a].sqrt()
-                    * composition[b].sqrt()
-                    * 0.5
-                    * (hessian[a * n + b] + hessian[b * n + a]);
-            }
-        }
-        let (eigenvalue, vector) = smallest_eigenpair(&mut matrix, m)?;
+        let (eigenvalue, vector) = scaled_eigenpair(composition, &active, &hessian)?;
         let mut eigenvector = vec![0.0; n];
         let mut direction = vec![0.0; n];
         let mut step: f64 = 1.0e-3;

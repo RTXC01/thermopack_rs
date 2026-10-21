@@ -65,6 +65,10 @@ phase amounts from molar enthalpy or entropy. Use
 including phase redistribution. Caloric options set temperature bounds and
 initial guesses; defaults are 80 to 999 K. `pseudo_critical(z)` is a
 fixed-composition estimate, not the true critical point of a mixture.
+
+Mixture [spinodal points and curves](../docs/rust/mixture-spinodal.md) use the
+Helmholtz stability eigenvalue, with explicit source-compatible and physical
+branch/pressure conventions. Partial curves report their point-limit status.
 `model.ideal_gas_mut(i)` configures owned ideal Cp parameters and H/S reference
 states for component i (zero based). A Cp setter preserves integration constants;
 reference setters recalculate them as in the source. Other models and the global

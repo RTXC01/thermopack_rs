@@ -604,16 +604,37 @@ def main(compiler_directory):
             arrays=[list(map(float,values)) for values in (temperature,pressure,volume)]
             print('THERMOPACK_RESULT='+json.dumps(dict(values=arrays)),flush=True)
             continue
-        if request['mode']=='SPINODAL':
+        if request['mode'] in ('SPINODAL','SPINODAL_CURVE'):
             eos,comps=request['eos'],request['components']
             from thermopack.cubic import cubic
-            model=cubic(",".join(comps),eos)
+            model=cubic(",".join(comps),'SRK' if eos=='RK' else eos,
+                        alpha='RK' if eos=='RK' else 'Classic',volume_shift=request.get('volume_shift',False))
+            previous=None
             model.activate()
             z=request['feed']
-            phase=model.LIQPH if request['phase']==1 else model.VAPPH
-            temperature,volume=model.spinodal_point(z,request['pressure'],phase)
-            values=[float(temperature),float(volume),float(request['pressure'])]
-            print('THERMOPACK_RESULT='+json.dumps(dict(values=values)),flush=True)
+            try:
+                if request['mode']=='SPINODAL_CURVE':
+                    temperature,volume,pressure=model.spinodal(z,initial_pressure=request['pressure'],
+                        dlnv=request.get('log_volume_step'),initial_liquid_temperature=request.get('temperature'),
+                        min_temperature_vapor=request.get('minimum_temperature'))
+                else:
+                    phase=model.LIQPH if request['phase']==1 else model.VAPPH
+                    t,v=model.spinodal_point(z,request['pressure'],phase,temperature=request.get('temperature'))
+                    temperature=[t];volume=[v];pressure=[request['pressure']]
+                if request.get('stability_diagnostics'):
+                    import numpy as np
+                    z=np.array(z);active=np.flatnonzero(z>0);weights=np.sqrt(z[active])
+                    data=[]
+                    for t,v,p in zip(temperature,volume,pressure):
+                        h=model.fugacity_tv(t,v,z,dlnphidn=True)[1]
+                        matrix=h[np.ix_(active,active)]*weights[:,None]*weights[None,:]
+                        lam=float(np.linalg.eigvalsh(matrix)[0])
+                        actual=float(model.pressure_tv(t,v,z)[0])
+                        data.append(list(map(float,[t,v,p,actual,lam])))
+                    result=dict(values=data)
+                else:result=dict(values=list(map(float,[temperature[0],volume[0],pressure[0]])))
+            except Exception as error:result=dict(calculation_error=str(error))
+            print('THERMOPACK_RESULT='+json.dumps(result),flush=True)
             continue
         if request['mode']=='ISOLINE':
             eos,comps=request['eos'],request['components']

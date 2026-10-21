@@ -127,11 +127,10 @@ The committed fixture is `tests/fixtures/joule_thompson.csv`; the test is
 
 ## Remaining scope
 
-* The mapping of the whole limit line, the source `map_stability_limit`, is
-  not yet ported, and the native model reports a single point instead of a
-  curve.
-* The limit of a mixture needs the stability matrix of the mixture with its
-  eigenvalues, and the native model reports the single component case only.
+* [Mixture spinodal points and complete volume traces](mixture-spinodal.md)
+  now use the Helmholtz stability eigenvalue, with physical and explicit source
+  compatibility APIs. The separate source pure 200-point temperature grids,
+  spinodal-property intersections and metastable isentropes remain pending.
 * Critical loci, critical end points and a global phase-stability classification
   of mixture critical points remain pending; the local point solve is native.
 * The curve of the Joule-Thomson inversion is not mapped by the native model,

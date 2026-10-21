@@ -92,6 +92,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             && fields[0] != "PSEUDOC"
             && fields[0] != "ISOLINE"
             && fields[0] != "SPINODAL"
+            && fields[0] != "MIXSPIN"
             && fields[0] != "JTI"
             && fields[0] != "VIRIAL"
             && fields[0] != "VIRIALMATRIX"
@@ -907,6 +908,86 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "{:.17e},{:.17e},{:.17e}",
                 point.temperature, point.volume, point.pressure
             );
+            continue;
+        }
+        if fields[0] == "MIXSPIN" {
+            use thermopack_rs::mixture_spinodal::*;
+            let kind = match fields[1] {
+                "SRK" => CubicKind::SoaveRedlichKwong,
+                "RK" => CubicKind::RedlichKwong,
+                "VDW" => CubicKind::VanDerWaals,
+                _ => CubicKind::PengRobinson,
+            };
+            let names: Vec<_> = fields[2].split(',').collect();
+            let z: Vec<f64> = fields[3]
+                .split(',')
+                .map(str::parse)
+                .collect::<Result<_, _>>()?;
+            let model = Cubic::with_options(
+                kind,
+                &names,
+                thermopack_rs::CubicOptions {
+                    volume_translation: fields[4] == "translated",
+                    ..Default::default()
+                },
+            )?;
+            let spec: f64 = fields[6].parse()?;
+            let result = match fields[5] {
+                "BASE_L" | "BASE_V" => baseline_mixture_spinodal_point(
+                    &model,
+                    spec,
+                    if fields[5] == "BASE_L" {
+                        Phase::Liquid
+                    } else {
+                        Phase::Vapor
+                    },
+                    &z,
+                )
+                .map(|p| vec![p]),
+                "L" | "V" => thermopack_rs::spinodal::spinodal_point(
+                    &model,
+                    spec,
+                    if fields[5] == "L" {
+                        Phase::Liquid
+                    } else {
+                        Phase::Vapor
+                    },
+                    &z,
+                )
+                .map(|p| vec![p]),
+                "T" => spinodal_volume_at_temperature(&model, spec, &z, fields[7].parse()?)
+                    .map(|p| vec![p]),
+                "VOLUME" => spinodal_temperature_at_volume(&model, spec, &z, fields[7].parse()?)
+                    .map(|p| vec![p]),
+                "CURVE" | "BASE_CURVE" => (if fields[5] == "BASE_CURVE" {
+                    baseline_trace_spinodal
+                } else {
+                    trace_spinodal
+                })(
+                    &model,
+                    &z,
+                    SpinodalTraceOptions {
+                        initial_pressure: spec,
+                        log_volume_step: fields[7].parse()?,
+                        minimum_vapor_temperature: fields.get(8).map(|s| s.parse()).transpose()?,
+                        ..Default::default()
+                    },
+                )
+                .map(|c| c.points),
+                _ => Err(thermopack_rs::Error::InvalidInput("spinodal mode")),
+            };
+            match result {
+                Ok(points) => println!(
+                    "{}",
+                    points
+                        .iter()
+                        .flat_map(|p| [p.temperature, p.volume, p.pressure])
+                        .map(|v| format!("{v:.17e}"))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                ),
+                Err(error) => println!("ERROR: {error}"),
+            }
             continue;
         }
         if fields[0] == "ISOLINE" {

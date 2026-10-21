@@ -11,6 +11,11 @@ readme = "rust/README.md"
 path = "rust/src/lib.rs"
 
 [[bench]]
+name = "mixture_spinodal"
+path = "rust/benches/mixture_spinodal.rs"
+harness = false
+
+[[bench]]
 name = "mixture_critical"
 path = "rust/benches/mixture_critical.rs"
 harness = false

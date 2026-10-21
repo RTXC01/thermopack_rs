@@ -83,6 +83,8 @@ jobs:
       - run: python tools/rust_port/validate_pseudo_components.py
       - run: python tools/rust_port/validate_isolines.py
       - run: python tools/rust_port/validate_spinodal.py
+      - run: python tools/rust_port/validate_mixture_spinodal.py
+      - run: python tools/rust_port/benchmark_mixture_spinodal.py --compiler /usr/bin/gfortran-13 --preflight-only
       - run: python tools/rust_port/validate_joule_thompson.py
       - run: python tools/rust_port/validate_virial.py
       - run: python tools/rust_port/validate_virial_matrix.py

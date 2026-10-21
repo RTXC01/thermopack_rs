@@ -106,3 +106,18 @@ pair and its temperature, volume and mole number derivatives.
 The pair correlation function and its derivatives are compared against the reference probe
 tools/rust_port/reference_probe.f90, as the branch of the cubic association
 model is qualified in tools/rust_port/validate_cpa_rdf.py.
+
+## The pair correlation function of the hard-sphere model
+
+The module rust/src/bmcsl.rs holds the reduced pair Helmholtz energy of the
+additive hard-sphere model of Boublik and its first and second derivatives
+with respect to the packing fractions, in the function
+bmcsl::boublik_pair_correlation. The expression and its derivatives follow
+src/hardsphere_bmcsl.f90:calc_bmcsl_dgij_dzeta.
+
+The derivatives of the kernel are verified against a central difference of the
+expression, because the original keeps the routine private and delivers the
+pair and its temperature, volume and mole number derivatives only. The
+qualification against the exact source library belongs to the chain rule from
+the packing fractions to the temperature, the volume and the mole numbers,
+which is the next part of the port.

@@ -60,6 +60,7 @@
 //! ```
 pub mod alpha;
 pub mod beta;
+pub mod bmcsl;
 pub mod caloric;
 pub mod chain_rule;
 pub mod component;

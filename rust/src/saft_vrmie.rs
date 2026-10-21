@@ -313,19 +313,7 @@ impl SaftVrMie {
                 self.alpha_ij[idx] = alpha;
 
                 // f_1 .. f_6 polynomials of alpha
-                let mut f_alpha = [0.0; 6];
-                let alpha_pow = [1.0, alpha, alpha * alpha, alpha * alpha * alpha];
-                for k in 0..6 {
-                    let mut num = 0.0;
-                    for p in 0..4 {
-                        num += PHI_MAT[p][k] * alpha_pow[p];
-                    }
-                    let mut den = 1.0;
-                    for p in 1..4 {
-                        den += PHI_MAT[p + 3][k] * alpha_pow[p];
-                    }
-                    f_alpha[k] = num / den;
-                }
+                let f_alpha = alpha_coefficients(alpha);
                 self.f_alpha_ij[idx] = f_alpha;
 
                 // Feynman-Hibbs quantum parameter
@@ -1389,4 +1377,23 @@ fn calc_b_tilde_with_deriv(x0: f64, eta: f64, lam: f64, eps_val: f64) -> (f64, f
     let b_val = 6.0 * eps_val * (keta10 * i_term + keta20 * j_term);
     let b_e = 6.0 * eps_val * (keta11 * i_term + keta21 * j_term);
     (b_val, b_e)
+}
+
+/// The six coefficients of the polynomials of the van der Waals attractive
+/// constant, the routine `calcFunAlpha` of the source.
+pub(crate) fn alpha_coefficients(alpha: f64) -> [f64; 6] {
+    let mut f_alpha = [0.0; 6];
+    let alpha_pow = [1.0, alpha, alpha * alpha, alpha * alpha * alpha];
+    for k in 0..6 {
+        let mut num = 0.0;
+        for p in 0..4 {
+            num += PHI_MAT[p][k] * alpha_pow[p];
+        }
+        let mut den = 1.0;
+        for p in 1..4 {
+            den += PHI_MAT[p + 3][k] * alpha_pow[p];
+        }
+        f_alpha[k] = num / den;
+    }
+    f_alpha
 }

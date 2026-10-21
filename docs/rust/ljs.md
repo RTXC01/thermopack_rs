@@ -56,6 +56,11 @@ is the third polynomial. The source divides the three terms by the first, the
 second and the third power of the temperature, and the native model follows
 that convention.
 
+The model control of the source can replace the third order term with the
+Lafitte form, which follows the dispersion packing fraction and the polynomials
+of the van der Waals attractive constant of the source. The native model
+implements that form as well.
+
 The database of the source holds the argon record with the segment diameter
 3.42e-10 metre and the well depth 124.0 kelvin, and the native model uses the
 same values.
@@ -95,11 +100,12 @@ The committed fixture is `tests/fixtures/ljs_spline.csv`; the test is
 Helmholtz energy against the exact-source library. The reference probe calls
 the original `calcFresLJs_bh` with the active model of the fork.
 
-* 8 cases: the temperature, the volume and the number of moles of the single
-  component over the dilute and the dense fluid.
+* 12 cases: the temperature, the volume and the number of moles of the single
+  component over the dilute and the dense fluid, and the same states with the
+  Lafitte form of the third order term.
 * The compared quantities are the reduced residual Helmholtz energy of the
-  whole system and its temperature derivative. All 8 cases match with a
-  relative 1e-9, and the observed worst relative difference is 3.3e-14.
+  whole system and its temperature derivative. All 12 cases match with a
+  relative 1e-9, and the observed worst relative difference is 4.4e-14.
 
 The committed fixture is `tests/fixtures/ljs_helmholtz.csv`; the test is
 `tests/ljs.rs`.

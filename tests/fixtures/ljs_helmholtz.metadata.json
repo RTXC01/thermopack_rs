@@ -129,16 +129,16 @@
     "complexmodelinit": "6ffae447c3e2be271d9720f3b5217bebf669fa879cf9291be7f5d0a407a96b41",
     "external": "e57f6391c43791ae80fde558f66d9c39ed40b3d3b27859579fc11d3ef0c97f9d"
   },
-  "cases": 8,
-  "attempted_cases": 8,
+  "cases": 12,
+  "attempted_cases": 12,
   "generator": "tools/rust_port/validate_ljs_helmholtz.py",
-  "fixture_sha256": "96ba4bc3cdbb56b9f07d56d28d47470086479ce94c3e40b653d76c9625ba4600",
+  "fixture_sha256": "6a154496d13b34a1a22e33ea1c9ddc9c1611e62a9e5da3769722a34190be75dc",
   "quantities": [
     "reduced_helmholtz",
     "reduced_helmholtz_t"
   ],
   "relative_tolerance": 1e-09,
   "absolute_tolerance": 1e-12,
-  "worst_relative_difference": 3.325331817159554e-14,
+  "worst_relative_difference": 4.399120519435281e-14,
   "convention": "the original calcFresLJs_bh; the reduced residual Helmholtz energy of the whole system, the hard-sphere reference and the three perturbation terms of the original"
 }

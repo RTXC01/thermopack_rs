@@ -271,6 +271,9 @@ def main(compiler_directory):
             probe.query_ljs_helmholtz.restype=None
             from thermopack.ljs_bh import ljs_bh
             model=ljs_bh(request.get('parameter_reference','Default'),2.0)
+            control=request.get('control')
+            if control:
+                model.model_control(**control)
             values=(c_double*3)();number=c_int()
             probe.query_ljs_helmholtz(request['temperature'],request['volume'],
                                      request['moles'],values,byref(number))

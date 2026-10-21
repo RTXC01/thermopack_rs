@@ -188,7 +188,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let temperature: f64 = fields[1].parse().unwrap();
             let volume: f64 = fields[2].parse().unwrap();
             let moles: f64 = fields[3].parse().unwrap();
-            let model = thermopack_rs::ljs::LjsBh::new();
+            let mut model = thermopack_rs::ljs::LjsBh::new();
+            if fields.len() > 4 && fields[4] == "1" {
+                model.set_control(thermopack_rs::ljs::LjsControl {
+                    use_lafitte_a3: true,
+                    ..thermopack_rs::ljs::LjsControl::default()
+                });
+            }
             let (energy, derivative) =
                 model.residual_helmholtz_energy_derivative(temperature, volume, moles)?;
             println!("{:.17e},{:.17e}", energy * moles, derivative * moles);

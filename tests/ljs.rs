@@ -76,8 +76,16 @@ fn the_helmholtz_energy_matches_the_source() {
         let temperature: f64 = parts[0].parse().unwrap();
         let volume: f64 = parts[1].parse().unwrap();
         let moles: f64 = parts[2].parse().unwrap();
+        let lafitte = parts[3].parse::<i32>().unwrap() == 1;
         let source: f64 = fields[1].parse().unwrap();
         let source_t: f64 = fields[2].parse().unwrap();
+        let mut model = model;
+        if lafitte {
+            model.set_control(LjsControl {
+                use_lafitte_a3: true,
+                ..LjsControl::default()
+            });
+        }
         let (energy, derivative) = model
             .residual_helmholtz_energy_derivative(temperature, volume, moles)
             .unwrap();
@@ -93,7 +101,7 @@ fn the_helmholtz_energy_matches_the_source() {
         );
         checked += 1;
     }
-    assert_eq!(checked, 8);
+    assert_eq!(checked, 12);
 }
 
 #[test]

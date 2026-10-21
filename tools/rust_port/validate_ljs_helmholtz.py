@@ -16,16 +16,21 @@ import subprocess
 from reference import ROOT, ReferenceProcess
 
 # The cases: the temperature in kelvin, the volume in cubic metre and the
-# number of moles.
+# number of moles. The last entry selects the Lafitte form of the third order
+# term.
 CASES = [
-    (100.0, 1.0e-3, 1.0),
-    (150.0, 1.0e-3, 1.0),
-    (200.0, 1.0e-3, 1.0),
-    (300.0, 1.0e-3, 1.0),
-    (150.0, 5.0e-4, 1.0),
-    (200.0, 5.0e-4, 1.0),
-    (250.0, 2.0e-4, 1.0),
-    (120.0, 1.0e-3, 0.5),
+    (100.0, 1.0e-3, 1.0, False),
+    (150.0, 1.0e-3, 1.0, False),
+    (200.0, 1.0e-3, 1.0, False),
+    (300.0, 1.0e-3, 1.0, False),
+    (150.0, 5.0e-4, 1.0, False),
+    (200.0, 5.0e-4, 1.0, False),
+    (250.0, 2.0e-4, 1.0, False),
+    (120.0, 1.0e-3, 0.5, False),
+    (100.0, 1.0e-3, 1.0, True),
+    (150.0, 1.0e-3, 1.0, True),
+    (200.0, 1.0e-3, 1.0, True),
+    (250.0, 2.0e-4, 1.0, True),
 ]
 QUANTITIES = ["reduced_helmholtz", "reduced_helmholtz_t"]
 RTOL = 1.0e-9
@@ -46,31 +51,30 @@ def native(lines):
 
 def main(directory):
     lines = [
-        f"LJSHELMHOLTZ|{temperature:.17e}|{volume:.17e}|{moles:.17e}"
-        for temperature, volume, moles in CASES
+        f"LJSHELMHOLTZ|{temperature:.17e}|{volume:.17e}|{moles:.17e}|{int(lafitte)}"
+        for temperature, volume, moles, lafitte in CASES
     ]
     native_values = native(lines)
 
     with ReferenceProcess(directory) as oracle:
         reference_values = []
-        for temperature, volume, moles in CASES:
-            reference_values.append(
-                oracle.call(
-                    {
-                        "mode": "LJS_HELMHOLTZ",
-                        "temperature": temperature,
-                        "volume": volume,
-                        "moles": moles,
-                    }
-                )
-            )
+        for temperature, volume, moles, lafitte in CASES:
+            request = {
+                "mode": "LJS_HELMHOLTZ",
+                "temperature": temperature,
+                "volume": volume,
+                "moles": moles,
+            }
+            if lafitte:
+                request["control"] = {"use_Lafitte_a3": True}
+            reference_values.append(oracle.call(request))
 
     failures = []
     rows = []
     worst = 0.0
     for index, case in enumerate(CASES):
-        temperature, volume, moles = case
-        label = f"{temperature:.17e}|{volume:.17e}|{moles:.17e}"
+        temperature, volume, moles, lafitte = case
+        label = f"{temperature:.17e}|{volume:.17e}|{moles:.17e}|{int(lafitte)}"
         expected = reference_values[index]
         actual = native_values[index]
         if "values" not in expected:

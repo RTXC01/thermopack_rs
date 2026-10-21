@@ -98,6 +98,10 @@ const LAMBDA_R: f64 = 12.0;
 /// The prefactor of the potential of the model.
 const C_FAC: f64 = 4.0;
 
+/// The van der Waals attractive constant of the Lafitte form of the third
+/// order term.
+const ALPHA_LJS: f64 = 0.5357287350120993;
+
 /// The state of the model at a temperature and a volume.
 #[derive(Debug, Clone, Copy)]
 pub struct LjsState {
@@ -419,8 +423,22 @@ impl LjsBh {
                 / (temperature * temperature);
         }
         if self.control.enable_a3 {
-            let (_, value_r, ..) = polynomial_with_derivatives(2, tau, reduced_density, 1.0);
-            derivative += self.eps.powi(3) * value_r * reduced_density_v / temperature.powi(3);
+            if self.control.use_lafitte_a3 {
+                // The Lafitte form of the third order term follows the
+                // dispersion packing fraction and the polynomials of the
+                // van der Waals attractive constant of the source.
+                let zeta = std::f64::consts::PI / 6.0 * crate::N_A * self.sigma.powi(3) * density;
+                let f_alpha = crate::saft_vrmie::alpha_coefficients(ALPHA_LJS);
+                let exponent = f_alpha[4] * zeta + f_alpha[5] * zeta * zeta;
+                let factor = exponent.exp();
+                let slope = -self.eps.powi(3)
+                    * (f_alpha[3] * factor
+                        + zeta * (f_alpha[4] + 2.0 * f_alpha[5] * zeta) * factor);
+                derivative += slope * (-zeta / volume) / temperature.powi(3);
+            } else {
+                let (_, value_r, ..) = polynomial_with_derivatives(2, tau, reduced_density, 1.0);
+                derivative += self.eps.powi(3) * value_r * reduced_density_v / temperature.powi(3);
+            }
         }
         // The pressure of the ideal gas and the pressure of the residual
         // energy, which is the negative volume derivative of the residual
@@ -529,13 +547,31 @@ impl LjsBh {
                 + unscaled * khs_eta(eta) * eta_n / (temperature * temperature);
         }
         if self.control.enable_a3 {
-            let (value, value_r, value_x, ..) =
-                polynomial_with_derivatives(2, tau, reduced_density, 1.0);
-            let third = self.eps.powi(3) * value;
-            let third_t = self.eps.powi(3) * value_x * tau_t;
+            let (third, third_t, third_n) = if self.control.use_lafitte_a3 {
+                // The Lafitte form of the third order term follows the
+                // dispersion packing fraction and the polynomials of the
+                // van der Waals attractive constant of the source.
+                let zeta = std::f64::consts::PI / 6.0 * crate::N_A * self.sigma.powi(3) * density;
+                let zeta_n = std::f64::consts::PI / 6.0 * crate::N_A * self.sigma.powi(3) / volume;
+                let f_alpha = crate::saft_vrmie::alpha_coefficients(ALPHA_LJS);
+                let exponent = f_alpha[4] * zeta + f_alpha[5] * zeta * zeta;
+                let factor = exponent.exp();
+                let value = -self.eps.powi(3) * f_alpha[3] * zeta * factor;
+                let slope = -self.eps.powi(3)
+                    * (f_alpha[3] * factor
+                        + zeta * (f_alpha[4] + 2.0 * f_alpha[5] * zeta) * factor);
+                (value, 0.0, slope * zeta_n)
+            } else {
+                let (value, value_r, value_x, ..) =
+                    polynomial_with_derivatives(2, tau, reduced_density, 1.0);
+                let third = self.eps.powi(3) * value;
+                let third_t = self.eps.powi(3) * value_x * tau_t;
+                let third_n = self.eps.powi(3) * value_r * reduced_density_n;
+                (third, third_t, third_n)
+            };
             energy += third / temperature.powi(3);
             derivative += third_t / temperature.powi(3) - 3.0 * third / temperature.powi(4);
-            mole_derivative += self.eps.powi(3) * value_r * reduced_density_n / temperature.powi(3);
+            mole_derivative += third_n / temperature.powi(3);
         }
         Ok((energy, derivative, mole_derivative))
     }

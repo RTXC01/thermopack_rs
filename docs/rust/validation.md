@@ -326,11 +326,12 @@ their partial derivatives. The polynomial, the first and the second
 derivative with respect to the reduced temperature, the first and the second
 derivative with respect to the reduced density and the mixed derivative match
 with a relative 1e-10, and the observed worst relative difference is 3.1e-14.
-The [Lennard-Jones Helmholtz energy qualification](ljs.md) adds 8 cases of the
+The [Lennard-Jones Helmholtz energy qualification](ljs.md) adds 12 cases of the
 original `calcFresLJs_bh`: the reduced residual Helmholtz energy of the
-splined Lennard-Jones model over the dilute and the dense fluid. The energy
-and its temperature derivative match with a relative 1e-9, and the observed
-worst relative difference is 3.3e-14.
+splined Lennard-Jones model over the dilute and the dense fluid, and the same
+states with the Lafitte form of the third order term. The energy and its
+temperature derivative match with a relative 1e-9, and the observed worst
+relative difference is 4.4e-14.
 The [Lennard-Jones state qualification](ljs.md) adds 8 cases of the original
 state of the splined Lennard-Jones model: the pressure of the state and the
 compressibility factor, with the analytic volume derivative of the reduced

@@ -29,7 +29,7 @@ CASES = [
     (["C1", "C2"], 350.0, 1.0e-3, [0.05, 0.05]),
     (["H2O", "MEOH"], 300.0, 1.0e-3, [0.1, 0.1]),
 ]
-QUANTITIES = ["alpha", "alpha_rho", "alpha_t"]
+QUANTITIES = ["alpha", "alpha_rho", "alpha_t", "alpha_rhorho", "alpha_rhot"]
 RTOL = 1.0e-12
 ATOL = 1.0e-14
 
@@ -93,11 +93,21 @@ def main(directory):
         rho = total / volume
         source = reference_values[index]["values"]
         # The change of variables from the volume representation of the
-        # original to the density representation of the native model.
+        # original to the density representation of the native model. The
+        # values of the source are the reduced residual Helmholtz energy F,
+        # its temperature and volume derivatives, the mole number derivatives,
+        # the second temperature derivative, the mixed temperature and volume
+        # derivative and the second volume derivative.
+        count = len(moles)
+        f_v = source[2]
+        f_tv = source[4 + count]
+        f_vv = source[5 + count]
         expected = [
             source[0] / total,
-            -source[2] / (rho * rho),
+            -f_v / (rho * rho),
             source[1] / total,
+            2.0 * f_v / (rho**3) + total * f_vv / (rho**4),
+            -f_tv / (rho * rho),
         ]
         actual = native_values[index]
         if isinstance(actual, str):

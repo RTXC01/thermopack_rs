@@ -596,6 +596,83 @@ pub fn pair_correlation_t_derivatives(
     }
 }
 
+/// The volume derivatives of the reduced Helmholtz energy of the hard-sphere
+/// mixture.
+///
+/// The function delivers the first derivative with respect to the volume, the
+/// second derivative with respect to the volume and the mixed derivative with
+/// respect to the temperature and the volume, all at a fixed temperature and
+/// fixed mole numbers, and needs no allocation.
+pub fn hard_sphere_energy_v_derivatives(moments: &PackingMoments) -> (f64, f64, f64) {
+    let energy = boublik_helmholtz_energy(moments.zet);
+    let d_v = dot4(&energy.dzeta, &moments.zet_v);
+    let d_vv = dot4(&energy.dzeta, &moments.zet_vv)
+        + double_sum4(&energy.d2zeta, &moments.zet_v, &moments.zet_v);
+    let d_tv = dot4(&energy.dzeta, &moments.zet_tv)
+        + double_sum4(&energy.d2zeta, &moments.zet_t, &moments.zet_v);
+    (d_v, d_vv, d_tv)
+}
+
+/// The pair correlation function of a pair of components and its volume
+/// derivatives.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PairVolumeDerivatives {
+    /// The pair correlation function.
+    pub value: f64,
+    /// The volume derivative of the pair correlation function.
+    pub d_v: f64,
+    /// The second volume derivative of the pair correlation function.
+    pub d_vv: f64,
+    /// The temperature and volume derivative of the pair correlation function.
+    pub d_tv: f64,
+    /// The logarithm of the pair correlation function.
+    pub log_value: f64,
+    /// The volume derivative of the logarithm.
+    pub log_d_v: f64,
+    /// The second volume derivative of the logarithm.
+    pub log_d_vv: f64,
+    /// The temperature and volume derivative of the logarithm.
+    pub log_d_tv: f64,
+}
+
+/// The pair correlation function of the pair of the components `i` and `j`
+/// and its volume derivatives.
+///
+/// The function delivers the first derivative with respect to the volume, the
+/// second derivative with respect to the volume and the mixed derivative with
+/// respect to the temperature and the volume, all at a fixed temperature and
+/// fixed mole numbers, and needs no allocation.
+pub fn pair_correlation_v_derivatives(
+    moments: &PackingMoments,
+    diameters: &HsDiameters,
+    i: usize,
+    j: usize,
+) -> PairVolumeDerivatives {
+    let mu = diameters.reduced_diameter(i, j);
+    let kernel = boublik_pair_correlation(moments.zet[2], moments.zet[3], mu.value);
+    let zet_v = [moments.zet_v[2], moments.zet_v[3], 0.0];
+    let zet_vv = [moments.zet_vv[2], moments.zet_vv[3], 0.0];
+    let zet_tv = [moments.zet_tv[2], moments.zet_tv[3], 0.0];
+    let zet_t = [moments.zet_t[2], moments.zet_t[3], mu.d_t];
+
+    let d_t = dot(&kernel.dzeta, &zet_t);
+    let d_v = dot(&kernel.dzeta, &zet_v);
+    let d_vv = dot(&kernel.dzeta, &zet_vv) + double_sum(&kernel.d2zeta, &zet_v, &zet_v);
+    let d_tv = dot(&kernel.dzeta, &zet_tv) + double_sum(&kernel.d2zeta, &zet_t, &zet_v);
+
+    let g = kernel.value;
+    PairVolumeDerivatives {
+        value: g,
+        d_v,
+        d_vv,
+        d_tv,
+        log_value: g.ln(),
+        log_d_v: d_v / g,
+        log_d_vv: d_vv / g - d_v * d_v / (g * g),
+        log_d_tv: d_tv / g - d_t * d_v / (g * g),
+    }
+}
+
 /// The reduced Helmholtz energy of the hard-sphere mixture and its
 /// derivatives with respect to the temperature, the volume and the mole
 /// numbers.

@@ -1762,9 +1762,11 @@ subroutine query_pcsaft_state(temperature,volume,moles,values,numbers) &
   integer(c_int), intent(out) :: numbers
   ! Locals
   class(base_eos_param), pointer :: eos
-  real :: F, F_T, F_V
+  real :: F, F_T, F_V, F_TT, F_TV, F_VV
+  real :: F_VV_fd, F_TV_fd, F_V_plus, F_V_minus, F_T_plus, F_T_minus
   real, dimension(nc) :: F_n
   real, dimension(nc) :: n
+  real :: step_v, step_t
   integer :: i, position
   eos => get_active_eos()
   select type(p_eos => eos)
@@ -1772,7 +1774,19 @@ subroutine query_pcsaft_state(temperature,volume,moles,values,numbers) &
     do i = 1, nc
       n(i) = moles(i)
     end do
-    call F_PC_SAFT_TVn(p_eos,temperature,volume,n,F,F_T,F_V,F_n)
+    call F_PC_SAFT_TVn(p_eos,temperature,volume,n,F=F,F_T=F_T,F_V=F_V,F_n=F_n, &
+         F_TT=F_TT,F_TV=F_TV,F_VV=F_VV)
+    ! The finite differences of the volume derivatives of the original, to
+    ! tell a defect of the original apart from the difference of the native
+    ! model.
+    step_v = 1.0e-2*volume
+    step_t = 1.0e-4*temperature
+    call F_PC_SAFT_TVn(p_eos,temperature,volume+step_v,n,F_V=F_V_plus)
+    call F_PC_SAFT_TVn(p_eos,temperature,volume-step_v,n,F_V=F_V_minus)
+    F_VV_fd = (F_V_plus-2.0*F_V+F_V_minus)/(step_v*step_v)
+    call F_PC_SAFT_TVn(p_eos,temperature,volume+step_v,n,F_T=F_T_plus)
+    call F_PC_SAFT_TVn(p_eos,temperature,volume-step_v,n,F_T=F_T_minus)
+    F_TV_fd = (F_T_plus-F_T_minus)/(2.0*step_v)
   end select
   position = 1
   values(position) = F
@@ -1785,6 +1799,16 @@ subroutine query_pcsaft_state(temperature,volume,moles,values,numbers) &
     values(position) = F_n(i)
     position = position + 1
   end do
+  values(position) = F_TT
+  position = position + 1
+  values(position) = F_TV
+  position = position + 1
+  values(position) = F_VV
+  position = position + 1
+  values(position) = F_VV_fd
+  position = position + 1
+  values(position) = F_TV_fd
+  position = position + 1
   numbers = position - 1
 end subroutine query_pcsaft_state
 

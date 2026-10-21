@@ -226,9 +226,10 @@ for the active model of the PC-SAFT model.
 - 6 cases: the components, the temperature, the volume and the number of
   moles.
 - The compared quantities are the reduced residual Helmholtz energy of the
-  mixture, its density derivative and its temperature derivative.
+  mixture, its density derivative, its temperature derivative, its second
+  density derivative and its mixed density and temperature derivative.
 - All 6 cases match with a relative 1e-12, and the observed worst relative
-  difference is 7.2e-15.
+  difference is 3.5e-13.
 
 The committed fixture is tests/fixtures/pcsaft_state.csv; the test is
 tests/pcsaft_state.rs.
@@ -246,3 +247,15 @@ correlation function of every component with itself. The evaluation of the
 temperature derivatives is free of an allocation, through the functions
 bmcsl::packing_moments, bmcsl::hard_sphere_energy_t_derivatives and
 bmcsl::pair_correlation_t_derivatives of the native module.
+
+The pressure derivatives of the model are analytic. The density and the
+temperature derivatives of the hard-chain contribution follow the chain rule
+of the hard-sphere model of Boublik for a mixture, and the packing fraction
+of the simplified model otherwise. The mixed density and temperature
+derivative of the dispersion term follows the chain rule of the packing
+fraction and of the mean segment numbers, and needed a correction: the
+expression of the native model missed the term of the derivative of the
+coefficient of the dispersion term with respect to the packing fraction. The
+derivative of the pressure with respect to the density follows from the
+compressibility factor, and the derivative with respect to the volume from
+the derivative with respect to the density.

@@ -401,7 +401,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let state = prepared.state(rho)?;
             let alpha_t =
                 -state.u_residual / (thermopack_rs::pc_saft::RGAS * temperature * temperature);
-            println!("{:.17e},{:.17e},{:.17e}", alpha, alpha_rho, alpha_t);
+            let (alpha_rhorho, alpha_rhot) = prepared.residual_helmholtz_density_derivatives(rho);
+            println!(
+                "{:.17e},{:.17e},{:.17e},{:.17e},{:.17e}",
+                alpha, alpha_rho, alpha_t, alpha_rhorho, alpha_rhot
+            );
             continue;
         }
         if fields[0] == "CRITICAL" {

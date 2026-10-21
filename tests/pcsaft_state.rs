@@ -14,11 +14,14 @@ const RTOL: f64 = 1.0e-12;
 fn the_state_matches_the_source() {
     let mut rows = include_str!("fixtures/pcsaft_state.csv").lines();
     let header = rows.next().expect("the header of the fixture");
-    assert_eq!(header, "case;alpha;alpha_rho;alpha_t");
+    assert_eq!(
+        header,
+        "case;alpha;alpha_rho;alpha_t;alpha_rhorho;alpha_rhot"
+    );
     let mut compared = 0;
     for row in rows {
         let fields: Vec<&str> = row.split(';').collect();
-        assert_eq!(fields.len(), 4, "row {row}");
+        assert_eq!(fields.len(), 6, "row {row}");
         let case: Vec<&str> = fields[0].split('|').collect();
         assert_eq!(case.len(), 4, "case {row}");
         let components: Vec<&str> = case[0].split(',').collect();
@@ -41,8 +44,9 @@ fn the_state_matches_the_source() {
         let alpha_rho = (compressibility - 1.0) / rho;
         let state = prepared.state(rho).expect("the state of the case");
         let alpha_t = -state.u_residual / (RGAS * temperature * temperature);
+        let (alpha_rhorho, alpha_rhot) = prepared.residual_helmholtz_density_derivatives(rho);
 
-        let native = [alpha, alpha_rho, alpha_t];
+        let native = [alpha, alpha_rho, alpha_t, alpha_rhorho, alpha_rhot];
         for (position, (source, native)) in fields[1..].iter().zip(native.iter()).enumerate() {
             let source: f64 = source.parse().expect("the source value");
             assert!(

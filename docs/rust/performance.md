@@ -298,8 +298,8 @@ on the host of the tables above.
 |---|---:|
 | Pressure, pure fluid | 42 |
 | Pressure, mixture | 126 |
-| State, pure fluid | 4237 |
-| State, mixture | 10576 |
+| State, pure fluid | 2328 |
+| State, mixture | 8711 |
 | Chain term of the hard-sphere model, mixture | 3007 |
 
 The pressure of the model is the hot path of the flash, and it needs 42
@@ -320,3 +320,9 @@ functions `bmcsl::packing_moments`,
 11571 to 10576 nanoseconds per evaluation with the allocation-free path, and
 the pure fluid uses the packing fraction of the simplified model, which is
 exact for a pure fluid, and needs 4237 nanoseconds.
+
+The pressure derivatives of the model are analytic now, which drops the state
+of the pure fluid to 2328 nanoseconds per evaluation and the state of the
+mixture to 8711 nanoseconds. The remaining cost of the state is the finite
+difference of the second temperature derivative of the dispersion term, which
+prepares the model twice.

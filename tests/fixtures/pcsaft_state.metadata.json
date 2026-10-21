@@ -132,14 +132,16 @@
   "cases": 6,
   "attempted_cases": 6,
   "generator": "tools/rust_port/validate_pcsaft_state.py",
-  "fixture_sha256": "2a07a27542bd7a0b28b4ef0c422aecb3502551115feca9df06b402dc8170cb07",
+  "fixture_sha256": "e2e15e23a33cdeec9b30dc07a86ab503ba0bc08fdd83aaff8f2ae86ef3c0242f",
   "quantities": [
     "alpha",
     "alpha_rho",
-    "alpha_t"
+    "alpha_t",
+    "alpha_rhorho",
+    "alpha_rhot"
   ],
   "relative_tolerance": 1e-12,
   "absolute_tolerance": 1e-14,
-  "worst_relative_difference": 7.199945489000156e-15,
+  "worst_relative_difference": 3.4741150739269033e-13,
   "convention": "the original pc_saft_nonassoc::F_PC_SAFT_TVn, which evaluates the reduced residual Helmholtz energy of the PC-SAFT model with its temperature and volume derivatives"
 }

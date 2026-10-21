@@ -244,6 +244,17 @@ pub fn pcsaft_hs_energy(
     Ok(crate::bmcsl::hard_sphere_energy(&packing))
 }
 
+/// The derivatives of the hard-chain contribution of the PC-SAFT model in the
+/// volume representation of the original.
+#[derive(Debug, Clone, Copy)]
+struct HardChainDerivatives {
+    d_t: f64,
+    d_tt: f64,
+    d_v: f64,
+    d_vv: f64,
+    d_tv: f64,
+}
+
 /// The reduced Helmholtz energy of the chain term of the PC-SAFT model and
 /// its derivatives with respect to the temperature, the volume and the mole
 /// numbers.
@@ -576,6 +587,19 @@ impl<'a> PreparedPcSaft<'a> {
         1.0 + rho * (d_ahc + d_adisp)
     }
 
+    /// The second density derivative and the mixed density and temperature
+    /// derivative of the reduced residual Helmholtz energy.
+    ///
+    /// The derivatives are the ones of the original
+    /// `src/pc_saft_nonassoc.f90:F_PC_SAFT_TVn`, in the density
+    /// representation of the native model.
+    pub fn residual_helmholtz_density_derivatives(&self, rho: f64) -> (f64, f64) {
+        let eta = self.packing_fraction(rho);
+        let (ahc_rhorho, ahc_rhot) = self.hard_chain_second_derivatives(rho, eta);
+        let (_, _, adisp_rhorho, _, adisp_rhot) = self.dispersion_rho_t_derivatives(rho, eta);
+        (ahc_rhorho + adisp_rhorho, ahc_rhot + adisp_rhot)
+    }
+
     /// Absolute pressure P(rho, T, x) (Pa).
     pub fn pressure(&self, rho: f64) -> f64 {
         rho * RGAS * self.temperature * self.compressibility_factor(rho)
@@ -584,32 +608,24 @@ impl<'a> PreparedPcSaft<'a> {
     /// Pressure and its derivatives at density rho [mol/m^3].
     pub fn pressure_and_derivatives(&self, rho: f64) -> PcSaftPressureJet {
         let eta = self.packing_fraction(rho);
-        let (ahc, ahc_rho) = self.hard_chain_rho_derivatives(rho, eta);
+        let (ahc, ahc_rho) = self.hard_chain_energy(rho, eta);
         let (adisp, adisp_rho, adisp_rhorho, adisp_t, adisp_rhot) =
             self.dispersion_rho_t_derivatives(rho, eta);
 
         let a_res = ahc + adisp;
         let a_rho = ahc_rho + adisp_rho;
-        let _a_rhorho = adisp_rhorho;
-        let _a_t = adisp_t;
-        let _a_rhot = adisp_rhot;
+        let (ahc_rhorho, ahc_rhot) = self.hard_chain_second_derivatives(rho, eta);
+        let a_rhorho = ahc_rhorho + adisp_rhorho;
+        let a_rhot = ahc_rhot + adisp_rhot;
 
         let z = 1.0 + rho * a_rho;
         let p = rho * RGAS * self.temperature * z;
 
-        let v = 1.0 / rho;
-        let hv = 1e-5 * v;
-        let p_v_plus = self.pressure(1.0 / (v + hv));
-        let p_v_minus = self.pressure(1.0 / (v - hv));
-        let dp_dv = (p_v_plus - p_v_minus) / (2.0 * hv);
-        let dp_drho = -dp_dv / (rho * rho);
+        let dp_drho = RGAS * self.temperature * (1.0 + 2.0 * rho * a_rho + rho * rho * a_rhorho);
+        let dp_dv = -dp_drho * rho * rho;
+        let dp_dt = rho * RGAS * (z + self.temperature * rho * a_rhot);
 
-        let ht = 1e-5 * self.temperature;
-        let prep_tp = PreparedPcSaft::new(self.model, self.temperature + ht, &self.mole_fractions)
-            .expect("valid temperature step");
-        let prep_tm = PreparedPcSaft::new(self.model, self.temperature - ht, &self.mole_fractions)
-            .expect("valid temperature step");
-        let dp_dt = (prep_tp.pressure(rho) - prep_tm.pressure(rho)) / (2.0 * ht);
+        let _a_t = adisp_t;
 
         PcSaftPressureJet {
             pressure: p,
@@ -1074,7 +1090,7 @@ impl<'a> PreparedPcSaft<'a> {
 
     /// The reduced Helmholtz energy of the hard-chain contribution and its
     /// density derivative.
-    fn hard_chain_rho_derivatives(&self, rho: f64, eta: f64) -> (f64, f64) {
+    fn hard_chain_energy(&self, rho: f64, eta: f64) -> (f64, f64) {
         (
             self.alpha_hard_chain(rho, eta),
             self.d_alpha_hard_chain_drho(rho, eta),
@@ -1101,7 +1117,10 @@ impl<'a> PreparedPcSaft<'a> {
                     ahc_eta * eta_tt + ahc_etaeta * eta_t * eta_t,
                 )
             }
-            PcSaftKind::PcSaft => self.hard_chain_bmcsl_t_derivatives(rho),
+            PcSaftKind::PcSaft => {
+                let derivatives = self.hard_chain_bmcsl_derivatives(rho);
+                (derivatives.d_t, derivatives.d_tt)
+            }
             PcSaftKind::SPcSaft => {
                 let (ahc_eta, ahc_etaeta) = self.simplified_hard_chain_eta_derivatives(eta);
                 let eta_t = self.packing_fraction_t_derivative(rho);
@@ -1109,6 +1128,47 @@ impl<'a> PreparedPcSaft<'a> {
                 (
                     ahc_eta * eta_t,
                     ahc_eta * eta_tt + ahc_etaeta * eta_t * eta_t,
+                )
+            }
+        }
+    }
+
+    /// The second density derivative and the mixed density and temperature
+    /// derivative of the hard-chain contribution.
+    ///
+    /// The model of the PC-SAFT model uses the chain rule of the hard-sphere
+    /// model of Boublik for a mixture, and the packing fraction of the
+    /// simplified model otherwise.
+    fn hard_chain_second_derivatives(&self, rho: f64, eta: f64) -> (f64, f64) {
+        match self.model.kind {
+            // The hard-sphere model of Boublik collapses to the expression of
+            // the simplified model for a pure fluid, so the packing fraction
+            // of the pure fluid is exact and cheaper.
+            PcSaftKind::PcSaft if self.model.components.len() == 1 => {
+                let (ahc_eta, ahc_etaeta) = self.simplified_hard_chain_eta_derivatives(eta);
+                let eta_t = self.packing_fraction_t_derivative(rho);
+                (
+                    ahc_etaeta * self.eta_factor.powi(2),
+                    ahc_eta * (eta_t / rho) + ahc_etaeta * self.eta_factor * eta_t,
+                )
+            }
+            PcSaftKind::PcSaft => {
+                let derivatives = self.hard_chain_bmcsl_derivatives(rho);
+                // The change of variables from the volume representation of
+                // the original to the density representation of the native
+                // model, on the molar basis.
+                let rho2 = rho * rho;
+                (
+                    2.0 * derivatives.d_v / (rho2 * rho) + derivatives.d_vv / (rho2 * rho2),
+                    -derivatives.d_tv / rho2,
+                )
+            }
+            PcSaftKind::SPcSaft => {
+                let (ahc_eta, ahc_etaeta) = self.simplified_hard_chain_eta_derivatives(eta);
+                let eta_t = self.packing_fraction_t_derivative(rho);
+                (
+                    ahc_etaeta * self.eta_factor.powi(2),
+                    ahc_eta * (eta_t / rho) + ahc_etaeta * self.eta_factor * eta_t,
                 )
             }
         }
@@ -1161,14 +1221,14 @@ impl<'a> PreparedPcSaft<'a> {
         (ahc_eta, ahc_etaeta)
     }
 
-    /// The temperature derivatives of the hard-chain contribution of the
-    /// PC-SAFT model.
+    /// The derivatives of the hard-chain contribution of the PC-SAFT model in
+    /// the volume representation of the original.
     ///
-    /// The chain rule of the hard-sphere model of Boublik is applied in the
-    /// volume representation of the original, on the molar basis, where the
-    /// derivatives with respect to the temperature at a fixed volume and mole
-    /// numbers are the derivatives at a fixed density and composition.
-    fn hard_chain_bmcsl_t_derivatives(&self, rho: f64) -> (f64, f64) {
+    /// The chain rule of the hard-sphere model of Boublik is applied on the
+    /// molar basis, where the derivatives with respect to the temperature and
+    /// the volume at a fixed mole number are the derivatives at a fixed
+    /// density and composition.
+    fn hard_chain_bmcsl_derivatives(&self, rho: f64) -> HardChainDerivatives {
         let volume = 1.0 / rho;
         let moles = &self.mole_fractions;
         let diameters = crate::bmcsl::HsDiameters {
@@ -1185,24 +1245,36 @@ impl<'a> PreparedPcSaft<'a> {
         let moments = crate::bmcsl::packing_moments(volume, moles, &diameters, &segments);
         let (hard_sphere_t, hard_sphere_tt) =
             crate::bmcsl::hard_sphere_energy_t_derivatives(&moments);
+        let (hard_sphere_v, hard_sphere_vv, hard_sphere_tv) =
+            crate::bmcsl::hard_sphere_energy_v_derivatives(&moments);
 
-        let mut ahc_t = self.m_bar * hard_sphere_t;
-        let mut ahc_tt = self.m_bar * hard_sphere_tt;
+        let mut derivatives = HardChainDerivatives {
+            d_t: self.m_bar * hard_sphere_t,
+            d_tt: self.m_bar * hard_sphere_tt,
+            d_v: self.m_bar * hard_sphere_v,
+            d_vv: self.m_bar * hard_sphere_vv,
+            d_tv: self.m_bar * hard_sphere_tv,
+        };
         for component in 0..self.model.components.len() {
             let segments = self.model.components[component].m;
             if segments <= 1.0 {
                 continue;
             }
-            let pair = crate::bmcsl::pair_correlation_t_derivatives(
+            let temperature = crate::bmcsl::pair_correlation_t_derivatives(
+                &moments, &diameters, component, component,
+            );
+            let volume = crate::bmcsl::pair_correlation_v_derivatives(
                 &moments, &diameters, component, component,
             );
             let weight = self.mole_fractions[component] * (segments - 1.0);
-            ahc_t -= weight * pair.log_d_t;
-            ahc_tt -= weight * pair.log_d_tt;
+            derivatives.d_t -= weight * temperature.log_d_t;
+            derivatives.d_tt -= weight * temperature.log_d_tt;
+            derivatives.d_v -= weight * volume.log_d_v;
+            derivatives.d_vv -= weight * volume.log_d_vv;
+            derivatives.d_tv -= weight * volume.log_d_tv;
         }
-        (ahc_t, ahc_tt)
+        derivatives
     }
-
     fn dispersion_rho_t_derivatives(&self, rho: f64, eta: f64) -> (f64, f64, f64, f64, f64) {
         let (i1, i2) = self.dispersion_i1_i2(eta);
         let mut i1_eta = 0.0;
@@ -1281,21 +1353,25 @@ impl<'a> PreparedPcSaft<'a> {
                         + eta * (c1_etaeta * i2 + 2.0 * c1_eta * i2_eta + c1 * i2_etaeta))
                     * self.m2e2s3_val);
 
+        // The mixed derivative of the density and the temperature of the
+        // dispersion term. The term is a function of the packing fraction and
+        // of the mean segment numbers, so the chain rule of the packing
+        // fraction and of the mean segment numbers applies.
+        let f_eta = 2.0 * i1_eta * self.m2e1s3_val
+            + self.m_bar * (c1_eta * i2 + c1 * i2_eta) * self.m2e2s3_val;
+        let f_t = 2.0 * i1 * self.m2e1s3_t + self.m_bar * c1 * i2 * self.m2e2s3_t;
+        let f_etaeta = 2.0 * i1_etaeta * self.m2e1s3_val
+            + self.m_bar
+                * (c1_etaeta * i2 + 2.0 * c1_eta * i2_eta + c1 * i2_etaeta)
+                * self.m2e2s3_val;
+        let f_eta_t =
+            2.0 * i1_eta * self.m2e1s3_t + self.m_bar * (c1_eta * i2 + c1 * i2_eta) * self.m2e2s3_t;
+
         let adisp_rhot = -(std::f64::consts::PI * N_AVOGADRO)
-            * (2.0
-                * (i1_t + eta * (i1_etaeta * eta_t) + i1_eta * (eta_t / rho) * rho)
-                * self.m2e1s3_val
-                + 2.0 * (i1 + eta * i1_eta) * self.m2e1s3_t
-                + self.m_bar
-                    * (c1_t * i2
-                        + c1 * i2_t
-                        + eta
-                            * (c1_etaeta * eta_t * i2
-                                + c1_eta * i2_t
-                                + c1_t * i2_eta
-                                + c1 * i2_etaeta * eta_t))
-                    * self.m2e2s3_val
-                + self.m_bar * (c1 * i2 + eta * (c1_eta * i2 + c1 * i2_eta)) * self.m2e2s3_t);
+            * (f_eta * eta_t
+                + f_t
+                + rho * self.eta_factor * (f_etaeta * eta_t + f_eta_t)
+                + f_eta * eta_t);
 
         (adisp, adisp_rho, adisp_rhorho, adisp_t, adisp_rhot)
     }

@@ -147,6 +147,6 @@
   ],
   "relative_tolerance": 1e-12,
   "absolute_tolerance": 1e-14,
-  "worst_relative_difference": 7.70382653017657e-15,
+  "worst_relative_difference": 2.4411533577574747e-14,
   "convention": "the original hardsphere_bmcsl::calc_bmcsl_helmholtzenergy, which evaluates the reduced Helmholtz energy of the additive hard-sphere model of Boublik with its temperature, volume and mole number derivatives"
 }

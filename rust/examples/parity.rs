@@ -104,6 +104,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             && fields[0] != "LJSCALORIC"
             && fields[0] != "LJSVOLUME"
             && fields[0] != "LJSPOT"
+            && fields[0] != "LJSWCATERM"
             && fields[0] != "QUAD"
             && fields[0] != "CRITICAL"
             && fields.len() != 6
@@ -203,6 +204,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             text.push(format!("{integral:.17e}"));
             text.push(format!("{differential:.17e}"));
             println!("{}", text.join(","));
+            continue;
+        }
+        if fields[0] == "LJSWCATERM" {
+            let index: usize = fields[1].parse().unwrap();
+            let reduced_temperature: f64 = fields[2].parse().unwrap();
+            let reduced_density: f64 = fields[3].parse().unwrap();
+            let (value, _, _, _, _, _) = thermopack_rs::ljs_wca::perturbation_term(
+                index,
+                reduced_temperature,
+                reduced_density,
+            )?;
+            println!("{value:.17e}");
             continue;
         }
         if fields[0] == "LJSFUGACITY" {

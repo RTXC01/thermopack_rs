@@ -17,6 +17,7 @@ second order term.
 | `src/lj_splined.f90:init_LJs_bh` | `ljs::LjsBh::new`, `ljs::LjsBh::with_parameters` |
 | `src/lj_splined.f90:ljs_bh_model_control` | `ljs::LjsBh::set_control`, `ljs::LjsControl` |
 | `src/lj_splined.f90:calcFresLJs_bh` | `ljs::LjsBh::residual_helmholtz_energy` |
+| `src/lj_splined.f90:calc_LJs_WCA_ai_tr` | `ljs_wca::perturbation_term` |
 | `src/lj_splined.f90:calcFresLJs_bh` (volume derivative) | `ljs::LjsBh::pressure` |
 | `src/lj_splined.f90:calcFresLJs_bh` (temperature derivative) | `ljs::LjsBh::residual_helmholtz_energy_derivative` |
 | `src/lj_splined.f90:calcFresLJs_bh` (mole number derivative) | `ljs::LjsBh::fugacity_coefficient` |
@@ -176,7 +177,31 @@ original `ljs_potential_reduced`.
 The committed fixture is `tests/fixtures/ljs_potential.csv`; the test is
 `tests/ljs.rs`.
 
+## The perturbation terms of the White Bear family
+
+The White Bear family replaces the perturbation terms of the
+Barker-Henderson theory with the soft repulsion of the White Bear model. The
+source evaluates the four terms with polynomials in the reduced distance of the
+hard-sphere centres and the reduced density, and the native module
+`ljs_wca` evaluates the same terms with their first and second derivatives.
+
+`tools/rust_port/validate_ljs_wca_term.py` compares the native terms against
+the exact-source library. The reference probe calls the original
+`calc_LJs_WCA_ai_tr`.
+
+* 8 cases: the four terms over the reduced temperature and the reduced
+  density.
+* The compared quantity is the term. All 8 cases match with a relative 1e-12,
+  and the observed worst relative difference is zero.
+
+The committed fixture is `tests/fixtures/ljs_wca_term.csv`; the test is
+`tests/ljs_wca.rs`.
+
 ## Remaining scope
+
+* The White Bear model of the source, with its hard-sphere reference, its
+  cavity term and its soft repulsion, is not yet ported, and the native model
+  provides the perturbation terms only.
 
 * The volume solve of the model is native. The pressure of the model falls
   with the molar volume over parts of the range, because the source scales the

@@ -36,6 +36,7 @@ pub mod isolines;
 pub mod joule_thompson;
 pub mod lee_kesler;
 pub mod ljs;
+pub mod ljs_wca;
 pub mod mbwr;
 pub mod multiparameter;
 pub mod multiparameter_data;

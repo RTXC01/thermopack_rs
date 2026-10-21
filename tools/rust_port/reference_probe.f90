@@ -1185,6 +1185,24 @@ subroutine query_ljs_potential(count,radii,values,numbers) &
   end do
 end subroutine query_ljs_potential
 
+! Evaluate one perturbation term of the White Bear family of the original.
+subroutine query_ljs_wca_term(index,t_star,rho_star,values,count) &
+     bind(C,name='query_ljs_wca_term')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use lj_splined, only: calc_LJs_WCA_ai_tr
+  implicit none
+  integer(c_int), value :: index
+  real(c_double), value :: t_star, rho_star
+  real(c_double), intent(out) :: values(1)
+  integer(c_int), intent(out) :: count
+  ! Locals
+  real :: ai
+  ai = 0.0
+  call calc_LJs_WCA_ai_tr(index,t_star,rho_star,ai)
+  values(1) = ai
+  count = 1
+end subroutine query_ljs_wca_term
+
 ! Evaluate the nodes and the weights of a quadrature of the original.
 subroutine query_quadrature(quad,values,count) bind(C,name='query_quadrature')
   use, intrinsic :: iso_c_binding, only: c_int,c_double

@@ -91,6 +91,7 @@ jobs:
       - run: python tools/rust_port/validate_ljs_fugacity.py
       - run: python tools/rust_port/validate_ljs_caloric.py
       - run: python tools/rust_port/validate_ljs_potential.py
+      - run: python tools/rust_port/validate_ljs_wca_term.py
       - run: python tools/rust_port/validate_quadrature.py
       - run: python tools/rust_port/validate_critical.py
       - run: python tools/rust_port/validate_mut_solve.py

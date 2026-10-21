@@ -13,6 +13,8 @@ second order term.
 | --- | --- |
 | `src/lj_splined.f90:calc_ai_reduced_LJs_ex` | `ljs::LjsBh::reduced_perturbation_terms` |
 | `src/lj_splined.f90:calc_ai_LJs_ex` | `ljs::LjsBh::spline_polynomial` |
+| `src/lj_splined.f90:calc_ais_LJs_ex` | `ljs::ais_ljs_ex` |
+| `src/lj_splined.f90:calc_chi_LJs_ex` | `ljs::chi_ljs_ex` |
 | `src/lj_splined.f90:ljs_bh_get_bh_diameter_div_sigma` | `ljs::LjsBh::diameter_div_sigma` |
 | `src/lj_splined.f90:init_LJs_bh` | `ljs::LjsBh::new`, `ljs::LjsBh::with_parameters` |
 | `src/lj_splined.f90:ljs_bh_model_control` | `ljs::LjsBh::set_control`, `ljs::LjsControl` |
@@ -241,6 +243,29 @@ against the exact-source library. The reference probe calls the original
 
 The committed fixture is `tests/fixtures/chain_rule.csv`; the test is
 `tests/chain_rule.rs`.
+
+## The perturbation terms of the Barker-Henderson theory
+
+The source exposes the terms of the spline of the excess energy through two
+public routines. `calc_ais_LJs_ex` returns one of the four terms with the
+prefactor of the source, and `calc_chi_LJs_ex` returns the correction of the
+second order term. The first and the second term carry the factor of the
+inverse reduced density, the third term and the correction do not. The native
+module `ljs` provides both routines as `ljs::ais_ljs_ex` and
+`ljs::chi_ljs_ex`.
+
+`tools/rust_port/validate_ais_ljs.py` compares the native terms against the
+exact-source library. The reference probe calls the original `calc_ais_LJs_ex`
+and `calc_chi_LJs_ex` for the same reduced distance and reduced density.
+
+* 5 cases: the index of the term, the reduced distance of the hard-sphere
+  centres and the reduced density.
+* The compared quantities are the term and the correction of the second order
+  term. All 5 cases match with a relative 1e-13, and the observed worst relative
+  difference is zero.
+
+The committed fixture is `tests/fixtures/ais_ljs.csv`; the test is
+`tests/ais_ljs.rs`.
 
 ## The u-fraction of the UV theory
 

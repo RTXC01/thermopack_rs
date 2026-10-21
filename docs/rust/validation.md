@@ -68,6 +68,7 @@ python tools/rust_port/validate_virial.py
 python tools/rust_port/validate_virial_matrix.py
 python tools/rust_port/validate_ljs.py
 python tools/rust_port/validate_ljs_spline.py
+python tools/rust_port/validate_ais_ljs.py
 python tools/rust_port/validate_ljs_helmholtz.py
 python tools/rust_port/validate_ljs_state.py
 python tools/rust_port/validate_ljs_fugacity.py

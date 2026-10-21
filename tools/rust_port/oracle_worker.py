@@ -221,6 +221,15 @@ def main(compiler_directory):
             print('THERMOPACK_RESULT='+json.dumps(dict(values=rule,integral=float(integrals[0]),
                   differential=float(integrals[1]))),flush=True)
             continue
+        if request['mode']=='AIS_LJS':
+            if probe is None:probe=load_probe()
+            probe.query_ais_ljs.argtypes=[c_int,c_double,c_double,POINTER(c_double),POINTER(c_int)]
+            probe.query_ais_ljs.restype=None
+            values=(c_double*2)();number=c_int()
+            probe.query_ais_ljs(request['index'],request['reduced_distance'],
+                               request['reduced_density'],values,byref(number))
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=list(map(float,values))[:number.value])),flush=True)
+            continue
         if request['mode']=='CHAIN_RULE':
             if probe is None:probe=load_probe()
             probe.query_chain_rule.argtypes=[POINTER(c_double),POINTER(c_int)]

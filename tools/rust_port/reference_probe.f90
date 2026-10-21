@@ -1449,6 +1449,25 @@ subroutine query_chain_rule(values,count) bind(C,name='query_chain_rule')
   count = 15
 end subroutine query_chain_rule
 
+! Evaluate the perturbation terms of the Barker-Henderson theory of the
+! original.
+subroutine query_ais_ljs(index,x0,rho,values,count) bind(C,name='query_ais_ljs')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use lj_splined, only: calc_ais_LJs_ex, calc_chi_LJs_ex
+  implicit none
+  integer(c_int), value :: index
+  real(c_double), value :: x0, rho
+  real(c_double), intent(out) :: values(2)
+  integer(c_int), intent(out) :: count
+  ! Locals
+  real :: ai, chi
+  call calc_ais_LJs_ex(index,x0,rho,ai)
+  call calc_chi_LJs_ex(x0,rho,0.0d0,chi)
+  values(1) = ai
+  values(2) = chi
+  count = 2
+end subroutine query_ais_ljs
+
 ! Evaluate the nodes and the weights of a quadrature of the original.
 subroutine query_quadrature(quad,values,count) bind(C,name='query_quadrature')
   use, intrinsic :: iso_c_binding, only: c_int,c_double

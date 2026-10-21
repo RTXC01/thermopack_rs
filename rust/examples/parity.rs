@@ -112,6 +112,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             && fields[0] != "WCATERM"
             && fields[0] != "UVVIRIALDIFF"
             && fields[0] != "CHAINRULE"
+            && fields[0] != "AISLJS"
             && fields[0] != "QUAD"
             && fields[0] != "CRITICAL"
             && fields.len() != 6
@@ -211,6 +212,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             text.push(format!("{integral:.17e}"));
             text.push(format!("{differential:.17e}"));
             println!("{}", text.join(","));
+            continue;
+        }
+        if fields[0] == "AISLJS" {
+            let index: usize = fields[1].parse().unwrap();
+            let reduced_distance: f64 = fields[2].parse().unwrap();
+            let reduced_density: f64 = fields[3].parse().unwrap();
+            let value = thermopack_rs::ljs::ais_ljs_ex(index, reduced_distance, reduced_density)?;
+            let correction = thermopack_rs::ljs::chi_ljs_ex(reduced_distance, reduced_density)?;
+            println!("{value:.17e},{correction:.17e}");
             continue;
         }
         if fields[0] == "CHAINRULE" {

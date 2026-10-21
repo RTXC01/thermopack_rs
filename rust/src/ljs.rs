@@ -1115,3 +1115,37 @@ pub fn calc_uv_wca(
     let value_rt = a1_rt + (1.0 - u) * b2_rt - u_rt * b2 - u_t * b2_r - u_r * b2_t;
     (value, value_r, value_t, value_rr, value_tt, value_rt)
 }
+
+/// One of the perturbation terms of the Barker-Henderson theory.
+///
+/// The index selects the term, the first order term is one and the correction
+/// of the second order term is four. The reduced distance and the reduced
+/// density are dimensionless.
+pub fn ais_ljs_ex(
+    index: usize,
+    reduced_distance: f64,
+    reduced_density: f64,
+) -> crate::error::Result<f64> {
+    crate::error::positive(reduced_distance, "the reduced distance")?;
+    crate::error::positive(reduced_density, "the reduced density")?;
+    let prefactor = if index <= 2 {
+        1.0 / reduced_density
+    } else {
+        1.0
+    };
+    let tau = 1.0 - 1.0 / reduced_distance;
+    let (value, _, _, _, _, _) =
+        polynomial_with_derivatives(index - 1, tau, reduced_density, prefactor);
+    Ok(value)
+}
+
+/// The correction polynomial of the second order term.
+///
+/// The reduced distance and the reduced density are dimensionless.
+pub fn chi_ljs_ex(reduced_distance: f64, reduced_density: f64) -> crate::error::Result<f64> {
+    crate::error::positive(reduced_distance, "the reduced distance")?;
+    crate::error::positive(reduced_density, "the reduced density")?;
+    let tau = 1.0 - 1.0 / reduced_distance;
+    let (value, _, _, _, _, _) = polynomial_with_derivatives(3, tau, reduced_density, 1.0);
+    Ok(value)
+}

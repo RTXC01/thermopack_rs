@@ -249,6 +249,23 @@ def main(compiler_directory):
             probe.query_cpa_rdf(request['temperature'],request['volume'],amounts,values,byref(number))
             print('THERMOPACK_RESULT='+json.dumps(dict(values=list(map(float,values))[:number.value])),flush=True)
             continue
+        if request['mode']=='PCSAFT_RDF':
+            if probe is None:probe=load_probe()
+            key=('PCSAFT_RDF',request['components'])
+            if previous!=key:
+                from thermopack.pcsaft import pcsaft
+                model=pcsaft(request['components']);previous=key
+            model.activate()
+            probe.query_pcsaft_rdf.argtypes=[c_double,c_double,POINTER(c_double),c_int,c_int,
+                                             POINTER(c_double),POINTER(c_int)]
+            probe.query_pcsaft_rdf.restype=None
+            count=len(request['moles'])
+            amounts=(c_double*16)(*request['moles'],*([0.0]*(16-count)))
+            values=(c_double*256)();number=c_int()
+            probe.query_pcsaft_rdf(request['temperature'],request['volume'],amounts,
+                                   request['first'],request['second'],values,byref(number))
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=list(map(float,values))[:number.value])),flush=True)
+            continue
         if request['mode']=='WONGSANDLER':
             if probe is None:probe=load_probe()
             key=('WONGSANDLER',request['components'],request.get('eos','PR'))

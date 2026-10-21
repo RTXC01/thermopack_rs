@@ -3,10 +3,13 @@
 //! The original `src/saft_rdf.f90` routes a request for the radial
 //! distribution function of a pair of components to the model of the active
 //! thermodynamic model. The native module provides the branch of the cubic
-//! association model, which needs no temperature dependence.
+//! association model, which needs no temperature dependence, and the branch of
+//! the PC-SAFT model, which follows the hard-sphere model of Boublik.
 
 use crate::Result;
+use crate::bmcsl::{self, HsDiameters};
 use crate::cpa::{Cpa, PreparedCpa};
+use crate::pc_saft::{PcSaft, PreparedPcSaft};
 
 /// The radial distribution function and its derivatives.
 ///
@@ -52,7 +55,7 @@ pub fn cpa_rdf(
 ) -> Result<RdfDerivatives> {
     crate::error::positive(temperature, "the temperature")?;
     crate::error::positive(volume, "the volume")?;
-    let count = model.components.len();
+    let count = model.num_components();
     if moles.len() != count {
         return Err(crate::Error::InvalidInput(
             "the number of moles must match the components of the model",
@@ -110,6 +113,76 @@ pub fn cpa_rdf(
             .push(g_eta_second * eta_volume * eta_moles[i] + g_eta * eta_volume_moles[i]);
         for j in 0..count {
             derivatives.moles_second[i * count + j] = g_eta_second * eta_moles[i] * eta_moles[j];
+        }
+    }
+    Ok(derivatives)
+}
+
+/// The hard-sphere contact radial distribution function of the PC-SAFT model.
+///
+/// The volume is in cubic metre and the number of moles is the amount of each
+/// component. The function reproduces the original `g_pc_saft_TVn`, which
+/// applies the chain rule of the hard-sphere model of Boublik to the packing
+/// fractions of the mixture.
+pub fn pcsaft_rdf(
+    model: &PcSaft,
+    temperature: f64,
+    volume: f64,
+    moles: &[f64],
+    first: usize,
+    second: usize,
+) -> Result<RdfDerivatives> {
+    crate::error::positive(temperature, "the temperature")?;
+    crate::error::positive(volume, "the volume")?;
+    let count = model.num_components();
+    if moles.len() != count {
+        return Err(crate::Error::InvalidInput(
+            "the number of moles must match the components of the model",
+        ));
+    }
+    if first >= count || second >= count {
+        return Err(crate::Error::InvalidInput(
+            "the components of the pair must match the components of the model",
+        ));
+    }
+    let total: f64 = moles.iter().sum();
+    if !total.is_finite() || total <= 0.0 {
+        return Err(crate::Error::InvalidInput(
+            "the number of moles must be strictly positive",
+        ));
+    }
+    let composition: Vec<f64> = moles.iter().map(|amount| amount / total).collect();
+    let prepared = PreparedPcSaft::new(model, temperature, &composition)?;
+    let diameters = HsDiameters {
+        d: prepared.d.clone(),
+        d_t: prepared.d_t.clone(),
+        d_tt: prepared.d_tt.clone(),
+    };
+    let segments: Vec<f64> = model
+        .components()
+        .iter()
+        .map(|component| component.m)
+        .collect();
+    let packing = bmcsl::packing_fractions(volume, moles, &diameters, &segments);
+    let correlation = bmcsl::pair_correlation(&packing, &diameters, first, second);
+
+    let mut derivatives = RdfDerivatives {
+        g: correlation.value,
+        temperature: correlation.d_t,
+        volume: correlation.d_v,
+        moles: correlation.d_n.clone(),
+        temperature_second: correlation.d_tt,
+        temperature_volume: correlation.d_tv,
+        temperature_moles: correlation.d_tn.clone(),
+        volume_second: correlation.d_vv,
+        volume_moles: correlation.d_vn.clone(),
+        moles_second: Vec::with_capacity(count * count),
+    };
+    for component in 0..count {
+        for other in 0..count {
+            derivatives
+                .moles_second
+                .push(correlation.d_nn[component][other]);
         }
     }
     Ok(derivatives)

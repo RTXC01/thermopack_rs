@@ -72,7 +72,7 @@ Extracted from `src/pc_saft_datadb.f90` via `tools/rust_port/generate_pcsaft_dat
 - `volume(P, phase)`: single-phase bounded $(1-\zeta)$ Newton solver from `pc_saft_nonassoc_volume_solver`, guaranteed to converge within physical limits $[10^{-10}, 0.75]$.
 - `saturation_pressure(T)`: pure fluid vapor-liquid coexistence saturation pressure with Clapeyron initialization and damped Newton root finding.
 
-## The radial distribution function is pending
+## The radial distribution function
 
 The original evaluates the radial distribution function of the PC-SAFT model
 in src/pc_saft_nonassoc.f90:g_pc_saft_TVn, which calls the pair correlation
@@ -91,9 +91,8 @@ that module:
   calc_bmcsl_dgij_dzeta, with the chain rule of the original to the
   temperature, the volume and the mole numbers.
 
-The native model evaluates the properties of the PC-SAFT model in the density
-representation, so the port of the pair correlation function follows the
-density representation of the native model rather than the volume
+All three pieces are ported, in the module rust/src/bmcsl.rs, and the native
+function rdf::pcsaft_rdf reproduces the original g_pc_saft_TVn in the volume
 representation of the original.
 
 The module of the original publishes the pair correlation function
@@ -101,11 +100,22 @@ calc_bmcsl_gij and the packing fractions
 calc_bmcsl_zeta_and_derivatives, but keeps the reduced pair Helmholtz
 energy calc_bmcsl_dgij_dzeta and its derivatives with respect to the
 packing fractions private. The reference probe therefore calls the published
-pair correlation function of the original, and the qualification compares the
-pair and its temperature, volume and mole number derivatives.
-The pair correlation function and its derivatives are compared against the reference probe
-tools/rust_port/reference_probe.f90, as the branch of the cubic association
-model is qualified in tools/rust_port/validate_cpa_rdf.py.
+routines of the original, and the qualification compares the pair and its
+temperature, volume and mole number derivatives.
+
+The qualification is tools/rust_port/validate_pcsaft_rdf.py. The reference
+probe tools/rust_port/reference_probe.f90 calls calc_dhs,
+calc_bmcsl_zeta_and_derivatives and calc_bmcsl_gij of the original for the
+active model of the PC-SAFT model.
+
+- 6 cases: the components, the temperature, the volume, the number of moles
+  and the components of the pair.
+- The compared quantities are the function and its nine derivatives.
+- All 6 cases match with a relative 1e-12, and the observed worst relative
+  difference is 4.1e-16.
+
+The committed fixture is tests/fixtures/pcsaft_rdf.csv; the test is
+tests/pcsaft_rdf.rs.
 
 ## The pair correlation function of the hard-sphere model
 
@@ -117,10 +127,9 @@ src/hardsphere_bmcsl.f90:calc_bmcsl_dgij_dzeta.
 
 The derivatives of the kernel are verified against a central difference of the
 expression, because the original keeps the routine private and delivers the
-pair and its temperature, volume and mole number derivatives only. The
-qualification against the exact source library belongs to the chain rule from
-the packing fractions to the temperature, the volume and the mole numbers,
-which is the next part of the port.
+pair and its temperature, volume and mole number derivatives only. The chain
+rule of the original is verified against the exact-source library, as
+described above.
 
 The module holds the chain rule as well. The function
 bmcsl::packing_fractions evaluates the moments zeta_0 to zeta_3 of the number

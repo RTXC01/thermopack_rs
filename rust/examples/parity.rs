@@ -114,6 +114,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             && fields[0] != "CHAINRULE"
             && fields[0] != "AISLJS"
             && fields[0] != "CPARDF"
+            && fields[0] != "PCSAFTRDF"
             && fields[0] != "WSMIX"
             && fields[0] != "WSSTATE"
             && fields[0] != "QUAD"
@@ -247,6 +248,42 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .collect();
             let model = thermopack_rs::Cpa::new(&[component])?;
             let rdf = thermopack_rs::rdf::cpa_rdf(&model, temperature, volume, &moles)?;
+            let mut text = vec![
+                format!("{:.17e}", rdf.g),
+                format!("{:.17e}", rdf.temperature),
+                format!("{:.17e}", rdf.volume),
+            ];
+            for value in &rdf.moles {
+                text.push(format!("{value:.17e}"));
+            }
+            text.push(format!("{:.17e}", rdf.temperature_second));
+            text.push(format!("{:.17e}", rdf.temperature_volume));
+            for value in &rdf.temperature_moles {
+                text.push(format!("{value:.17e}"));
+            }
+            text.push(format!("{:.17e}", rdf.volume_second));
+            for value in &rdf.volume_moles {
+                text.push(format!("{value:.17e}"));
+            }
+            for value in &rdf.moles_second {
+                text.push(format!("{value:.17e}"));
+            }
+            println!("{}", text.join(","));
+            continue;
+        }
+        if fields[0] == "PCSAFTRDF" {
+            let components: Vec<&str> = fields[1].split(',').collect();
+            let temperature: f64 = fields[2].parse().unwrap();
+            let volume: f64 = fields[3].parse().unwrap();
+            let moles: Vec<f64> = fields[4]
+                .split(',')
+                .map(|value| value.parse().unwrap())
+                .collect();
+            let first: usize = fields[5].parse().unwrap();
+            let second: usize = fields[6].parse().unwrap();
+            let model = thermopack_rs::PcSaft::new(&components)?;
+            let rdf =
+                thermopack_rs::rdf::pcsaft_rdf(&model, temperature, volume, &moles, first, second)?;
             let mut text = vec![
                 format!("{:.17e}", rdf.g),
                 format!("{:.17e}", rdf.temperature),

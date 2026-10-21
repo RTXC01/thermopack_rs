@@ -1269,6 +1269,41 @@ subroutine query_uv_phi(eps_divk,temperature,rho,values,count) &
   count = 6
 end subroutine query_uv_phi
 
+! Evaluate the first and the second order terms of the UV theory of the
+! original.
+subroutine query_uv_terms(sigma,eps_divk,temperature,rho,values,count) &
+     bind(C,name='query_uv_terms')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use lj_splined, only: uv_a1_u, uv_a1_b2
+  use hardsphere_wca, only: calc_dhs_WCA
+  use saftvrmie_containers, only: saftvrmie_dhs, allocate_saftvrmie_dhs, &
+       cleanup_saftvrmie_dhs
+  implicit none
+  real(c_double), value :: sigma, eps_divk, temperature, rho
+  real(c_double), intent(out) :: values(9)
+  integer(c_int), intent(out) :: count
+  ! Locals
+  type(saftvrmie_dhs) :: dhs
+  real :: a1, a1_r, a1_T, a1_rr, a1_TT, a1_rT
+  real :: b2, b2_T, b2_TT
+  call allocate_saftvrmie_dhs(1,dhs)
+  call calc_dhs_WCA(1,sigma,eps_divk,temperature,dhs)
+  call uv_a1_u(sigma,eps_divk,temperature,dhs,rho, &
+       a1,a1_r,a1_T,a1_rr,a1_TT,a1_rT)
+  call uv_a1_b2(dhs,sigma,eps_divk,temperature,b2,b2_T,b2_TT)
+  call cleanup_saftvrmie_dhs(dhs)
+  values(1) = a1
+  values(2) = a1_r
+  values(3) = a1_T
+  values(4) = a1_rr
+  values(5) = a1_TT
+  values(6) = a1_rT
+  values(7) = b2
+  values(8) = b2_T
+  values(9) = b2_TT
+  count = 9
+end subroutine query_uv_terms
+
 ! Evaluate the nodes and the weights of a quadrature of the original.
 subroutine query_quadrature(quad,values,count) bind(C,name='query_quadrature')
   use, intrinsic :: iso_c_binding, only: c_int,c_double

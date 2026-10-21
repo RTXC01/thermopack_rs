@@ -221,6 +221,15 @@ def main(compiler_directory):
             print('THERMOPACK_RESULT='+json.dumps(dict(values=rule,integral=float(integrals[0]),
                   differential=float(integrals[1]))),flush=True)
             continue
+        if request['mode']=='UV_TERMS':
+            if probe is None:probe=load_probe()
+            probe.query_uv_terms.argtypes=[c_double,c_double,c_double,c_double,POINTER(c_double),POINTER(c_int)]
+            probe.query_uv_terms.restype=None
+            values=(c_double*9)();number=c_int()
+            probe.query_uv_terms(request['sigma'],request['eps_divk'],request['temperature'],
+                                request['rho'],values,byref(number))
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=list(map(float,values))[:number.value])),flush=True)
+            continue
         if request['mode']=='UV_PHI':
             if probe is None:probe=load_probe()
             probe.query_uv_phi.argtypes=[c_double,c_double,c_double,POINTER(c_double),POINTER(c_int)]

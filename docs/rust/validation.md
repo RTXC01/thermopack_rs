@@ -76,6 +76,7 @@ python tools/rust_port/validate_ljs_potential.py
 python tools/rust_port/validate_ljs_wca_term.py
 python tools/rust_port/validate_white_bear.py
 python tools/rust_port/validate_uv_phi.py
+python tools/rust_port/validate_uv_terms.py
 python tools/rust_port/validate_quadrature.py
 python tools/rust_port/validate_critical.py
 python tools/rust_port/validate_mut_solve.py
@@ -372,6 +373,10 @@ The [UV theory fraction qualification](ljs.md) adds 5 cases of the original
 `uv_phi`: the u-fraction of the UV theory and its five partial derivatives.
 The quantities match with a relative 1e-12, and the observed worst relative
 difference is 4.1e-15.
+The [UV theory term qualification](ljs.md) adds 5 cases of the original
+`uv_a1_u` and `uv_a1_b2`: the first and the second order terms of the UV
+theory and their partial derivatives. The nine quantities match with a relative
+1e-11, and the observed worst relative difference is 2.5e-16.
 The [quadrature qualification](quadrature.md) adds 14 cases of the original
 `get_quadrature_positions`, `get_quadrature_weights` and
 `integrate_with_differential`: the seven Gauss rules and the seven Gauss-Kronrod

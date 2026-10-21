@@ -216,6 +216,20 @@ The committed fixture is `tests/fixtures/uv_phi.csv`; the test is
 `tests/uv_phi.rs`. The temperature dependent form of the source is a private
 routine, so the native model provides it without a qualification of its own.
 
+`tools/rust_port/validate_uv_terms.py` compares the first and the second order
+terms of the UV theory against the exact-source library. The reference probe
+calls the original `uv_a1_u` and `uv_a1_b2` with the hard-sphere diameter of
+the Barker-Henderson reference.
+
+* 5 cases: the segment diameter, the well depth, the temperature and the
+  reduced density.
+* The compared quantities are the nine values of the two routines. All 5 cases
+  match with a relative 1e-11, and the observed worst relative difference is
+  2.5e-16.
+
+The committed fixture is `tests/fixtures/uv_terms.csv`; the test is
+`tests/uv_phi.rs`.
+
 ## The cavity terms of the White Bear reference
 
 The White Bear family adds the cavity of the hard-sphere reference and the soft

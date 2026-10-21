@@ -94,6 +94,7 @@ jobs:
       - run: python tools/rust_port/validate_ljs_wca_term.py
       - run: python tools/rust_port/validate_white_bear.py
       - run: python tools/rust_port/validate_uv_phi.py
+      - run: python tools/rust_port/validate_uv_terms.py
       - run: python tools/rust_port/validate_quadrature.py
       - run: python tools/rust_port/validate_critical.py
       - run: python tools/rust_port/validate_mut_solve.py

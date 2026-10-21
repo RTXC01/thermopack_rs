@@ -807,3 +807,120 @@ pub fn uv_phi_temp(eps_divk: f64, temperature: f64, rho: f64) -> (f64, f64, f64,
         value_rb * beta_t,
     )
 }
+/// The first order term of the UV theory and its partial derivatives.
+///
+/// The segment diameter, its temperature derivative and its second
+/// temperature derivative are the ones of the model, the reduced density is
+/// the density of the model and the temperature is in kelvin. The method
+/// returns the term, its derivative with respect to the reduced density, its
+/// derivative with respect to the temperature, the second derivative with
+/// respect to the reduced density, the second derivative with respect to the
+/// temperature and the mixed derivative, in the order of the source.
+pub fn uv_a1_u(
+    sigma: f64,
+    eps_divk: f64,
+    temperature: f64,
+    diameter: f64,
+    diameter_t: f64,
+    diameter_tt: f64,
+    rho: f64,
+) -> (f64, f64, f64, f64, f64, f64) {
+    let d = diameter / sigma;
+    let d_t = diameter_t / sigma;
+    let d_tt = diameter_tt / sigma;
+    let (a1, a1_r, a1_d, a1_rr, a1_dd, a1_rd, _a1_rdd) = uv_a1_u_multiple(eps_divk, d, rho);
+    let a1_t = a1_d * d_t / temperature - a1 / (temperature * temperature);
+    let a1_rt = a1_rd * d_t / temperature - a1_r / (temperature * temperature);
+    let a1_tt = a1_dd * d_t * d_t / temperature + a1_d * d_tt / temperature
+        - 2.0 * a1_d * d_t / (temperature * temperature)
+        + 2.0 * a1 / temperature.powi(3);
+    (
+        a1 / temperature,
+        a1_r / temperature,
+        a1_t,
+        a1_rr / temperature,
+        a1_tt,
+        a1_rt,
+    )
+}
+
+/// The second order term of the UV theory and its temperature derivatives.
+///
+/// The method follows the source and uses the hard-sphere diameter of the
+/// model at the zero density.
+pub fn uv_a1_b2(
+    sigma: f64,
+    eps_divk: f64,
+    temperature: f64,
+    diameter: f64,
+    diameter_t: f64,
+    diameter_tt: f64,
+) -> (f64, f64, f64) {
+    let d = diameter / sigma;
+    let d_t = diameter_t / sigma;
+    let d_tt = diameter_tt / sigma;
+    let (_a1, a1_r, _a1_d, _a1_rr, _a1_dd, a1_rd, a1_rdd) = uv_a1_u_multiple(eps_divk, d, 0.0);
+    let b2 = a1_r / temperature;
+    let b2_t = a1_rd * d_t / temperature - a1_r / (temperature * temperature);
+    let b2_tt = a1_rd * d_tt / temperature + a1_rdd * d_t * d_t / temperature
+        - 2.0 * a1_rd * d_t / (temperature * temperature)
+        + 2.0 * a1_r / temperature.powi(3);
+    (b2, b2_t, b2_tt)
+}
+
+/// The first order term of the UV theory with the derivatives of the source.
+fn uv_a1_u_multiple(eps_divk: f64, d: f64, rho: f64) -> (f64, f64, f64, f64, f64, f64, f64) {
+    const C: [f64; 8] = [
+        -0.8513603, 0.2977649, -0.1287404, -0.3377645, 0.7343770, -0.9839062, -0.4592915, 0.7963438,
+    ];
+    let d3 = d * d * d;
+    let a1_div_r = 2.0
+        * std::f64::consts::PI
+        * ((C[0] + C[1] * d3)
+            + (C[2] + C[3] * d3) * rho
+            + (C[4] + C[5] * d3) * rho * rho
+            + (C[6] + C[7] * d3) * rho * rho * rho);
+    let a1_div_r_r = 2.0
+        * std::f64::consts::PI
+        * ((C[2] + C[3] * d3)
+            + 2.0 * (C[4] + C[5] * d3) * rho
+            + 3.0 * (C[6] + C[7] * d3) * rho * rho);
+    let a1 = a1_div_r * rho;
+    let a1_r = a1_div_r + a1_div_r_r * rho;
+    let a1_rr = 2.0 * a1_div_r_r
+        + 2.0
+            * std::f64::consts::PI
+            * rho
+            * (2.0 * (C[4] + C[5] * d3) + 6.0 * (C[6] + C[7] * d3) * rho);
+    let a1_d = 6.0
+        * std::f64::consts::PI
+        * rho
+        * (C[1] + C[3] * rho + C[5] * rho * rho + C[7] * rho * rho * rho)
+        * d
+        * d;
+    let a1_dd = 12.0
+        * std::f64::consts::PI
+        * rho
+        * (C[1] + C[3] * rho + C[5] * rho * rho + C[7] * rho * rho * rho)
+        * d;
+    let a1_rd = 6.0
+        * std::f64::consts::PI
+        * d
+        * d
+        * ((C[1] + C[3] * rho + C[5] * rho * rho + C[7] * rho * rho * rho)
+            + rho * (C[3] + 2.0 * C[5] * rho + 3.0 * C[7] * rho * rho));
+    let a1_rdd = 12.0
+        * std::f64::consts::PI
+        * d
+        * ((C[1] + C[3] * rho + C[5] * rho * rho + C[7] * rho * rho * rho)
+            + rho * (C[3] + 2.0 * C[5] * rho + 3.0 * C[7] * rho * rho));
+    (
+        a1 * eps_divk,
+        a1_r * eps_divk,
+        a1_d * eps_divk,
+        a1_rr * eps_divk,
+        a1_dd * eps_divk,
+        a1_rd * eps_divk,
+        a1_rdd * eps_divk,
+    )
+}

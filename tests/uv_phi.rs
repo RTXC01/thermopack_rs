@@ -4,7 +4,7 @@
 
 #![allow(clippy::excessive_precision)]
 
-use thermopack_rs::ljs::{uv_phi, uv_phi_temp};
+use thermopack_rs::ljs::{uv_a1_b2, uv_a1_u, uv_phi, uv_phi_temp};
 
 const ATOL: f64 = 1.0e-14;
 const RTOL: f64 = 1.0e-12;
@@ -22,6 +22,52 @@ fn uv_fractions_match_the_source() {
         let source: Vec<f64> = fields[1..].iter().map(|v| v.parse().unwrap()).collect();
         let native = uv_phi(eps_divk, temperature, rho);
         let native = [native.0, native.1, native.2, native.3, native.4, native.5];
+        assert_eq!(native.len(), source.len(), "{case}");
+        for (position, (source, native)) in source.iter().zip(native.iter()).enumerate() {
+            assert!(
+                (source - native).abs() <= ATOL + RTOL * source.abs(),
+                "{case} entry {position}: source {source} native {native}"
+            );
+        }
+        checked += 1;
+    }
+    assert_eq!(checked, 5);
+}
+
+#[test]
+fn uv_terms_match_the_source() {
+    let mut checked = 0;
+    for row in include_str!("fixtures/uv_terms.csv").lines().skip(1) {
+        let fields: Vec<_> = row.split(';').collect();
+        let case = fields[0];
+        let parts: Vec<_> = case.split('|').collect();
+        let sigma: f64 = parts[0].parse().unwrap();
+        let eps_divk: f64 = parts[1].parse().unwrap();
+        let temperature: f64 = parts[2].parse().unwrap();
+        let rho: f64 = parts[3].parse().unwrap();
+        let source: Vec<f64> = fields[1..].iter().map(|v| v.parse().unwrap()).collect();
+        let (diameter, diameter_t, diameter_tt) =
+            thermopack_rs::hardsphere_wca::hard_sphere_diameter(sigma, eps_divk, temperature);
+        let first = uv_a1_u(
+            sigma,
+            eps_divk,
+            temperature,
+            diameter,
+            diameter_t,
+            diameter_tt,
+            rho,
+        );
+        let second = uv_a1_b2(
+            sigma,
+            eps_divk,
+            temperature,
+            diameter,
+            diameter_t,
+            diameter_tt,
+        );
+        let native = [
+            first.0, first.1, first.2, first.3, first.4, first.5, second.0, second.1, second.2,
+        ];
         assert_eq!(native.len(), source.len(), "{case}");
         for (position, (source, native)) in source.iter().zip(native.iter()).enumerate() {
             assert!(

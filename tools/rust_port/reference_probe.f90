@@ -1208,15 +1208,24 @@ subroutine query_white_bear(temperature,eps_divk,eta,r_star,r_star_t,r_star_tt,v
      bind(C,name='query_white_bear')
   use, intrinsic :: iso_c_binding, only: c_int,c_double
   use hardsphere_wca, only: cavity_distribution_function, lj_boltzmann_factor, &
-       minimum_r_cavity_int_LJ
+       minimum_r_cavity_int_LJ, calc_dhs_WCA
+  use saftvrmie_containers, only: saftvrmie_dhs, allocate_saftvrmie_dhs, cleanup_saftvrmie_dhs
   implicit none
   real(c_double), value :: temperature, eps_divk, eta, r_star, r_star_t, r_star_tt
-  real(c_double), intent(out) :: values(12)
+  real(c_double), intent(out) :: values(15)
   integer(c_int), intent(out) :: count
   ! Locals
+  type(saftvrmie_dhs) :: dhs
   real :: r_min, r_min_t, r_min_tt
   real :: y_hs, y_hs_e, y_hs_ee, y_hs_t, y_hs_tt, y_hs_et
   real :: e_lj, e_lj_t, e_lj_tt
+  real :: dhs_d, dhs_d_t, dhs_d_tt
+  call allocate_saftvrmie_dhs(1,dhs)
+  call calc_dhs_WCA(1,1.0d0,eps_divk,temperature,dhs)
+  dhs_d = dhs%d(1,1)
+  dhs_d_t = dhs%d_T(1,1)
+  dhs_d_tt = dhs%d_TT(1,1)
+  call cleanup_saftvrmie_dhs(dhs)
   call minimum_r_cavity_int_LJ(temperature,eps_divk,r_min,r_min_t,r_min_tt)
   call cavity_distribution_function(eta,r_star,r_star_t,r_star_tt,y_hs,y_hs_e,y_hs_ee, &
        y_hs_t,y_hs_tt,y_hs_et)
@@ -1233,7 +1242,10 @@ subroutine query_white_bear(temperature,eps_divk,eta,r_star,r_star_t,r_star_tt,v
   values(10) = e_lj
   values(11) = e_lj_t
   values(12) = e_lj_tt
-  count = 12
+  values(13) = dhs_d
+  values(14) = dhs_d_t
+  values(15) = dhs_d_tt
+  count = 15
 end subroutine query_white_bear
 
 ! Evaluate the nodes and the weights of a quadrature of the original.

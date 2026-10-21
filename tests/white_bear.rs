@@ -5,7 +5,7 @@
 #![allow(clippy::excessive_precision)]
 
 use thermopack_rs::hardsphere_wca::{
-    cavity_distribution_function, lj_boltzmann_factor, minimum_cavity_radius,
+    cavity_distribution_function, hard_sphere_diameter, lj_boltzmann_factor, minimum_cavity_radius,
 };
 
 const ATOL: f64 = 1.0e-13;
@@ -29,6 +29,7 @@ fn white_bear_terms_match_the_source() {
         let distribution = cavity_distribution_function(eta, r_star, r_star_t, r_star_tt);
         let (e, e_t, e_tt) =
             lj_boltzmann_factor(r_star, r_star_t, r_star_tt, temperature, eps_divk);
+        let (diameter, diameter_t, diameter_tt) = hard_sphere_diameter(1.0, eps_divk, temperature);
         let native = [
             r_min,
             r_min_t,
@@ -42,6 +43,9 @@ fn white_bear_terms_match_the_source() {
             e,
             e_t,
             e_tt,
+            diameter,
+            diameter_t,
+            diameter_tt,
         ];
         assert_eq!(native.len(), source.len(), "{case}");
         for (position, (source, native)) in source.iter().zip(native.iter()).enumerate() {

@@ -132,7 +132,7 @@
   "cases": 5,
   "attempted_cases": 5,
   "generator": "tools/rust_port/validate_white_bear.py",
-  "fixture_sha256": "8fac829514b693cc102be1a8415476d7d363b6077ce3858b0c4512d4d04bb630",
+  "fixture_sha256": "1d70cceda0b305d7ebd253accf55d62e1b75f0add29e1b4e4b329b02349446bd",
   "quantities": [
     "r_min",
     "r_min_t",
@@ -145,7 +145,10 @@
     "y_hs_et",
     "e_lj",
     "e_lj_t",
-    "e_lj_tt"
+    "e_lj_tt",
+    "diameter",
+    "diameter_t",
+    "diameter_tt"
   ],
   "relative_tolerance": 1e-11,
   "absolute_tolerance": 1e-13,

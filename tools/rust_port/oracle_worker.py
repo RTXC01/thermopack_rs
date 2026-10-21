@@ -226,7 +226,7 @@ def main(compiler_directory):
             probe.query_white_bear.argtypes=[c_double,c_double,c_double,c_double,c_double,c_double,
                                             POINTER(c_double),POINTER(c_int)]
             probe.query_white_bear.restype=None
-            values=(c_double*12)();number=c_int()
+            values=(c_double*15)();number=c_int()
             probe.query_white_bear(request['temperature'],request['eps_divk'],request['eta'],
                                    request['r_star'],request['r_star_t'],request['r_star_tt'],
                                    values,byref(number))

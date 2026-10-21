@@ -226,6 +226,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 temperature,
                 eps_divk,
             );
+            let (diameter, diameter_t, diameter_tt) =
+                thermopack_rs::hardsphere_wca::hard_sphere_diameter(1.0, eps_divk, temperature);
             let values = [
                 r_min,
                 r_min_t,
@@ -239,6 +241,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 e,
                 e_t,
                 e_tt,
+                diameter,
+                diameter_t,
+                diameter_tt,
             ];
             let text: Vec<String> = values.iter().map(|value| format!("{value:.17e}")).collect();
             println!("{}", text.join(","));

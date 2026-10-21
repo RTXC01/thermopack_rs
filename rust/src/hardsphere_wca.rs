@@ -33,6 +33,24 @@ pub struct CavityDistribution {
     pub packing_fraction_temperature: f64,
 }
 
+/// The hard-sphere diameter of the White Bear reference and its derivatives.
+///
+/// The diameter is the segment diameter times the reduced diameter of the
+/// source, and the derivatives are those with respect to the temperature.
+pub fn hard_sphere_diameter(sigma: f64, eps_divk: f64, temperature: f64) -> (f64, f64, f64) {
+    let t_star = temperature / eps_divk;
+    let sqrt_t_star = t_star.sqrt();
+    let denominator = 1.0 + sqrt_t_star;
+    let d_star = 2.0f64.powf(1.0 / 6.0) * denominator.powf(-1.0 / 6.0);
+    let d_star_t = -d_star / (12.0 * denominator * sqrt_t_star);
+    let d_star_tt = -d_star_t * (7.0 / (12.0 * denominator * sqrt_t_star) + 1.0 / (2.0 * t_star));
+    (
+        sigma * d_star,
+        sigma * d_star_t / eps_divk,
+        sigma * d_star_tt / (eps_divk * eps_divk),
+    )
+}
+
 /// The radius of the minimum of the cavity integral and its derivatives.
 ///
 /// The radius is reduced by the segment diameter of the source, and the

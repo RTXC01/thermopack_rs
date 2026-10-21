@@ -360,12 +360,13 @@ The [White Bear term qualification](ljs.md) adds 8 cases of the original
 over the reduced temperature and the reduced density. The terms match with a
 relative 1e-12, and the observed worst relative difference is zero.
 The [White Bear cavity term qualification](ljs.md) adds 5 cases of the original
-`minimum_r_cavity_int_LJ`, `cavity_distribution_function` and
-`lj_boltzmann_factor`: the radius of the minimum of the cavity integral, the
-cavity correlation function of the hard spheres and the Boltzmann factor of the
-Lennard-Jones potential, on both sides of the packing fraction where the
-source changes the correlation. The twelve values match with a relative 1e-11,
-and the observed worst relative difference is 1.6e-14.
+`calc_dhs_WCA`, `minimum_r_cavity_int_LJ`, `cavity_distribution_function` and
+`lj_boltzmann_factor`: the hard-sphere diameter of the reference, the radius of
+the minimum of the cavity integral, the cavity correlation function of the hard
+spheres and the Boltzmann factor of the Lennard-Jones potential, on both sides
+of the packing fraction where the source changes the correlation. The fifteen
+values match with a relative 1e-11, and the observed worst relative difference
+is 1.6e-14.
 The [quadrature qualification](quadrature.md) adds 14 cases of the original
 `get_quadrature_positions`, `get_quadrature_weights` and
 `integrate_with_differential`: the seven Gauss rules and the seven Gauss-Kronrod

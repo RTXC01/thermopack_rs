@@ -36,6 +36,9 @@ QUANTITIES = [
     "e_lj",
     "e_lj_t",
     "e_lj_tt",
+    "diameter",
+    "diameter_t",
+    "diameter_tt",
 ]
 RTOL = 1.0e-11
 ATOL = 1.0e-13

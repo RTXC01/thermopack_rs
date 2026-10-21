@@ -200,21 +200,21 @@ The committed fixture is `tests/fixtures/ljs_wca_term.csv`; the test is
 ## The cavity terms of the White Bear reference
 
 The White Bear family adds the cavity of the hard-sphere reference and the soft
-repulsion of the model. The source evaluates the radius of the minimum of the
-cavity integral, the cavity correlation function of the hard spheres with its
-derivatives and the Boltzmann factor of the Lennard-Jones potential with its
-derivatives. The native module `hardsphere_wca` evaluates the same
-quantities.
+repulsion of the model. The source evaluates the hard-sphere diameter of the
+reference, the radius of the minimum of the cavity integral, the cavity
+correlation function of the hard spheres with its derivatives and the Boltzmann
+factor of the Lennard-Jones potential with its derivatives. The native module
+`hardsphere_wca` evaluates the same quantities.
 
 `tools/rust_port/validate_white_bear.py` compares the native terms against the
 exact-source library. The reference probe calls the original
-`minimum_r_cavity_int_LJ`, `cavity_distribution_function` and
+`calc_dhs_WCA`, `minimum_r_cavity_int_LJ`, `cavity_distribution_function` and
 `lj_boltzmann_factor`.
 
 * 5 cases: the temperature, the well depth, the packing fraction and the
   reduced separation, on both sides of the packing fraction of 0.52 where the
   source changes the correlation.
-* The compared quantities are the twelve values of the three routines. All 5
+* The compared quantities are the fifteen values of the four routines. All 5
   cases match with a relative 1e-11, and the observed worst relative difference
   is 1.6e-14.
 

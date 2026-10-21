@@ -1162,6 +1162,29 @@ subroutine query_ljs_helmholtz(temperature,volume,moles,values,count) &
   count = 3
 end subroutine query_ljs_helmholtz
 
+! Evaluate the reduced interaction potential of the original.
+subroutine query_ljs_potential(count,radii,values,numbers) &
+     bind(C,name='query_ljs_potential')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use lj_splined, only: ljs_potential_reduced
+  implicit none
+  integer(c_int), value :: count
+  real(c_double), intent(in) :: radii(32)
+  real(c_double), intent(out) :: values(64)
+  integer(c_int), intent(out) :: numbers
+  ! Locals
+  real :: pot(32), force(32)
+  integer :: i
+  pot = 0.0
+  force = 0.0
+  call ljs_potential_reduced(count,radii,pot,force)
+  numbers = 2*count
+  do i=1,count
+    values(2*i-1) = pot(i)
+    values(2*i) = force(i)
+  end do
+end subroutine query_ljs_potential
+
 ! Evaluate the matrix of the third virial coefficients of the original.
 subroutine query_binary_third_virial_matrix(temperature,values,count) &
      bind(C,name='query_binary_third_virial_matrix')

@@ -22,6 +22,8 @@ second order term.
 | `src/lj_splined.f90:calcFresLJs_bh` (mole number derivative) | `ljs::LjsBh::fugacity_coefficient` |
 | `src/lj_splined.f90:calcFresLJs_bh` (state functions) | `ljs::LjsBh::state` |
 | `src/lj_splined.f90:specific_volume` | `ljs::LjsBh::volume` (native) |
+| `src/lj_splined.f90:ljs_potential_reduced` | `ljs::LjsBh::reduced_potential` |
+| `src/lj_splined.f90:calc_LJs_bh_zeta` | `ljs::LjsBh::packing_fraction` |
 
 The native model provides the reduced perturbation terms and the reduced
 Barker-Henderson hard-sphere diameter, the polynomials of the spline with
@@ -153,6 +155,19 @@ the constant heat capacity of the original, and the residual part from the
 temperature derivative of the reduced residual Helmholtz energy.
 
 The committed fixture is `tests/fixtures/ljs_caloric.csv`; the test is
+`tests/ljs.rs`.
+
+`tools/rust_port/validate_ljs_potential.py` compares the reduced interaction
+potential against the exact-source library. The reference probe calls the
+original `ljs_potential_reduced`.
+
+* 4 cases: the separations divided by the segment diameter over the attractive
+  branch, the minimum and the smoothing of the cutoff.
+* The compared quantities are the potential divided by the well depth and the
+  reduced force. All 4 cases match with a relative 1e-12, and the observed
+  worst relative difference is 2.8e-15.
+
+The committed fixture is `tests/fixtures/ljs_potential.csv`; the test is
 `tests/ljs.rs`.
 
 ## Remaining scope

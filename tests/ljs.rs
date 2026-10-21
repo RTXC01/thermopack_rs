@@ -140,6 +140,46 @@ fn the_volume_solve_returns_a_state_of_the_pressure() {
 }
 
 #[test]
+fn the_reduced_potential_matches_the_source() {
+    let model = LjsBh::new();
+    let mut checked = 0;
+    for row in include_str!("fixtures/ljs_potential.csv").lines().skip(1) {
+        let fields: Vec<_> = row.split(';').collect();
+        let case = fields[0];
+        let separations: Vec<f64> = case.split(',').map(|v| v.parse().unwrap()).collect();
+        let source: Vec<f64> = fields[1].split(',').map(|v| v.parse().unwrap()).collect();
+        let (potential, force) = model.reduced_potential(&separations);
+        for index in 0..separations.len() {
+            let source_potential = source[2 * index];
+            let source_force = source[2 * index + 1];
+            assert!(
+                (source_potential - potential[index]).abs()
+                    <= 1.0e-14 + 1.0e-12 * source_potential.abs(),
+                "{case} potential {index}: source {source_potential} native {}",
+                potential[index]
+            );
+            assert!(
+                (source_force - force[index]).abs() <= 1.0e-14 + 1.0e-12 * source_force.abs(),
+                "{case} force {index}: source {source_force} native {}",
+                force[index]
+            );
+        }
+        // The force is the negative derivative of the potential.
+        let step = 1.0e-6 * separations[0];
+        let (upper, _) = model.reduced_potential(&[separations[0] + step]);
+        let (lower, _) = model.reduced_potential(&[separations[0] - step]);
+        let slope = -(upper[0] - lower[0]) / (2.0 * step);
+        assert!(
+            (slope - force[0]).abs() < 1.0e-4 * slope.abs().max(1.0),
+            "{case} force: {slope} against {}",
+            force[0]
+        );
+        checked += 1;
+    }
+    assert_eq!(checked, 4);
+}
+
+#[test]
 fn the_caloric_state_matches_the_source() {
     let model = LjsBh::new();
     let mut checked = 0;

@@ -103,6 +103,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             && fields[0] != "LJSFUGACITY"
             && fields[0] != "LJSCALORIC"
             && fields[0] != "LJSVOLUME"
+            && fields[0] != "LJSPOT"
             && fields[0] != "CRITICAL"
             && fields.len() != 6
         {
@@ -126,6 +127,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "{:.17e},{:.17e},{:.17e}",
                 point.temperature, point.volume, point.pressure
             );
+            continue;
+        }
+        if fields[0] == "LJSPOT" {
+            let separations: Vec<f64> = fields[1]
+                .split(',')
+                .map(|value| value.parse().unwrap())
+                .collect();
+            let model = thermopack_rs::ljs::LjsBh::new();
+            let (potential, force) = model.reduced_potential(&separations);
+            let text: Vec<String> = potential
+                .iter()
+                .zip(force.iter())
+                .map(|(value, slope)| format!("{value:.17e},{slope:.17e}"))
+                .collect();
+            println!("{}", text.join(";"));
             continue;
         }
         if fields[0] == "LJSVOLUME" {

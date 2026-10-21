@@ -237,6 +237,50 @@ impl LjsBh {
         Ok(energy + moles * mole_derivative)
     }
 
+    /// The packing fraction of the model at a temperature and a density.
+    ///
+    /// The source uses the hypothetical pure fluid packing fraction of the
+    /// Barker-Henderson diameter.
+    pub fn packing_fraction(&self, temperature: f64, density: f64) -> Result<f64> {
+        crate::error::positive(density, "the LJS density")?;
+        let (diameter, _, _) = self.diameter(temperature)?;
+        Ok(std::f64::consts::PI / 6.0 * crate::N_A * diameter.powi(3) * density)
+    }
+
+    /// The reduced interaction potential of the model and the reduced force.
+    ///
+    /// The separations are divided by the segment diameter, the potential is
+    /// divided by the well depth and the force is the negative derivative of
+    /// the potential with respect to the separation. The potential of the
+    /// source is the truncated and shifted Lennard-Jones potential with a
+    /// smoothing of the cutoff, and it is zero beyond the cutoff.
+    pub fn reduced_potential(&self, separations: &[f64]) -> (Vec<f64>, Vec<f64>) {
+        let xs = (26.0_f64 / 7.0).powf(1.0 / 6.0);
+        let xc = 67.0 / 48.0 * xs;
+        let a = -24192.0 / 3211.0 / (xs * xs);
+        let b = -387072.0 / 61009.0 / xs.powi(3);
+        let mut potential = Vec::with_capacity(separations.len());
+        let mut force = Vec::with_capacity(separations.len());
+        for &separation in separations {
+            if separation < xs {
+                let inverse = 1.0 / separation.powi(6);
+                potential.push(4.0 * (inverse * inverse - inverse));
+                // The force is the negative derivative of the potential with
+                // respect to the separation.
+                force.push((inverse / separation) * (48.0 * inverse - 24.0));
+            } else if separation < xc {
+                let difference = separation - xc;
+                potential
+                    .push(a * difference * difference + b * difference * difference * difference);
+                force.push(-(2.0 * a * difference + 3.0 * b * difference * difference));
+            } else {
+                potential.push(0.0);
+                force.push(0.0);
+            }
+        }
+        (potential, force)
+    }
+
     /// The molar volume of the model at a temperature and a pressure.
     ///
     /// The phase selects the liquid branch, which has the smaller molar

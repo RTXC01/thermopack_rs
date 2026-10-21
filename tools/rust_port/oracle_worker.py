@@ -206,6 +206,19 @@ def main(compiler_directory):
             values=[float(temperature),float(volume),float(pressure)]
             print('THERMOPACK_RESULT='+json.dumps(dict(values=values)),flush=True)
             continue
+        if request['mode']=='LJS_POTENTIAL':
+            if probe is None:probe=load_probe()
+            probe.query_ljs_potential.argtypes=[c_int,POINTER(c_double),POINTER(c_double),POINTER(c_int)]
+            probe.query_ljs_potential.restype=None
+            radii=request['separations']
+            count=len(radii)
+            radius_buffer=(c_double*32)()
+            for index,radius in enumerate(radii):
+                radius_buffer[index]=radius
+            values=(c_double*64)();number=c_int()
+            probe.query_ljs_potential(count,radius_buffer,values,byref(number))
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=list(map(float,values))[:number.value])),flush=True)
+            continue
         if request['mode']=='LJS_CALORIC':
             from thermopack.ljs_bh import ljs_bh
             model=ljs_bh(request.get('parameter_reference','Default'),2.0)

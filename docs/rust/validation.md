@@ -72,6 +72,7 @@ python tools/rust_port/validate_ljs_helmholtz.py
 python tools/rust_port/validate_ljs_state.py
 python tools/rust_port/validate_ljs_fugacity.py
 python tools/rust_port/validate_ljs_caloric.py
+python tools/rust_port/validate_ljs_potential.py
 python tools/rust_port/validate_critical.py
 python tools/rust_port/validate_mut_solve.py
 python tools/rust_port/validate_hyperdual.py
@@ -345,6 +346,11 @@ The [Lennard-Jones caloric qualification](ljs.md) adds 8 cases of the original
 state of the splined Lennard-Jones model: the molar enthalpy and the molar
 entropy of the state. The two quantities match with a relative 1e-8, and the
 observed worst relative difference is 4.2e-15.
+The [Lennard-Jones potential qualification](ljs.md) adds 4 cases of the
+original `ljs_potential_reduced`: the reduced interaction potential and the
+reduced force over the attractive branch, the minimum and the smoothing of the
+cutoff. The two quantities match with a relative 1e-12, and the observed worst
+relative difference is 2.8e-15.
 The [critical point qualification](spinodal.md#critical-points) adds 7 cases of
 the original `calcCriticalTV`: methane, carbon dioxide, propane and water in
 the Peng-Robinson equation of state, nitrogen and methane in the

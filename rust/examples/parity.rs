@@ -106,6 +106,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             && fields[0] != "LJSPOT"
             && fields[0] != "LJSWCATERM"
             && fields[0] != "WHITEBEAR"
+            && fields[0] != "UVPHI"
             && fields[0] != "QUAD"
             && fields[0] != "CRITICAL"
             && fields.len() != 6
@@ -205,6 +206,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             text.push(format!("{integral:.17e}"));
             text.push(format!("{differential:.17e}"));
             println!("{}", text.join(","));
+            continue;
+        }
+        if fields[0] == "UVPHI" {
+            let eps_divk: f64 = fields[1].parse().unwrap();
+            let temperature: f64 = fields[2].parse().unwrap();
+            let rho: f64 = fields[3].parse().unwrap();
+            let (value, value_r, value_t, value_rr, value_tt, value_rt) =
+                thermopack_rs::ljs::uv_phi(eps_divk, temperature, rho);
+            println!(
+                "{:.17e},{:.17e},{:.17e},{:.17e},{:.17e},{:.17e}",
+                value, value_r, value_t, value_rr, value_tt, value_rt
+            );
             continue;
         }
         if fields[0] == "WHITEBEAR" {

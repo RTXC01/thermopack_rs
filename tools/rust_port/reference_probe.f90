@@ -1248,6 +1248,27 @@ subroutine query_white_bear(temperature,eps_divk,eta,r_star,r_star_t,r_star_tt,v
   count = 15
 end subroutine query_white_bear
 
+! Evaluate the u-fraction of the UV theory of the original.
+subroutine query_uv_phi(eps_divk,temperature,rho,values,count) &
+     bind(C,name='query_uv_phi')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use lj_splined, only: uv_phi
+  implicit none
+  real(c_double), value :: eps_divk, temperature, rho
+  real(c_double), intent(out) :: values(6)
+  integer(c_int), intent(out) :: count
+  ! Locals
+  real :: u, u_r, u_T, u_rr, u_TT, u_rT
+  call uv_phi(eps_divk,temperature,rho,u,u_r,u_T,u_rr,u_TT,u_rT)
+  values(1) = u
+  values(2) = u_r
+  values(3) = u_T
+  values(4) = u_rr
+  values(5) = u_TT
+  values(6) = u_rT
+  count = 6
+end subroutine query_uv_phi
+
 ! Evaluate the nodes and the weights of a quadrature of the original.
 subroutine query_quadrature(quad,values,count) bind(C,name='query_quadrature')
   use, intrinsic :: iso_c_binding, only: c_int,c_double

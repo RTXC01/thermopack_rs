@@ -75,6 +75,7 @@ python tools/rust_port/validate_ljs_caloric.py
 python tools/rust_port/validate_ljs_potential.py
 python tools/rust_port/validate_ljs_wca_term.py
 python tools/rust_port/validate_white_bear.py
+python tools/rust_port/validate_uv_phi.py
 python tools/rust_port/validate_quadrature.py
 python tools/rust_port/validate_critical.py
 python tools/rust_port/validate_mut_solve.py
@@ -367,6 +368,10 @@ spheres and the Boltzmann factor of the Lennard-Jones potential, on both sides
 of the packing fraction where the source changes the correlation. The fifteen
 values match with a relative 1e-11, and the observed worst relative difference
 is 1.6e-14.
+The [UV theory fraction qualification](ljs.md) adds 5 cases of the original
+`uv_phi`: the u-fraction of the UV theory and its five partial derivatives.
+The quantities match with a relative 1e-12, and the observed worst relative
+difference is 4.1e-15.
 The [quadrature qualification](quadrature.md) adds 14 cases of the original
 `get_quadrature_positions`, `get_quadrature_weights` and
 `integrate_with_differential`: the seven Gauss rules and the seven Gauss-Kronrod

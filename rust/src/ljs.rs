@@ -736,3 +736,74 @@ fn khs_eta(eta: f64) -> f64 {
     let denominator = 1.0 + 4.0 * eta + 4.0 * eta2 - 4.0 * eta2 * eta + eta2 * eta2;
     4.0 * (eta2 - 5.0 * eta - 2.0) * (1.0 - eta).powi(3) / (denominator * denominator)
 }
+/// The u-fraction of the UV theory and its partial derivatives.
+///
+/// The well depth is divided by the Boltzmann constant, the temperature is in
+/// kelvin and the density is the reduced density. The method returns the
+/// fraction, its derivative with respect to the reduced density, its
+/// derivative with respect to the temperature, the second derivative with
+/// respect to the reduced density and the mixed derivative, in the order of the
+/// source. The fraction of the source does not depend on the temperature, so
+/// the temperature derivatives vanish.
+pub fn uv_phi(_eps_divk: f64, _temperature: f64, rho: f64) -> (f64, f64, f64, f64, f64, f64) {
+    const C: [f64; 5] = [0.11072527, 2.5809656, 1.2333385, 2.3534453, 4.1241290];
+    let x = C[0] * rho + C[1] * rho.powf(C[2]) + C[3] * rho.powf(C[4]);
+    let x_r = C[0] + C[1] * C[2] * rho.powf(C[2] - 1.0) + C[3] * C[4] * rho.powf(C[4] - 1.0);
+    let x_rr = C[1] * C[2] * (C[2] - 1.0) * rho.powf(C[2] - 2.0)
+        + C[3] * C[4] * (C[4] - 1.0) * rho.powf(C[4] - 2.0);
+    let e2x = (2.0 * x).exp();
+    let tanh = (e2x - 1.0) / (e2x + 1.0);
+    let denominator = (e2x + 1.0).powi(2);
+    let tanh_r = 4.0 * e2x * x_r / denominator;
+    let tanh_rr = 2.0 * tanh_r * x_r + 4.0 * e2x * x_rr / denominator
+        - 16.0 * e2x * e2x * x_r * x_r / (denominator * (e2x + 1.0));
+    (tanh, tanh_r, 0.0, tanh_rr, 0.0, 0.0)
+}
+
+/// The temperature dependent u-fraction of the UV theory and its partial
+/// derivatives.
+///
+/// The method follows the source and reports the same quantities as
+/// `uv_phi`.
+pub fn uv_phi_temp(eps_divk: f64, temperature: f64, rho: f64) -> (f64, f64, f64, f64, f64, f64) {
+    const C: [f64; 7] = [
+        1.01236, 0.99164, 2.63226, 1.21219, 2.25005, 3.91411, 0.436593,
+    ];
+    let beta = eps_divk / temperature;
+    let beta_t = -eps_divk / (temperature * temperature);
+    let beta_tt = 2.0 * eps_divk / temperature.powi(3);
+    let sqrt_c7 = C[6].sqrt();
+    let denominator_sq = 1.0 + C[6] * beta * beta;
+    let denominator = denominator_sq.sqrt();
+    let sigma_beta = sqrt_c7 * beta / denominator;
+    let sigma_beta_b =
+        sqrt_c7 / denominator - sqrt_c7 * C[6] * beta * beta / (denominator * denominator_sq);
+    let sigma_beta_bb = -3.0 * sqrt_c7 * C[6] * beta / (denominator * denominator_sq)
+        + 3.0 * sqrt_c7 * C[6] * C[6] * beta.powi(3)
+            / (denominator * denominator_sq * denominator_sq);
+    let prefactor = C[0] + sigma_beta * (C[1] - C[0]);
+    let x = C[2] * rho.powf(C[3]) + C[4] * rho.powf(C[5]);
+    let x_r = C[2] * C[3] * rho.powf(C[3] - 1.0) + C[4] * C[5] * rho.powf(C[5] - 1.0);
+    let x_rr = C[2] * C[3] * (C[3] - 1.0) * rho.powf(C[3] - 2.0)
+        + C[4] * C[5] * (C[5] - 1.0) * rho.powf(C[5] - 2.0);
+    let e2x = (2.0 * x).exp();
+    let tanh = (e2x - 1.0) / (e2x + 1.0);
+    let denominator = (e2x + 1.0).powi(2);
+    let tanh_r = 4.0 * e2x * x_r / denominator;
+    let tanh_rr = 2.0 * tanh_r * x_r + 4.0 * e2x * x_rr / denominator
+        - 16.0 * e2x * e2x * x_r * x_r / (denominator * (e2x + 1.0));
+    let value = prefactor * tanh;
+    let value_b = sigma_beta_b * (C[1] - C[0]) * tanh;
+    let value_bb = sigma_beta_bb * (C[1] - C[0]) * tanh;
+    let value_r = prefactor * tanh_r;
+    let value_rr = prefactor * tanh_rr;
+    let value_rb = sigma_beta_b * (C[1] - C[0]) * tanh_r;
+    (
+        value,
+        value_r,
+        value_b * beta_t,
+        value_rr,
+        value_bb * beta_t * beta_t + value_b * beta_tt,
+        value_rb * beta_t,
+    )
+}

@@ -197,6 +197,25 @@ the exact-source library. The reference probe calls the original
 The committed fixture is `tests/fixtures/ljs_wca_term.csv`; the test is
 `tests/ljs_wca.rs`.
 
+## The u-fraction of the UV theory
+
+The UV theory of the source describes the Lennard-Jones fluid with the
+u-fraction of the theory. The native module `ljs` provides the fraction of the
+source and the temperature dependent form of it, with their partial
+derivatives.
+
+`tools/rust_port/validate_uv_phi.py` compares the native fraction against the
+exact-source library. The reference probe calls the original `uv_phi`.
+
+* 5 cases: the well depth, the temperature and the reduced density.
+* The compared quantities are the fraction and its five partial derivatives.
+  All 5 cases match with a relative 1e-12, and the observed worst relative
+  difference is 4.1e-15.
+
+The committed fixture is `tests/fixtures/uv_phi.csv`; the test is
+`tests/uv_phi.rs`. The temperature dependent form of the source is a private
+routine, so the native model provides it without a qualification of its own.
+
 ## The cavity terms of the White Bear reference
 
 The White Bear family adds the cavity of the hard-sphere reference and the soft

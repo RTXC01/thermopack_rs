@@ -527,3 +527,11 @@ cached APIs compare all finite candidates; independent checks verify the
 mixed-coordinate pressure convention and caloric stationarity along corrected
 spinodal volumes. Broad degeneracy, other model families and pressure-tie raw
 ordering remain pending.
+
+The [activity-based cubic derivative qualification](ge-derivatives.md) adds
+252 complete log-fugacity T/P/mole derivative comparisons, with no failed,
+censored, nonfinite or pressure-inconsistent source calls. Analytic GE
+attraction Hessians replace the classical fallback in prepared activity-based
+models, and independent normalized mole perturbations check every entry,
+symmetry and Gibbs-Duhem sums. Broader GE critical/phase-envelope and mixed
+quantum-beta qualification remain separate work.

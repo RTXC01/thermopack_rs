@@ -46,6 +46,9 @@ method and Fortran source file; the coverage ledger distinguishes native,
 validated, and pending capabilities. A wrapper calling Fortran is a reference
 adapter, not a completed Rust port.
 
+[Activity-based cubic derivative qualification](ge-derivatives.md) documents
+the full attraction Hessian and its use in TP fugacity mole derivatives.
+
 See [coverage.md](coverage.md), [inventory.json](inventory.json),
 [numerics.md](numerics.md), [validation.md](validation.md),
 [performance.md](performance.md) and [baseline-defects.md](baseline-defects.md).

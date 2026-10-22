@@ -604,6 +604,15 @@ def main(compiler_directory):
             arrays=[list(map(float,values)) for values in (temperature,pressure,volume)]
             print('THERMOPACK_RESULT='+json.dumps(dict(values=arrays)),flush=True)
             continue
+        if request['mode']=='GE_DERIVATIVES':
+            from thermopack.cubic import cubic
+            model=cubic(','.join(request['components']),request['eos'],mixing=request['mixing'],
+                parameter_reference=request.get('parameter_reference','DEFAULT'),volume_shift=request.get('volume_shift',False))
+            previous=None;t=request['temperature'];p=request['pressure'];z=request['feed'];phase=model.LIQPH if request['phase']=='L' else model.VAPPH
+            phi,dt,dp,dn=model.thermo(t,p,z,phase,dlnfugdt=True,dlnfugdp=True,dlnfugdn=True)
+            v=float(model.specific_volume(t,p,z,phase)[0]);error=float(model.pressure_tv(t,v,z)[0])-p
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=[*map(float,dt),*map(float,dp),*map(float,dn.flatten())],volume=v,pressure_error=error)),flush=True)
+            continue
         if request['mode'] in ('META_PS','META_CURVE'):
             from thermopack.cubic import cubic
             eos=request['eos'];comps=request['components'];z=request['feed']

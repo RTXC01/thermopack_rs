@@ -51,6 +51,7 @@ jobs:
       - run: python tools/rust_port/validate_mixture_saturation.py
       - run: python tools/rust_port/benchmark_mixture_saturation.py --compiler /usr/bin/gfortran-13 --preflight-only
       - run: python tools/rust_port/validate_derivatives.py
+      - run: python tools/rust_port/validate_ge_derivatives.py
       - run: python tools/rust_port/validate_flash.py
       - run: python tools/rust_port/validate_initialization.py
       - run: python tools/rust_port/validate_caloric.py

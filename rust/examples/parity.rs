@@ -127,6 +127,63 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         {
             return Err("expected six fields".into());
         }
+        if fields[0] == "GEDER" {
+            let kind = if fields[1] == "SRK" {
+                CubicKind::SoaveRedlichKwong
+            } else {
+                CubicKind::PengRobinson
+            };
+            let names: Vec<_> = fields[2].split(',').collect();
+            let z: Vec<f64> = fields[4].split(',').map(|s| s.parse().unwrap()).collect();
+            let spec: Vec<_> = fields[5].split(':').collect();
+            let t = spec[0].parse()?;
+            let p = spec[1].parse()?;
+            let rule = match spec[3] {
+                "HV1" => thermopack_rs::MixingRule::HuronVidal1,
+                "HV2" => thermopack_rs::MixingRule::HuronVidal2,
+                "NRTL" => thermopack_rs::MixingRule::Nrtl,
+                _ => thermopack_rs::MixingRule::Unifac,
+            };
+            let model = Cubic::with_options(
+                kind,
+                &names,
+                thermopack_rs::CubicOptions {
+                    mixing_rule: rule,
+                    parameter_reference: spec[4],
+                    volume_translation: fields[3] == "translated",
+                    ..Default::default()
+                },
+            )?;
+            let result = (|| -> thermopack_rs::Result<Vec<f64>> {
+                let prepared = model.prepare(t, &z)?;
+                let v = prepared.volume(
+                    p,
+                    if spec[2] == "L" {
+                        Phase::Liquid
+                    } else {
+                        Phase::Vapor
+                    },
+                )?;
+                let n = z.len();
+                let mut dt = vec![0.; n];
+                let mut dp = vec![0.; n];
+                let mut dn = vec![0.; n * n];
+                prepared.fugacity_derivatives_into(v, &mut dt, &mut dp, &mut dn)?;
+                Ok(dt.into_iter().chain(dp).chain(dn).collect())
+            })();
+            match result {
+                Ok(values) => println!(
+                    "{}",
+                    values
+                        .iter()
+                        .map(|v| format!("{v:.17e}"))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                ),
+                Err(e) => println!("ERROR: {e}"),
+            }
+            continue;
+        }
         if fields[0] == "WSMIX" {
             let kind = match fields[1] {
                 "SRK" => thermopack_rs::CubicKind::SoaveRedlichKwong,

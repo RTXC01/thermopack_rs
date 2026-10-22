@@ -208,6 +208,7 @@ pub struct ExcessGibbsCubicJet {
     pub d2a_dt2: f64,
     pub da_dni: Vec<f64>,
     pub d2a_dnid_t: Vec<f64>,
+    pub d2a_dn_dn: Vec<f64>,
 }
 
 /// Excess Gibbs energy and derivatives consumed by the cubic mixing rule.
@@ -256,8 +257,39 @@ pub fn excess_gibbs_cubic_mix(
     d2a_dt2_pure: &[f64],
     b_mix: f64,
 ) -> Result<ExcessGibbsCubicJet> {
+    excess_gibbs_cubic_mix_with_covolume(
+        ge_mix,
+        kind,
+        temperature,
+        mole_fractions,
+        b_pure,
+        a_pure,
+        da_dt_pure,
+        d2a_dt2_pure,
+        b_mix,
+        b_pure,
+        &vec![0.; ge_mix.nc * ge_mix.nc],
+    )
+}
+
+/// GE cubic coefficients with explicit first/second extensive covolume
+/// derivatives. The ordinary linear-covolume entry point is retained above.
+#[allow(clippy::too_many_arguments)]
+pub fn excess_gibbs_cubic_mix_with_covolume(
+    ge_mix: &ExcessGibbsMixture,
+    kind: crate::cubic::CubicKind,
+    temperature: f64,
+    mole_fractions: &[f64],
+    b_pure: &[f64],
+    a_pure: &[f64],
+    da_dt_pure: &[f64],
+    d2a_dt2_pure: &[f64],
+    b_mix: f64,
+    b_partial: &[f64],
+    b_second: &[f64],
+) -> Result<ExcessGibbsCubicJet> {
     let nc = ge_mix.nc;
-    if nc == 0 || mole_fractions.len() != nc {
+    if nc == 0 || mole_fractions.len() != nc || b_partial.len() != nc || b_second.len() != nc * nc {
         return Err(Error::InvalidInput(
             "component count mismatch in ExcessGibbs",
         ));
@@ -270,7 +302,6 @@ pub fn excess_gibbs_cubic_mix(
             "UNIFAC mixing rule without a group database",
         ))?;
         let ge = database.excess_gibbs(temperature, mole_fractions)?;
-        let count = ge.dg_dn.len();
         (
             ExcessGibbsKernel {
                 gibbs: ge.gibbs,
@@ -278,9 +309,7 @@ pub fn excess_gibbs_cubic_mix(
                 d2g_dt2: ge.d2g_dt2,
                 dg_dn: ge.dg_dn,
                 d2g_dn_dt: ge.d2g_dn_dt,
-                // The UNIFAC model does not deliver the second composition
-                // derivatives, and no mixing rule consumes them.
-                d2g_dn_dn: vec![0.0; count * count],
+                d2g_dn_dn: ge.d2g_dn_dn,
             },
             excess_gibbs_limit(kind, GeLimit::Zero),
         )
@@ -296,9 +325,7 @@ pub fn excess_gibbs_cubic_mix(
                 a_pure,
                 da_dt_pure,
                 d2a_dt2_pure,
-                // The cubic mixing of the classic rules needs the first
-                // composition derivatives only.
-                false,
+                true,
             )?,
             lambda_ge,
         )
@@ -309,6 +336,7 @@ pub fn excess_gibbs_cubic_mix(
     let d2g_ex_dt2 = kernel.d2g_dt2;
     let dg_ex_dni = kernel.dg_dn;
     let d2g_ex_dni_dt = kernel.d2g_dn_dt;
+    let g_second = kernel.d2g_dn_dn;
 
     // Combine with cubic covolume B = b_mix to obtain a_mix and derivatives
     let mut sum_aa_b = 0.0;
@@ -333,19 +361,32 @@ pub fn excess_gibbs_cubic_mix(
     for i in 0..nc {
         let bi = b_pure[i];
         // ai = (bi / B) * A + B * (a_i / b_i - dGex/dni / lambda_ge)
-        let ai = (bi / b_mix) * a_mix + b_mix * (a_pure[i] / bi - dg_ex_dni[i] / lambda_ge);
-        let ait =
-            (bi / b_mix) * da_dt + b_mix * (da_dt_pure[i] / bi - d2g_ex_dni_dt[i] / lambda_ge);
+        let ai =
+            (b_partial[i] / b_mix) * a_mix + b_mix * (a_pure[i] / bi - dg_ex_dni[i] / lambda_ge);
+        let ait = (b_partial[i] / b_mix) * da_dt
+            + b_mix * (da_dt_pure[i] / bi - d2g_ex_dni_dt[i] / lambda_ge);
         da_dni.push(ai);
         d2a_dnid_t.push(ait);
     }
 
+    let mut d2a_dn_dn = vec![0.; nc * nc];
+    for i in 0..nc {
+        for j in 0..nc {
+            d2a_dn_dn[i * nc + j] = (b_second[i * nc + j] * a_mix
+                + b_partial[j] * da_dni[i]
+                + b_partial[i] * da_dni[j])
+                / b_mix
+                - 2. * b_partial[i] * b_partial[j] * a_mix / (b_mix * b_mix)
+                - b_mix * g_second[i * nc + j] / lambda_ge;
+        }
+    }
     Ok(ExcessGibbsCubicJet {
         a_mix,
         da_dt,
         d2a_dt2,
         da_dni,
         d2a_dnid_t,
+        d2a_dn_dn,
     })
 }
 
@@ -682,8 +723,7 @@ fn hv_nrtl_kernel(
             + RGAS * t * (term_self_dt + sum3ji + sum4ji + sum5ji - sum6ji - 2.0 * sum7ji);
     }
 
-    // 5. Second composition derivatives of the excess Gibbs energy. Only the
-    // Wong-Sandler mixing rule consumes them.
+    // 5. Second composition derivatives of the extensive excess Gibbs energy.
     let mut d2g_ex_dnid_nj = Vec::new();
     if second_composition {
         d2g_ex_dnid_nj = vec![0.0; nc * nc];
@@ -704,11 +744,11 @@ fn hv_nrtl_kernel(
                 let mut sum_ij = 0.0;
                 for ii in 0..nc {
                     let gamma2_ii = gamma2[ii] * gamma2[ii];
-                    let c_ii_i = cij[ii * nc + i];
-                    let c_ii_j = cij[ii * nc + j];
+                    let c_ii_i = cij[i * nc + ii];
+                    let c_ii_j = cij[j * nc + ii];
                     let z_ii = mole_fractions[ii];
-                    sum_i += z_ii * (bj * c_ii_j) * tau[ii * nc + i] * bi * c_ii_i / gamma2_ii;
-                    sum_j += z_ii * (bi * c_ii_i) * tau[ii * nc + j] * bj * c_ii_j / gamma2_ii;
+                    sum_i += z_ii * (bj * c_ii_j) * tau[i * nc + ii] * bi * c_ii_i / gamma2_ii;
+                    sum_j += z_ii * (bi * c_ii_i) * tau[j * nc + ii] * bj * c_ii_j / gamma2_ii;
                     sum_ij +=
                         z_ii * bi * bj * c_ii_i * c_ii_j * gamma1[ii] / (gamma2_ii * gamma2[ii]);
                 }
@@ -717,10 +757,10 @@ fn hv_nrtl_kernel(
                 d2g_ex_dnid_nj[i * nc + j] = RGAS
                     * t
                     * (tau[j * nc + i] * bj * cij[j * nc + i] / gamma2[i]
-                        - bj * cij[i * nc + j] * gamma1[i] / g2i
+                        - bj * cij[j * nc + i] * gamma1[i] / g2i
                         + tau[i * nc + j] * bi * cij[i * nc + j] / gamma2[j]
                         - sum_i
-                        - bi * cij[j * nc + i] * gamma1[j] / g2j
+                        - bi * cij[i * nc + j] * gamma1[j] / g2j
                         - sum_j
                         + 2.0 * sum_ij);
             }

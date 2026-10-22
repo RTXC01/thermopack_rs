@@ -153,6 +153,8 @@ pub struct PreparedState<'a> {
     att: f64,
     b: f64,
     ai_t: Option<Vec<f64>>,
+    /// GE attraction Hessian, replacing the classical pair Hessian.
+    ge_a_nn: Option<Vec<f64>>,
     beta: Option<crate::beta::PreparedBeta>,
     translation: Option<crate::translation::PreparedTranslation>,
     /// The second mole derivatives of the mixture coefficients of the
@@ -1432,6 +1434,7 @@ impl Cubic {
 
         let wong_sandler = self.mixing_rule == crate::excess_gibbs::MixingRule::WongSandler;
         let mut ai_t = None;
+        let mut ge_a_nn = None;
         let mut prepared_wong_sandler = None;
         if wong_sandler {
             // The Wong-Sandler rule replaces the attraction and the covolume
@@ -1491,7 +1494,15 @@ impl Cubic {
                 da_pure.push(self.a0[i] * alpha_t);
                 d2a_pure.push(self.a0[i] * alpha_tt);
             }
-            let jet = crate::excess_gibbs::excess_gibbs_cubic_mix(
+            let mut b_second = vec![0.; n * n];
+            for i in 0..n {
+                for j in 0..n {
+                    b_second[i * n + j] = (1. - self.lij[i * n + j]) * (self.bi[i] + self.bi[j])
+                        - buffer[2 * n + i]
+                        - buffer[2 * n + j];
+                }
+            }
+            let jet = crate::excess_gibbs::excess_gibbs_cubic_mix_with_covolume(
                 ge,
                 self.kind,
                 temperature,
@@ -1501,11 +1512,14 @@ impl Cubic {
                 &da_pure,
                 &d2a_pure,
                 b,
+                &buffer[2 * n..3 * n],
+                &b_second,
             )?;
             for (slot, &ai) in buffer[n..2 * n].iter_mut().zip(jet.da_dni.iter()) {
                 *slot = 0.5 * ai;
             }
             ai_t = Some(jet.d2a_dnid_t.iter().map(|&ait| 0.5 * ait).collect());
+            ge_a_nn = Some(jet.d2a_dn_dn);
             a = jet.a_mix;
             at = jet.da_dt;
             att = jet.d2a_dt2;
@@ -1555,6 +1569,7 @@ impl Cubic {
             att,
             b,
             ai_t,
+            ge_a_nn,
             beta,
             translation,
             wong_sandler: prepared_wong_sandler,
@@ -1642,9 +1657,14 @@ impl PreparedState<'_> {
                     let bij = (1.0 - self.model.lij[i * n + j]) * (bii + bjj) / 2.0;
                     (
                         2.0 * bij - bi - bj,
-                        2.0 * (1.0 - self.model.kij[i * n + j])
-                            * self.factors().0[i]
-                            * self.factors().0[j],
+                        self.ge_a_nn.as_ref().map_or_else(
+                            || {
+                                2.0 * (1.0 - self.model.kij[i * n + j])
+                                    * self.factors().0[i]
+                                    * self.factors().0[j]
+                            },
+                            |h| h[i * n + j],
+                        ),
                     )
                 };
                 let fnn = (bi + bj + bnn) / free + bi * bj / free.powi(2)

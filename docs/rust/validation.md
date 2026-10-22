@@ -497,7 +497,7 @@ physical vapor-branch selection differences are retained explicitly. Separate
 physical APIs close pressure at their returned coordinates. The pure grids and
 property searches below extend this coverage. Metastable entropy intersections
 are qualified through complete maps below; other mixture source-order property
-selection, property extrema and other model families remain pending.
+selection, mixture property extrema and other model families remain pending.
 
 The [pure spinodal grid/property qualification](spinodal-properties.md) adds
 4000 full-grid states and all 276 successful property returns from 288 attempts.
@@ -517,3 +517,13 @@ stability endpoints. Mixing rules, quantum local states and translated curves
 extend the documented scope; full nonlinear trajectories/failure compatibility
 and other model families remain pending. Benchmark preflight compares all
 T/V/P/S values of 170 source states before native-executable measurements.
+
+The [pure spinodal extrema qualification](spinodal-extrema.md) adds 504
+attempts: 379 unambiguous full ordered results match, and 83 pressure-tied
+candidate pairs match in either assignment. All 50 primary label differences
+remain explicit; candidate parity is not claimed as raw ordered-result parity.
+Forty-two source failures and 613 coordinate warnings are retained. Fresh and
+cached APIs compare all finite candidates; independent checks verify the
+mixed-coordinate pressure convention and caloric stationarity along corrected
+spinodal volumes. Broad degeneracy, other model families and pressure-tie raw
+ordering remain pending.

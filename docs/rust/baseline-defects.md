@@ -380,3 +380,20 @@ pressure or entropy errors above the documented closure threshold. Fixtures
 retain those errors. The compatibility mapper preserves coordinates while
 recording actual residuals; physical continuation corrects its explicit seed
 and every endpoint. See [metastable notes](metastable.md).
+
+## Pure spinodal extrema selection and pressure coordinates
+
+`locate_spinodal_prop_min_max_pure_fluid` keeps the last branch turning
+segment, or its first point when the branch is monotone. It compares only
+these two branch candidates, rather than including every endpoint. Its final
+`Ps_min = pressure(Ts_max,vs_min,z)` mixes maximum temperature and minimum
+volume. All 462 finite returns in the current grid exhibit a minimum-pressure
+coordinate mismatch. The compatibility API preserves this formula.
+
+For pressure, both candidates are intended to be at P0. Strict ordering by
+their residuals makes the labels depend on iteration roundoff. Of 83 such
+source returns, 50 have reversed native primary labels. The native result
+marks this ambiguity; qualification checks both complete assignments while
+retaining the original ordering and derived alternative pressures. This is
+candidate/reporting parity, not full raw ordered-result parity. See
+[pure extrema notes](spinodal-extrema.md).

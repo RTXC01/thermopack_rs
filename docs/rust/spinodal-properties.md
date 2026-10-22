@@ -5,6 +5,10 @@ pure property-intersection selection and a reusable search workspace. A separate
 physical search finds every bracketed property crossing on a supplied pure or
 mixture stability curve.
 
+[Pure extrema queries](spinodal-extrema.md) now reuse the same grid and cached
+property arrays. Their qualification separates ordered results from pressure
+candidate ties, and preserves the fork's mixed-coordinate minimum pressure.
+
 `SpinodalProperty` covers entropy (J/mol/K), volume (m³/mol), enthalpy (J/mol),
 temperature (K), pressure (Pa) and internal energy (J/mol). All compositions are
 normalized mole fractions; the model owns the ideal caloric reference levels.
@@ -113,8 +117,10 @@ both pure/mixture curves, no crossing, invalid input, ordinary baseline volume
 roots and the narrow vapor bracket. Qualification uses one-component model
 instances and default caloric references; raw embedded-pure/mixed-model grids,
 other alpha/beta/reference settings, all failure trajectories and other EOS
-families remain unqualified. Mixture source-order property-intersection selection,
-property extrema APIs and metastable isentropes remain pending.
+families remain unqualified. Mixture entropy intersection selection is now
+qualified through [metastable isentrope maps](metastable.md); other mixture
+source-order property selection and mixture extrema remain pending. The
+[pure extrema API](spinodal-extrema.md) has separate qualification.
 
 Reproduce after building the exact-source reference:
 

@@ -1102,17 +1102,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     "5" => SpinodalProperty::Pressure,
                     _ => SpinodalProperty::InternalEnergy,
                 };
-                let target = config[3].parse()?;
-                let phase = match config[2] {
-                    "1" => Some(Phase::Liquid),
-                    "2" => Some(Phase::Vapor),
-                    _ => None,
-                };
-                baseline_pure_spinodal_intersection(&model, &z, property, target, p, phase, None)
+                if config[0] == "EXTREMA" {
+                    baseline_pure_spinodal_extrema(&model, &z, property, p).map(|e| {
+                        [e.minimum, e.maximum]
+                            .into_iter()
+                            .flat_map(|p| [p.temperature, p.volume, p.pressure])
+                            .chain([f64::from(e.ordering_ambiguous)])
+                            .collect()
+                    })
+                } else {
+                    let target = config[3].parse()?;
+                    let phase = match config[2] {
+                        "1" => Some(Phase::Liquid),
+                        "2" => Some(Phase::Vapor),
+                        _ => None,
+                    };
+                    baseline_pure_spinodal_intersection(
+                        &model, &z, property, target, p, phase, None,
+                    )
                     .map(|found| match found {
                         Some(p) => vec![1.0, p.temperature, p.volume, p.pressure],
                         None => vec![0.0, 0.0, 0.0, 0.0],
                     })
+                }
             };
             match result {
                 Ok(values) => println!(

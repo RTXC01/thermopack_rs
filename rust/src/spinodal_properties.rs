@@ -15,6 +15,18 @@ pub enum SpinodalProperty {
     InternalEnergy,
 }
 
+/// The two candidates selected and ordered by the fork's pure extrema mapper.
+/// These are not guaranteed global extrema. In particular, its minimum
+/// pressure is evaluated using the maximum candidate's temperature.
+#[derive(Debug, Clone, Copy)]
+pub struct BaselineSpinodalExtrema {
+    pub minimum: SpinodalPoint,
+    pub maximum: SpinodalPoint,
+    /// Pressure candidates at the common initial pressure cannot be reliably
+    /// ordered by their residuals. Coordinates are candidates in either order.
+    pub ordering_ambiguous: bool,
+}
+
 impl SpinodalProperty {
     /// The source `spin_locate_from_*` identifier.
     pub fn code(self) -> usize {
@@ -384,6 +396,18 @@ pub fn baseline_pure_spinodal_intersection(
     locate_on_pure_curve(model, z, &curve, property, target, phase, None)
 }
 
+/// Port `locate_spinodal_prop_min_max_pure_fluid`, including the last turning
+/// segment, monotone-branch first-point fallback and mixed-coordinate P_min.
+pub fn baseline_pure_spinodal_extrema(
+    model: &Cubic,
+    z: &[f64],
+    property: SpinodalProperty,
+    initial_pressure: f64,
+) -> Result<BaselineSpinodalExtrema> {
+    let curve = baseline_pure_spinodal_curve(model, z, initial_pressure, None, None)?;
+    extrema_on_pure_curve(model, z, &curve, property, None)
+}
+
 /// Immutable reusable pure spinodal grid and all six property arrays. The
 /// borrowed model cannot be modified while the search is alive. Preparation
 /// is excluded from subsequent queries but remains explicit to the caller.
@@ -431,6 +455,28 @@ impl PreparedPureSpinodal<'_> {
     pub fn curve(&self) -> &SpinodalCurve {
         &self.curve
     }
+    /// Reuse the stored grid/property arrays for source-selected extrema.
+    ///
+    /// ```
+    /// use thermopack_rs::{Cubic, CubicKind};
+    /// use thermopack_rs::spinodal_properties::SpinodalProperty;
+    /// # fn main() -> Result<(), thermopack_rs::Error> {
+    /// let model = Cubic::new(CubicKind::PengRobinson, &["C1"])?;
+    /// let search = model.prepare_pure_spinodal_search(&[1.0], 1e6, None)?;
+    /// let extrema = search.extrema(SpinodalProperty::Entropy)?;
+    /// assert!(!extrema.ordering_ambiguous);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn extrema(&self, property: SpinodalProperty) -> Result<BaselineSpinodalExtrema> {
+        extrema_on_pure_curve(
+            self.model,
+            &self.composition,
+            &self.curve,
+            property,
+            Some(&self.properties[property.code() - 1]),
+        )
+    }
     /// Query the original pure branch/reporting conventions using a cached grid.
     pub fn locate(
         &self,
@@ -451,6 +497,63 @@ impl PreparedPureSpinodal<'_> {
             Some(&self.properties[property.code() - 1]),
         )
     }
+}
+
+fn extrema_on_pure_curve(
+    model: &Cubic,
+    z: &[f64],
+    curve: &SpinodalCurve,
+    property: SpinodalProperty,
+    cached: Option<&[f64]>,
+) -> Result<BaselineSpinodalExtrema> {
+    let mut candidates = [(curve.points[0], 0.); 2];
+    for (branch, liquid) in [true, false].into_iter().enumerate() {
+        let index = |i| if liquid { i } else { 199 - i };
+        let point = |i| curve.points[index(i)];
+        let mut values = [0.; 100];
+        for (i, value) in values.iter_mut().enumerate() {
+            *value = cached.map_or_else(
+                || property.evaluate(model, z, point(i)),
+                |v| Ok(v[index(i)]),
+            )?;
+        }
+        let turn = (2..100)
+            .filter(|&i| (values[i] - values[i - 1]) * (values[i - 1] - values[i - 2]) < 0.)
+            .map(|i| i - 1)
+            .next_back();
+        let candidate = if let Some(j) = turn {
+            let p = refine_property(
+                model,
+                z,
+                point(j - 1),
+                point((j + 1).min(99)),
+                property,
+                0.,
+                Refinement::SourceGradient,
+            )?;
+            (p, property.evaluate(model, z, p)?)
+        } else {
+            (point(0), values[0])
+        };
+        candidates[branch] = candidate;
+    }
+    let ordering_ambiguous = property == SpinodalProperty::Pressure
+        && (candidates[0].1 - candidates[1].1).abs()
+            <= 2. + 1e-7 * candidates[0].1.abs().max(candidates[1].1.abs());
+    let ((mut minimum, _), (mut maximum, _)) = if candidates[1].1 > candidates[0].1 {
+        (candidates[0], candidates[1])
+    } else {
+        (candidates[1], candidates[0])
+    };
+    // Source typo: Ps_min = pressure(Ts_max,vs_min,z).
+    let maximum_temperature = model.prepare(maximum.temperature, z)?;
+    minimum.pressure = maximum_temperature.pressure(minimum.volume)?.value;
+    maximum.pressure = maximum_temperature.pressure(maximum.volume)?.value;
+    Ok(BaselineSpinodalExtrema {
+        minimum,
+        maximum,
+        ordering_ambiguous,
+    })
 }
 
 /// The fork's mixture selection: map from P0 to model Tmin and refine the

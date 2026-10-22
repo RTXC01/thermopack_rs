@@ -7,6 +7,10 @@ The original Fortran/Python implementation is retained as the reference.
 provide local root solves, pressure continuation with stability termination,
 and a separately qualified implementation of the fork's mapping convention.
 
+[Pure spinodal property extrema](../docs/rust/spinodal-extrema.md) provide
+fresh and cached source-convention queries with explicit pressure-order
+ambiguity reporting.
+
 `Mbwr` provides MBWR-19/32 pressure and residual Helmholtz kernels with all
 65 stored fits. It offers stable integrals and explicit source-order methods;
 see [MBWR scope and qualification](../docs/rust/mbwr.md).

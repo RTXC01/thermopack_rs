@@ -646,7 +646,7 @@ def main(compiler_directory):
                 except Exception as error:result=dict(calculation_error=str(error),pressure=pressure,entropy=entropy)
             print('THERMOPACK_RESULT='+json.dumps(result),flush=True)
             continue
-        if request['mode'] in ('PURE_SPINODAL_GRID','PURE_SPINODAL_PROP'):
+        if request['mode'] in ('PURE_SPINODAL_GRID','PURE_SPINODAL_PROP','PURE_SPINODAL_EXTREMA'):
             from thermopack.cubic import cubic
             import numpy as np
             eos=request['eos'];names=request['components'];z=request['feed'];n=len(z)
@@ -654,7 +654,28 @@ def main(compiler_directory):
                         alpha='RK' if eos=='RK' else 'Classic',volume_shift=request.get('volume_shift',False))
             previous=None;model.activate()
             p0=c_double(request['pressure']);amounts=(c_double*n)(*z);status=c_int()
-            if request['mode']=='PURE_SPINODAL_GRID':
+            if request['mode']=='PURE_SPINODAL_EXTREMA':
+                prop=c_int(request['property']);coordinates=[c_double() for _ in range(6)]
+                calculate=getattr(model.tp,model.get_export_name('spinodal','locate_spinodal_prop_min_max_pure_fluid'))
+                calculate.argtypes=[POINTER(c_int),*([POINTER(c_double)]*8),POINTER(c_int)];calculate.restype=None
+                calculate(byref(prop),amounts,byref(p0),*[byref(v) for v in coordinates],byref(status))
+                result=dict(values=[v.value for v in coordinates],status=status.value)
+                if not status.value and all(math.isfinite(v.value) for v in coordinates):
+                    diagnostics=[]
+                    for offset in [0,3]:
+                        t,v,p=[c.value for c in coordinates[offset:offset+3]]
+                        actual=float(model.pressure_tv(t,v,z)[0])
+                        h=model.fugacity_tv(t,v,z,dlnphidn=True)[1]
+                        value={2:lambda:v,4:lambda:t}.get(prop.value)
+                        if value is None:
+                            method={1:'entropy_tv',3:'enthalpy_tv',5:'pressure_tv',6:'internal_energy_tv'}[prop.value]
+                            value=lambda:float(getattr(model,method)(t,v,z)[0])
+                        diagnostics.append([actual,float(h[0,0]),value()])
+                    result['diagnostics']=diagnostics
+                    if prop.value==5:
+                        a=[v.value for v in coordinates]
+                        result['alternative_pressures']=[float(model.pressure_tv(a[0],a[4],z)[0]),float(model.pressure_tv(a[0],a[1],z)[0])]
+            elif request['mode']=='PURE_SPINODAL_GRID':
                 vt=request.get('vapor_temperature',.6*model.critical_temperature(1))
                 ts,vs,ps=model.spinodal(z,initial_pressure=request['pressure'],
                     initial_liquid_temperature=request.get('liquid_temperature'),min_temperature_vapor=vt)

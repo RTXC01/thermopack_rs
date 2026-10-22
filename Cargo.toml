@@ -11,6 +11,11 @@ readme = "rust/README.md"
 path = "rust/src/lib.rs"
 
 [[bench]]
+name = "spinodal_extrema"
+path = "rust/benches/spinodal_extrema.rs"
+harness = false
+
+[[bench]]
 name = "metastable"
 path = "rust/benches/metastable.rs"
 harness = false

@@ -96,9 +96,11 @@ pure/zero-species/translated limits and invalid input.
 
 This is local stability, not a global equilibrium or nucleation calculation.
 Other activity-rule Hessians, other EOS families, critical degeneracies,
-mixture source-order property intersections, property extrema, metastable
-isentropes and full raw trajectory
-fidelity remain pending. Default pressure initialization requires a mechanical
+other mixture source-order property intersections, mixture property extrema
+and full raw trajectory fidelity remain pending. Entropy intersections are
+qualified through [metastable isentropes](metastable.md), and
+[pure extrema](spinodal-extrema.md) have separate qualification.
+Default pressure initialization requires a mechanical
 seed below the fixed-composition pseudo-critical pressure; explicit local
 seeds can address other roots without promising their global classification.
 

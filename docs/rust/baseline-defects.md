@@ -352,3 +352,19 @@ Helmholtz eigenvalue exceeding 1e-6 in magnitude. Physical searches refine
 temperature at fixed volume and close both constraints. See
 [spinodal property notes](spinodal-properties.md) for near-grid ties and the
 separate critical multiple-root rounding allowance.
+
+## Excess Gibbs fallback interaction initialization
+
+`cbselect::SelectBinary` requests mixing label `Classic` for the attraction
+interactions used by HV1/HV2/NRTL fallback pairs. This fork's `kijdb` stores
+those classical records with label `vdW`, so the request returns zero even
+when the normal vdW constructor finds a nonzero interaction. The GE path
+also leaves covolume interactions at zero. For PR methane/water, for example,
+the vdW constructor selects kij=0.5, while HV1 selects zero.
+
+The Rust GE constructor preserves these defaults. Explicit `set_kij` updates
+both the public parameter and fallback evaluation. The fallback uses the
+geometric mean of the already temperature-dependent attractions; the previous
+Rust formula counted those attractions twice. Four exact-source pressure and
+entropy states and independent classic/HV fallback identity checks now cover
+this previously unqualified path, including temperature derivatives.

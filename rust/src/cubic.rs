@@ -672,6 +672,19 @@ impl Cubic {
             ));
         }
         if options.mixing_rule.is_excess_gibbs() {
+            if matches!(
+                options.mixing_rule,
+                crate::excess_gibbs::MixingRule::HuronVidal1
+                    | crate::excess_gibbs::MixingRule::HuronVidal2
+                    | crate::excess_gibbs::MixingRule::Nrtl
+            ) {
+                // cbSelect's GE path requests "Classic", whereas this fork's
+                // binary records are labelled "vdW". Its lookup returns zero;
+                // it also leaves the covolume interactions at zero.
+                model.kij.fill(0.0);
+                model.lij.fill(0.0);
+                model.rebuild_pairs();
+            }
             let comp_idents: Vec<&str> = model.components.iter().map(|c| c.ident).collect();
             let database_eos = if kind == CubicKind::RedlichKwong {
                 "SRK"
@@ -1229,6 +1242,10 @@ impl Cubic {
         let n = self.components.len();
         self.kij[i * n + j] = value;
         self.kij[j * n + i] = value;
+        if let Some(ge) = &mut self.excess_gibbs {
+            ge.pairs[i * n + j].kij = value;
+            ge.pairs[j * n + i].kij = value;
+        }
         self.rebuild_pairs();
         Ok(())
     }

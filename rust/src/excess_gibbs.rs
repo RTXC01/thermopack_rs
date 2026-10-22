@@ -515,8 +515,10 @@ fn hv_nrtl_kernel(
                     let kij = pair.kij;
                     let t1 = -2.0 * (bi * bj).sqrt() / (bi + bj);
                     let gii = -a_pure[i] * lambda_ge / bi;
-                    let t2 = (a_pure[i] / bi) * lambda_ge;
-                    let t3 = t2 * (a_pure[j] / bj) * lambda_ge;
+                    // a_pure already contains alpha(T); only the covolumes and
+                    // model constant belong in the temperature-independent factor.
+                    let t2 = lambda_ge / bi;
+                    let t3 = t2 * lambda_ge / bj;
                     let t4 = (t3 * a_pure[i] * a_pure[j]).sqrt();
 
                     tau[idx_ji] = (t1 * t4 * (1.0 - kij) - gii) / (RGAS * t);

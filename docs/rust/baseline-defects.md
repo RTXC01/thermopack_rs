@@ -368,3 +368,15 @@ geometric mean of the already temperature-dependent attractions; the previous
 Rust formula counted those attractions twice. Four exact-source pressure and
 entropy states and independent classic/HV fallback identity checks now cover
 this previously unqualified path, including temperature derivatives.
+
+## Metastable-isentrope first and terminal coordinates
+
+`map_meta_isentrope` starts with an equilibrium PS flash, then evaluates the
+majority phase's volume root at the feed composition. In a two-phase mixture
+this reported homogeneous state need not have the target entropy. Its assigned
+spinodal endpoint also inherits the uncorrected property-search volume above.
+In the current 97 complete qualified maps, 25 first/last coordinates have
+pressure or entropy errors above the documented closure threshold. Fixtures
+retain those errors. The compatibility mapper preserves coordinates while
+recording actual residuals; physical continuation corrects its explicit seed
+and every endpoint. See [metastable notes](metastable.md).

@@ -1,0 +1,5356 @@
+{
+  "baseline": "d68c794",
+  "compiler": "GNU Fortran (MinGW-W64 x86_64-ucrt-posix-seh, built by Brecht Sanders) 14.3.0",
+  "flags": [
+    "-O3",
+    "-cpp",
+    "-fdefault-real-8",
+    "-fdefault-double-8",
+    "-frecursive",
+    "-fopenmp",
+    "-fallow-argument-mismatch",
+    "-ffree-line-length-none"
+  ],
+  "lapack_commit": "3c351aad417ae1ad8552bc742a6f039d6a298f2c",
+  "library_sha256": "05c5eeb892302a0700ad079073d160fe607275ac673d7b1d6791073fca26a6ac",
+  "sources": {
+    "numconstants": "81b2771fa060b08c6dc551a32eafcb61b91f139d1864644fc25ca7d89ab4f330",
+    "stringmod": "0c2459ae3cd3a0c227b15107337d66d8c79ced4eb868ce69dd8bb5bd4af352e2",
+    "quadratures": "158894a2caa55fb4781275fb720862d0be19b03df13fba29ab21346f4d684820",
+    "thermopack_constants": "9046988b81e338f895ee05189087bbdd89a10759774e1f8021cb198ef2dc9b86",
+    "error": "5c275dd4808c6ad373c826ce5ddcab3e02e73410859afc4f4dac800a528c5706",
+    "parameters": "d7c3a50c4745afac77fc5fa031d49cab1571e24af6c8bb15878c2cada2bfdd2f",
+    "hyperdual_mod": "41b121f1b66d45325ec9f87937c95101e88bccbaac75f2d7cad06e95f32a411e",
+    "linear_numerics": "ce49eeef25d1c3e5ae0f27f26f3537b6cced8e8c0e9ab113ae8194bbd917527f",
+    "optimizer": "7648d0d88a30163e36462015db91dd189702d8c389eb3c3cb617d522d4111355",
+    "nonlinear_solvers": "693ac124cb25aa12c805ce09f8ec553087b0789dcfacaf28b79112cf1f31e063",
+    "utilities": "77d315d2eadaecf47d24ca2d92d671b86c9515672afaba369a7b8c3d6cf6981e",
+    "apparent_composition": "3536e3eab063855aefc6dab1621746f74bd7e31f28ad9f25bce74d164442c377",
+    "solid_correlation_datadb": "013f25ec37dac3fe647e00c84fef5525c0f3c6dd718a7364290e05f0c273ae82",
+    "compdata": "ce941b7b3266ec2260e1f8f9635fd3fd383e772f1b8f704c11175523451e7047",
+    "association_var": "10ecb2dac187bb8500b522bbc6aebf522a79e888baa8e04bf8a2aeb1851c5cfc",
+    "multipol_var": "2f9bf2a453b03cd3f7b784f74ba6a1b358d58906581dc2171f37366adaf00006",
+    "thermopack_var": "1e75d96aebc50ee5e9d63d63034625b46fd6fa352ffb18dd0f62bd9544627801",
+    "hyperdual_utility": "6924c70a6821989595276279d56da82a86f647830bde52d96c069dd68ce62589",
+    "fmt": "b94b7b91a454511fa5446b8f84604cc593fa5aa2d0e17dd9e154b8bee48eaafa",
+    "eosdata": "5347e25c79f23cb3752ba692bd2be2ce5b94ab3382fec1a6c379a4e5adfd804c",
+    "assocschemeutils": "06352929c097aa2864b646565e9dc591fb08d60a4d2824eb47f56820a74174ec",
+    "unifacdata": "225d321b1fe3818c20ecfcc56ca565a817a99877198c1848843204631d3c1d8a",
+    "unifac": "dd0d41c70800dc5a8a3c5c3c58b8de9b467167bc8a4c3e34484cbe93dd4dacf0",
+    "cubic_eos": "5331b361c38f23636b746d8b93446662944bce17aa676d7d43a815c8dfe82530",
+    "compdatadb": "c54497d27f95539576545cdf9ba78bfcf4159749b60dccaa709be286682148a2",
+    "compdata_init": "cd85a3e560ac24cfc7318ae4d8ab3bd491282330264f878c6a71a276fcbb31ac",
+    "volume_shift": "0de6b71bbf9f8833d335bb9b1c5619f7225cc2f17cc8a055dc9e662745edf6bd",
+    "multiparameter_base": "228e9bad560f4ee6f8d6ff9e6aab057c887df5a82d030357d461e0e7cfa13399",
+    "multiparameter_c3": "025f3e94c7abca6a1ea08e3c1a4b5cfdc972629e5879109e523199437097be44",
+    "multiparameter_para_h2": "579951c3fa36fff2e97a8bfeabe615927deb65f631082690a66452d458bbb250",
+    "multiparameter_ortho_h2": "f65855b3b2438454b2117d3e8f19eba6a67279a4139ac2485fb08ef8710a6974",
+    "multiparameter_normal_h2": "385e1d177b6def4f0cf637318380d2fc00738f1b9f7b6eb28ca956cbba073b92",
+    "multiparameter_r134a": "17740e7f977376bafd39faeac6c1d71e4467e783a8d9c3e33f8d9fcdaac007a5",
+    "multiparameter_lj": "035bae279e62dcdb7b42b358dfb3c17562bd7a8ddd178a3092ac75f0b34342cf",
+    "mbwrdata": "64f67102fbb97a0c6bd241a6430f05d00fcb5772892d62f28d7f0e2e41f82675",
+    "mbwr": "783f624958e3c1228f8433ee00965fc99f170364250d876bcd0b5d9484b4579a",
+    "mbwr_additional": "a57ea631169f2ba51282fb326038e22433cfb1dcc242e28a6debc042b4d4ec3c",
+    "pets": "2f7a472ad252f0952aa49f5491dd3c7795106c080c36079b9bea33926ab70b9c",
+    "pc_saft_datadb": "24667d3bf38092d05329762ae21ce1d829a90f0da5cf5491ebf0598dd71a7ef6",
+    "pc_saft_parameters": "39cb10930ae3f2b0f705b8ef47fd703113b0104601f0c699f053c9d1f6ae4fab",
+    "eos_parameters": "eb7b41483e973f4701008861ffd1e47e0e5a7549fe40ac34eca8c417a8f27ea8",
+    "mixdatadb": "a208994066d699b441362ca9c078dc6965c6020c29c6fe334562a97fb2df1aaa",
+    "cbalpha": "40475a554d43f8e0e2b5137460c60b7ee7fa1706b59cc1df6454c12b0c410b02",
+    "cbbeta": "f9ac7e9e686c79affc2c12ff17db5693332f294e9df8df25ec4a2d0938c085ec",
+    "excess_gibbs": "91db5a4da578e85def8b6c7c4a384ac3e8dc3370faaba29d40c12191198152b5",
+    "wong_sandler": "310e1df96f792d62a4b4c8c488a5c9501bb802853d273b7c4b1dc27e5112b208",
+    "cbmix": "14a973e85f0a768715e7896125e070c0888082c407391f60e4d4ad598dc22e7f",
+    "cbhelm": "a092ae02bbfb0f39ec227ac936366fb4394b403dc24d782206bc7bd49a28cd4b",
+    "cubic": "4fc1c75b5083500754436076a2472478a99463fffe8d578f0560baee095ea606",
+    "idealh2": "e02374dec47754a196b3102de89210df5a4c01d18a1203bf24468716b129bade",
+    "ideal": "4abeed45be71e58aebc14473b15cbf90df2c260b3152dc68e09183c148cb2fc2",
+    "cpa_parameters": "8eca97665cf0c22281bfbc0ef156022be3be0bbedf1d3f0236571ab892ac1a6b",
+    "cbselect": "4840cd70d733cfd61638b6fb59e7d0069074b71121d17977c5ec33f7fd5fbc0c",
+    "hardsphere_bmcsl": "aaa5be55f77fb1def8d15962c1e7df2d353f3b0cfd6fd47d0739ffca3620d301",
+    "pc_saft_nonassoc": "a2512afe7ad8da09c7737ab955be209734d773822a24ca4c34cd508cc9aa0db4",
+    "saftvrmie_options": "5d4b9891ea470f49dd5c4d5d624e901de4894d6642221b5a23c1ae6fd2c5b9e4",
+    "saftvrmie_datadb": "5673b761a3698429dff898135fba4675c8ce000408898ac70106f6688d119842",
+    "saftvrmie_parameters": "9f9522f18419781b75ca699240e9327d9836186922a64f033c4b30241e4fbac9",
+    "saftvrmie_containers": "ecd4aa67a916f260006c5ec87d58bc48bd08a3fe808d0cdc5ab17095a0c56447",
+    "saftvrmie_utils": "3073a53eb1e4ca53d0c99215cff5bb0374c6111f17950be79c8ff0ef738af193",
+    "saftvrmie_hardsphere": "69eadfad516eaf43bd4635b5cf9c19a794cfb862795ab3b1ea554bac3c516add",
+    "saftvrmie_dispersion": "9970200beba5b09c40675c8d815795c9e53f6cfb015264bd8323a471d2dfcb8a",
+    "saftvrmie_chain": "313951dcb61c081aee2edeabf5ad08b827475f02af3b056b3d660234039f6253",
+    "saftvrmie_association": "9ba1a54816cb0fc2eef93faa5101e953c41c30c3310926f1d376c7c0160dc8c3",
+    "saftvrmie_interface": "6bc6d39e595b7fda87a5b4ca69f4b589dd699c410c7ea8d3e10adc191b700cc6",
+    "hardsphere_wca": "568bdef8f6f16f5ff636b369e3824d1a9aea4393ccce9cc59ae0980d878e4819",
+    "lj_splined": "21b26d0e68b20281fc91b6f93d587fb7562d40036e364481e4e4384cd8cdefae",
+    "saft_globals": "cd491377b6e647ca1c8da737bd5be6761f3e994859ed9052840fa0acfb6948b9",
+    "saft_rdf": "80cd38594817aea99c75402d7e6669a1eca5d834a42428e3e091712c78d4963e",
+    "saft_association": "df3a5f9b6e871d005427fcfaf167989256395e55017110227ca0f1c8181dd5b6",
+    "multipol": "b227a20226ceb793e13c6153f3e678f2cfd0dbfa2463a93f3da012a60ae23f3a",
+    "saft_interface": "df8725cb15f2bb2b2a54898989ba1af7ae59c49dd578120a85b18d95ae471750",
+    "extcsp": "b452c5397da6e45de151caa10bbc35529742448148ad989ae43c5e71c737cc70",
+    "leekesler": "6dfcf59b3188e174f48403e435f8253dac1add0a95bdcee169a24d9c5c3f7af8",
+    "multiparameter_idealmix": "43adb5de94054eea91a54a241a4a71eb0b6b2ae1757f13d9c8d462113fb79f9f",
+    "co2_gibbs": "8b2351c798fb1b4f89a7f7e3b0ef1af34859bc65477a354b3ed0628ccdad6829",
+    "h2o_gibbs": "a12fc215f7a41fdd1d019c654b2fc4f2a0f87cac83fa4e505f7e15fe25198d0e",
+    "single_component": "329ed5bec79c4fa4e5b66ccd51c3ba28819eda6b67537477bda453e7a8ab60ba",
+    "eos_container": "cc9c69a832a85a6338a7b21d6c3372ede4cde1b2cebe971a0d2b432fad2ac8fa",
+    "single_phase": "02c00dbf65e25e014ce3d7bce8ba626435b8f928dd1d380bf22718a2d0592790",
+    "eostv": "306093cddf7098985eb729d463c966a7dfb230009c722249842c3e320b3ab7a5",
+    "eos": "befee3261d285fdcfa2c83b0cb9ab8b235ad311147d6d42c53f07fa5d26ece23",
+    "puresaturation": "70efebbb25d9659b5921770ba15d484b66df79d34502d8787c4cb790302f5888",
+    "thermo_utils": "7fa5c3db69531986d9928ce0271b36765c94080862224355cce987c1ba010eae",
+    "critical": "8ff578626a8512de7ec8c5b0b34631632e6f02662d8e0981f5a08b7e46ae3e58",
+    "stability": "e82e20c659b339477a9116648b07f03aa78090792903b68385fcbb95e18901c7",
+    "saturation": "c3841bfe67898ad420044a3191a07d7b6ff1c5e16e8c52a31900133eec1d1ea8",
+    "solideos": "2b0a45599d7faed4f166e03e630d5b8a9620f2de996d8517db0a2feb7d2787de",
+    "vls": "3ecc60a8b527374c1a6903a6f4b6b5785b0e2228c1c52da4258e0eb9367d41f8",
+    "tuning": "ea7ad3173d0e1a19f3175319dfb4536a0c9e496904babe9bdc7c259b752acb89",
+    "tp_solver": "9826e826da68e5a7058ec57b3d17e5442bfd4db628679a3bd00d15e271efbb0f",
+    "state_functions": "2ecbac8dffc1094f2350fbcbb5a0b7efa47b28c193007428751e01fa88dd6fa3",
+    "saturation_curve": "3129cc1e181bb3e67fb11000164265e1783fa3d9d0d7fa48deb898241e198406",
+    "saturation_tv": "fd1ee2d47482fc212815b2ae26fb510d11ddef704077e515940b0809e0b42887",
+    "multi_phase_envelope_tv": "0fb3a57447e34bb610c960f7476037db1031d84c1fa514f9229e6644fc13a607",
+    "solid_saturation": "75bd97d719d7d57ddefc3622b479612e941072499381cd316fa645fb4a552fa6",
+    "saturation_point_locators": "daa38b0ff695031b3d1f3e00ba354f16eed2d21e2434ea9ca22cf202df5d8bd0",
+    "joule_thompson_inversion": "e285640f5558ea4973202c0abacbf005db919c7f89da883e583251f6ad35a93e",
+    "ph_solver": "00d134e44f95c6c5521d59d86f627fb95710c3f0e176cbfe801e6ffcee7f5754",
+    "ps_solver": "34d11b86595713aba761e27163bfb8dfbcab4fe15a18a51e92b7df6be0de2c56",
+    "uv_solver": "efbd86537a6578b8f318daaaa4d0bb37cb9540ffef90392585f10838d9b4bbd6",
+    "sv_solver": "1f51cf123ff8fcbe264e1cc9d1142c70545331a8a4eab12ad49225fa49302b75",
+    "spinodal": "ae12a892a1c1f34845ba81750cdb47d93a801b3ef06df2647787163b4a58f80f",
+    "mut_solver": "6ddbb514d5d6e241b0a03478a17641decb496d10f65557838ff59132af6c3bc1",
+    "isolines": "660e6d90c2e92d4315302d1fa5b5dc62316b283a0af4d59ab32d86c93eb40d2c",
+    "binaryplot": "bc8ff596e437a41e18585a9bd67faa40cfda6a13c09cf36b65219a0f4091f622",
+    "speed_of_sound": "85fb9206528061cbdcce58c20cf824ed7455a7c5ee1f0a539a42cbd76a7f133f",
+    "saftvrmie_testing": "931b50a23a6384d10ceeb32184ae7618bc4a2e4d04fd4efd0cd321e22fc33d85",
+    "hydrate": "dffef9c31c571a3b365e72923c01812eb2edfc39f2aa36c36b6b8f81bb3653ab",
+    "hydrate_curves": "1d5a48516803bb81e64d6dd3a3d79723abf0700356ae0d662b09efcff1725731",
+    "consistency": "1ed20d6dd79e6474d237ff5795cefde81c11e4223911a30a3d6d222377f8daf8",
+    "eoslibinit": "7df67e296f5b79105714fecc897c80ab0cb1bd2844a18b01027877da87351258",
+    "complexmodelinit": "6ffae447c3e2be271d9720f3b5217bebf669fa879cf9291be7f5d0a407a96b41",
+    "external": "e57f6391c43791ae80fde558f66d9c39ed40b3d3b27859579fc11d3ef0c97f9d"
+  },
+  "cases": 298,
+  "generator": "tools/rust_port/validate_metastable.py",
+  "fixture_sha256": "1d1c17e315fa922da96dea6a405b6bd364e697c218e1ebfe91baa1864c1777a9",
+  "relative_tolerance": 2e-06,
+  "absolute_tolerances": [
+    2e-05,
+    1e-10,
+    2.0
+  ],
+  "reference_errors": [
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 150.0,
+        "volume": 8e-05,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          152.99998371590823,
+          8.2216356424139e-05
+        ],
+        "pressure": -2214424.7131163757,
+        "entropy": 114.55363318450418,
+        "status": 1,
+        "pressure_error": 639377.3973423541,
+        "entropy_error": 0.976583992452646
+      },
+      "native": "1.49999999999999972e2,7.99999999999997219e-5,-2.21442471311637573e6,1.14553633184504150e2,5.58793544769287109e-9,-2.84217094304040074e-14,4.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 150.0,
+        "volume": 0.0002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          153.00019669089374,
+          0.00018068212618229184
+        ],
+        "pressure": 2190155.3425379163,
+        "entropy": 126.58179904021866,
+        "status": 1,
+        "pressure_error": 7.133930921554565e-07,
+        "entropy_error": -0.6000519462365475
+      },
+      "native": "1.50000000000243233e2,1.99999999998898135e-4,2.19015534253791627e6,1.26581799040200579e2,5.24893403053283691e-6,-1.80762071977369487e-11,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 150.0,
+        "volume": 0.002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          152.4351511981452,
+          0.002038516705835899
+        ],
+        "pressure": 579738.7732167137,
+        "entropy": 147.56166961080206,
+        "status": 1,
+        "pressure_error": -0.00014535943046212196,
+        "entropy_error": 0.5622310008772899
+      },
+      "native": "1.50000000000002501e2,1.99999999999992415e-3,5.79738773216713686e5,1.47561669610802142e2,3.09664756059646606e-8,8.52651282912120223e-14,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 250.0,
+        "volume": 8e-05,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          254.99997394550894,
+          8.183868674549493e-05
+        ],
+        "pressure": 20296163.611792944,
+        "entropy": 127.41195610037931,
+        "status": 1,
+        "pressure_error": 2111.1674767956138,
+        "entropy_error": 0.9218984849228207
+      },
+      "native": "2.49999999999999886e2,8.00000000000000065e-5,2.02961636117929444e7,1.27411956100379314e2,-1.49011611938476562e-8,0.00000000000000000e0,4.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 250.0,
+        "volume": 0.0002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          254.99985860467675,
+          0.00020951657940331854
+        ],
+        "pressure": 7488158.338947767,
+        "entropy": 139.44012195609378,
+        "status": 1,
+        "pressure_error": 3584.8498075008392,
+        "entropy_error": 1.007452746878613
+      },
+      "native": "2.50000000000045418e2,1.99999999999899314e-4,7.48815833894776739e6,1.39440121956093208e2,5.10457903146743774e-6,-5.68434188608080149e-13,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 250.0,
+        "volume": 0.002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          254.40442586636,
+          0.0020385259639703205
+        ],
+        "pressure": 1004610.283041702,
+        "entropy": 160.41999252667713,
+        "status": 1,
+        "pressure_error": -5.346734542399645e-05,
+        "entropy_error": 0.6187664889198459
+      },
+      "native": "2.50000000000003439e2,1.99999999999991721e-3,1.00461028304170200e6,1.60419992526677134e2,5.45987859368324280e-8,0.00000000000000000e0,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 400.0,
+        "volume": 8e-05,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          407.99997424068,
+          8.117638908153748e-05
+        ],
+        "pressure": 54062046.09915692,
+        "entropy": 140.8595051535587,
+        "status": 1,
+        "pressure_error": 1244.1384872794151,
+        "entropy_error": 0.903814053258202
+      },
+      "native": "4.00000000003121670e2,7.99999999985797695e-5,5.40620460991569236e7,1.40859505153490858e2,2.88749486207962036e-3,-6.78426204103743657e-11,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 400.0,
+        "volume": 0.0002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          407.999830770875,
+          0.00020544627400336662
+        ],
+        "pressure": 15435162.833562538,
+        "entropy": 152.88767100927316,
+        "status": 1,
+        "pressure_error": 15.11032023280859,
+        "entropy_error": 0.9267699504765403
+      },
+      "native": "4.00000000000036493e2,1.99999999999942655e-4,1.54351628335625380e7,1.52887671009273163e2,6.37397170066833496e-6,0.00000000000000000e0,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 400.0,
+        "volume": 0.002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          407.2936769842616,
+          0.0020381921938620014
+        ],
+        "pressure": 1641917.547779184,
+        "entropy": 173.86754157985652,
+        "status": 1,
+        "pressure_error": -2.6512891054153442e-05,
+        "entropy_error": 0.7472286541620292
+      },
+      "native": "4.00000000000004889e2,1.99999999999991374e-3,1.64191754777918407e6,1.73867541579856635e2,9.05711203813552856e-8,1.13686837721616030e-13,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "CO2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 150.0,
+        "volume": 8e-05,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          152.9998875683785,
+          7.868084319038028e-05
+        ],
+        "pressure": -23586022.63239874,
+        "entropy": 142.46265873448482,
+        "status": 1,
+        "pressure_error": -7.450580596923828e-09,
+        "entropy_error": 0.13289726198934204
+      },
+      "native": "1.49999999999984908e2,8.00000000000079619e-5,-2.35860226323987395e7,1.42462658734484734e2,8.04662704467773438e-7,-8.52651282912120223e-14,4.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "CO2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 150.0,
+        "volume": 0.0002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          152.99998686987985,
+          0.00019616209050767476
+        ],
+        "pressure": -1209930.4236886352,
+        "entropy": 154.45580866554408,
+        "status": 1,
+        "pressure_error": -6.666817377321422,
+        "entropy_error": 0.22801225037156314
+      },
+      "native": "1.49999999999994117e2,2.00000000000006596e-4,-1.20993042368863523e6,1.54455808665544026e2,-4.47034835815429688e-8,-5.68434188608080149e-14,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "CO2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 150.0,
+        "volume": 0.002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          152.6436191936584,
+          0.0020477597398491708
+        ],
+        "pressure": 545774.6778754801,
+        "entropy": 175.42573887797553,
+        "status": 1,
+        "pressure_error": -0.0001236085081472993,
+        "entropy_error": 0.5828355599000759
+      },
+      "native": "1.50000000000000085e2,1.99999999999987818e-3,5.45774677875480149e5,1.75425738877975590e2,2.88709998130798340e-8,5.68434188608080149e-14,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "CO2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 250.0,
+        "volume": 8e-05,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          254.99998473599194,
+          8.501500539415921e-05
+        ],
+        "pressure": -1199155.7046683393,
+        "entropy": 154.805780720612,
+        "status": 1,
+        "pressure_error": 873498.3286016621,
+        "entropy_error": 1.5861747010244756
+      },
+      "native": "2.49999999999999886e2,8.00000000000000065e-5,-1.19915570466833934e6,1.54805780720611978e2,-1.86264514923095703e-8,-2.84217094304040074e-14,4.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "CO2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 250.0,
+        "volume": 0.0002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          255.0002067523365,
+          0.0001738792214962171
+        ],
+        "pressure": 4081190.41641167,
+        "entropy": 166.7989306516713,
+        "status": 1,
+        "pressure_error": -0.07891174964606762,
+        "entropy_error": -0.9784173319347929
+      },
+      "native": "2.50000000000312326e2,1.99999999999301024e-4,4.08119041641166992e6,1.66798930651667888e2,1.14291906356811523e-5,-3.41060513164848089e-12,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "CO2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 250.0,
+        "volume": 0.002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          254.5999264390236,
+          0.0020432222030109474
+        ],
+        "pressure": 970601.8743513942,
+        "entropy": 187.76886086410298,
+        "status": 1,
+        "pressure_error": -4.622957203537226e-05,
+        "entropy_error": 0.6722614994554306
+      },
+      "native": "2.50000000000004349e2,1.99999999999992588e-3,9.70601874351394246e5,1.87768860864103061e2,5.16884028911590576e-8,8.52651282912120223e-14,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "CO2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 400.0,
+        "volume": 8e-05,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          407.9999810385921,
+          8.185976904399844e-05
+        ],
+        "pressure": 32381144.68692725,
+        "entropy": 168.7914521982427,
+        "status": 1,
+        "pressure_error": 3323.3283736892045,
+        "entropy_error": 1.0612850870305977
+      },
+      "native": "3.99999999999999886e2,8.00000000000000065e-5,3.23811446869272515e7,1.68791452198242752e2,2.23517417907714844e-8,5.68434188608080149e-14,4.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "CO2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 400.0,
+        "volume": 0.0002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          407.9931277257853,
+          0.00020956962540891292
+        ],
+        "pressure": 12017871.676562127,
+        "entropy": 180.7846021293022,
+        "status": 1,
+        "pressure_error": -9.797513484954834e-07,
+        "entropy_error": 1.145993137321767
+      },
+      "native": "4.00000000000063835e2,1.99999999999891481e-4,1.20178716765621267e7,1.80784602129301675e2,8.06711614131927490e-6,-5.11590769747272134e-13,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "CO2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 400.0,
+        "volume": 0.002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          407.5363457104616,
+          0.002041169306367999
+        ],
+        "pressure": 1607842.6690652652,
+        "entropy": 201.75453234173364,
+        "status": 1,
+        "pressure_error": -2.141459845006466e-05,
+        "entropy_error": 0.7903508897369989
+      },
+      "native": "4.00000000000005230e2,1.99999999999991547e-3,1.60784266906526522e6,2.01754532341733750e2,8.77771526575088501e-8,1.13686837721616030e-13,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C3"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 150.0,
+        "volume": 8e-05,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          53.00000000000001,
+          7.840000000000005e-06
+        ],
+        "pressure": -265247172.20689693,
+        "entropy": NaN,
+        "status": 1,
+        "pressure_error": -15023658895.311365,
+        "entropy_error": NaN
+      },
+      "native": "ERROR: invalid input: finite homogeneous PS specifications required"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C3"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 150.0,
+        "volume": 0.0002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          152.99997551581976,
+          0.00019824044858849849
+        ],
+        "pressure": -12092781.896380097,
+        "entropy": 189.98403084033714,
+        "status": 1,
+        "pressure_error": -1078.5447276979685,
+        "entropy_error": 0.7437677383783523
+      },
+      "native": "1.49999999999998636e2,2.00000000000000904e-4,-1.20927818963800967e7,1.89984030840337198e2,1.11758708953857422e-8,5.68434188608080149e-14,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C3"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 150.0,
+        "volume": 0.002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          152.69296640057487,
+          0.0021042471270998945
+        ],
+        "pressure": 418295.22287854383,
+        "entropy": 213.7543481140164,
+        "status": 1,
+        "pressure_error": -0.0006964723579585552,
+        "entropy_error": 1.2312489578321504
+      },
+      "native": "1.49999999999999432e2,1.99999999999995624e-3,4.18295222878543835e5,2.13754348114016409e2,2.27009877562522888e-9,0.00000000000000000e0,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C3"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 250.0,
+        "volume": 8e-05,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          155.00000000000003,
+          7.840000000000005e-06
+        ],
+        "pressure": -344222972.6809023,
+        "entropy": NaN,
+        "status": 1,
+        "pressure_error": -14954939439.302303,
+        "entropy_error": NaN
+      },
+      "native": "ERROR: invalid input: finite homogeneous PS specifications required"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C3"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 250.0,
+        "volume": 0.0002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          254.9987963123015,
+          0.00019353587058426854
+        ],
+        "pressure": -4497732.86773869,
+        "entropy": 214.6054149333325,
+        "status": 1,
+        "pressure_error": 1.9744038581848145e-07,
+        "entropy_error": 0.6035445584595038
+      },
+      "native": "2.50000000000002331e2,1.99999999999997001e-4,-4.49773286773869023e6,2.14605414933332469e2,-3.72529029846191406e-9,-2.84217094304040074e-14,4.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C3"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 250.0,
+        "volume": 0.002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          254.6963611018893,
+          0.002060436275968422
+        ],
+        "pressure": 853727.7410598546,
+        "entropy": 238.3757322070118,
+        "status": 1,
+        "pressure_error": -0.00010794249828904867,
+        "entropy_error": 1.3016423120198795
+      },
+      "native": "2.50000000000004121e2,1.99999999999991374e-3,8.53727741059854627e5,2.38375732207011879e2,4.66825440526008606e-8,8.52651282912120223e-14,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C3"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 400.0,
+        "volume": 8e-05,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          307.9999999999999,
+          7.840000000000005e-06
+        ],
+        "pressure": -462686673.3919103,
+        "entropy": NaN,
+        "status": 1,
+        "pressure_error": -14851860255.288712,
+        "entropy_error": NaN
+      },
+      "native": "ERROR: invalid input: finite homogeneous PS specifications required"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C3"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 400.0,
+        "volume": 0.0002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          407.9998371640764,
+          0.0002160873530921841
+        ],
+        "pressure": 6894840.675223425,
+        "entropy": 247.32722398070848,
+        "status": 1,
+        "pressure_error": 3994.8545361626893,
+        "entropy_error": 2.863599933518259
+      },
+      "native": "3.99999999999999886e2,2.00000000000000199e-4,6.89484067522342503e6,2.47327223980708425e2,-1.11758708953857422e-8,-5.68434188608080149e-14,4.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C3"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 400.0,
+        "volume": 0.002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          407.5773286656807,
+          0.0020485336256225806
+        ],
+        "pressure": 1506876.5183318206,
+        "entropy": 271.09754125438764,
+        "status": 1,
+        "pressure_error": -5.7124532759189606e-05,
+        "entropy_error": 1.8413467521115194
+      },
+      "native": "4.00000000000002728e2,1.99999999999988165e-3,1.50687651833182061e6,2.71097541254387806e2,9.19681042432785034e-8,1.70530256582424045e-13,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "N2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 150.0,
+        "volume": 8e-05,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          152.9999506371964,
+          8.323232194135833e-05
+        ],
+        "pressure": 8777736.565298297,
+        "entropy": 124.16077078751603,
+        "status": 1,
+        "pressure_error": 2057.069719929248,
+        "entropy_error": 1.0386409843271878
+      },
+      "native": "1.49999999999999829e2,7.99999999999998575e-5,8.77773656529829651e6,1.24160770787515986e2,1.11758708953857422e-8,-4.26325641456060112e-14,4.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "N2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 150.0,
+        "volume": 0.0002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          152.9998506941595,
+          0.0002107680550094387
+        ],
+        "pressure": 4309709.007021522,
+        "entropy": 135.4777060579312,
+        "status": 1,
+        "pressure_error": 1852.6796272071078,
+        "entropy_error": 0.9502382162777678
+      },
+      "native": "1.50000000000022624e2,1.99999999999928778e-4,4.30970900702152215e6,1.35477706057930675e2,2.14297324419021606e-6,-5.11590769747272134e-13,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "N2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 150.0,
+        "volume": 0.002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          152.21848681719305,
+          0.0020323990375616867
+        ],
+        "pressure": 601677.4774766478,
+        "entropy": 156.24465047445608,
+        "status": 1,
+        "pressure_error": -0.00013010320253670216,
+        "entropy_error": 0.44256256121229853
+      },
+      "native": "1.50000000000002217e2,1.99999999999992068e-3,6.01677477476647822e5,1.56244650474456080e2,3.23634594678878784e-8,0.00000000000000000e0,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "N2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 250.0,
+        "volume": 8e-05,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          254.9999662150446,
+          8.148545563731794e-05
+        ],
+        "pressure": 28874747.917146735,
+        "entropy": 134.77925545617464,
+        "status": 1,
+        "pressure_error": 531.0087506473064,
+        "entropy_error": 0.7039485842468025
+      },
+      "native": "2.50000000001128996e2,7.99999999993865243e-5,2.88747479171467349e7,1.34779255456144966e2,6.44221901893615723e-4,-2.96722646453417838e-11,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "N2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 250.0,
+        "volume": 0.0002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          254.98927982531168,
+          0.00020560314493473406
+        ],
+        "pressure": 9462078.261033135,
+        "entropy": 146.0961907265898,
+        "status": 1,
+        "pressure_error": -1.0170042514801025e-06,
+        "entropy_error": 0.6935775893570906
+      },
+      "native": "2.50000000000021657e2,1.99999999999959352e-4,9.46207826103313453e6,1.46096190726589498e2,2.97464430332183838e-6,-3.12638803734444082e-13,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "N2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 250.0,
+        "volume": 0.002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          254.18497080773767,
+          0.002035031372546949
+        ],
+        "pressure": 1025588.0949543858,
+        "entropy": 166.8631351431147,
+        "status": 1,
+        "pressure_error": -5.0114584155380726e-05,
+        "entropy_error": 0.491457920935062
+      },
+      "native": "2.50000000000004121e2,1.99999999999992415e-3,1.02558809495438577e6,1.66863135143114704e2,5.57629391551017761e-8,0.00000000000000000e0,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "N2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 400.0,
+        "volume": 8e-05,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          407.99996915598706,
+          8.114338106615434e-05
+        ],
+        "pressure": 59020264.94491938,
+        "entropy": 144.5588596016206,
+        "status": 1,
+        "pressure_error": 532.781958296895,
+        "entropy_error": 0.6422020368264896
+      },
+      "native": "4.00000000000958778e2,7.99999999996646357e-5,5.90202649449193776e7,1.44558859601603501e2,6.65210187435150146e-4,-1.71098690771032125e-11,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "N2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 400.0,
+        "volume": 0.0002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          407.99675777659513,
+          0.00020439633839616298
+        ],
+        "pressure": 17190632.142050553,
+        "entropy": 155.8757948720358,
+        "status": 1,
+        "pressure_error": -1.862645149230957e-07,
+        "entropy_error": 0.6388542675089184
+      },
+      "native": "4.00000000000027967e2,1.99999999999967863e-4,1.71906321420505531e7,1.55875794872035669e2,4.44427132606506348e-6,-1.42108547152020037e-13,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "N2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 400.0,
+        "volume": 0.002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          407.1569221590918,
+          0.002036525456629627
+        ],
+        "pressure": 1661454.0211709924,
+        "entropy": 176.64273928856068,
+        "status": 1,
+        "pressure_error": -1.9117258489131927e-05,
+        "entropy_error": 0.5255191806498658
+      },
+      "native": "4.00000000000005912e2,1.99999999999992068e-3,1.66145402117099240e6,1.76642739288560648e2,9.08039510250091553e-8,-2.84217094304040074e-14,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 150.0,
+        "volume": 8e-05,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          152.99996326520292,
+          8.328481688228863e-05
+        ],
+        "pressure": -10711676.770866575,
+        "entropy": 135.50161376111382,
+        "status": 1,
+        "pressure_error": 2786.510067090392,
+        "entropy_error": 1.5359662444463424
+      },
+      "native": "1.50000000000000085e2,8.00000000000000065e-5,-1.07116767708665747e7,1.35501613761113845e2,4.65661287307739258e-8,2.84217094304040074e-14,4.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 150.0,
+        "volume": 0.0002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          152.99863744877268,
+          0.00019521916058116515
+        ],
+        "pressure": -852923.2964351866,
+        "entropy": 149.8554306990572,
+        "status": 1,
+        "pressure_error": 4.470348358154297e-08,
+        "entropy_error": 0.2686894850255044
+      },
+      "native": "1.50000000000016627e2,1.99999999999937316e-4,-8.52923296435186639e5,1.49855430699056654e2,-1.27963721752166748e-6,-5.40012479177676141e-13,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 150.0,
+        "volume": 0.002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          152.5971204178372,
+          0.0020469406302814686
+        ],
+        "pressure": 546929.9627443646,
+        "entropy": 171.3906900762966,
+        "status": 1,
+        "pressure_error": -0.00015721505042165518,
+        "entropy_error": 0.6711931847574988
+      },
+      "native": "1.50000000000002359e2,1.99999999999992241e-3,5.46929962744364631e5,1.71390690076296664e2,2.82889232039451599e-8,5.68434188608080149e-14,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 250.0,
+        "volume": 8e-05,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          254.9999793411891,
+          8.100802213643907e-05
+        ],
+        "pressure": 21300394.590080917,
+        "entropy": 150.6150245383754,
+        "status": 1,
+        "pressure_error": 3338.5865986682475,
+        "entropy_error": 0.9655469076882923
+      },
+      "native": "2.49999999999999460e2,7.99999999999998575e-5,2.13003945900809169e7,1.50615024538375337e2,1.19209289550781250e-7,-5.68434188608080149e-14,4.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 250.0,
+        "volume": 0.0002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          254.97723961082667,
+          0.0002444537128475802
+        ],
+        "pressure": 4842971.445918722,
+        "entropy": 164.9688414763188,
+        "status": 1,
+        "pressure_error": -0.0001155780628323555,
+        "entropy_error": 2.856391089288678
+      },
+      "native": "2.50000000000668706e2,1.99999999998292418e-4,4.84297144591872208e6,1.64968841476308796e2,4.42024320363998413e-5,-1.00044417195022106e-11,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 250.0,
+        "volume": 0.002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          254.5509921841393,
+          0.002042654370783361
+        ],
+        "pressure": 974195.0406403814,
+        "entropy": 186.50410085355819,
+        "status": 1,
+        "pressure_error": -5.7666213251650333e-05,
+        "entropy_error": 0.771222139988538
+      },
+      "native": "2.50000000000003439e2,1.99999999999991374e-3,9.74195040640381398e5,1.86504100853558271e2,5.37838786840438843e-8,8.52651282912120223e-14,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 400.0,
+        "volume": 8e-05,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          407.9999806026163,
+          8.07426630176692e-05
+        ],
+        "pressure": 69318501.63150214,
+        "entropy": 168.37234694662862,
+        "status": 1,
+        "pressure_error": 5579.935044899583,
+        "entropy_error": 1.1217437354059427
+      },
+      "native": "3.99999999999999545e2,8.00000000000000065e-5,6.93185016315021366e7,1.68372346946628596e2,-4.47034835815429688e-8,-2.84217094304040074e-14,4.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 400.0,
+        "volume": 0.0002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          407.9998542437968,
+          0.00020728267611495193
+        ],
+        "pressure": 13386813.559449583,
+        "entropy": 182.72616388457206,
+        "status": 1,
+        "pressure_error": 31.986072914674878,
+        "entropy_error": 1.29212116362919
+      },
+      "native": "4.00000000000102943e2,1.99999999999783494e-4,1.33868135594495833e7,1.82726163884571122e2,1.93044543266296387e-5,-9.37916411203332245e-13,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 400.0,
+        "volume": 0.002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          407.4279395870182,
+          0.002040420696923774
+        ],
+        "pressure": 1615092.6574844064,
+        "entropy": 204.26142326181133,
+        "status": 1,
+        "pressure_error": -3.171595744788647e-05,
+        "entropy_error": 0.9949378569130545
+      },
+      "native": "4.00000000000003809e2,1.99999999999990290e-3,1.61509265748440637e6,2.04261423261811387e2,9.24337655305862427e-8,5.68434188608080149e-14,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 150.0,
+        "volume": 8e-05,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          152.9999837242571,
+          8.037336529724795e-05
+        ],
+        "pressure": 12426907.111704377,
+        "entropy": 144.96240363634757,
+        "status": 1,
+        "pressure_error": 39.96955419704318,
+        "entropy_error": 0.9171231459245064
+      },
+      "native": "1.49999999999999972e2,7.99999999999997219e-5,1.24269071117043775e7,1.44962403636347574e2,1.71549618244171143e-6,0.00000000000000000e0,4.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 150.0,
+        "volume": 0.0002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          152.99997973011799,
+          0.00019692358492170943
+        ],
+        "pressure": -3761508.262976244,
+        "entropy": 164.18015782199174,
+        "status": 1,
+        "pressure_error": -235.57261261623353,
+        "entropy_error": 0.4909997353701385
+      },
+      "native": "1.49999999999998238e2,2.00000000000001256e-4,-3.76150826297624409e6,1.64180157821991685e2,-3.16649675369262695e-8,-5.68434188608080149e-14,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 150.0,
+        "volume": 0.002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          152.63917761510837,
+          0.002055607964407505
+        ],
+        "pressure": 513887.1532322849,
+        "entropy": 186.42178171679976,
+        "status": 1,
+        "pressure_error": -0.0002231001853942871,
+        "entropy_error": 0.8393081269961158
+      },
+      "native": "1.50000000000000625e2,1.99999999999990116e-3,5.13887153232284880e5,1.86421781716799757e2,2.27591954171657562e-8,0.00000000000000000e0,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 250.0,
+        "volume": 8e-05,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          254.9999817709011,
+          8.032013833783135e-05
+        ],
+        "pressure": 75396359.07820953,
+        "entropy": 163.70225714078285,
+        "status": 1,
+        "pressure_error": 30.145836040377617,
+        "entropy_error": 1.0130971738306016
+      },
+      "native": "2.50000000000000995e2,8.00000000000000065e-5,7.53963590782095343e7,1.63702257140782848e2,1.05798244476318359e-6,0.00000000000000000e0,4.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 250.0,
+        "volume": 0.0002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          255.00005429397285,
+          0.00017689677330986976
+        ],
+        "pressure": 2480395.1177652795,
+        "entropy": 182.92001132642713,
+        "status": 1,
+        "pressure_error": 23.97112675383687,
+        "entropy_error": -0.7698622805633875
+      },
+      "native": "2.49999999999998352e2,2.00000000000007653e-4,2.48039511776527949e6,1.82920011326427129e2,5.58793544769287109e-9,0.00000000000000000e0,4.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 250.0,
+        "volume": 0.002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          254.60598964150824,
+          0.0020464659262566815
+        ],
+        "pressure": 943974.3442810652,
+        "entropy": 205.16163522123514,
+        "status": 1,
+        "pressure_error": -6.989878602325916e-05,
+        "entropy_error": 0.9474603540198814
+      },
+      "native": "2.50000000000003894e2,1.99999999999991374e-3,9.43974344281065161e5,2.05161635221235173e2,5.34346327185630798e-8,2.84217094304040074e-14,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 400.0,
+        "volume": 8e-05,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          407.99916104247507,
+          8.029645619538955e-05
+        ],
+        "pressure": 169850537.0279672,
+        "entropy": 186.78693619106042,
+        "status": 1,
+        "pressure_error": -1.430511474609375e-06,
+        "entropy_error": 1.3678760986053362
+      },
+      "native": "3.99999999999999545e2,8.00000000000000065e-5,1.69850537027967215e8,1.86786936191060477e2,4.17232513427734375e-7,5.68434188608080149e-14,4.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 400.0,
+        "volume": 0.0002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          407.99986066235255,
+          0.0002088751308499252
+        ],
+        "pressure": 11843250.188877564,
+        "entropy": 206.00469037670473,
+        "status": 1,
+        "pressure_error": 138.227164844051,
+        "entropy_error": 1.7196701005995862
+      },
+      "native": "4.00000000000467764e2,1.99999999998715881e-4,1.18432501888775639e7,2.06004690376693929e2,1.01363286375999451e-4,-1.08002495835535228e-11,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 400.0,
+        "volume": 0.002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          407.471513273208,
+          0.0020422862097289845
+        ],
+        "pressure": 1589105.1308542353,
+        "entropy": 228.2463142715127,
+        "status": 1,
+        "pressure_error": -4.056328907608986e-05,
+        "entropy_error": 1.2852356373996656
+      },
+      "native": "4.00000000000003070e2,1.99999999999989596e-3,1.58910513085423526e6,2.28246314271512801e2,9.22009348869323730e-8,1.13686837721616030e-13,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.2,
+          0.3,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 150.0,
+        "volume": 8e-05,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          152.99998833137937,
+          8.01455944420339e-05
+        ],
+        "pressure": 87093971.0386461,
+        "entropy": 152.8951548625733,
+        "status": 1,
+        "pressure_error": 3791.987170815468,
+        "entropy_error": 0.8982347014650998
+      },
+      "native": "1.49999999999999034e2,8.00000000000000065e-5,8.70939710386461020e7,1.52895154862573293e2,-2.98023223876953125e-8,0.00000000000000000e0,5.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.2,
+          0.3,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 150.0,
+        "volume": 0.0002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          152.99997324195905,
+          0.00019764522966478462
+        ],
+        "pressure": -6330474.204168482,
+        "entropy": 177.4245133614314,
+        "status": 1,
+        "pressure_error": -486.40038785059005,
+        "entropy_error": 0.561446840538423
+      },
+      "native": "1.49999999999998778e2,2.00000000000000904e-4,-6.33047420416848175e6,1.77424513361431423e2,-1.11758708953857422e-8,2.84217094304040074e-14,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.2,
+          0.3,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 150.0,
+        "volume": 0.002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          152.68185062312608,
+          0.002065546852503567
+        ],
+        "pressure": 485536.41409864195,
+        "entropy": 200.05885863902049,
+        "status": 1,
+        "pressure_error": -0.00027489918284118176,
+        "entropy_error": 0.9201554637541562
+      },
+      "native": "1.50000000000000512e2,1.99999999999990463e-3,4.85536414098641952e5,2.00058858639020514e2,1.86264514923095703e-8,2.84217094304040074e-14,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.2,
+          0.3,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 250.0,
+        "volume": 8e-05,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          254.99998570257875,
+          8.014002332647355e-05
+        ],
+        "pressure": 212572004.31236285,
+        "entropy": 172.98806108384048,
+        "status": 1,
+        "pressure_error": 5390.809352397919,
+        "entropy_error": 1.066375605277841
+      },
+      "native": "2.50000000000000341e2,8.00000000000000065e-5,2.12572004312362850e8,1.72988061083840392e2,2.44379043579101562e-6,-8.52651282912120223e-14,5.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.2,
+          0.3,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 250.0,
+        "volume": 0.0002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          254.99998724931336,
+          0.00018951286009337244
+        ],
+        "pressure": 235671.40605829097,
+        "entropy": 197.51741958269855,
+        "status": 1,
+        "pressure_error": -0.3368239216506481,
+        "entropy_error": 0.17371315673472054
+      },
+      "native": "2.49999999999982350e2,2.00000000000046739e-4,2.35671406058290973e5,1.97517419582698381e2,3.39001417160034180e-7,-1.70530256582424045e-13,4.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.2,
+          0.3,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 250.0,
+        "volume": 0.002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          254.64836030468052,
+          0.0020501479214918234
+        ],
+        "pressure": 917091.974294461,
+        "entropy": 220.15176486028778,
+        "status": 1,
+        "pressure_error": -7.660733535885811e-05,
+        "entropy_error": 1.0435474015108923
+      },
+      "native": "2.50000000000003666e2,1.99999999999990637e-3,9.17091974294460961e5,2.20151764860287926e2,5.28525561094284058e-8,1.42108547152020037e-13,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.2,
+          0.3,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 400.0,
+        "volume": 8e-05,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          407.9999791102534,
+          8.013707536158092e-05
+        ],
+        "pressure": 400789054.22293794,
+        "entropy": 198.65860414716252,
+        "status": 1,
+        "pressure_error": 7905.298184454441,
+        "entropy_error": 1.500152634285115
+      },
+      "native": "3.99999999999999886e2,8.00000000000000065e-5,4.00789054222937942e8,1.98658604147162464e2,3.09944152832031250e-6,-5.68434188608080149e-14,5.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.2,
+          0.3,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 400.0,
+        "volume": 0.0002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          407.99986386220564,
+          0.0002116468940400552
+        ],
+        "pressure": 10084889.821398446,
+        "entropy": 223.18796264602057,
+        "status": 1,
+        "pressure_error": 478.5340885259211,
+        "entropy_error": 2.0614885786990556
+      },
+      "native": "4.00000000001862929e2,1.99999999994510911e-4,1.00848898213984463e7,2.23187962645970202e2,3.72741371393203735e-4,-5.03632691106759012e-11,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.2,
+          0.3,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 400.0,
+        "volume": 0.002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          407.5209265764978,
+          0.0020441111878611515
+        ],
+        "pressure": 1564425.3145881891,
+        "entropy": 245.8223079236097,
+        "status": 1,
+        "pressure_error": -4.3962616473436356e-05,
+        "entropy_error": 1.438580861560638
+      },
+      "native": "4.00000000000003070e2,1.99999999999989249e-3,1.56442531458818913e6,2.45822307923609799e2,9.22009348869323730e-8,8.52651282912120223e-14,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5,
+          0.0
+        ],
+        "configuration": "classic",
+        "temperature": 150.0,
+        "volume": 8e-05,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          152.99996326520292,
+          8.328481688228863e-05
+        ],
+        "pressure": -10711676.770866575,
+        "entropy": 135.50161376111382,
+        "status": 1,
+        "pressure_error": 2786.510067090392,
+        "entropy_error": 1.5359662444463424
+      },
+      "native": "1.50000000000000085e2,8.00000000000000065e-5,-1.07116767708665747e7,1.35501613761113845e2,4.65661287307739258e-8,2.84217094304040074e-14,4.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5,
+          0.0
+        ],
+        "configuration": "classic",
+        "temperature": 150.0,
+        "volume": 0.0002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          152.99863744877268,
+          0.00019521916058116515
+        ],
+        "pressure": -852923.2964351866,
+        "entropy": 149.8554306990572,
+        "status": 1,
+        "pressure_error": 4.470348358154297e-08,
+        "entropy_error": 0.2686894850255044
+      },
+      "native": "1.50000000000016627e2,1.99999999999937316e-4,-8.52923296435186639e5,1.49855430699056654e2,-1.27963721752166748e-6,-5.40012479177676141e-13,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5,
+          0.0
+        ],
+        "configuration": "classic",
+        "temperature": 150.0,
+        "volume": 0.002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          152.5971204178372,
+          0.0020469406302814686
+        ],
+        "pressure": 546929.9627443646,
+        "entropy": 171.3906900762966,
+        "status": 1,
+        "pressure_error": -0.00015721505042165518,
+        "entropy_error": 0.6711931847574988
+      },
+      "native": "1.50000000000002359e2,1.99999999999992241e-3,5.46929962744364631e5,1.71390690076296664e2,2.82889232039451599e-8,5.68434188608080149e-14,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5,
+          0.0
+        ],
+        "configuration": "classic",
+        "temperature": 250.0,
+        "volume": 8e-05,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          254.9999793411891,
+          8.100802213643907e-05
+        ],
+        "pressure": 21300394.590080917,
+        "entropy": 150.6150245383754,
+        "status": 1,
+        "pressure_error": 3338.5865986682475,
+        "entropy_error": 0.9655469076882923
+      },
+      "native": "2.49999999999999460e2,7.99999999999998575e-5,2.13003945900809169e7,1.50615024538375337e2,1.19209289550781250e-7,-5.68434188608080149e-14,4.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5,
+          0.0
+        ],
+        "configuration": "classic",
+        "temperature": 250.0,
+        "volume": 0.0002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          254.97723961082667,
+          0.0002444537128475802
+        ],
+        "pressure": 4842971.445918722,
+        "entropy": 164.9688414763188,
+        "status": 1,
+        "pressure_error": -0.0001155780628323555,
+        "entropy_error": 2.856391089288678
+      },
+      "native": "2.50000000000668706e2,1.99999999998292418e-4,4.84297144591872208e6,1.64968841476308796e2,4.42024320363998413e-5,-1.00044417195022106e-11,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5,
+          0.0
+        ],
+        "configuration": "classic",
+        "temperature": 250.0,
+        "volume": 0.002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          254.5509921841393,
+          0.002042654370783361
+        ],
+        "pressure": 974195.0406403814,
+        "entropy": 186.50410085355819,
+        "status": 1,
+        "pressure_error": -5.7666213251650333e-05,
+        "entropy_error": 0.771222139988538
+      },
+      "native": "2.50000000000003439e2,1.99999999999991374e-3,9.74195040640381398e5,1.86504100853558271e2,5.37838786840438843e-8,8.52651282912120223e-14,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5,
+          0.0
+        ],
+        "configuration": "classic",
+        "temperature": 400.0,
+        "volume": 8e-05,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          407.9999806026163,
+          8.07426630176692e-05
+        ],
+        "pressure": 69318501.63150214,
+        "entropy": 168.37234694662862,
+        "status": 1,
+        "pressure_error": 5579.935044899583,
+        "entropy_error": 1.1217437354059427
+      },
+      "native": "3.99999999999999545e2,8.00000000000000065e-5,6.93185016315021366e7,1.68372346946628596e2,-4.47034835815429688e-8,-2.84217094304040074e-14,4.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5,
+          0.0
+        ],
+        "configuration": "classic",
+        "temperature": 400.0,
+        "volume": 0.0002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          407.9998542437968,
+          0.00020728267611495193
+        ],
+        "pressure": 13386813.559449583,
+        "entropy": 182.72616388457206,
+        "status": 1,
+        "pressure_error": 31.986072914674878,
+        "entropy_error": 1.29212116362919
+      },
+      "native": "4.00000000000102943e2,1.99999999999783494e-4,1.33868135594495833e7,1.82726163884571122e2,1.93044543266296387e-5,-9.37916411203332245e-13,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5,
+          0.0
+        ],
+        "configuration": "classic",
+        "temperature": 400.0,
+        "volume": 0.002,
+        "mode": "META_PS"
+      },
+      "result": {
+        "values": [
+          407.4279395870182,
+          0.002040420696923774
+        ],
+        "pressure": 1615092.6574844064,
+        "entropy": 204.26142326181133,
+        "status": 1,
+        "pressure_error": -3.171595744788647e-05,
+        "entropy_error": 0.9949378569130545
+      },
+      "native": "4.00000000000003809e2,1.99999999999990290e-3,1.61509265748440637e6,2.04261423261811387e2,9.24337655305862427e-8,5.68434188608080149e-14,3.00000000000000000e0"
+    },
+    {
+      "request": {
+        "eos": "PR",
+        "components": [
+          "C1"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 220.0,
+        "volume": 0.0,
+        "initial_pressure": 6000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "calculation_error": "Isentrope mapping into the meta-stable region failed",
+        "pressure": 6000000.0,
+        "entropy": 134.4599152524104
+      },
+      "native": "2.19999999999999829e2,1.92391284293877402e-4,6.00000000000000000e6,2.14371465108762834e2,2.04398717732491879e-4,5.46363636363636330e6,2.08228236045932334e2,2.18873194784644187e-4,4.92727272727272660e6,2.01468179038882909e2,2.36703102297062152e-4,4.39090909090908989e6,1.93956525794855452e2,2.59263397548249340e-4,3.85454545454545366e6,1.85510434810506808e2,2.88799107376335427e-4,3.31818181818181742e6,1.75872668241497479e2,3.29236870669633291e-4,2.78181818181818118e6,1.64662293734597938e2,3.88109061340422793e-4,2.24545454545454495e6,1.51268300027154254e2,4.81908986672718702e-4,1.70909090909090871e6,1.34563662553087795e2,6.55184114675071800e-4,1.17272727272727247e6,1.11795728938714433e2,1.08777882528244435e-3,6.36363636363636120e5,6.71047466054645838e1,4.93770337036332062e-3,9.9999999999999767"
+    },
+    {
+      "request": {
+        "eos": "PR",
+        "components": [
+          "N2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 150.0,
+        "volume": 0.0,
+        "initial_pressure": 6000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "calculation_error": "Isentrope mapping into the meta-stable region failed",
+        "pressure": 6000000.0,
+        "entropy": 128.01777026293044
+      },
+      "native": "1.49999999999675111e2,1.20494425920806669e-4,6.00000000000000000e6,1.46406446301664431e2,1.25800525135362002e-4,5.46363636363636330e6,1.42495123432687819e2,1.32064448555431854e-4,4.92727272727272660e6,1.38194355824435604e2,1.39612754747874229e-4,4.39090909090908989e6,1.33404466834472800e2,1.48949857193597082e-4,3.85454545454545366e6,1.27981095356513578e2,1.60902511517523175e-4,3.31818181818181742e6,1.21704219715504536e2,1.76934863911723718e-4,2.78181818181818118e6,1.14215832071321955e2,1.99926972860444178e-4,2.24545454545454495e6,1.04881498898482292e2,2.36462499647802001e-4,1.70909090909090871e6,9.24439391052972468e1,3.05529905104519133e-4,1.17272727272727247e6,7.40101391763354570e1,4.90231312761889673e-4,6.36363636363636120e5,3.80954160408271534e1,2.29574445137123223e-3,9.9999999999999767"
+    },
+    {
+      "request": {
+        "eos": "PR",
+        "components": [
+          "N2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 150.0,
+        "volume": 0.0,
+        "initial_pressure": 6000000.0,
+        "minimum_pressure": 1000000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "calculation_error": "Isentrope mapping into the meta-stable region failed",
+        "pressure": 6000000.0,
+        "entropy": 128.01777026293044
+      },
+      "native": "1.49999999999675111e2,1.20494425920806669e-4,6.00000000000000000e6,1.46973656453614382e2,1.24935666330867255e-4,5.54545454545454588e6,1.43725945303583529e2,1.30034961838003567e-4,5.09090909090909176e6,1.40216392233048225e2,1.35972219164024079e-4,4.63636363636363763e6,1.36392006881933384e2,1.43003700821136068e-4,4.18181818181818305e6,1.32181544293294991e2,1.51508650710578723e-4,3.72727272727272846e6,1.27486107821144984e2,1.62075387932055371e-4,3.27272727272727387e6,1.22162967554913934e2,1.75672456520244331e-4,2.81818181818181928e6,1.15995976800896472e2,1.94022247434525851e-4,2.36363636363636469e6,1.08637494243461134e2,2.20523039238145532e-4,1.90909090909091011e6,9.94844561898707553e1,2.62941047301917038e-4,1.45454545454545552e6,8.73874236815949672e1,3.43481661037646794e-4,1.0000000000000009"
+    },
+    {
+      "request": {
+        "eos": "SRK",
+        "components": [
+          "C1"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 220.0,
+        "volume": 0.0,
+        "initial_pressure": 6000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "calculation_error": "Isentrope mapping into the meta-stable region failed",
+        "pressure": 6000000.0,
+        "entropy": 134.41746281275246
+      },
+      "native": "2.19999999999997868e2,2.02309436263483852e-4,6.00000000000000000e6,2.14360751468093326e2,2.14589106259218684e-4,5.46363636363636330e6,2.08210938075669873e2,2.29362016578444554e-4,4.92727272727272660e6,2.01449840275363385e2,2.47518191994397984e-4,4.39090909090908989e6,1.93944417532347586e2,2.70432269637725100e-4,3.85454545454545366e6,1.85513773630239285e2,3.00344328861714088e-4,3.31818181818181742e6,1.75902449923758184e2,3.41165617354555000e-4,2.78181818181818118e6,1.64730052396309219e2,4.00389489738925918e-4,2.24545454545454495e6,1.51382249707017053e2,4.94414173719366135e-4,1.70909090909090871e6,1.34719045757038714e2,6.67540683519551935e-4,1.17272727272727247e6,1.11953139857438828e2,1.09878937152294281e-3,6.36363636363636120e5,6.71344466410031373e1,4.93667663214972501e-3,9.9999999999999767"
+    },
+    {
+      "request": {
+        "eos": "SRK",
+        "components": [
+          "N2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 150.0,
+        "volume": 0.0,
+        "initial_pressure": 6000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "calculation_error": "Isentrope mapping into the meta-stable region failed",
+        "pressure": 6000000.0,
+        "entropy": 127.89687356004231
+      },
+      "native": "1.49999999999926644e2,1.27855831233039663e-4,6.00000000000000000e6,1.46393039090146601e2,1.33345694808554758e-4,5.46363636363636330e6,1.42468127363219622e2,1.39816958603216572e-4,4.92727272727272660e6,1.38154085446046594e2,1.47601563766436229e-4,4.39090909090908989e6,1.33352146766624116e2,1.57210812341116379e-4,3.85454545454545366e6,1.27919638932414131e2,1.69479892195692239e-4,3.31818181818181742e6,1.21639754414469181e2,1.85881588716250653e-4,2.78181818181818118e6,1.14160802656526229e2,2.09297380430355890e-4,2.24545454545454495e6,1.04860979802832148e2,2.46269722389874722e-4,1.70909090909090871e6,9.25056939312428739e1,3.15521215437100427e-4,1.17272727272727247e6,7.42049993207529326e1,4.98557904759683031e-4,6.36363636363636120e5,3.81727788030962643e1,2.28276413067972665e-3,9.9999999999999767"
+    },
+    {
+      "request": {
+        "eos": "SRK",
+        "components": [
+          "N2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 150.0,
+        "volume": 0.0,
+        "initial_pressure": 6000000.0,
+        "minimum_pressure": 1000000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "calculation_error": "Isentrope mapping into the meta-stable region failed",
+        "pressure": 6000000.0,
+        "entropy": 127.89687356004231
+      },
+      "native": "1.49999999999926644e2,1.27855831233039663e-4,6.00000000000000000e6,1.46962314796464284e2,1.32451396224590447e-4,5.54545454545454588e6,1.43703090450752143e2,1.37721420966500772e-4,5.09090909090909176e6,1.40182112175777235e2,1.43848895958529206e-4,4.63636363636363763e6,1.36346823236596066e2,1.51093903635853547e-4,4.18181818181818305e6,1.32126705572503937e2,1.59840343036873444e-4,3.72727272727272846e6,1.27424097213450494e2,1.70681910501411437e-4,3.27272727272727387e6,1.22098408760379556e2,1.84592346953695643e-4,2.81818181818181928e6,1.15937293656067979e2,2.03295404120179551e-4,2.36363636363636469e6,1.08599966080789869e2,2.30173287959738133e-4,1.90909090909091011e6,9.94953381399744643e1,2.72905870488646162e-4,1.45454545454545552e6,8.74894265521938479e1,3.53313839060653975e-4,1.0000000000000009"
+    },
+    {
+      "request": {
+        "eos": "SRK",
+        "components": [
+          "CO2",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 350.0,
+        "volume": 0.0,
+        "initial_pressure": 10000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_META_SPEC={\"pressure\": 10000000.0, \"entropy\": 199.86631604596042}",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    189.63375157149193        6.9524840245121074E-307",
+            "#0  0x335fb41a",
+            "#1  0x337977a4",
+            "#2  0x3382c3de",
+            "#3  0x339c457d",
+            "#4  0x339c5f9f",
+            "#5  0x339d60b2",
+            "#6  0x33a7874d",
+            "#7  0x33a78d95",
+            "#8  0xd31b4790",
+            "#9  0xd31b449f",
+            "#10  0xd31b4351",
+            "#11  0xc37a3ec5",
+            "#12  0xc37a297a",
+            "#13  0xc37a2584",
+            "#14  0x44de26fd",
+            "#15  0x44de2158",
+            "#16  0x44de3685",
+            "#17  0x44e5b8ab",
+            "#18  0x44e5b775",
+            "#19  0x44e44247",
+            "#20  0x44e38efb",
+            "#21  0x44e7263f",
+            "#22  0x44e71c79",
+            "#23  0x44e72ca8",
+            "#24  0x44e9b541",
+            "#25  0x44e9b5e6",
+            "#26  0x44e9c4c6",
+            "#27  0x44e9c277",
+            "#28  0x44e9c96a",
+            "#29  0xc851122f",
+            "#30  0xe3b97123",
+            "#31  0xe447cc90",
+            "#32  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        },
+        "pressure": 10000000.0,
+        "entropy": 199.86631604596042
+      },
+      "native": "ERROR: solver did not converge: spinodal property bracket"
+    },
+    {
+      "request": {
+        "eos": "RK",
+        "components": [
+          "C1"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 220.0,
+        "volume": 0.0,
+        "initial_pressure": 6000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "calculation_error": "Isentrope mapping into the meta-stable region failed",
+        "pressure": 6000000.0,
+        "entropy": 134.60657942707894
+      },
+      "native": "2.19999999999997499e2,2.01394916192734286e-4,6.00000000000000000e6,2.14458944046710172e2,2.14281543725014804e-4,5.46363636363636330e6,2.08416574917713405e2,2.29795885262049326e-4,4.92727272727272660e6,2.01776616057339197e2,2.48863065484978435e-4,4.39090909090908989e6,1.94412173263749139e2,2.72903046321126960e-4,3.85454545454545366e6,1.86150532353347529e2,3.04213778808991265e-4,3.31818181818181742e6,1.76746304773981905e2,3.46778044352673612e-4,2.78181818181818118e6,1.65829226320166782e2,4.08170106100217713e-4,2.24545454545454495e6,1.52788210778005691e2,5.04854402412072416e-4,1.70909090909090871e6,1.36457132751979771e2,6.81079347037747730e-4,1.17272727272727247e6,1.13914714417849211e2,1.11510328747500571e-3,6.36363636363636120e5,6.84318858088241200e1,4.94103020355568957e-3,9.9999999999999767"
+    },
+    {
+      "request": {
+        "eos": "RK",
+        "components": [
+          "N2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 150.0,
+        "volume": 0.0,
+        "initial_pressure": 6000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "calculation_error": "Isentrope mapping into the meta-stable region failed",
+        "pressure": 6000000.0,
+        "entropy": 128.27403312256232
+      },
+      "native": "1.49999999999931873e2,1.24949809613432027e-4,6.00000000000000000e6,1.46441597092348189e2,1.30825320523457732e-4,5.46363636363636330e6,1.42554845985536446e2,1.37806227211941266e-4,4.92727272727272660e6,1.38266573642387669e2,1.46275339944345641e-4,4.39090909090908989e6,1.33476191034299575e2,1.56823467927300287e-4,3.85454545454545366e6,1.28040342304351157e2,1.70415521006780484e-4,3.31818181818181742e6,1.21745356511333100e2,1.88746816065029163e-4,2.78181818181818118e6,1.14253977474163619e2,2.15102741631728416e-4,2.24545454545454495e6,1.04991506587414193e2,2.56800169349776343e-4,1.70909090909090871e6,9.28627234840577529e1,3.34063531519782672e-4,1.17272727272727247e6,7.53084559009047894e1,5.30477827670835633e-4,6.36363636363636120e5,4.00028939011446667e1,2.31339138810282433e-3,9.9999999999999767"
+    },
+    {
+      "request": {
+        "eos": "RK",
+        "components": [
+          "N2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 150.0,
+        "volume": 0.0,
+        "initial_pressure": 6000000.0,
+        "minimum_pressure": 1000000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "calculation_error": "Isentrope mapping into the meta-stable region failed",
+        "pressure": 6000000.0,
+        "entropy": 128.27403312256232
+      },
+      "native": "1.49999999999931873e2,1.24949809613432027e-4,6.00000000000000000e6,1.47004089555811760e2,1.29865173848685696e-4,5.54545454545454588e6,1.43779387278550558e2,1.35539442661393087e-4,5.09090909090909176e6,1.40284472358182228e2,1.42183503377443912e-4,4.63636363636363763e6,1.36465586397626140e2,1.50097715922529779e-4,4.18181818181818305e6,1.32251282038776225e2,1.59725827792671208e-4,3.72727272727272846e6,1.27543882795878332e2,1.71753439801186918e-4,3.27272727272727387e6,1.22205216941724160e2,1.87300791832402109e-4,2.81818181818181928e6,1.16031411914811414e2,2.08334938493701333e-4,2.36363636363636469e6,1.08705043893471824e2,2.38658904655151291e-4,1.90909090909091011e6,9.96948086709275145e1,2.86698115247463155e-4,1.45454545454545552e6,8.80090897527754379e1,3.75513128082147218e-4,1.0000000000000009"
+    },
+    {
+      "request": {
+        "eos": "RK",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.2,
+          0.3,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 350.0,
+        "volume": 0.0,
+        "initial_pressure": 10000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_META_SPEC={\"pressure\": 10000000.0, \"entropy\": 204.84666732595934}",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    231.32809936008334        6.9524840245121074E-307",
+            "#0  0x335fb41a",
+            "#1  0x337977a4",
+            "#2  0x3382c3de",
+            "#3  0x339c457d",
+            "#4  0x339c5f9f",
+            "#5  0x339d60b2",
+            "#6  0x33a7874d",
+            "#7  0x33a78d95",
+            "#8  0xd31b4790",
+            "#9  0xd31b449f",
+            "#10  0xd31b4351",
+            "#11  0xc37a3ec5",
+            "#12  0xc37a297a",
+            "#13  0xc37a2584",
+            "#14  0x44de26fd",
+            "#15  0x44de2158",
+            "#16  0x44de3685",
+            "#17  0x44e5b8ab",
+            "#18  0x44e5b775",
+            "#19  0x44e44247",
+            "#20  0x44e38efb",
+            "#21  0x44e7263f",
+            "#22  0x44e71c79",
+            "#23  0x44e72ca8",
+            "#24  0x44e9b541",
+            "#25  0x44e9b5e6",
+            "#26  0x44e9c4c6",
+            "#27  0x44e9c277",
+            "#28  0x44e9c96a",
+            "#29  0xc851122f",
+            "#30  0xe3b97123",
+            "#31  0xe447cc90",
+            "#32  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        },
+        "pressure": 10000000.0,
+        "entropy": 204.84666732595934
+      },
+      "native": "ERROR: solver did not converge: spinodal property bracket"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 180.0,
+        "volume": 0.0,
+        "initial_pressure": 6000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_META_SPEC={\"pressure\": 6000000.0, \"entropy\": 117.82405089897203}",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    171.75447201190903        6.9524840245121074E-307",
+            "#0  0x335fb41a",
+            "#1  0x337977a4",
+            "#2  0x3382c3de",
+            "#3  0x339c457d",
+            "#4  0x339c5f9f",
+            "#5  0x339d48f2",
+            "#6  0x33a713e5",
+            "#7  0x33a76dee",
+            "#8  0x33a788d2",
+            "#9  0xd31b4790",
+            "#10  0xd31b449f",
+            "#11  0xd31b4351",
+            "#12  0xc37a3ec5",
+            "#13  0xc37a297a",
+            "#14  0xc37a2584",
+            "#15  0x44de26fd",
+            "#16  0x44de2158",
+            "#17  0x44de3685",
+            "#18  0x44e5b8ab",
+            "#19  0x44e5b775",
+            "#20  0x44e44247",
+            "#21  0x44e38efb",
+            "#22  0x44e7263f",
+            "#23  0x44e71c79",
+            "#24  0x44e72ca8",
+            "#25  0x44e9b541",
+            "#26  0x44e9b5e6",
+            "#27  0x44e9c4c6",
+            "#28  0x44e9c277",
+            "#29  0x44e9c96a",
+            "#30  0xc851122f",
+            "#31  0xe3b97123",
+            "#32  0xe447cc90",
+            "#33  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        },
+        "pressure": 6000000.0,
+        "entropy": 117.82405089897203
+      },
+      "native": "1.79999999999999545e2,7.48036827735776207e-5,6.00000000000000000e6,1.78841475093101195e2,7.54233935970162527e-5,5.47278155572113022e6,1.77626964724959919e2,7.60903026470751510e-5,4.94556311144226044e6,1.76349025794534185e2,7.68117734499236218e-5,4.41834466716339067e6,1.74998477709566089e2,7.75970443452661703e-5,3.89112622288452089e6,1.73563786838247694e2,7.84579312514765108e-5,3.36390777860565111e6,1.72030141778089813e2,7.94098979948231257e-5,2.83668933432678133e6,1.70378006821143657e2,8.04737549012028415e-5,2.30947089004791155e6,1.68580743980382607e2,8.16784939555095649e-5,1.78225244576904178e6,1.66600451350417359e2,8.30663314584882272e-5,1.25503400149017200e6,1.64380060833958339e2,8.47024506432909565e-5,7.27815557211302221e5,1.61826563327446053e2,8.66957028099311656e-5,2.0059711293243244"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 180.0,
+        "volume": 0.0,
+        "initial_pressure": 6000000.0,
+        "minimum_pressure": 1000000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_META_SPEC={\"pressure\": 6000000.0, \"entropy\": 117.82405089897203}",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    172.29991950840545        6.9524840245121074E-307",
+            "#0  0x335fb41a",
+            "#1  0x337977a4",
+            "#2  0x3382c3de",
+            "#3  0x339c457d",
+            "#4  0x339c5f9f",
+            "#5  0x339d48f2",
+            "#6  0x33a713e5",
+            "#7  0x33a76dee",
+            "#8  0x33a788d2",
+            "#9  0xd31b4790",
+            "#10  0xd31b449f",
+            "#11  0xd31b4351",
+            "#12  0xc37a3ec5",
+            "#13  0xc37a297a",
+            "#14  0xc37a2584",
+            "#15  0x44de26fd",
+            "#16  0x44de2158",
+            "#17  0x44de3685",
+            "#18  0x44e5b8ab",
+            "#19  0x44e5b775",
+            "#20  0x44e44247",
+            "#21  0x44e38efb",
+            "#22  0x44e7263f",
+            "#23  0x44e71c79",
+            "#24  0x44e72ca8",
+            "#25  0x44e9b541",
+            "#26  0x44e9b5e6",
+            "#27  0x44e9c4c6",
+            "#28  0x44e9c277",
+            "#29  0x44e9c96a",
+            "#30  0xc851122f",
+            "#31  0xe3b97123",
+            "#32  0xe447cc90",
+            "#33  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        },
+        "pressure": 6000000.0,
+        "entropy": 117.82405089897203
+      },
+      "native": "1.79999999999999545e2,7.48036827735776207e-5,6.00000000000000000e6,1.79004345147551106e2,7.53353140617309499e-5,5.54545454545454588e6,1.77967775565738037e2,7.59013408938861891e-5,5.09090909090909176e6,1.76885722491414981e2,7.65062666797276873e-5,4.63636363636363763e6,1.75752734222113787e2,7.71555433491590437e-5,4.18181818181818305e6,1.74562221561983193e2,7.78558604828945115e-5,3.72727272727272846e6,1.73306101346545006e2,7.86155549015502654e-5,3.27272727272727387e6,1.71974283575303360e2,7.94452070622115567e-5,2.81818181818181928e6,1.70553909685625399e2,8.03585380125540689e-5,2.36363636363636469e6,1.69028177300192709e2,8.13738115718850620e-5,1.90909090909091011e6,1.67374440726495237e2,8.25161321287256927e-5,1.45454545454545552e6,1.65560957432842741e2,8.38214383279924693e-5,1.0000000000000009"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 220.0,
+        "volume": 0.0,
+        "initial_pressure": 6000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_META_SPEC={\"pressure\": 6000000.0, \"entropy\": 135.8290873932157}",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    171.75447201190903        6.9524840245121074E-307",
+            "#0  0x335fb41a",
+            "#1  0x337977a4",
+            "#2  0x3382c3de",
+            "#3  0x339c457d",
+            "#4  0x339c5f9f",
+            "#5  0x339d48f2",
+            "#6  0x33a713e5",
+            "#7  0x33a76dee",
+            "#8  0x33a788d2",
+            "#9  0xd31b4790",
+            "#10  0xd31b449f",
+            "#11  0xd31b4351",
+            "#12  0xc37a3ec5",
+            "#13  0xc37a297a",
+            "#14  0xc37a2584",
+            "#15  0x44de26fd",
+            "#16  0x44de2158",
+            "#17  0x44de3685",
+            "#18  0x44e5b8ab",
+            "#19  0x44e5b775",
+            "#20  0x44e44247",
+            "#21  0x44e38efb",
+            "#22  0x44e7263f",
+            "#23  0x44e71c79",
+            "#24  0x44e72ca8",
+            "#25  0x44e9b541",
+            "#26  0x44e9b5e6",
+            "#27  0x44e9c4c6",
+            "#28  0x44e9c277",
+            "#29  0x44e9c96a",
+            "#30  0xc851122f",
+            "#31  0xe3b97123",
+            "#32  0xe447cc90",
+            "#33  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        },
+        "pressure": 6000000.0,
+        "entropy": 135.8290873932157
+      },
+      "native": "2.19999999998759364e2,1.94028511569606778e-4,6.00000000000000000e6,2.13863696395570514e2,2.07631335203429200e-4,5.46363636363636330e6,2.07173691339702202e2,2.24306309896593809e-4,4.92727272727272660e6,1.99850261007621299e2,2.45146717143164908e-4,4.39090909090908989e6,1.91795271291046049e2,2.71810254948900412e-4,3.85454545454545366e6,1.82881172361148970e2,3.06942547540178009e-4,3.31818181818181742e6,1.72928824593675444e2,3.55064266259336669e-4,2.78181818181818118e6,1.61660601430979284e2,4.24659588717637873e-4,2.24545454545454495e6,1.48591704787643692e2,5.33958875486220045e-4,1.70909090909090871e6,1.32730668798109576e2,7.31465022119772638e-4,1.17272727272727247e6,1.11425716494112791e2,1.21063941858395429e-3,6.36363636363636120e5,6.85824908571833589e1,5.31563835764684457e-3,9.9999999999999767"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 220.0,
+        "volume": 0.0,
+        "initial_pressure": 6000000.0,
+        "minimum_pressure": 1000000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_META_SPEC={\"pressure\": 6000000.0, \"entropy\": 135.8290873932157}",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    172.29991950840545        6.9524840245121074E-307",
+            "#0  0x335fb41a",
+            "#1  0x337977a4",
+            "#2  0x3382c3de",
+            "#3  0x339c457d",
+            "#4  0x339c5f9f",
+            "#5  0x339d48f2",
+            "#6  0x33a713e5",
+            "#7  0x33a76dee",
+            "#8  0x33a788d2",
+            "#9  0xd31b4790",
+            "#10  0xd31b449f",
+            "#11  0xd31b4351",
+            "#12  0xc37a3ec5",
+            "#13  0xc37a297a",
+            "#14  0xc37a2584",
+            "#15  0x44de26fd",
+            "#16  0x44de2158",
+            "#17  0x44de3685",
+            "#18  0x44e5b8ab",
+            "#19  0x44e5b775",
+            "#20  0x44e44247",
+            "#21  0x44e38efb",
+            "#22  0x44e7263f",
+            "#23  0x44e71c79",
+            "#24  0x44e72ca8",
+            "#25  0x44e9b541",
+            "#26  0x44e9b5e6",
+            "#27  0x44e9c4c6",
+            "#28  0x44e9c277",
+            "#29  0x44e9c96a",
+            "#30  0xc851122f",
+            "#31  0xe3b97123",
+            "#32  0xe447cc90",
+            "#33  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        },
+        "pressure": 6000000.0,
+        "entropy": 135.8290873932157
+      },
+      "native": "2.19999999998759364e2,1.94028511569606778e-4,6.00000000000000000e6,2.14833742031035882e2,2.05379543505145430e-4,5.54545454545454588e6,2.09277884950114441e2,2.18836388763556344e-4,5.09090909090909176e6,2.03286009547438397e2,2.35003633973233597e-4,4.63636363636363763e6,1.96803396218211560e2,2.54730930474132309e-4,4.18181818181818305e6,1.89763410742631777e2,2.79251960866165280e-4,3.72727272727272846e6,1.82081064519920943e2,3.10433239841557951e-4,3.27272727272727387e6,1.73641245938118630e2,3.51251599638834479e-4,2.81818181818181928e6,1.64276383730289382e2,4.06794219421589224e-4,2.36363636363636469e6,1.53721155525254602e2,4.86608268060177056e-4,1.90909090909091011e6,1.41509731201361546e2,6.11185548590871498e-4,1.45454545454545552e6,1.26694667775135358e2,8.34869268222087355e-4,1.0000000000000009"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 260.0,
+        "volume": 0.0,
+        "initial_pressure": 6000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_META_SPEC={\"pressure\": 6000000.0, \"entropy\": 144.27060596742987}",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    171.75447201190903        6.9524840245121074E-307",
+            "#0  0x335fb41a",
+            "#1  0x337977a4",
+            "#2  0x3382c3de",
+            "#3  0x339c457d",
+            "#4  0x339c5f9f",
+            "#5  0x339d48f2",
+            "#6  0x33a713e5",
+            "#7  0x33a76dee",
+            "#8  0x33a788d2",
+            "#9  0xd31b4790",
+            "#10  0xd31b449f",
+            "#11  0xd31b4351",
+            "#12  0xc37a3ec5",
+            "#13  0xc37a297a",
+            "#14  0xc37a2584",
+            "#15  0x44de26fd",
+            "#16  0x44de2158",
+            "#17  0x44de3685",
+            "#18  0x44e5b8ab",
+            "#19  0x44e5b775",
+            "#20  0x44e44247",
+            "#21  0x44e38efb",
+            "#22  0x44e7263f",
+            "#23  0x44e71c79",
+            "#24  0x44e72ca8",
+            "#25  0x44e9b541",
+            "#26  0x44e9b5e6",
+            "#27  0x44e9c4c6",
+            "#28  0x44e9c277",
+            "#29  0x44e9c96a",
+            "#30  0xc851122f",
+            "#31  0xe3b97123",
+            "#32  0xe447cc90",
+            "#33  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        },
+        "pressure": 6000000.0,
+        "entropy": 144.27060596742987
+      },
+      "native": "2.60000000000000000e2,2.90983131446747559e-4,6.00000000000000000e6,2.53330187931286787e2,3.12200117217709713e-4,5.46363636363636330e6,2.46138290098156119e2,3.37648443720721641e-4,4.92727272727272660e6,2.38331795959747467e2,3.68750279617175109e-4,4.39090909090908989e6,2.29786905916481828e2,4.07662595424988761e-4,3.85454545454545366e6,2.20331348899733257e2,4.57834200452373837e-4,3.31818181818181742e6,2.09713121080021551e2,5.25170651350198537e-4,2.78181818181818118e6,1.97538161294916478e2,6.20767810938101000e-4,2.24545454545454495e6,1.83129183586828759e2,7.68452392189112655e-4,1.70909090909090871e6,1.65137879878043890e2,1.03144399247879831e-3,1.17272727272727247e6,1.40049406760453166e2,1.66063870075746603e-3,6.36363636363636120e5,8.69617972141918045e1,6.94390676632712298e-3,9.9999999999999767"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 260.0,
+        "volume": 0.0,
+        "initial_pressure": 6000000.0,
+        "minimum_pressure": 1000000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_META_SPEC={\"pressure\": 6000000.0, \"entropy\": 144.27060596742987}",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    172.29991950840545        6.9524840245121074E-307",
+            "#0  0x335fb41a",
+            "#1  0x337977a4",
+            "#2  0x3382c3de",
+            "#3  0x339c457d",
+            "#4  0x339c5f9f",
+            "#5  0x339d48f2",
+            "#6  0x33a713e5",
+            "#7  0x33a76dee",
+            "#8  0x33a788d2",
+            "#9  0xd31b4790",
+            "#10  0xd31b449f",
+            "#11  0xd31b4351",
+            "#12  0xc37a3ec5",
+            "#13  0xc37a297a",
+            "#14  0xc37a2584",
+            "#15  0x44de26fd",
+            "#16  0x44de2158",
+            "#17  0x44de3685",
+            "#18  0x44e5b8ab",
+            "#19  0x44e5b775",
+            "#20  0x44e44247",
+            "#21  0x44e38efb",
+            "#22  0x44e7263f",
+            "#23  0x44e71c79",
+            "#24  0x44e72ca8",
+            "#25  0x44e9b541",
+            "#26  0x44e9b5e6",
+            "#27  0x44e9c4c6",
+            "#28  0x44e9c277",
+            "#29  0x44e9c96a",
+            "#30  0xc851122f",
+            "#31  0xe3b97123",
+            "#32  0xe447cc90",
+            "#33  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        },
+        "pressure": 6000000.0,
+        "entropy": 144.27060596742987
+      },
+      "native": "2.60000000000000000e2,2.90983131446747559e-4,6.00000000000000000e6,2.54379386178626646e2,3.08718494170977503e-4,5.54545454545454588e6,2.48392812141969841e2,3.29361862255317134e-4,5.09090909090909176e6,2.41987546048200585e2,3.53699867697200891e-4,4.63636363636363763e6,2.35096728833890353e2,3.82837572993005712e-4,4.18181818181818305e6,2.27633402347493103e2,4.18381262178627662e-4,3.72727272727272846e6,2.19480918580867950e2,4.62765614497950644e-4,3.27272727272727387e6,2.10476678836513742e2,5.19880362056277120e-4,2.81818181818181928e6,2.00382589854661717e2,5.96378978882628548e-4,2.36363636363636469e6,1.88826247122665848e2,7.04743911993543481e-4,1.90909090909091011e6,1.75167949509668261e2,8.71719403772623050e-4,1.45454545454545552e6,1.58136385257889685e2,1.16799991357892786e-3,1.0000000000000009"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "CO2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 270.0,
+        "volume": 0.0,
+        "initial_pressure": 10000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_META_SPEC={\"pressure\": 10000000.0, \"entropy\": 153.70596025172378}",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    280.63339213007572        6.9524840245121074E-307",
+            "#0  0x335fb41a",
+            "#1  0x337977a4",
+            "#2  0x3382c3de",
+            "#3  0x339c457d",
+            "#4  0x339c5f9f",
+            "#5  0x339d48f2",
+            "#6  0x33a713e5",
+            "#7  0x33a76dee",
+            "#8  0x33a788d2",
+            "#9  0xd31b4790",
+            "#10  0xd31b449f",
+            "#11  0xd31b4351",
+            "#12  0xc37a3ec5",
+            "#13  0xc37a297a",
+            "#14  0xc37a2584",
+            "#15  0x44de26fd",
+            "#16  0x44de2158",
+            "#17  0x44de3685",
+            "#18  0x44e5b8ab",
+            "#19  0x44e5b775",
+            "#20  0x44e44247",
+            "#21  0x44e38efb",
+            "#22  0x44e7263f",
+            "#23  0x44e71c79",
+            "#24  0x44e72ca8",
+            "#25  0x44e9b541",
+            "#26  0x44e9b5e6",
+            "#27  0x44e9c4c6",
+            "#28  0x44e9c277",
+            "#29  0x44e9c96a",
+            "#30  0xc851122f",
+            "#31  0xe3b97123",
+            "#32  0xe447cc90",
+            "#33  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        },
+        "pressure": 10000000.0,
+        "entropy": 153.70596025172378
+      },
+      "native": "2.70000000001292790e2,6.81431565263191698e-5,1.00000000000000000e7,2.68696248849059032e2,6.85539175126046352e-5,9.10000000000000000e6,2.67341715481346398e2,6.89889734469964971e-5,8.20000000000000000e6,2.65931192995883521e2,6.94512060507412307e-5,7.30000000000000000e6,2.64458559569259819e2,6.99440441305169421e-5,6.40000000000000000e6,2.62916540601642680e2,7.04716129859968380e-5,5.50000000000000000e6,2.61296385752345259e2,7.10389391623399852e-5,4.60000000000000000e6,2.59587420633842896e2,7.16522373944485384e-5,3.70000000000000000e6,2.57776408419416668e2,7.23193232835751316e-5,2.80000000000000000e6,2.55846613120245280e2,7.30502250828169683e-5,1.90000000000000000e6,2.53776375231185824e2,7.38581239790126945e-5,1.00000000000000000e6,2.51536850318205722e2,7.47608637652607421e-5,1.0000000000000000"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "CO2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 270.0,
+        "volume": 0.0,
+        "initial_pressure": 10000000.0,
+        "minimum_pressure": 1000000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_META_SPEC={\"pressure\": 10000000.0, \"entropy\": 153.70596025172378}",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    280.23856996238845        6.9524840245121074E-307",
+            "#0  0x335fb41a",
+            "#1  0x337977a4",
+            "#2  0x3382c3de",
+            "#3  0x339c457d",
+            "#4  0x339c5f9f",
+            "#5  0x339d48f2",
+            "#6  0x33a713e5",
+            "#7  0x33a76dee",
+            "#8  0x33a788d2",
+            "#9  0xd31b4790",
+            "#10  0xd31b449f",
+            "#11  0xd31b4351",
+            "#12  0xc37a3ec5",
+            "#13  0xc37a297a",
+            "#14  0xc37a2584",
+            "#15  0x44de26fd",
+            "#16  0x44de2158",
+            "#17  0x44de3685",
+            "#18  0x44e5b8ab",
+            "#19  0x44e5b775",
+            "#20  0x44e44247",
+            "#21  0x44e38efb",
+            "#22  0x44e7263f",
+            "#23  0x44e71c79",
+            "#24  0x44e72ca8",
+            "#25  0x44e9b541",
+            "#26  0x44e9b5e6",
+            "#27  0x44e9c4c6",
+            "#28  0x44e9c277",
+            "#29  0x44e9c96a",
+            "#30  0xc851122f",
+            "#31  0xe3b97123",
+            "#32  0xe447cc90",
+            "#33  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        },
+        "pressure": 10000000.0,
+        "entropy": 153.70596025172378
+      },
+      "native": "2.70000000001292790e2,6.81431565263191698e-5,1.00000000000000000e7,2.68816798124524041e2,6.85156112730158105e-5,9.18181818181818165e6,2.67591995175244676e2,6.89079419536337278e-5,8.36363636363636330e6,2.66321764427465382e2,6.93222628703700684e-5,7.54545454545454495e6,2.65001680116829220e2,6.97610458145643260e-5,6.72727272727272660e6,2.63626579800905517e2,7.02272063287070802e-5,5.90909090909090824e6,2.62190383590817760e2,7.07242179444345494e-5,5.09090909090908989e6,2.60685852589161641e2,7.12562661511566389e-5,4.27272727272727154e6,2.59104259661926903e2,7.18284601023660144e-5,3.45454545454545319e6,2.57434930452764945e2,7.24471304661642861e-5,2.63636363636363484e6,2.55664586452048042e2,7.31202597759571520e-5,1.81818181818181649e6,2.53776375231185597e2,7.38581239790125590e-5,9.9999999999999825"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "CO2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 310.0,
+        "volume": 0.0,
+        "initial_pressure": 10000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_META_SPEC={\"pressure\": 10000000.0, \"entropy\": 162.3359428903905}",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    280.63339213007572        6.9524840245121074E-307",
+            "#0  0x335fb41a",
+            "#1  0x337977a4",
+            "#2  0x3382c3de",
+            "#3  0x339c457d",
+            "#4  0x339c5f9f",
+            "#5  0x339d48f2",
+            "#6  0x33a713e5",
+            "#7  0x33a76dee",
+            "#8  0x33a788d2",
+            "#9  0xd31b4790",
+            "#10  0xd31b449f",
+            "#11  0xd31b4351",
+            "#12  0xc37a3ec5",
+            "#13  0xc37a297a",
+            "#14  0xc37a2584",
+            "#15  0x44de26fd",
+            "#16  0x44de2158",
+            "#17  0x44de3685",
+            "#18  0x44e5b8ab",
+            "#19  0x44e5b775",
+            "#20  0x44e44247",
+            "#21  0x44e38efb",
+            "#22  0x44e7263f",
+            "#23  0x44e71c79",
+            "#24  0x44e72ca8",
+            "#25  0x44e9b541",
+            "#26  0x44e9b5e6",
+            "#27  0x44e9c4c6",
+            "#28  0x44e9c277",
+            "#29  0x44e9c96a",
+            "#30  0xc851122f",
+            "#31  0xe3b97123",
+            "#32  0xe447cc90",
+            "#33  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        },
+        "pressure": 10000000.0,
+        "entropy": 162.3359428903905
+      },
+      "native": "3.10000000000001421e2,8.72694105620824400e-5,1.00000000000000000e7,3.08503117754733637e2,8.80362722397436424e-5,9.57256524852821603e6,3.06938652598154022e2,8.88542024458900215e-5,9.14513049705643207e6,3.05299084287263497e2,8.97298745739166722e-5,8.71769574558464810e6,3.03575498164961402e2,9.06713293752952265e-5,8.29026099411286414e6,3.01757208794240512e2,9.16883718499491820e-5,7.86282624264108017e6,2.99831245374566151e2,9.27931225418878282e-5,7.43539149116929621e6,2.97781632504750235e2,9.40008011320356913e-5,7.00795673969751224e6,2.95588359028751142e2,9.53308701515055208e-5,6.58052198822572827e6,2.93225855229837862e2,9.68087567683850573e-5,6.15308723675394431e6,2.90660663799521899e2,9.84685413599650279e-5,5.72565248528216034e6,2.87847724708136411e2,1.00356304717699532e-4,5.2982177338103801"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "CO2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 310.0,
+        "volume": 0.0,
+        "initial_pressure": 10000000.0,
+        "minimum_pressure": 1000000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_META_SPEC={\"pressure\": 10000000.0, \"entropy\": 162.3359428903905}",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    280.23856996238845        6.9524840245121074E-307",
+            "#0  0x335fb41a",
+            "#1  0x337977a4",
+            "#2  0x3382c3de",
+            "#3  0x339c457d",
+            "#4  0x339c5f9f",
+            "#5  0x339d48f2",
+            "#6  0x33a713e5",
+            "#7  0x33a76dee",
+            "#8  0x33a788d2",
+            "#9  0xd31b4790",
+            "#10  0xd31b449f",
+            "#11  0xd31b4351",
+            "#12  0xc37a3ec5",
+            "#13  0xc37a297a",
+            "#14  0xc37a2584",
+            "#15  0x44de26fd",
+            "#16  0x44de2158",
+            "#17  0x44de3685",
+            "#18  0x44e5b8ab",
+            "#19  0x44e5b775",
+            "#20  0x44e44247",
+            "#21  0x44e38efb",
+            "#22  0x44e7263f",
+            "#23  0x44e71c79",
+            "#24  0x44e72ca8",
+            "#25  0x44e9b541",
+            "#26  0x44e9b5e6",
+            "#27  0x44e9c4c6",
+            "#28  0x44e9c277",
+            "#29  0x44e9c96a",
+            "#30  0xc851122f",
+            "#31  0xe3b97123",
+            "#32  0xe447cc90",
+            "#33  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        },
+        "pressure": 10000000.0,
+        "entropy": 162.3359428903905
+      },
+      "native": "3.10000000000001421e2,8.72694105620824400e-5,1.00000000000000000e7,3.08503117755182757e2,8.80362722395109455e-5,9.57256524865379930e6,3.06938652599094837e2,8.88542024453933078e-5,9.14513049730759859e6,3.05299084288744041e2,8.97298745731169917e-5,8.71769574596139789e6,3.03575498167040507e2,9.06713293741466769e-5,8.29026099461519625e6,3.01757208796987129e2,9.16883718483939346e-5,7.86282624326899461e6,2.99831245378065148e2,9.27931225398545968e-5,7.43539149192279298e6,2.97781632509105464e2,9.40008011294336603e-5,7.00795674057659134e6,2.95588359034093742e2,9.53308701482169052e-5,6.58052198923038971e6,2.93225855236335747e2,9.68087567642537185e-5,6.15308723788418807e6,2.90660663807397043e2,9.84685413547793160e-5,5.72565248653798643e6,2.87847724710850571e2,1.00356063947801901e-4,5.2982177351917848"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "CO2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 350.0,
+        "volume": 0.0,
+        "initial_pressure": 10000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_META_SPEC={\"pressure\": 10000000.0, \"entropy\": 175.23070893607476}",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    280.63339213007572        6.9524840245121074E-307",
+            "#0  0x335fb41a",
+            "#1  0x337977a4",
+            "#2  0x3382c3de",
+            "#3  0x339c457d",
+            "#4  0x339c5f9f",
+            "#5  0x339d48f2",
+            "#6  0x33a713e5",
+            "#7  0x33a76dee",
+            "#8  0x33a788d2",
+            "#9  0xd31b4790",
+            "#10  0xd31b449f",
+            "#11  0xd31b4351",
+            "#12  0xc37a3ec5",
+            "#13  0xc37a297a",
+            "#14  0xc37a2584",
+            "#15  0x44de26fd",
+            "#16  0x44de2158",
+            "#17  0x44de3685",
+            "#18  0x44e5b8ab",
+            "#19  0x44e5b775",
+            "#20  0x44e44247",
+            "#21  0x44e38efb",
+            "#22  0x44e7263f",
+            "#23  0x44e71c79",
+            "#24  0x44e72ca8",
+            "#25  0x44e9b541",
+            "#26  0x44e9b5e6",
+            "#27  0x44e9c4c6",
+            "#28  0x44e9c277",
+            "#29  0x44e9c96a",
+            "#30  0xc851122f",
+            "#31  0xe3b97123",
+            "#32  0xe447cc90",
+            "#33  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        },
+        "pressure": 10000000.0,
+        "entropy": 175.23070893607476
+      },
+      "native": "3.49999999999548436e2,1.77541232028309245e-4,1.00000000000000000e7,3.40951822131025040e2,1.91301058519061833e-4,9.10000000000000000e6,3.30977528642119239e2,2.08382750422504720e-4,8.20000000000000000e6,3.19957129544710881e2,2.29953414983978738e-4,7.30000000000000000e6,3.07744400874279393e2,2.57755087359815753e-4,6.40000000000000000e6,2.94141512798987776e2,2.94534548904994316e-4,5.50000000000000000e6,2.78847920552647963e2,3.44954400029035793e-4,4.60000000000000000e6,2.61356989636283970e2,4.17753546133673315e-4,3.70000000000000000e6,2.40723981943096078e2,5.31760235959537978e-4,2.80000000000000000e6,2.14923221265548847e2,7.37421980886773429e-4,1.90000000000000000e6,1.78256672971307523e2,1.24014757645641454e-3,1.00000000000000000e6,8.83219392210902470e1,6.85605358165371302e-3,1.0000000000000000"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "CO2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 350.0,
+        "volume": 0.0,
+        "initial_pressure": 10000000.0,
+        "minimum_pressure": 1000000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_META_SPEC={\"pressure\": 10000000.0, \"entropy\": 175.23070893607476}",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    280.23856996238845        6.9524840245121074E-307",
+            "#0  0x335fb41a",
+            "#1  0x337977a4",
+            "#2  0x3382c3de",
+            "#3  0x339c457d",
+            "#4  0x339c5f9f",
+            "#5  0x339d48f2",
+            "#6  0x33a713e5",
+            "#7  0x33a76dee",
+            "#8  0x33a788d2",
+            "#9  0xd31b4790",
+            "#10  0xd31b449f",
+            "#11  0xd31b4351",
+            "#12  0xc37a3ec5",
+            "#13  0xc37a297a",
+            "#14  0xc37a2584",
+            "#15  0x44de26fd",
+            "#16  0x44de2158",
+            "#17  0x44de3685",
+            "#18  0x44e5b8ab",
+            "#19  0x44e5b775",
+            "#20  0x44e44247",
+            "#21  0x44e38efb",
+            "#22  0x44e7263f",
+            "#23  0x44e71c79",
+            "#24  0x44e72ca8",
+            "#25  0x44e9b541",
+            "#26  0x44e9b5e6",
+            "#27  0x44e9c4c6",
+            "#28  0x44e9c277",
+            "#29  0x44e9c96a",
+            "#30  0xc851122f",
+            "#31  0xe3b97123",
+            "#32  0xe447cc90",
+            "#33  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        },
+        "pressure": 10000000.0,
+        "entropy": 175.23070893607476
+      },
+      "native": "3.49999999999548436e2,1.77541232028309245e-4,1.00000000000000000e7,3.41810985729243669e2,1.89927189406752922e-4,9.18181818181818165e6,3.32865075339322289e2,2.04983288404035543e-4,8.36363636363636330e6,3.23074129771849186e2,2.23539431129121500e-4,7.54545454545454495e6,3.12334297664120186e2,2.46779886474630386e-4,6.72727272727272660e6,3.00512917566443662e2,2.76466758331116115e-4,5.90909090909090824e6,2.87423419214169655e2,3.15370106995106932e-4,5.09090909090908989e6,2.72778458378640153e2,3.68166711085512370e-4,4.27272727272727154e6,2.56098189651917494e2,4.43533476206724522e-4,3.45454545454545319e6,2.36507338441647363e2,5.59839988264659361e-4,2.63636363636363484e6,2.12184712550623885e2,7.64810593170353104e-4,1.81818181818181649e6,1.78256672971307381e2,1.24014757645641563e-3,9.9999999999999825"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C3"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 330.0,
+        "volume": 0.0,
+        "initial_pressure": 8000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_META_SPEC={\"pressure\": 8000000.0, \"entropy\": 225.36302042802174}",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    363.77403652830475        6.9524840245121074E-307",
+            "#0  0x335fb41a",
+            "#1  0x337977a4",
+            "#2  0x3382c3de",
+            "#3  0x339c457d",
+            "#4  0x339c5f9f",
+            "#5  0x339d48f2",
+            "#6  0x33a713e5",
+            "#7  0x33a76dee",
+            "#8  0x33a788d2",
+            "#9  0xd31b4790",
+            "#10  0xd31b449f",
+            "#11  0xd31b4351",
+            "#12  0xc37a3ec5",
+            "#13  0xc37a297a",
+            "#14  0xc37a2584",
+            "#15  0x44de26fd",
+            "#16  0x44de2158",
+            "#17  0x44de3685",
+            "#18  0x44e5b8ab",
+            "#19  0x44e5b775",
+            "#20  0x44e44247",
+            "#21  0x44e38efb",
+            "#22  0x44e7263f",
+            "#23  0x44e71c79",
+            "#24  0x44e72ca8",
+            "#25  0x44e9b541",
+            "#26  0x44e9b5e6",
+            "#27  0x44e9c4c6",
+            "#28  0x44e9c277",
+            "#29  0x44e9c96a",
+            "#30  0xc851122f",
+            "#31  0xe3b97123",
+            "#32  0xe447cc90",
+            "#33  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        },
+        "pressure": 8000000.0,
+        "entropy": 225.36302042802174
+      },
+      "native": "ERROR: solver did not converge: spinodal scalar backtracking"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C3"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 330.0,
+        "volume": 0.0,
+        "initial_pressure": 8000000.0,
+        "minimum_pressure": 1000000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_META_SPEC={\"pressure\": 8000000.0, \"entropy\": 225.36302042802174}",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    364.96045455155809        6.9524840245121074E-307",
+            "#0  0x335fb41a",
+            "#1  0x337977a4",
+            "#2  0x3382c3de",
+            "#3  0x339c457d",
+            "#4  0x339c5f9f",
+            "#5  0x339d48f2",
+            "#6  0x33a713e5",
+            "#7  0x33a76dee",
+            "#8  0x33a788d2",
+            "#9  0xd31b4790",
+            "#10  0xd31b449f",
+            "#11  0xd31b4351",
+            "#12  0xc37a3ec5",
+            "#13  0xc37a297a",
+            "#14  0xc37a2584",
+            "#15  0x44de26fd",
+            "#16  0x44de2158",
+            "#17  0x44de3685",
+            "#18  0x44e5b8ab",
+            "#19  0x44e5b775",
+            "#20  0x44e44247",
+            "#21  0x44e38efb",
+            "#22  0x44e7263f",
+            "#23  0x44e71c79",
+            "#24  0x44e72ca8",
+            "#25  0x44e9b541",
+            "#26  0x44e9b5e6",
+            "#27  0x44e9c4c6",
+            "#28  0x44e9c277",
+            "#29  0x44e9c96a",
+            "#30  0xc851122f",
+            "#31  0xe3b97123",
+            "#32  0xe447cc90",
+            "#33  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        },
+        "pressure": 8000000.0,
+        "entropy": 225.36302042802174
+      },
+      "native": "3.30000000000008242e2,1.38965317515627569e-4,8.00000000000000000e6,3.29148751892930420e2,1.40057723922432786e-4,7.36363636363636330e6,3.28249909037864654e2,1.41238050035246988e-4,6.72727272727272660e6,3.27296597502704572e2,1.42520754906940111e-4,6.09090909090908989e6,3.26280215087455588e2,1.43924197830483575e-4,5.45454545454545319e6,3.25189771394550803e2,1.45472197292629776e-4,4.81818181818181649e6,3.24010868917045400e2,1.47196466240002381e-4,4.18181818181818025e6,3.22724055654969561e2,1.49140598242372333e-4,3.54545454545454402e6,3.21302004016397802e2,1.51366983469420079e-4,2.90909090909090778e6,3.19704309095867984e2,1.53969740114801696e-4,2.27272727272727154e6,3.17866898603975358e2,1.57101441358159451e-4,1.63636363636363531e6,3.15677207558182090e2,1.61036815964011210e-4,9.9999999999999895"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C3"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 370.0,
+        "volume": 0.0,
+        "initial_pressure": 8000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_META_SPEC={\"pressure\": 8000000.0, \"entropy\": 236.79211233404757}",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    363.77403652830475        6.9524840245121074E-307",
+            "#0  0x335fb41a",
+            "#1  0x337977a4",
+            "#2  0x3382c3de",
+            "#3  0x339c457d",
+            "#4  0x339c5f9f",
+            "#5  0x339d48f2",
+            "#6  0x33a713e5",
+            "#7  0x33a76dee",
+            "#8  0x33a788d2",
+            "#9  0xd31b4790",
+            "#10  0xd31b449f",
+            "#11  0xd31b4351",
+            "#12  0xc37a3ec5",
+            "#13  0xc37a297a",
+            "#14  0xc37a2584",
+            "#15  0x44de26fd",
+            "#16  0x44de2158",
+            "#17  0x44de3685",
+            "#18  0x44e5b8ab",
+            "#19  0x44e5b775",
+            "#20  0x44e44247",
+            "#21  0x44e38efb",
+            "#22  0x44e7263f",
+            "#23  0x44e71c79",
+            "#24  0x44e72ca8",
+            "#25  0x44e9b541",
+            "#26  0x44e9b5e6",
+            "#27  0x44e9c4c6",
+            "#28  0x44e9c277",
+            "#29  0x44e9c96a",
+            "#30  0xc851122f",
+            "#31  0xe3b97123",
+            "#32  0xe447cc90",
+            "#33  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        },
+        "pressure": 8000000.0,
+        "entropy": 236.79211233404757
+      },
+      "native": "ERROR: solver did not converge: spinodal scalar backtracking"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C3"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 370.0,
+        "volume": 0.0,
+        "initial_pressure": 8000000.0,
+        "minimum_pressure": 1000000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_META_SPEC={\"pressure\": 8000000.0, \"entropy\": 236.79211233404757}",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    364.96045455155809        6.9524840245121074E-307",
+            "#0  0x335fb41a",
+            "#1  0x337977a4",
+            "#2  0x3382c3de",
+            "#3  0x339c457d",
+            "#4  0x339c5f9f",
+            "#5  0x339d48f2",
+            "#6  0x33a713e5",
+            "#7  0x33a76dee",
+            "#8  0x33a788d2",
+            "#9  0xd31b4790",
+            "#10  0xd31b449f",
+            "#11  0xd31b4351",
+            "#12  0xc37a3ec5",
+            "#13  0xc37a297a",
+            "#14  0xc37a2584",
+            "#15  0x44de26fd",
+            "#16  0x44de2158",
+            "#17  0x44de3685",
+            "#18  0x44e5b8ab",
+            "#19  0x44e5b775",
+            "#20  0x44e44247",
+            "#21  0x44e38efb",
+            "#22  0x44e7263f",
+            "#23  0x44e71c79",
+            "#24  0x44e72ca8",
+            "#25  0x44e9b541",
+            "#26  0x44e9b5e6",
+            "#27  0x44e9c4c6",
+            "#28  0x44e9c277",
+            "#29  0x44e9c96a",
+            "#30  0xc851122f",
+            "#31  0xe3b97123",
+            "#32  0xe447cc90",
+            "#33  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        },
+        "pressure": 8000000.0,
+        "entropy": 236.79211233404757
+      },
+      "native": "3.70000000000001137e2,1.57818551335273523e-4,8.00000000000000000e6,3.69000150916623454e2,1.59596611569982422e-4,7.53845529422154743e6,3.67928262873909773e2,1.61555299629151128e-4,7.07691058844309486e6,3.66771078496620760e2,1.63732607387119479e-4,6.61536588266464230e6,3.65511063321575932e2,1.66179798119065923e-4,6.15382117688618973e6,3.64124272095155447e2,1.68968410674202787e-4,5.69227647110773716e6,3.62576656013893114e2,1.72202611351884226e-4,5.23073176532928459e6,3.60817174665400898e2,1.76042715496116489e-4,4.76918705955083203e6,3.58763595663384251e2,1.80754818110102406e-4,4.30764235377237946e6,3.56268759650577408e2,1.86831894658255805e-4,3.84609764799392689e6,3.53020625436189107e2,1.95364412826223762e-4,3.38455294221547432e6,3.48092752962209374e2,2.09779477467300288e-4,2.9230082364370189"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C3"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 410.0,
+        "volume": 0.0,
+        "initial_pressure": 8000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_META_SPEC={\"pressure\": 8000000.0, \"entropy\": 248.99274951141325}",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    363.77403652830475        6.9524840245121074E-307",
+            "#0  0x335fb41a",
+            "#1  0x337977a4",
+            "#2  0x3382c3de",
+            "#3  0x339c457d",
+            "#4  0x339c5f9f",
+            "#5  0x339d48f2",
+            "#6  0x33a713e5",
+            "#7  0x33a76dee",
+            "#8  0x33a788d2",
+            "#9  0xd31b4790",
+            "#10  0xd31b449f",
+            "#11  0xd31b4351",
+            "#12  0xc37a3ec5",
+            "#13  0xc37a297a",
+            "#14  0xc37a2584",
+            "#15  0x44de26fd",
+            "#16  0x44de2158",
+            "#17  0x44de3685",
+            "#18  0x44e5b8ab",
+            "#19  0x44e5b775",
+            "#20  0x44e44247",
+            "#21  0x44e38efb",
+            "#22  0x44e7263f",
+            "#23  0x44e71c79",
+            "#24  0x44e72ca8",
+            "#25  0x44e9b541",
+            "#26  0x44e9b5e6",
+            "#27  0x44e9c4c6",
+            "#28  0x44e9c277",
+            "#29  0x44e9c96a",
+            "#30  0xc851122f",
+            "#31  0xe3b97123",
+            "#32  0xe447cc90",
+            "#33  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        },
+        "pressure": 8000000.0,
+        "entropy": 248.99274951141325
+      },
+      "native": "ERROR: solver did not converge: spinodal scalar backtracking"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C3"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 410.0,
+        "volume": 0.0,
+        "initial_pressure": 8000000.0,
+        "minimum_pressure": 1000000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_META_SPEC={\"pressure\": 8000000.0, \"entropy\": 248.99274951141325}",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    364.96045455155809        6.9524840245121074E-307",
+            "#0  0x335fb41a",
+            "#1  0x337977a4",
+            "#2  0x3382c3de",
+            "#3  0x339c457d",
+            "#4  0x339c5f9f",
+            "#5  0x339d48f2",
+            "#6  0x33a713e5",
+            "#7  0x33a76dee",
+            "#8  0x33a788d2",
+            "#9  0xd31b4790",
+            "#10  0xd31b449f",
+            "#11  0xd31b4351",
+            "#12  0xc37a3ec5",
+            "#13  0xc37a297a",
+            "#14  0xc37a2584",
+            "#15  0x44de26fd",
+            "#16  0x44de2158",
+            "#17  0x44de3685",
+            "#18  0x44e5b8ab",
+            "#19  0x44e5b775",
+            "#20  0x44e44247",
+            "#21  0x44e38efb",
+            "#22  0x44e7263f",
+            "#23  0x44e71c79",
+            "#24  0x44e72ca8",
+            "#25  0x44e9b541",
+            "#26  0x44e9b5e6",
+            "#27  0x44e9c4c6",
+            "#28  0x44e9c277",
+            "#29  0x44e9c96a",
+            "#30  0xc851122f",
+            "#31  0xe3b97123",
+            "#32  0xe447cc90",
+            "#33  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        },
+        "pressure": 8000000.0,
+        "entropy": 248.99274951141325
+      },
+      "native": "4.10000000001088324e2,1.93753269836820599e-4,8.00000000000000000e6,4.07161936314072761e2,2.01622115942072175e-4,7.36363636363636330e6,4.03689506179078080e2,2.12078575300428862e-4,6.72727272727272660e6,3.99218009255949937e2,2.27020553770670031e-4,6.09090909090908989e6,3.93032334477575432e2,2.50795407272259103e-4,5.45454545454545319e6,3.83872761980124551e2,2.93890134338401941e-4,4.81818181818181649e6,3.71385997692271133e2,3.72067929659079116e-4,4.18181818181818025e6,3.58128526378726633e2,4.88474534659143374e-4,3.54545454545454402e6,3.45179053423133894e2,6.48814653999829497e-4,2.90909090909090778e6,3.31719098063504021e2,8.84653588863608593e-4,2.27272727272727154e6,3.16271591866122378e2,1.28105572450353195e-3,1.63636363636363531e6,2.95821040409776344e2,2.12731717853960464e-3,9.9999999999999895"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "N2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 110.0,
+        "volume": 0.0,
+        "initial_pressure": 6000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_META_SPEC={\"pressure\": 6000000.0, \"entropy\": 111.59995134247337}",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    108.16519693218794        6.9524840245121074E-307",
+            "#0  0x335fb41a",
+            "#1  0x337977a4",
+            "#2  0x3382c3de",
+            "#3  0x339c457d",
+            "#4  0x339c5f9f",
+            "#5  0x339d48f2",
+            "#6  0x33a713e5",
+            "#7  0x33a76dee",
+            "#8  0x33a788d2",
+            "#9  0xd31b4790",
+            "#10  0xd31b449f",
+            "#11  0xd31b4351",
+            "#12  0xc37a3ec5",
+            "#13  0xc37a297a",
+            "#14  0xc37a2584",
+            "#15  0x44de26fd",
+            "#16  0x44de2158",
+            "#17  0x44de3685",
+            "#18  0x44e5b8ab",
+            "#19  0x44e5b775",
+            "#20  0x44e44247",
+            "#21  0x44e38efb",
+            "#22  0x44e7263f",
+            "#23  0x44e71c79",
+            "#24  0x44e72ca8",
+            "#25  0x44e9b541",
+            "#26  0x44e9b5e6",
+            "#27  0x44e9c4c6",
+            "#28  0x44e9c277",
+            "#29  0x44e9c96a",
+            "#30  0xc851122f",
+            "#31  0xe3b97123",
+            "#32  0xe447cc90",
+            "#33  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        },
+        "pressure": 6000000.0,
+        "entropy": 111.59995134247337
+      },
+      "native": "1.09999999999999105e2,5.85685511936788738e-5,6.00000000000000000e6,1.09357092503901725e2,5.88659593024450567e-5,5.46363636363636330e6,1.08694128777958767e2,5.91792085271296970e-5,4.92727272727272660e6,1.08009339459650960e2,5.95099638590680961e-5,4.39090909090908989e6,1.07300686135909615e2,5.98601675025771631e-5,3.85454545454545366e6,1.06565801064061077e2,6.02321046208952011e-5,3.31818181818181742e6,1.05801908452522170e2,6.06284900068540720e-5,2.78181818181818118e6,1.05005719928581655e2,6.10525842935642809e-5,2.24545454545454495e6,1.04173293071189093e2,6.15083528027268061e-5,1.70909090909090871e6,1.03299835752912188e2,6.20006875136083432e-5,1.17272727272727247e6,1.02379428640236839e2,6.25357252441870897e-5,6.36363636363636120e5,1.01404619848239946e2,6.31213175659256308e-5,9.9999999999999767"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "N2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 110.0,
+        "volume": 0.0,
+        "initial_pressure": 6000000.0,
+        "minimum_pressure": 1000000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_META_SPEC={\"pressure\": 6000000.0, \"entropy\": 111.59995134247337}",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    109.02383176961403        6.9524840245121074E-307",
+            "#0  0x335fb41a",
+            "#1  0x337977a4",
+            "#2  0x3382c3de",
+            "#3  0x339c457d",
+            "#4  0x339c5f9f",
+            "#5  0x339d48f2",
+            "#6  0x33a713e5",
+            "#7  0x33a76dee",
+            "#8  0x33a788d2",
+            "#9  0xd31b4790",
+            "#10  0xd31b449f",
+            "#11  0xd31b4351",
+            "#12  0xc37a3ec5",
+            "#13  0xc37a297a",
+            "#14  0xc37a2584",
+            "#15  0x44de26fd",
+            "#16  0x44de2158",
+            "#17  0x44de3685",
+            "#18  0x44e5b8ab",
+            "#19  0x44e5b775",
+            "#20  0x44e44247",
+            "#21  0x44e38efb",
+            "#22  0x44e7263f",
+            "#23  0x44e71c79",
+            "#24  0x44e72ca8",
+            "#25  0x44e9b541",
+            "#26  0x44e9b5e6",
+            "#27  0x44e9c4c6",
+            "#28  0x44e9c277",
+            "#29  0x44e9c96a",
+            "#30  0xc851122f",
+            "#31  0xe3b97123",
+            "#32  0xe447cc90",
+            "#33  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        },
+        "pressure": 6000000.0,
+        "entropy": 111.59995134247337
+      },
+      "native": "1.09999999999999105e2,5.85685511936788738e-5,6.00000000000000000e6,1.09456418740099124e2,5.88196061477297134e-5,5.54545454545454588e6,1.08898616115954923e2,5.90818669383824771e-5,5.09090909090909176e6,1.08325549393816885e2,5.93563119190488570e-5,4.63636363636363763e6,1.07736045370302307e2,5.96440534145778486e-5,4.18181818181818305e6,1.07128776587905534e2,5.99463635640590107e-5,3.72727272727272846e6,1.06502231704350535e2,6.02647067696994446e-5,3.27272727272727387e6,1.05854678164366405e2,6.06007809054256804e-5,2.81818181818181928e6,1.05184114588732143e2,6.09565703117508995e-5,2.36363636363636469e6,1.04488209204844310e2,6.13344149085664266e-5,1.90909090909091011e6,1.03764218985438447e2,6.17371017532035280e-5,1.45454545454545552e6,1.03008881578656101e2,6.21679885006883704e-5,1.0000000000000009"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "N2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 130.0,
+        "volume": 0.0,
+        "initial_pressure": 6000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_META_SPEC={\"pressure\": 6000000.0, \"entropy\": 119.3932538681417}",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    108.16519693218794        6.9524840245121074E-307",
+            "#0  0x335fb41a",
+            "#1  0x337977a4",
+            "#2  0x3382c3de",
+            "#3  0x339c457d",
+            "#4  0x339c5f9f",
+            "#5  0x339d48f2",
+            "#6  0x33a713e5",
+            "#7  0x33a76dee",
+            "#8  0x33a788d2",
+            "#9  0xd31b4790",
+            "#10  0xd31b449f",
+            "#11  0xd31b4351",
+            "#12  0xc37a3ec5",
+            "#13  0xc37a297a",
+            "#14  0xc37a2584",
+            "#15  0x44de26fd",
+            "#16  0x44de2158",
+            "#17  0x44de3685",
+            "#18  0x44e5b8ab",
+            "#19  0x44e5b775",
+            "#20  0x44e44247",
+            "#21  0x44e38efb",
+            "#22  0x44e7263f",
+            "#23  0x44e71c79",
+            "#24  0x44e72ca8",
+            "#25  0x44e9b541",
+            "#26  0x44e9b5e6",
+            "#27  0x44e9c4c6",
+            "#28  0x44e9c277",
+            "#29  0x44e9c96a",
+            "#30  0xc851122f",
+            "#31  0xe3b97123",
+            "#32  0xe447cc90",
+            "#33  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        },
+        "pressure": 6000000.0,
+        "entropy": 119.3932538681417
+      },
+      "native": "1.29999999999999972e2,7.20388177883255734e-5,6.00000000000000000e6,1.28991276470798681e2,7.27004016866465832e-5,5.60309183789164852e6,1.27936523092824785e2,7.34120334063984644e-5,5.20618367578329705e6,1.26829985129198533e2,7.41812579561739046e-5,4.80927551367494557e6,1.25664662041436515e2,7.50174407252472757e-5,4.41236735156659409e6,1.24431903344516215e2,7.59324035729762976e-5,4.01545918945824262e6,1.23120821033996933e2,7.69413661610052511e-5,3.61855102734989114e6,1.21717406321524422e2,7.80643878043194223e-5,3.22164286524153966e6,1.20203147519660831e2,7.93286691319400116e-5,2.82473470313318819e6,1.18552758348356051e2,8.07724168795729950e-5,2.42782654102483671e6,1.16730206073690553e2,8.24517587809463600e-5,2.03091837891648524e6,1.14681186638399268e2,8.44530724585429356e-5,1.6340102168081328"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "N2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 130.0,
+        "volume": 0.0,
+        "initial_pressure": 6000000.0,
+        "minimum_pressure": 1000000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_META_SPEC={\"pressure\": 6000000.0, \"entropy\": 119.3932538681417}",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    109.02383176961403        6.9524840245121074E-307",
+            "#0  0x335fb41a",
+            "#1  0x337977a4",
+            "#2  0x3382c3de",
+            "#3  0x339c457d",
+            "#4  0x339c5f9f",
+            "#5  0x339d48f2",
+            "#6  0x33a713e5",
+            "#7  0x33a76dee",
+            "#8  0x33a788d2",
+            "#9  0xd31b4790",
+            "#10  0xd31b449f",
+            "#11  0xd31b4351",
+            "#12  0xc37a3ec5",
+            "#13  0xc37a297a",
+            "#14  0xc37a2584",
+            "#15  0x44de26fd",
+            "#16  0x44de2158",
+            "#17  0x44de3685",
+            "#18  0x44e5b8ab",
+            "#19  0x44e5b775",
+            "#20  0x44e44247",
+            "#21  0x44e38efb",
+            "#22  0x44e7263f",
+            "#23  0x44e71c79",
+            "#24  0x44e72ca8",
+            "#25  0x44e9b541",
+            "#26  0x44e9b5e6",
+            "#27  0x44e9c4c6",
+            "#28  0x44e9c277",
+            "#29  0x44e9c96a",
+            "#30  0xc851122f",
+            "#31  0xe3b97123",
+            "#32  0xe447cc90",
+            "#33  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        },
+        "pressure": 6000000.0,
+        "entropy": 119.3932538681417
+      },
+      "native": "1.29999999999999972e2,7.20388177883255734e-5,6.00000000000000000e6,1.28991276470287602e2,7.27004016869866161e-5,5.60309183769485354e6,1.27936523091754282e2,7.34120334071313579e-5,5.20618367538970709e6,1.26829985127510852e2,7.41812579573653886e-5,4.80927551308456063e6,1.25664662039061625e2,7.50174407269793699e-5,4.41236735077941418e6,1.24431903341367899e2,7.59324035753537497e-5,4.01545918847426726e6,1.23120821029966933e2,7.69413661641647789e-5,3.61855102616912033e6,1.21717406316473557e2,7.80643878084440391e-5,3.22164286386397341e6,1.20203147513404048e2,7.93286691372810084e-5,2.82473470155882649e6,1.18552758340639329e2,8.07724168864903404e-5,2.42782653925367957e6,1.16730206064147779e2,8.24517587899834697e-5,2.03091837694853265e6,1.14681186638691713e2,8.44540386444878120e-5,1.6340102146433852"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "N2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 150.0,
+        "volume": 0.0,
+        "initial_pressure": 6000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_META_SPEC={\"pressure\": 6000000.0, \"entropy\": 129.22480252215863}",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    108.16519693218794        6.9524840245121074E-307",
+            "#0  0x335fb41a",
+            "#1  0x337977a4",
+            "#2  0x3382c3de",
+            "#3  0x339c457d",
+            "#4  0x339c5f9f",
+            "#5  0x339d48f2",
+            "#6  0x33a713e5",
+            "#7  0x33a76dee",
+            "#8  0x33a788d2",
+            "#9  0xd31b4790",
+            "#10  0xd31b449f",
+            "#11  0xd31b4351",
+            "#12  0xc37a3ec5",
+            "#13  0xc37a297a",
+            "#14  0xc37a2584",
+            "#15  0x44de26fd",
+            "#16  0x44de2158",
+            "#17  0x44de3685",
+            "#18  0x44e5b8ab",
+            "#19  0x44e5b775",
+            "#20  0x44e44247",
+            "#21  0x44e38efb",
+            "#22  0x44e7263f",
+            "#23  0x44e71c79",
+            "#24  0x44e72ca8",
+            "#25  0x44e9b541",
+            "#26  0x44e9b5e6",
+            "#27  0x44e9c4c6",
+            "#28  0x44e9c277",
+            "#29  0x44e9c96a",
+            "#30  0xc851122f",
+            "#31  0xe3b97123",
+            "#32  0xe447cc90",
+            "#33  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        },
+        "pressure": 6000000.0,
+        "entropy": 129.22480252215863
+      },
+      "native": "1.49999999999999943e2,1.14698713303888197e-4,6.00000000000000000e6,1.46314353266537040e2,1.19601289341688354e-4,5.46363636363636330e6,1.42216968895975754e2,1.25589321431480370e-4,4.92727272727272660e6,1.37602119012190542e2,1.33106423164062570e-4,4.39090909090908989e6,1.32323433123390203e2,1.42874231836221364e-4,3.85454545454545366e6,1.26175904241712274e2,1.56136363879198634e-4,3.31818181818181742e6,1.18873886850524414e2,1.75184515250635827e-4,2.78181818181818118e6,1.10034938412430392e2,2.04583507411203077e-4,2.24545454545454495e6,9.91883226624999281e1,2.54369822494603299e-4,1.70909090909090871e6,8.57486634850568947e1,3.50650880324123641e-4,1.17272727272727247e6,6.83777072171485401e1,5.93505200078810538e-4,6.36363636363636120e5,3.74020561282677093e1,2.63750539451163826e-3,9.9999999999999767"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "N2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 150.0,
+        "volume": 0.0,
+        "initial_pressure": 6000000.0,
+        "minimum_pressure": 1000000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_META_SPEC={\"pressure\": 6000000.0, \"entropy\": 129.22480252215863}",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    109.02383176961403        6.9524840245121074E-307",
+            "#0  0x335fb41a",
+            "#1  0x337977a4",
+            "#2  0x3382c3de",
+            "#3  0x339c457d",
+            "#4  0x339c5f9f",
+            "#5  0x339d48f2",
+            "#6  0x33a713e5",
+            "#7  0x33a76dee",
+            "#8  0x33a788d2",
+            "#9  0xd31b4790",
+            "#10  0xd31b449f",
+            "#11  0xd31b4351",
+            "#12  0xc37a3ec5",
+            "#13  0xc37a297a",
+            "#14  0xc37a2584",
+            "#15  0x44de26fd",
+            "#16  0x44de2158",
+            "#17  0x44de3685",
+            "#18  0x44e5b8ab",
+            "#19  0x44e5b775",
+            "#20  0x44e44247",
+            "#21  0x44e38efb",
+            "#22  0x44e7263f",
+            "#23  0x44e71c79",
+            "#24  0x44e72ca8",
+            "#25  0x44e9b541",
+            "#26  0x44e9b5e6",
+            "#27  0x44e9c4c6",
+            "#28  0x44e9c277",
+            "#29  0x44e9c96a",
+            "#30  0xc851122f",
+            "#31  0xe3b97123",
+            "#32  0xe447cc90",
+            "#33  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        },
+        "pressure": 6000000.0,
+        "entropy": 129.22480252215863
+      },
+      "native": "1.49999999999999943e2,1.14698713303888197e-4,6.00000000000000000e6,1.46900982336049850e2,1.18791788197292734e-4,5.54545454545454588e6,1.43516336212871380e2,1.23624853125801578e-4,5.09090909090909176e6,1.39786426685296931e2,1.29439097905349808e-4,4.63636363636363763e6,1.35633048189351712e2,1.36593324796513996e-4,4.18181818181818305e6,1.30952489036364483e2,1.45642319267961216e-4,3.72727272727272846e6,1.25606554705145427e2,1.57482513614228562e-4,3.27272727272727387e6,1.19412669926840891e2,1.73636293815009366e-4,2.81818181818181928e6,1.12137358903888270e2,1.96839019399738113e-4,2.36363636363636469e6,1.03500457982883034e2,2.32351256547992375e-4,1.90909090909091011e6,9.31802790709530626e1,2.91354958135466165e-4,1.45454545454545552e6,8.07075264028433708e1,4.02545048487770577e-4,1.0000000000000009"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 250.0,
+        "volume": 0.0,
+        "initial_pressure": 10000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_META_SPEC={\"pressure\": 10000000.0, \"entropy\": 153.92905089347406}",
+            " Temperature at exit   539.50000000000000",
+            " Temperature upper limit   999.00000000000000",
+            " Temperature lower limit   80.000000000000000",
+            " Initial temperature   0.0000000000000000",
+            " Pressure   10000000.000000000",
+            " Entropy   153.92905089347406",
+            " Comp.  0.50000000000000000       0.50000000000000000",
+            "#0  0x335fb41a",
+            "#1  0x337977a4",
+            "#2  0x33a78971",
+            "#3  0xd31b4790",
+            "#4  0xd31b449f",
+            "#5  0xd31b4351",
+            "#6  0xc37a3ec5",
+            "#7  0xc37a297a",
+            "#8  0xc37a2584",
+            "#9  0x44de26fd",
+            "#10  0x44de2158",
+            "#11  0x44de3685",
+            "#12  0x44e5b8ab",
+            "#13  0x44e5b775",
+            "#14  0x44e44247",
+            "#15  0x44e38efb",
+            "#16  0x44e7263f",
+            "#17  0x44e71c79",
+            "#18  0x44e72ca8",
+            "#19  0x44e9b541",
+            "#20  0x44e9b5e6",
+            "#21  0x44e9c4c6",
+            "#22  0x44e9c277",
+            "#23  0x44e9c96a",
+            "#24  0xc851122f",
+            "#25  0xe3b97123",
+            "#26  0xe447cc90",
+            "#27  0xffffffff",
+            " ps_solver::twoPhasePSflash: The nonlinear solver did not converge"
+          ]
+        },
+        "pressure": 10000000.0,
+        "entropy": 153.92905089347406
+      },
+      "native": "2.50000000000091916e2,9.27193536100297711e-5,1.00000000000000000e7,2.48182675875674960e2,9.38403777215138663e-5,9.14619792504170351e6,2.46237096013265614e2,9.50813512238311940e-5,8.29239585008340701e6,2.44139409071232421e2,9.64686121070665157e-5,7.43859377512511052e6,2.41857866070231267e2,9.80381195661384424e-5,6.58479170016681403e6,2.39348727408977112e2,9.98407949292537763e-5,5.73098962520851754e6,2.36549023371214872e2,1.01952191155806599e-4,4.87718755025022104e6,2.33362639175802741e2,1.04491560681519902e-4,4.02338547529192455e6,2.29630349941485548e2,1.07664110971317806e-4,3.16958340033362806e6,2.25053576011770133e2,1.11872131357637904e-4,2.31578132537533157e6,2.18938343539126407e2,1.18103497266406726e-4,1.46197925041703507e6,1.06932193972747868e2,7.65907207584874553e-4,6.0817717545874032"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 350.0,
+        "volume": 0.0,
+        "initial_pressure": 10000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_META_SPEC={\"pressure\": 10000000.0, \"entropy\": 177.82511340144535}",
+            " Temperature at exit   539.50000000000000",
+            " Temperature upper limit   999.00000000000000",
+            " Temperature lower limit   80.000000000000000",
+            " Initial temperature   0.0000000000000000",
+            " Pressure   10000000.000000000",
+            " Entropy   177.82511340144535",
+            " Comp.  0.50000000000000000       0.50000000000000000",
+            "#0  0x335fb41a",
+            "#1  0x337977a4",
+            "#2  0x33a78971",
+            "#3  0xd31b4790",
+            "#4  0xd31b449f",
+            "#5  0xd31b4351",
+            "#6  0xc37a3ec5",
+            "#7  0xc37a297a",
+            "#8  0xc37a2584",
+            "#9  0x44de26fd",
+            "#10  0x44de2158",
+            "#11  0x44de3685",
+            "#12  0x44e5b8ab",
+            "#13  0x44e5b775",
+            "#14  0x44e44247",
+            "#15  0x44e38efb",
+            "#16  0x44e7263f",
+            "#17  0x44e71c79",
+            "#18  0x44e72ca8",
+            "#19  0x44e9b541",
+            "#20  0x44e9b5e6",
+            "#21  0x44e9c4c6",
+            "#22  0x44e9c277",
+            "#23  0x44e9c96a",
+            "#24  0xc851122f",
+            "#25  0xe3b97123",
+            "#26  0xe447cc90",
+            "#27  0xffffffff",
+            " ps_solver::twoPhasePSflash: The nonlinear solver did not converge"
+          ]
+        },
+        "pressure": 10000000.0,
+        "entropy": 177.82511340144535
+      },
+      "native": "3.49999999999999886e2,2.13554248669725079e-4,1.00000000000000000e7,3.42935998898556477e2,2.29931382410371413e-4,9.10000000000000000e6,3.35116201118875836e2,2.50160046305150771e-4,8.20000000000000000e6,3.26416975541589977e2,2.75606991620870991e-4,7.30000000000000000e6,3.16679185768118828e2,3.08338916290973504e-4,6.40000000000000000e6,3.05684260720453722e2,3.51655423033908772e-4,5.50000000000000000e6,2.93107559931522587e2,4.11218408126869464e-4,4.60000000000000000e6,2.78422019642896430e2,4.97742125059474406e-4,3.70000000000000000e6,2.60674858836419446e2,6.34549341806343523e-4,2.80000000000000000e6,2.37855987336523356e2,8.85007654923268116e-4,1.90000000000000000e6,2.04325850729967073e2,1.51338978343710140e-3,1.00000000000000000e6,1.17360859620398983e2,9.41501829126225633e-3,1.0000000000000000"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 250.0,
+        "volume": 0.0,
+        "initial_pressure": 10000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_META_SPEC={\"pressure\": 10000000.0, \"entropy\": 171.40075785398813}",
+            " Temperature at exit   539.50000000000000",
+            " Temperature upper limit   999.00000000000000",
+            " Temperature lower limit   80.000000000000000",
+            " Initial temperature   0.0000000000000000",
+            " Pressure   10000000.000000000",
+            " Entropy   171.40075785398813",
+            " Comp.  0.50000000000000000       0.50000000000000000",
+            "#0  0x335fb41a",
+            "#1  0x337977a4",
+            "#2  0x33a78971",
+            "#3  0xd31b4790",
+            "#4  0xd31b449f",
+            "#5  0xd31b4351",
+            "#6  0xc37a3ec5",
+            "#7  0xc37a297a",
+            "#8  0xc37a2584",
+            "#9  0x44de26fd",
+            "#10  0x44de2158",
+            "#11  0x44de3685",
+            "#12  0x44e5b8ab",
+            "#13  0x44e5b775",
+            "#14  0x44e44247",
+            "#15  0x44e38efb",
+            "#16  0x44e7263f",
+            "#17  0x44e71c79",
+            "#18  0x44e72ca8",
+            "#19  0x44e9b541",
+            "#20  0x44e9b5e6",
+            "#21  0x44e9c4c6",
+            "#22  0x44e9c277",
+            "#23  0x44e9c96a",
+            "#24  0xc851122f",
+            "#25  0xe3b97123",
+            "#26  0xe447cc90",
+            "#27  0xffffffff",
+            " ps_solver::twoPhasePSflash: The nonlinear solver did not converge"
+          ]
+        },
+        "pressure": 10000000.0,
+        "entropy": 171.40075785398813
+      },
+      "native": "2.50000000000000483e2,1.00125233514652718e-4,1.00000000000000000e7,2.48877353741271179e2,1.00869159356184376e-4,9.13396851748533733e6,2.47698090934201957e2,1.01669866094286206e-4,8.26793703497067373e6,2.46454796085145745e2,1.02536032565958470e-4,7.40190555245601013e6,2.45138366455830777e2,1.03478486112494578e-4,6.53587406994134653e6,2.43737433067492532e2,1.04510981552768562e-4,5.66984258742668293e6,2.42237501563771104e2,1.05651372243883553e-4,4.80381110491201933e6,2.40619628460079610e2,1.06923439335625747e-4,3.93777962239735574e6,2.38858285789144048e2,1.08359885499544821e-4,3.07174813988269214e6,2.36917713768068069e2,1.10007527352729009e-4,2.20571665736802854e6,2.34745215644650159e2,1.11936998547904025e-4,1.33968517485336494e6,1.12841676324545247e2,1.10601403794344851e-3,4.7365369233870081"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 350.0,
+        "volume": 0.0,
+        "initial_pressure": 10000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_META_SPEC={\"pressure\": 10000000.0, \"entropy\": 196.44250723096187}",
+            " Temperature at exit   539.50000000000000",
+            " Temperature upper limit   999.00000000000000",
+            " Temperature lower limit   80.000000000000000",
+            " Initial temperature   0.0000000000000000",
+            " Pressure   10000000.000000000",
+            " Entropy   196.44250723096187",
+            " Comp.  0.50000000000000000       0.50000000000000000",
+            "#0  0x335fb41a",
+            "#1  0x337977a4",
+            "#2  0x33a78971",
+            "#3  0xd31b4790",
+            "#4  0xd31b449f",
+            "#5  0xd31b4351",
+            "#6  0xc37a3ec5",
+            "#7  0xc37a297a",
+            "#8  0xc37a2584",
+            "#9  0x44de26fd",
+            "#10  0x44de2158",
+            "#11  0x44de3685",
+            "#12  0x44e5b8ab",
+            "#13  0x44e5b775",
+            "#14  0x44e44247",
+            "#15  0x44e38efb",
+            "#16  0x44e7263f",
+            "#17  0x44e71c79",
+            "#18  0x44e72ca8",
+            "#19  0x44e9b541",
+            "#20  0x44e9b5e6",
+            "#21  0x44e9c4c6",
+            "#22  0x44e9c277",
+            "#23  0x44e9c96a",
+            "#24  0xc851122f",
+            "#25  0xe3b97123",
+            "#26  0xe447cc90",
+            "#27  0xffffffff",
+            " ps_solver::twoPhasePSflash: The nonlinear solver did not converge"
+          ]
+        },
+        "pressure": 10000000.0,
+        "entropy": 196.44250723096187
+      },
+      "native": "3.49999999999993406e2,1.70541161446430598e-4,1.00000000000000000e7,3.44893491110049922e2,1.80653685779069457e-4,9.10000000000000000e6,3.38839258294304557e2,1.93963619429969543e-4,8.20000000000000000e6,3.31537269947086770e2,2.12164604456700306e-4,7.30000000000000000e6,3.22631544577514603e2,2.38038749257192544e-4,6.40000000000000000e6,3.11796878399303694e2,2.76026559415094288e-4,5.50000000000000000e6,2.98860345083631330e2,3.33029996630964970e-4,4.60000000000000000e6,2.83733904436019145e2,4.20650940035506907e-4,3.70000000000000000e6,2.65988453548792450e2,5.63228050045007020e-4,2.80000000000000000e6,2.44078407970781797e2,8.28170128859565956e-4,1.90000000000000000e6,2.12975673046119880e2,1.50403080533039629e-3,1.00000000000000000e6,1.33137310901274560e2,1.06464431791485001e-2,1.0000000000000000"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "CO2",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 250.0,
+        "volume": 0.0,
+        "initial_pressure": 10000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_META_SPEC={\"pressure\": 10000000.0, \"entropy\": 182.5824366321593}",
+            " Temperature at exit   539.50000000000000",
+            " Temperature upper limit   999.00000000000000",
+            " Temperature lower limit   80.000000000000000",
+            " Initial temperature   0.0000000000000000",
+            " Pressure   10000000.000000000",
+            " Entropy   182.58243663215930",
+            " Comp.  0.50000000000000000       0.50000000000000000",
+            "#0  0x335fb41a",
+            "#1  0x337977a4",
+            "#2  0x33a78971",
+            "#3  0xd31b4790",
+            "#4  0xd31b449f",
+            "#5  0xd31b4351",
+            "#6  0xc37a3ec5",
+            "#7  0xc37a297a",
+            "#8  0xc37a2584",
+            "#9  0x44de26fd",
+            "#10  0x44de2158",
+            "#11  0x44de3685",
+            "#12  0x44e5b8ab",
+            "#13  0x44e5b775",
+            "#14  0x44e44247",
+            "#15  0x44e38efb",
+            "#16  0x44e7263f",
+            "#17  0x44e71c79",
+            "#18  0x44e72ca8",
+            "#19  0x44e9b541",
+            "#20  0x44e9b5e6",
+            "#21  0x44e9c4c6",
+            "#22  0x44e9c277",
+            "#23  0x44e9c96a",
+            "#24  0xc851122f",
+            "#25  0xe3b97123",
+            "#26  0xe447cc90",
+            "#27  0xffffffff",
+            " ps_solver::twoPhasePSflash: The nonlinear solver did not converge"
+          ]
+        },
+        "pressure": 10000000.0,
+        "entropy": 182.5824366321593
+      },
+      "native": "2.50000000000000313e2,9.13908406504483997e-5,1.00000000000000000e7,2.49257255968570320e2,9.17572533275197780e-5,9.11429244317085482e6,2.48491505775743065e2,9.21410710256607599e-5,8.22858488634171057e6,2.47700926857750233e2,9.25438995054869527e-5,7.34287732951256633e6,2.46883452073635624e2,9.29675775796929145e-5,6.45716977268342208e6,2.46036721877535285e2,9.34142249595715300e-5,5.57146221585427783e6,2.45158023851455454e2,9.38863031770695517e-5,4.68575465902513359e6,2.44244215280188456e2,9.43866941612371319e-5,3.80004710219598934e6,2.43291622595840749e2,9.49188030516946154e-5,2.91433954536684509e6,2.42295908683224638e2,9.54866949129189294e-5,2.02863198853770085e6,2.41251894585542686e2,9.60952798755919071e-5,1.14292443170855660e6,9.19233772974340013e1,1.56336385939098992e-3,2.5721687487941258"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "CO2",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 350.0,
+        "volume": 0.0,
+        "initial_pressure": 10000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_META_SPEC={\"pressure\": 10000000.0, \"entropy\": 205.70246697239176}",
+            " Temperature at exit   539.50000000000000",
+            " Temperature upper limit   999.00000000000000",
+            " Temperature lower limit   80.000000000000000",
+            " Initial temperature   0.0000000000000000",
+            " Pressure   10000000.000000000",
+            " Entropy   205.70246697239176",
+            " Comp.  0.50000000000000000       0.50000000000000000",
+            "#0  0x335fb41a",
+            "#1  0x337977a4",
+            "#2  0x33a78971",
+            "#3  0xd31b4790",
+            "#4  0xd31b449f",
+            "#5  0xd31b4351",
+            "#6  0xc37a3ec5",
+            "#7  0xc37a297a",
+            "#8  0xc37a2584",
+            "#9  0x44de26fd",
+            "#10  0x44de2158",
+            "#11  0x44de3685",
+            "#12  0x44e5b8ab",
+            "#13  0x44e5b775",
+            "#14  0x44e44247",
+            "#15  0x44e38efb",
+            "#16  0x44e7263f",
+            "#17  0x44e71c79",
+            "#18  0x44e72ca8",
+            "#19  0x44e9b541",
+            "#20  0x44e9b5e6",
+            "#21  0x44e9c4c6",
+            "#22  0x44e9c277",
+            "#23  0x44e9c96a",
+            "#24  0xc851122f",
+            "#25  0xe3b97123",
+            "#26  0xe447cc90",
+            "#27  0xffffffff",
+            " ps_solver::twoPhasePSflash: The nonlinear solver did not converge"
+          ]
+        },
+        "pressure": 10000000.0,
+        "entropy": 205.70246697239176
+      },
+      "native": "3.49999999999999716e2,1.26245319606214278e-4,1.00000000000000000e7,3.48022623615971668e2,1.28454476324351720e-4,9.31121008174512908e6,3.45846570210989853e2,1.30983327813756137e-4,8.62242016349025816e6,3.43420623194790323e2,1.33928598333455816e-4,7.93363024523538817e6,3.40669855794692751e2,1.37436858700418094e-4,7.24484032698051818e6,3.37477971671583305e2,1.41744989944570562e-4,6.55605040872564819e6,3.33649208589322711e2,1.47271267574604001e-4,5.86726049047077820e6,3.28812660313634183e2,1.54856611075154842e-4,5.17847057221590821e6,3.22119233920732938e2,1.66586655247005371e-4,4.48968065396103822e6,3.10816556492397638e2,1.90181231157705161e-4,3.80089073570616823e6,2.83061609454675647e2,2.75919918200927033e-4,3.11210081745129824e6,2.52621049506574934e2,4.46111126096221801e-4,2.4233108991964291"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.2,
+          0.3,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 250.0,
+        "volume": 0.0,
+        "initial_pressure": 10000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_META_SPEC={\"pressure\": 10000000.0, \"entropy\": 185.2452153427913}",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    109.01248044222939        6.9524840245121074E-307",
+            "#0  0x335fb41a",
+            "#1  0x337977a4",
+            "#2  0x3382c3de",
+            "#3  0x339c457d",
+            "#4  0x339c5f9f",
+            "#5  0x339d60b2",
+            "#6  0x33a7874d",
+            "#7  0x33a78d95",
+            "#8  0xd31b4790",
+            "#9  0xd31b449f",
+            "#10  0xd31b4351",
+            "#11  0xc37a3ec5",
+            "#12  0xc37a297a",
+            "#13  0xc37a2584",
+            "#14  0x44de26fd",
+            "#15  0x44de2158",
+            "#16  0x44de3685",
+            "#17  0x44e5b8ab",
+            "#18  0x44e5b775",
+            "#19  0x44e44247",
+            "#20  0x44e38efb",
+            "#21  0x44e7263f",
+            "#22  0x44e71c79",
+            "#23  0x44e72ca8",
+            "#24  0x44e9b541",
+            "#25  0x44e9b5e6",
+            "#26  0x44e9c4c6",
+            "#27  0x44e9c277",
+            "#28  0x44e9c96a",
+            "#29  0xc851122f",
+            "#30  0xe3b97123",
+            "#31  0xe447cc90",
+            "#32  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        },
+        "pressure": 10000000.0,
+        "entropy": 185.2452153427913
+      },
+      "native": "ERROR: solver did not converge: spinodal property bracket"
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.2,
+          0.3,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 350.0,
+        "volume": 0.0,
+        "initial_pressure": 10000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "result": {
+        "reference_error": {
+          "exit_code": 1,
+          "output": [
+            "THERMOPACK_META_SPEC={\"pressure\": 10000000.0, \"entropy\": 209.94208973950512}",
+            " In cbCalcDerivatives_svol: inputted T [K], v [L/mol] =    277.54431892677195        6.9524840245121074E-307",
+            "#0  0x335fb41a",
+            "#1  0x337977a4",
+            "#2  0x3382c3de",
+            "#3  0x339c457d",
+            "#4  0x339c5f9f",
+            "#5  0x339d60b2",
+            "#6  0x33a7874d",
+            "#7  0x33a78d95",
+            "#8  0xd31b4790",
+            "#9  0xd31b449f",
+            "#10  0xd31b4351",
+            "#11  0xc37a3ec5",
+            "#12  0xc37a297a",
+            "#13  0xc37a2584",
+            "#14  0x44de26fd",
+            "#15  0x44de2158",
+            "#16  0x44de3685",
+            "#17  0x44e5b8ab",
+            "#18  0x44e5b775",
+            "#19  0x44e44247",
+            "#20  0x44e38efb",
+            "#21  0x44e7263f",
+            "#22  0x44e71c79",
+            "#23  0x44e72ca8",
+            "#24  0x44e9b541",
+            "#25  0x44e9b5e6",
+            "#26  0x44e9c4c6",
+            "#27  0x44e9c277",
+            "#28  0x44e9c96a",
+            "#29  0xc851122f",
+            "#30  0xe3b97123",
+            "#31  0xe447cc90",
+            "#32  0xffffffff",
+            " Expression v/n <= 0 in selected cubic EOS"
+          ]
+        },
+        "pressure": 10000000.0,
+        "entropy": 209.94208973950512
+      },
+      "native": "ERROR: solver did not converge: spinodal property bracket"
+    }
+  ],
+  "unqualified_returns": [],
+  "censored_calls": [],
+  "source_endpoint_warnings": [
+    {
+      "request": {
+        "eos": "PR",
+        "components": [
+          "CO2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 310.0,
+        "volume": 0.0,
+        "initial_pressure": 10000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "index": 11,
+      "values": [
+        294.83414224164494,
+        7.733123183283671e-05,
+        5249728.146940596,
+        0.0,
+        -0.0006257913670424387
+      ],
+      "entropy": 152.42386604413048
+    },
+    {
+      "request": {
+        "eos": "PR",
+        "components": [
+          "CO2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 310.0,
+        "volume": 0.0,
+        "initial_pressure": 10000000.0,
+        "minimum_pressure": 1000000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "index": 11,
+      "values": [
+        294.8341422222502,
+        7.733139610187552e-05,
+        5249728.140079837,
+        0.0,
+        -0.0005822597461246914
+      ],
+      "entropy": 152.42386604413048
+    },
+    {
+      "request": {
+        "eos": "PR",
+        "components": [
+          "C3"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 370.0,
+        "volume": 0.0,
+        "initial_pressure": 8000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "index": 11,
+      "values": [
+        347.34093532294736,
+        0.00014750692690855037,
+        1672524.242758382,
+        0.0,
+        -3.676917629036325e-05
+      ],
+      "entropy": 225.35752028698394
+    },
+    {
+      "request": {
+        "eos": "PR",
+        "components": [
+          "C3"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 370.0,
+        "volume": 0.0,
+        "initial_pressure": 8000000.0,
+        "minimum_pressure": 1000000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "index": 11,
+      "values": [
+        347.34093533489084,
+        0.0001475059008681614,
+        1672524.245456092,
+        0.0,
+        -0.00018118349854034932
+      ],
+      "entropy": 225.35752028698394
+    },
+    {
+      "request": {
+        "eos": "PR",
+        "components": [
+          "N2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 130.0,
+        "volume": 0.0,
+        "initial_pressure": 6000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "index": 11,
+      "values": [
+        118.03772534155391,
+        6.348533756253757e-05,
+        1441194.9106436074,
+        0.0,
+        -0.00025177228093298254
+      ],
+      "entropy": 112.27674060735828
+    },
+    {
+      "request": {
+        "eos": "PR",
+        "components": [
+          "C1",
+          "C2"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 250.0,
+        "volume": 0.0,
+        "initial_pressure": 10000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "index": 11,
+      "values": [
+        233.12953167274023,
+        7.417924667413038e-05,
+        2111409.3603418805,
+        0.0,
+        -0.10470756865117892
+      ],
+      "entropy": 144.19274490288026
+    },
+    {
+      "request": {
+        "eos": "PR",
+        "components": [
+          "CO2",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 350.0,
+        "volume": 0.0,
+        "initial_pressure": 10000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "index": 11,
+      "values": [
+        197.2370489961569,
+        0.0008582080725401497,
+        978727.679164739,
+        0.0,
+        0.02308600630661317
+      ],
+      "entropy": 200.57542461509598
+    },
+    {
+      "request": {
+        "eos": "PR",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.2,
+          0.3,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 350.0,
+        "volume": 0.0,
+        "initial_pressure": 10000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "index": 11,
+      "values": [
+        210.2469279990967,
+        0.0008198366224486408,
+        1096552.046788046,
+        0.0,
+        0.01337008667826467
+      ],
+      "entropy": 203.32599772353768
+    },
+    {
+      "request": {
+        "eos": "SRK",
+        "components": [
+          "CO2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 310.0,
+        "volume": 0.0,
+        "initial_pressure": 10000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "index": 11,
+      "values": [
+        294.1903520915096,
+        8.494892955699022e-05,
+        5167026.975702822,
+        0.0,
+        -0.0006394521269044162
+      ],
+      "entropy": 152.162880663104
+    },
+    {
+      "request": {
+        "eos": "SRK",
+        "components": [
+          "CO2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 310.0,
+        "volume": 0.0,
+        "initial_pressure": 10000000.0,
+        "minimum_pressure": 1000000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "index": 11,
+      "values": [
+        294.19035201052384,
+        8.4949710308101e-05,
+        5167026.948016491,
+        0.0,
+        -0.00043885256098974423
+      ],
+      "entropy": 152.162880663104
+    },
+    {
+      "request": {
+        "eos": "SRK",
+        "components": [
+          "C3"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 370.0,
+        "volume": 0.0,
+        "initial_pressure": 8000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "index": 11,
+      "values": [
+        346.53999992519783,
+        0.000163658375039499,
+        1674836.2597409245,
+        0.0,
+        -0.00010419913931514202
+      ],
+      "entropy": 225.00484701309375
+    },
+    {
+      "request": {
+        "eos": "SRK",
+        "components": [
+          "N2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 130.0,
+        "volume": 0.0,
+        "initial_pressure": 6000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "index": 11,
+      "values": [
+        117.62711851653891,
+        7.017841725266083e-05,
+        1398587.9960099403,
+        0.0,
+        -0.00025869706550452065
+      ],
+      "entropy": 111.88373753707873
+    },
+    {
+      "request": {
+        "eos": "SRK",
+        "components": [
+          "N2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 130.0,
+        "volume": 0.0,
+        "initial_pressure": 6000000.0,
+        "minimum_pressure": 1000000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "index": 11,
+      "values": [
+        117.62711850140975,
+        7.017902198702557e-05,
+        1398587.9900097381,
+        0.0,
+        -8.69693470377797e-05
+      ],
+      "entropy": 111.88373753707873
+    },
+    {
+      "request": {
+        "eos": "SRK",
+        "components": [
+          "C1",
+          "C2"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 250.0,
+        "volume": 0.0,
+        "initial_pressure": 10000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "index": 11,
+      "values": [
+        232.34275426823638,
+        8.270980545480909e-05,
+        1964503.1440812834,
+        0.0,
+        -0.06532288735778025
+      ],
+      "entropy": 143.65106065773944
+    },
+    {
+      "request": {
+        "eos": "SRK",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.2,
+          0.3,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 350.0,
+        "volume": 0.0,
+        "initial_pressure": 10000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "index": 11,
+      "values": [
+        205.82436378476805,
+        0.0008782699603633527,
+        1026408.7429413823,
+        0.0,
+        0.0014839037762044427
+      ],
+      "entropy": 202.82242863042615
+    },
+    {
+      "request": {
+        "eos": "RK",
+        "components": [
+          "CO2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 310.0,
+        "volume": 0.0,
+        "initial_pressure": 10000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "index": 11,
+      "values": [
+        292.60724588275076,
+        8.540950861103367e-05,
+        5230988.389462888,
+        0.0,
+        -0.00034293211027147663
+      ],
+      "entropy": 156.05164975626164
+    },
+    {
+      "request": {
+        "eos": "RK",
+        "components": [
+          "CO2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 310.0,
+        "volume": 0.0,
+        "initial_pressure": 10000000.0,
+        "minimum_pressure": 1000000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "index": 11,
+      "values": [
+        292.60724587418986,
+        8.540963184947286e-05,
+        5230988.386868421,
+        0.0,
+        -0.0003164418212691089
+      ],
+      "entropy": 156.05164975626164
+    },
+    {
+      "request": {
+        "eos": "RK",
+        "components": [
+          "C3"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 370.0,
+        "volume": 0.0,
+        "initial_pressure": 8000000.0,
+        "minimum_pressure": 1000000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "index": 11,
+      "values": [
+        347.4843835875007,
+        0.00016825885070923986,
+        2118039.263860211,
+        0.0,
+        -0.00014476600634338865
+      ],
+      "entropy": 228.50488093081188
+    },
+    {
+      "request": {
+        "eos": "RK",
+        "components": [
+          "N2"
+        ],
+        "feed": [
+          1.0
+        ],
+        "configuration": "classic",
+        "temperature": 130.0,
+        "volume": 0.0,
+        "initial_pressure": 6000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "index": 11,
+      "values": [
+        118.24527315495766,
+        7.132569716570323e-05,
+        1611297.9756169822,
+        0.0,
+        -8.951769089549089e-05
+      ],
+      "entropy": 112.59576942324423
+    },
+    {
+      "request": {
+        "eos": "RK",
+        "components": [
+          "C1",
+          "C2"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 250.0,
+        "volume": 0.0,
+        "initial_pressure": 10000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "index": 11,
+      "values": [
+        233.1114564763927,
+        8.479464374971955e-05,
+        2322204.1832816787,
+        0.0,
+        -0.025476293662023863
+      ],
+      "entropy": 145.00503103782046
+    },
+    {
+      "request": {
+        "eos": "RK",
+        "components": [
+          "CO2",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "configuration": "classic",
+        "temperature": 350.0,
+        "volume": 0.0,
+        "initial_pressure": 10000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "index": 11,
+      "values": [
+        222.7942614832278,
+        0.0006583897576790429,
+        1463955.3897750734,
+        0.0,
+        0.015493161247150056
+      ],
+      "entropy": 202.3003747876643
+    },
+    {
+      "request": {
+        "eos": "PR",
+        "components": [
+          "C1",
+          "C2"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "configuration": "translated",
+        "temperature": 250.0,
+        "volume": 0.0,
+        "initial_pressure": 10000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "index": 11,
+      "values": [
+        233.12953139070365,
+        7.953981576659018e-05,
+        2102423.9444475286,
+        0.0,
+        -0.08392182450492669
+      ],
+      "entropy": 144.19274490288024
+    },
+    {
+      "request": {
+        "eos": "PR",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.2,
+          0.3,
+          0.5
+        ],
+        "configuration": "translated",
+        "temperature": 350.0,
+        "volume": 0.0,
+        "initial_pressure": 10000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "index": 11,
+      "values": [
+        210.24692802611128,
+        0.0008285610248733459,
+        1095891.2408903004,
+        0.0,
+        0.052067324300281825
+      ],
+      "entropy": 203.32599772353765
+    },
+    {
+      "request": {
+        "eos": "SRK",
+        "components": [
+          "C1",
+          "C2"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "configuration": "translated",
+        "temperature": 250.0,
+        "volume": 0.0,
+        "initial_pressure": 10000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "index": 11,
+      "values": [
+        232.34275430029996,
+        8.087800549498455e-05,
+        1967138.806581039,
+        0.0,
+        -0.07185487513487487
+      ],
+      "entropy": 143.65106065773946
+    },
+    {
+      "request": {
+        "eos": "SRK",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.2,
+          0.3,
+          0.5
+        ],
+        "configuration": "translated",
+        "temperature": 350.0,
+        "volume": 0.0,
+        "initial_pressure": 10000000.0,
+        "minimum_pressure": 100000.0,
+        "points": 12,
+        "mode": "META_CURVE"
+      },
+      "index": 11,
+      "values": [
+        205.82436207538035,
+        0.0008776292549415199,
+        1025825.1675192119,
+        0.0,
+        0.038592774443173994
+      ],
+      "entropy": 202.82242863042612
+    }
+  ],
+  "worst_relative_differences": [
+    2.5463151586597666e-11,
+    3.7804395031093686e-11
+  ]
+}

@@ -990,6 +990,74 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             continue;
         }
+        if fields[0] == "META" {
+            let kind = match fields[1] {
+                "SRK" => CubicKind::SoaveRedlichKwong,
+                "RK" => CubicKind::RedlichKwong,
+                "VDW" => CubicKind::VanDerWaals,
+                _ => CubicKind::PengRobinson,
+            };
+            let names: Vec<_> = fields[2].split(',').collect();
+            let model = if fields[3] == "quantum" {
+                Cubic::quantum(&names)?
+            } else {
+                Cubic::with_options(
+                    kind,
+                    &names,
+                    thermopack_rs::CubicOptions {
+                        volume_translation: fields[3] == "translated",
+                        mixing_rule: match fields[3] {
+                            "unifac" => thermopack_rs::MixingRule::Unifac,
+                            "hv1" => thermopack_rs::MixingRule::HuronVidal1,
+                            _ => thermopack_rs::MixingRule::VdW,
+                        },
+                        ..Default::default()
+                    },
+                )?
+            };
+            let z: Vec<f64> = fields[5]
+                .split(',')
+                .map(str::parse)
+                .collect::<Result<_, _>>()?;
+            let cfg: Vec<_> = fields[4].split(':').collect();
+            let p = cfg[1].parse()?;
+            let s = cfg[2].parse()?;
+            let result: thermopack_rs::Result<Vec<f64>> = if cfg[0] == "PS" {
+                model
+                    .homogeneous_ps(p, s, &z, cfg[3].parse()?, cfg[4].parse()?)
+                    .map(|p| {
+                        vec![
+                            p.temperature,
+                            p.volume,
+                            p.pressure,
+                            p.entropy,
+                            p.pressure_residual,
+                            p.entropy_residual,
+                            p.iterations as f64,
+                        ]
+                    })
+            } else {
+                model
+                    .baseline_metastable_isentrope(&z, p, s, cfg[3].parse()?, cfg[4].parse()?)
+                    .map(|c| {
+                        c.points
+                            .iter()
+                            .flat_map(|p| [p.temperature, p.volume, p.pressure])
+                            .collect()
+                    })
+            };
+            match result {
+                Ok(v) => println!(
+                    "{}",
+                    v.iter()
+                        .map(|v| format!("{v:.17e}"))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                ),
+                Err(e) => println!("ERROR: {e}"),
+            };
+            continue;
+        }
         if fields[0] == "SPINPROP" {
             use thermopack_rs::spinodal_properties::*;
             let kind = match fields[1] {

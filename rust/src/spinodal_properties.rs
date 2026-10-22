@@ -453,6 +453,58 @@ impl PreparedPureSpinodal<'_> {
     }
 }
 
+/// The fork's mixture selection: map from P0 to model Tmin and refine the
+/// last strict property sign change. Its uncorrected output-volume convention
+/// is preserved, as for the pure compatibility API. No crossing returns None.
+pub fn baseline_mixture_spinodal_intersection(
+    model: &Cubic,
+    z: &[f64],
+    property: SpinodalProperty,
+    target: f64,
+    initial_pressure: f64,
+    liquid_temperature: Option<f64>,
+) -> Result<Option<SpinodalPoint>> {
+    if !target.is_finite() {
+        return Err(Error::InvalidInput("finite spinodal target required"));
+    }
+    if z.iter().filter(|&&x| x > 0.0).count() < 2 {
+        return Err(Error::InvalidInput("mixture spinodal composition required"));
+    }
+    let curve = crate::mixture_spinodal::baseline_trace_spinodal(
+        model,
+        z,
+        crate::mixture_spinodal::SpinodalTraceOptions {
+            initial_pressure,
+            initial_liquid_temperature: liquid_temperature,
+            minimum_vapor_temperature: Some(model.temperature_bounds().0),
+            ..Default::default()
+        },
+    )?;
+    if curve.end == SpinodalTraceEnd::PointLimit {
+        return Err(Error::NotConverged("incomplete spinodal property curve"));
+    }
+    let values = curve
+        .points
+        .iter()
+        .map(|&p| property.evaluate(model, z, p))
+        .collect::<Result<Vec<_>>>()?;
+    let last = values
+        .windows(2)
+        .rposition(|w| (w[0] - target) * (w[1] - target) < 0.0);
+    last.map(|i| {
+        refine_property(
+            model,
+            z,
+            curve.points[i],
+            curve.points[i + 1],
+            property,
+            target,
+            Refinement::SourceValue,
+        )
+    })
+    .transpose()
+}
+
 fn locate_on_pure_curve(
     model: &Cubic,
     z: &[f64],

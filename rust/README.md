@@ -3,6 +3,10 @@
 Experimental native port; see [coverage](../docs/rust/coverage.md) before use.
 The original Fortran/Python implementation is retained as the reference.
 
+[Homogeneous PS and metastable isentropes](../docs/rust/metastable.md) now
+provide local root solves, pressure continuation with stability termination,
+and a separately qualified implementation of the fork's mapping convention.
+
 `Mbwr` provides MBWR-19/32 pressure and residual Helmholtz kernels with all
 65 stored fits. It offers stable integrals and explicit source-order methods;
 see [MBWR scope and qualification](../docs/rust/mbwr.md).

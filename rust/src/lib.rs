@@ -86,6 +86,7 @@ pub mod lee_kesler;
 pub mod ljs;
 pub mod ljs_wca;
 pub mod mbwr;
+pub mod metastable;
 pub mod mixture_critical;
 pub mod mixture_saturation;
 pub mod mixture_spinodal;

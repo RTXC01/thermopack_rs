@@ -158,5 +158,9 @@ physical endpoint closure.
 The [spinodal property notes](spinodal-properties.md) cover pure sampling,
 all six property constraints, source coordinate reporting and cached searches.
 
+The [metastable isentrope notes](metastable.md) cover local homogeneous PS,
+physical pressure continuation and complete source-convention mappings,
+including their independently recorded equation residuals.
+
 Regenerate inventory with
 `python tools/rust_port/inventory.py`.

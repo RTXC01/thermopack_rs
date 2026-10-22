@@ -495,9 +495,9 @@ compatibility APIs. Every source state independently satisfies the local
 Helmholtz eigenvalue condition; 22 stale endpoint pressure warnings and 54
 physical vapor-branch selection differences are retained explicitly. Separate
 physical APIs close pressure at their returned coordinates. The pure grids and
-property searches below extend this coverage; mixture source-order intersection
-selection, property extrema, metastable isentropes and other model families
-remain pending.
+property searches below extend this coverage. Metastable entropy intersections
+are qualified through complete maps below; other mixture source-order property
+selection, property extrema and other model families remain pending.
 
 The [pure spinodal grid/property qualification](spinodal-properties.md) adds
 4000 full-grid states and all 276 successful property returns from 288 attempts.
@@ -506,3 +506,14 @@ covered. Twelve source failures and 145 nonclosing-coordinate warnings remain
 explicit; 31 critical-volume comparisons use documented multiple-root rounding
 radii. Fresh and cached searches share the source reporting convention, while
 independent pure/mixture physical searches close both property and stability.
+
+The [homogeneous PS/metastable qualification](metastable.md) adds 510 attempts:
+298 successful local PS returns and 97 complete 12-point source maps match
+their returned coordinates. Seventy-two source PS failures, 34 map aborts and
+nine map errors are retained; no calls were censored. Twenty-five first/last
+coordinate closure warnings remain distinct from coordinate parity. Independent
+tests close native pressure/entropy equations and refine pure and mixture
+stability endpoints. Mixing rules, quantum local states and translated curves
+extend the documented scope; full nonlinear trajectories/failure compatibility
+and other model families remain pending. Benchmark preflight compares all
+T/V/P/S values of 170 source states before native-executable measurements.

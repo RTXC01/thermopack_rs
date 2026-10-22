@@ -604,6 +604,48 @@ def main(compiler_directory):
             arrays=[list(map(float,values)) for values in (temperature,pressure,volume)]
             print('THERMOPACK_RESULT='+json.dumps(dict(values=arrays)),flush=True)
             continue
+        if request['mode'] in ('META_PS','META_CURVE'):
+            from thermopack.cubic import cubic
+            eos=request['eos'];comps=request['components'];z=request['feed']
+            config=request.get('configuration','classic')
+            if config=='quantum':
+                from thermopack.quantum_cubic import qcubic
+                model=qcubic(','.join(comps))
+            else:
+                model=cubic(','.join(comps),'SRK' if eos=='RK' else eos,
+                    alpha='RK' if eos=='RK' else 'Classic',volume_shift=config=='translated',
+                    mixing={'unifac':'UNIFAC','hv1':'HV1'}.get(config,'vdW'))
+            previous=None;model.activate()
+            t=request['temperature'];v=request['volume']
+            if request['mode']=='META_CURVE' and 'initial_pressure' in request:
+                v=float(model.specific_volume(t,request['initial_pressure'],z,model.LIQPH)[0])
+            initial_volume=float(v)
+            entropy=float(model.entropy_tv(t,v,z)[0]);pressure=float(model.pressure_tv(t,v,z)[0])
+            if request['mode']=='META_CURVE':pressure=request.get('initial_pressure',pressure)
+            print('THERMOPACK_META_SPEC='+json.dumps(dict(pressure=pressure,entropy=entropy)),flush=True)
+            if request['mode']=='META_PS':
+                tg=request.get('temperature_guess',t*1.02);vg=request.get('volume_guess',v*.98)
+                pc=c_double(pressure);sc=c_double(entropy);amounts=(c_double*len(z))(*z)
+                tc=c_double(tg);vc=c_double(vg);status=c_int()
+                calculate=getattr(model.tp,model.get_export_name('spinodal','tv_meta_ps'))
+                calculate.argtypes=[POINTER(c_double)]*5+[POINTER(c_int)];calculate.restype=None
+                calculate(byref(pc),byref(sc),amounts,byref(tc),byref(vc),byref(status))
+                result=dict(values=[tc.value,vc.value],pressure=pressure,entropy=entropy,status=status.value)
+                if math.isfinite(tc.value) and math.isfinite(vc.value) and tc.value>0 and vc.value>0:
+                    result['pressure_error']=float(model.pressure_tv(tc.value,vc.value,z)[0])-pressure
+                    result['entropy_error']=float(model.entropy_tv(tc.value,vc.value,z)[0])-entropy
+            else:
+                try:
+                    temperatures,volumes,pressures=model.map_meta_isentrope(z,pressure,entropy,request['minimum_pressure'],request['points'])
+                    values=[]
+                    for t,v,p in zip(temperatures,volumes,pressures):
+                        pe=float(model.pressure_tv(t,v,z)[0])-float(p)
+                        se=float(model.entropy_tv(t,v,z)[0])-entropy
+                        values.append(list(map(float,[t,v,p,pe,se])))
+                    result=dict(values=values,pressure=pressure,entropy=entropy,initial_volume=initial_volume)
+                except Exception as error:result=dict(calculation_error=str(error),pressure=pressure,entropy=entropy)
+            print('THERMOPACK_RESULT='+json.dumps(result),flush=True)
+            continue
         if request['mode'] in ('PURE_SPINODAL_GRID','PURE_SPINODAL_PROP'):
             from thermopack.cubic import cubic
             import numpy as np

@@ -272,17 +272,17 @@ fn reported_point(mut point: MixtureSaturation, source_conventions: bool) -> Mix
     point
 }
 
-struct Jet<'a> {
+pub(crate) struct Jet<'a> {
     model: &'a Cubic,
     prepared: Option<PreparedState<'a>>,
     roots: Option<(f64, [f64; 3], usize)>,
-    phi: Vec<f64>,
-    dt: Vec<f64>,
-    dp: Vec<f64>,
-    dn: Vec<f64>,
+    pub(crate) phi: Vec<f64>,
+    pub(crate) dt: Vec<f64>,
+    pub(crate) dp: Vec<f64>,
+    pub(crate) dn: Vec<f64>,
 }
 impl<'a> Jet<'a> {
-    fn new(model: &'a Cubic, n: usize) -> Self {
+    pub(crate) fn new(model: &'a Cubic, n: usize) -> Self {
         Self {
             model,
             prepared: None,
@@ -313,7 +313,14 @@ impl<'a> Jet<'a> {
         self.roots = Some((p, roots, count));
         Ok((roots, count))
     }
-    fn fill(&mut self, t: f64, p: f64, z: &[f64], phase: Phase, derivatives: bool) -> Result<f64> {
+    pub(crate) fn fill(
+        &mut self,
+        t: f64,
+        p: f64,
+        z: &[f64],
+        phase: Phase,
+        derivatives: bool,
+    ) -> Result<f64> {
         let (roots, count) = self.roots(t, p, z)?;
         let state = self.prepared.as_ref().unwrap();
         let volume = match phase {
@@ -326,6 +333,30 @@ impl<'a> Jet<'a> {
             state.fugacity_derivatives_into(volume, &mut self.dt, &mut self.dp, &mut self.dn)?;
         }
         Ok(volume)
+    }
+    pub(crate) fn fill_baseline(
+        &mut self,
+        t: f64,
+        p: f64,
+        z: &[f64],
+        phase: Phase,
+        derivatives: bool,
+    ) -> Result<f64> {
+        if !self
+            .prepared
+            .as_ref()
+            .is_some_and(|s| s.temperature() == t && s.composition() == z)
+        {
+            self.prepared = Some(self.model.prepare(t, z)?);
+            self.roots = None;
+        }
+        let state = self.prepared.as_ref().unwrap();
+        let v = state.baseline_volume(p, phase)?;
+        state.ln_fugacity_tp_into(p, v, &mut self.phi)?;
+        if derivatives {
+            state.fugacity_derivatives_into(v, &mut self.dt, &mut self.dp, &mut self.dn)?;
+        }
+        Ok(v)
     }
 }
 struct Evaluation {

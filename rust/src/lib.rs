@@ -101,6 +101,7 @@ pub mod pets;
 pub mod pure_saturation_curve;
 pub mod quadrature;
 pub mod quadrature_data;
+pub mod quality;
 pub mod rdf;
 pub mod saft_vrmie;
 pub mod saft_vrmie_data;

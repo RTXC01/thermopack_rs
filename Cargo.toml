@@ -142,6 +142,11 @@ harness = false
 lto = "thin"
 codegen-units = 1
 
+[[bench]]
+name = "quality"
+path = "rust/benches/quality.rs"
+harness = false
+
 [lints.rust]
 unsafe_code = "forbid"
 

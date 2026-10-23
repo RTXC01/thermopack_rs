@@ -87,6 +87,83 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for line in io::stdin().lock().lines() {
         let line = line?;
         let fields: Vec<_> = line.split('|').collect();
+        if fields[0] == "QUALITY" {
+            use thermopack_rs::envelope::EnvelopeConstraint;
+            use thermopack_rs::quality::QualityGuess;
+            let kind = match fields[1] {
+                "SRK" => CubicKind::SoaveRedlichKwong,
+                "RK" => CubicKind::RedlichKwong,
+                "VDW" => CubicKind::VanDerWaals,
+                _ => CubicKind::PengRobinson,
+            };
+            let names: Vec<_> = fields[2].split(',').collect();
+            let model = if fields[3] == "quantum" {
+                Cubic::quantum(&names)?
+            } else {
+                Cubic::with_options(
+                    kind,
+                    &names,
+                    thermopack_rs::CubicOptions {
+                        volume_translation: fields[3] == "translated",
+                        mixing_rule: match fields[3] {
+                            "unifac" => thermopack_rs::MixingRule::Unifac,
+                            "hv1" => thermopack_rs::MixingRule::HuronVidal1,
+                            "hv2" => thermopack_rs::MixingRule::HuronVidal2,
+                            "nrtl" => thermopack_rs::MixingRule::Nrtl,
+                            _ => thermopack_rs::MixingRule::VdW,
+                        },
+                        ..Default::default()
+                    },
+                )?
+            };
+            let z: Vec<f64> = fields[4].split(',').map(|v| v.parse().unwrap()).collect();
+            let beta = fields[5].parse::<f64>()?;
+            let o: Vec<_> = fields[6].split(':').collect();
+            let value = o[1].parse::<f64>()?;
+            let constraint = match o[0] {
+                "T" => EnvelopeConstraint::Temperature(value),
+                "P" => EnvelopeConstraint::Pressure(value),
+                _ => EnvelopeConstraint::LogK {
+                    component: o[2].parse()?,
+                    value,
+                },
+            };
+            let guess: Vec<f64> = fields[7].split(',').map(|v| v.parse().unwrap()).collect();
+            let guess = QualityGuess {
+                temperature: guess[0],
+                pressure: guess[1],
+                ratios: guess[2..].to_vec(),
+            };
+            let warm = model.baseline_quality_state_with_guess(&z, beta, constraint, &guess);
+            let cold = match constraint {
+                EnvelopeConstraint::Temperature(t) => model.quality_pressure(t, &z, beta),
+                EnvelopeConstraint::Pressure(p) => model.quality_temperature(p, &z, beta),
+                _ => warm.clone(),
+            };
+            let encode = |result: thermopack_rs::Result<thermopack_rs::quality::QualityState>| {
+                match result {
+                    Ok(p) => {
+                        let mut v = vec![
+                            p.temperature,
+                            p.pressure,
+                            p.vapor_fraction,
+                            p.liquid_volume,
+                            p.vapor_volume,
+                        ];
+                        v.extend(p.liquid);
+                        v.extend(p.vapor);
+                        v.push(p.dpdt);
+                        v.iter()
+                            .map(|v| format!("{v:.17e}"))
+                            .collect::<Vec<_>>()
+                            .join(",")
+                    }
+                    Err(e) => format!("ERROR:{e}"),
+                }
+            };
+            println!("{}|{}", encode(warm), encode(cold));
+            continue;
+        }
         if fields[0] == "PURE_CURVE" || fields[0] == "PURE_ENV" {
             use thermopack_rs::pure_saturation_curve::{
                 PureSaturationOptions, PureSaturationStart,

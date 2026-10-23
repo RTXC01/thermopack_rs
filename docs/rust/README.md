@@ -65,6 +65,10 @@ multiple-root conditioning and complete-curve measurements.
 source critical initialization and roundoff classification, one-point grids,
 physical endpoint bounds and their remaining diagnostic differences.
 
+[Fixed-quality states](quality.md) add local T/P/log-K correction, analytic
+branch slopes and warm continuation with an exactly preserved feed, with
+explicit source-convention and near-coincident-state qualification gaps.
+
 See [coverage.md](coverage.md), [inventory.json](inventory.json),
 [numerics.md](numerics.md), [validation.md](validation.md),
 [performance.md](performance.md) and [baseline-defects.md](baseline-defects.md).

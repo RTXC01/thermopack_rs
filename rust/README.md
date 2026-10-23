@@ -13,6 +13,10 @@ replacement scope behind chat progress updates.
 grids to the general envelope API, with explicit physical bounds and source
 critical-start, one-point and trace-classification conventions.
 
+[Fixed-quality states](../docs/rust/quality.md) provide local T/P/log-K
+correction at a specified molar vapor fraction, with analytic slopes and
+explicit source compatibility limits near coincident phases.
+
 [Mixture phase envelopes](../docs/rust/envelope.md) now provide adaptive cubic
 VLE tracing through turns, source-convention tracing, warm T/P/log-K correction
 and explicit partial-curve status. Read the remaining sampling differences

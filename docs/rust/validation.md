@@ -602,3 +602,33 @@ PR/SRK mixtures and a ternary model combining fitted and missing NRTL pairs.
 All derivatives match, with no failed, censored, nonfinite or pressure-warning
 source returns. Independent mole perturbations verify the corrected Hessians.
 The correction preserves the fork's L/mol off-diagonal covolume weight.
+
+The [fixed-quality corrector qualification](quality.md) adds 588 source
+attempts: 577 finite closing states, six failed source bubble initializations
+and five source solver-bound statuses. None were censored or nonfinite, and
+the returned phase volumes have no pressure warnings. The local release
+baseline matches 576 complete states strictly. One near-coincident NRTL
+composition difference remains outside ordinary tolerance and is retained
+explicitly. Physical cold initialization matches 491 of 499 finite T/P calls;
+eight near-coincident initialization errors remain pending. These raw gaps
+are not counted as qualified coordinates. Development evaluation order also
+exposes small raw composition differences in that near-coincident set.
+
+All other 569 source states must pass ordinary tolerances on every native
+test build. Independent checks cover the normalized analytic Jacobian away
+from material-balance closure, phase pressure/fugacity/material balance,
+warm finite-difference slopes, beta=0/1, exact zero species and pure dispatch.
+The original feed is preserved exactly during warm correction. The source
+path preserves the fork's distinct Jacobian normalization and convergence
+test. Full trajectory/failure identity and general quality curves remain open.
+
+The local checkpoint passed 328 standard development tests plus the custom
+source-data harnesses and all-target benchmark executables, 46 selected
+release tests, 22 documentation examples, strict all-target Clippy and
+warning-free rustdoc. All 113 fixture hashes, row counts and LF line endings
+are checked. Hosted CI has not been observed running.
+
+The fixed-quality benchmark preflight compares all ten returned quantities
+for 46 matching states across four workloads before executable timing.
+All ten separate sums are checked again for every timed sample; medians,
+exact inputs and source/harness/Cargo fingerprints are retained in the report.

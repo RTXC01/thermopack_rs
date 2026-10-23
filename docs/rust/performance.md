@@ -332,3 +332,7 @@ pure fluid drops to 697 nanoseconds per evaluation.
 The state of a mixture needs 7054 nanoseconds per evaluation. The remaining
 cost is the finite difference of the mole number derivatives of the residual
 Helmholtz energy, which prepares the model twice per component.
+
+The [fixed-quality correction measurements](quality.md#performance) compare
+identical source guesses and all returned coordinates before native-executable
+timing; cold initialization and complete quality curves remain separate work.

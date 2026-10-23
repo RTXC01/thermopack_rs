@@ -675,6 +675,55 @@ def main(compiler_directory):
             print('THERMOPACK_RESULT='+json.dumps(dict(values=points,critical=critical,initial_pressure=value,initial_temperature=temp,
                 critical_polynomial=[pp,qq,rr],critical_shift=shift,all_fugacity_differences=all_fugacity_differences,**envelope_output)),flush=True)
             continue
+        if request['mode']=='QUALITY':
+            import numpy as np
+            from thermopack.cubic import cubic
+            eos=request['eos'];names=request['components'];z=np.array(request['feed'],dtype=float);z/=z.sum();nc=len(z)
+            config=request.get('configuration','classic')
+            if config=='quantum':
+                from thermopack.quantum_cubic import qcubic
+                model=qcubic(','.join(names))
+            else:
+                model=cubic(','.join(names),'SRK' if eos=='RK' else eos,alpha='RK' if eos=='RK' else 'Classic',
+                    volume_shift=config=='translated',mixing={'unifac':'UNIFAC','hv1':'HV1','hv2':'HV2','nrtl':'NRTL'}.get(config,'vdW'))
+            previous=None;model.activate();beta=request['beta'];fixed=request['fixed'];value=request['value']
+            try:
+                if 'guess' in request:
+                    guess=request['guess'];t=guess['temperature'];p=guess['pressure'];k=np.array(guess['ratios'])
+                elif fixed=='P':
+                    p=value
+                    if beta<.5:t,y=model.bubble_temperature(p,z);k=np.divide(y,z,out=np.ones(nc),where=z>0)
+                    else:t,x=model.dew_temperature(p,z);k=np.divide(z,x,out=np.ones(nc),where=x>0)
+                else:
+                    t=value
+                    if beta<.5:p,y=model.bubble_pressure(t,z);k=np.divide(y,z,out=np.ones(nc),where=z>0)
+                    else:p,x=model.dew_pressure(t,z);k=np.divide(z,x,out=np.ones(nc),where=x>0)
+            except Exception as error:
+                print('THERMOPACK_RESULT='+json.dumps(dict(initialization_error=str(error))),flush=True)
+                continue
+            guess=dict(temperature=float(t),pressure=float(p),ratios=k.tolist())
+            s=nc+1 if fixed=='T' else nc+2 if fixed=='P' else request['component']+1
+            specification=value if fixed=='K' else math.log(value)
+            amounts=(c_double*nc)(*z);ratios=(c_double*nc)(*k);tc=c_double(t);pc=c_double(p);bc=c_double(beta);sc=c_int(s);lc=c_double(specification);status=c_int()
+            calculate=getattr(model.tp,model.get_export_name('saturation','sat_newton'))
+            calculate.argtypes=[POINTER(c_double)]*5+[POINTER(c_int),POINTER(c_double),POINTER(c_int),POINTER(c_int)];calculate.restype=c_int
+            iterations=calculate(amounts,ratios,byref(tc),byref(pc),byref(bc),byref(sc),byref(lc),None,byref(status))
+            t=tc.value;p=pc.value;k=np.array(ratios);x=z/(1.-beta+beta*k);y=k*x;x/=x.sum();y/=y.sum()
+            result=dict(status=status.value,iterations=iterations,guess=guess,ratios=k.tolist(),values=[])
+            if status.value==0:
+                vl=float(model.specific_volume(t,p,x,model.LIQPH)[0]);vv=float(model.specific_volume(t,p,y,model.VAPPH)[0])
+                fl=np.array(model.thermo(t,p,x,model.LIQPH)[0]);fv=np.array(model.thermo(t,p,y,model.VAPPH)[0]);active=np.flatnonzero(z>0)
+                residual=float(np.max(np.abs((np.log(k)+fv-fl)[active])))
+                pl=float(model.pressure_tv(t,vl,x)[0])-p;pv=float(model.pressure_tv(t,vv,y)[0])-p
+                balance=float(np.max(np.abs((1.-beta)*x+beta*y-z)))
+                u=np.r_[np.log(k),math.log(t),math.log(p)];param=np.r_[z,beta,float(s),specification,2.]
+                uc=(c_double*(nc+2))(*u);params=(c_double*(nc+4))(*param);j=(c_double*((nc+2)**2))()
+                jac=getattr(model.tp,model.get_export_name('saturation','sat_diff_newton'));jac.argtypes=[POINTER(c_double)]*3;jac.restype=None;jac(j,uc,params)
+                matrix=np.array(j).reshape((nc+2,nc+2),order='F');rhs=np.zeros(nc+2);rhs[-1]=1.
+                tangent=np.linalg.solve(matrix,rhs);dpdt=p*tangent[-1]/(t*tangent[-2])
+                result.update(values=[t,p,beta,vl,vv,*x,*y,float(dpdt)],fugacity_residual=residual,material_balance_residual=balance,pressure_errors=[pl,pv])
+            print('THERMOPACK_RESULT='+json.dumps(result),flush=True)
+            continue
         if request['mode']=='ENVELOPE':
             import numpy as np
             from thermopack.cubic import cubic

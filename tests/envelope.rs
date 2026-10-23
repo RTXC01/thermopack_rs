@@ -310,7 +310,7 @@ fn invalid_envelope_inputs_and_seeds_are_rejected() {
     ] {
         assert!(model.phase_envelope(&[0.5, 0.5], options).is_err());
     }
-    for z in [&[1.][..], &[0., 0.], &[1., -0.1], &[1., 0.]] {
+    for z in [&[1.][..], &[0., 0.], &[1., -0.1]] {
         assert!(model.phase_envelope(z, EnvelopeOptions::default()).is_err());
     }
     let seed = model.bubble_pressure(180., &[0.5, 0.5]).unwrap();

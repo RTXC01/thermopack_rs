@@ -6,7 +6,7 @@ from reference import ROOT
 from benchmark_isochoric import fingerprints
 from benchmark_solid_water import parse
 
-def benchmark(compiler,repeats,output,preflight_only):
+def benchmark(compiler,repeats,output,preflight_only,envelope=False):
     if repeats<1:raise ValueError('Positive sample count required')
     compiler=Path(compiler).resolve();env=dict(os.environ);env['PATH']=str(compiler.parent)+os.pathsep+env['PATH']
     directory=ROOT/'.reference';source=ROOT/'tools/rust_port/benchmark_pure_curve_reference.f90'
@@ -28,15 +28,20 @@ def benchmark(compiler,repeats,output,preflight_only):
     assert len(endpoints)==4
     subprocess.run([str(compiler),*flags,'-I',str(directory),str(source),'@'+str(directory/'objects.rsp'),'-o',str(exe)],cwd=directory,env=env,check=True)
     command=['cargo','bench','--bench','pure_curve','-j','2'];subprocess.run([*command,'--no-run'],cwd=ROOT,check=True)
-    ref=parse(subprocess.check_output([str(exe),'check'],env=env,text=True),('check_',))
-    native=parse(subprocess.check_output([*command,'--','--check'],cwd=ROOT,text=True),('check_',))
-    assert ref.keys()==native.keys() and len(ref)==400
+    native_command=[*command,'--']+(['--envelope'] if envelope else [])
+    ref_command=lambda check:[str(exe),'check' if check else '']+(['envelope'] if envelope else [])
+    ref=parse(subprocess.check_output(ref_command(True),env=env,text=True),('check_',))
+    native=parse(subprocess.check_output([*native_command,'--check'],cwd=ROOT,text=True),('check_',))
+    expected_states=364 if envelope else 400
+    assert ref.keys()==native.keys() and len(ref)==expected_states
+    counts={p:sum(k.startswith(f'check_{p}_') for k in ref) for p in range(1,5)}
+    assert counts=={1:100,2:100,3:100,4:64 if envelope else 100}
     maxima=[0.]*4;conditioned=0
     for key,expected in ref.items():
         profile,index=map(int,key.split('_')[1:]);actual=native[key];assert len(expected)==len(actual)==4
         for j,(a,b) in enumerate(zip(expected,actual)):
             atol=[2e-6,.1,1e-12,1e-12][j];bound=atol+2e-7*max(abs(a),abs(b))
-            if index==99 and j>=2:
+            if index==counts[profile]-1 and j>=2:
                 if abs(a-b)>bound:conditioned+=1
                 bound+=float(endpoints[profile]['critical_volume_radius'])
                 e=endpoints[profile];poly=[float(e[f'critical_polynomial_{c}']) for c in ['a','b','c']]
@@ -48,29 +53,32 @@ def benchmark(compiler,repeats,output,preflight_only):
     samples={};checksums={}
     if not preflight_only:
         for sample in range(repeats+1):
-            ref=parse(subprocess.check_output([str(exe)],env=env,text=True),('source_',))
-            native=parse(subprocess.check_output(command,cwd=ROOT,text=True),('native_',));assert len(ref)==len(native)==4
+            ref=parse(subprocess.check_output(ref_command(False),env=env,text=True),('source_',))
+            native=parse(subprocess.check_output(native_command,cwd=ROOT,text=True),('native_',));assert len(ref)==len(native)==4
             for profile in range(1,5):
                 sk=f'source_{profile}';nk=f'native_{profile}';expected=ref[sk];actual=native[nk]
                 assert len(expected)==len(actual)==6 and min(expected[0],actual[0])>0. and all(map(math.isfinite,expected+actual))
-                assert expected[1]==actual[1]==2000.
+                states=20*counts[profile];assert expected[1]==actual[1]==states
                 for j,(a,b) in enumerate(zip(expected[2:],actual[2:])):
-                    bound=2000.*[2e-6,.1,1e-12,1e-12][j]+2e-7*max(abs(a),abs(b))
+                    bound=states*[2e-6,.1,1e-12,1e-12][j]+2e-7*max(abs(a),abs(b))
                     if j>=2:bound+=20.*float(endpoints[profile]['critical_volume_radius'])
                     assert abs(a-b)<=bound,(profile,j,a,b,bound)
                 if sample:samples.setdefault(sk,[]).append(expected[0]);samples.setdefault(nk,[]).append(actual[0])
             checksums=dict(source=ref,native=native);print(f'Pure curve benchmark {sample}/{repeats} (0 is warm-up)',flush=True)
     assert rust==fingerprints(sorted((ROOT/'rust').rglob('*.rs')))
     assert harness==fingerprints(harness_paths) and cargo==fingerprints(cargo_paths)
-    if preflight_only:print(json.dumps(dict(source_states=400,native_states=400,conditioned_endpoint_volumes=conditioned,maximum_absolute_differences=maxima),indent=2));return
+    if preflight_only:print(json.dumps(dict(source_states=expected_states,native_states=expected_states,points_per_curve=counts,conditioned_endpoint_volumes=conditioned,maximum_absolute_differences=maxima),indent=2));return
     report=dict(measured_at=datetime.now(timezone.utc).isoformat(),platform=platform.platform(),processor=platform.processor(),git_head=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
         rustc=subprocess.check_output(['rustc','--version'],text=True).strip(),reference=json.loads((directory/'metadata.json').read_text()),compiler=subprocess.check_output([str(compiler),'--version'],text=True).splitlines()[0],compiler_flags=flags,
         native_sources_sha256=rust,benchmark_sources_sha256=harness,cargo_inputs_sha256=cargo,
-        source_preflight_states=400,native_preflight_states=400,conditioned_endpoint_volumes=conditioned,endpoint_conditioning=endpoints,maximum_preflight_absolute_differences=maxima,
+        source_preflight_states=expected_states,native_preflight_states=expected_states,points_per_curve=counts,source_surface='envelopePlot' if envelope else 'pure_fluid_saturation_wrapper',native_surface='baseline_phase_envelope' if envelope else 'baseline_pure_saturation_curve',conditioned_endpoint_volumes=conditioned,endpoint_conditioning=endpoints,maximum_preflight_absolute_differences=maxima,
         iterations_per_sample=20,samples_ns=samples,median_ns={k:statistics.median(v) for k,v in samples.items()},checksums=checksums,cargo_profile=dict(optimization='release',lto='thin',codegen_units=1),
         workload='Complete 100-point pure saturation grids: PR methane, pressure start 0.05 Pc, linear; SRK CO2, temperature start 0.65 Tc, logarithmic; translated PR water, pressure start 0.05 Pc, linear; QuantumCubic H2, pressure start 0.05 Pc, logarithmic. Full source/native grids and both phase volumes compared before timing. Final volume comparisons use source-derived cubic backward-error bounds; all interior outputs and all T/P retain standard tolerances. Twenty complete curves/sample, five samples after one warm-up. Includes cold initial saturation, warm analytic continuation, database-critical endpoint and both returned phase volumes; excludes construction and Python/FFI. Native additionally calculates Clapeyron slopes and explicit errors. Timed point counts and separate T/P/volume sums are checked, with the same endpoint conditioning allowance. Scoped workload measurement, not whole-library speed or exact raw critical-iteration parity.')
+    if envelope:
+        report['workload']='Pure dispatch through envelopePlot/baseline_phase_envelope: PR methane, pressure start 0.05 Pc; SRK CO2, temperature start 0.65 Tc; translated PR water, pressure start 0.05 Pc; QuantumCubic H2, pressure start 0.05 Pc. Source pure-envelope dispatch uses linear grids with requested pressure spacing 20 kPa, capped at 100 points: 100/100/100/64 nodes. All 364 T/P/phase-volume states compared before timing; source beta=0/K=1 and native bubble labels/full pure compositions checked. Eight final phase volumes use source-polynomial backward-error/critical-root bounds. Twenty complete curves/sample, five samples after one warm-up, timed counts and separate T/P/volume sums checked. Includes cold initialization, complete pure continuation, source critical endpoints, both volumes, and native phase composition/residual reporting; excludes construction and Python/FFI. Both native and reference APIs calculate complete pure curves despite the mixture pressure cap. Scoped workload performance, not full-library speed or raw critical-iteration identity.'
+    output=output or ('docs/rust/pure-envelope-benchmark.json' if envelope else 'docs/rust/pure-curve-benchmark.json')
     (ROOT/output).write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report['median_ns'],indent=2))
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('--compiler',required=True);p.add_argument('--repeats',type=int,default=5);p.add_argument('--output',default='docs/rust/pure-curve-benchmark.json');p.add_argument('--preflight-only',action='store_true')
-    a=p.parse_args();benchmark(a.compiler,a.repeats,a.output,a.preflight_only)
+    p=argparse.ArgumentParser();p.add_argument('--compiler',required=True);p.add_argument('--repeats',type=int,default=5);p.add_argument('--output');p.add_argument('--preflight-only',action='store_true');p.add_argument('--envelope',action='store_true')
+    a=p.parse_args();benchmark(a.compiler,a.repeats,a.output,a.preflight_only,a.envelope)

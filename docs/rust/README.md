@@ -61,6 +61,10 @@ termination and the remaining raw sampled-grid differences.
 linear/logarithmic grids, physical/source critical endpoints, explicit
 multiple-root conditioning and complete-curve measurements.
 
+[Pure-envelope dispatch](pure-envelope.md) qualifies the common envelope APIs,
+source critical initialization and roundoff classification, one-point grids,
+physical endpoint bounds and their remaining diagnostic differences.
+
 See [coverage.md](coverage.md), [inventory.json](inventory.json),
 [numerics.md](numerics.md), [validation.md](validation.md),
 [performance.md](performance.md) and [baseline-defects.md](baseline-defects.md).

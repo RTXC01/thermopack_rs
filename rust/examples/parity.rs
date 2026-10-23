@@ -87,7 +87,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for line in io::stdin().lock().lines() {
         let line = line?;
         let fields: Vec<_> = line.split('|').collect();
-        if fields[0] == "PURE_CURVE" {
+        if fields[0] == "PURE_CURVE" || fields[0] == "PURE_ENV" {
             use thermopack_rs::pure_saturation_curve::{
                 PureSaturationOptions, PureSaturationStart,
             };
@@ -129,6 +129,58 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 maximum_points: opts[4].parse()?,
                 logarithmic: opts[5] == "1",
             };
+            if fields[0] == "PURE_ENV" {
+                use thermopack_rs::envelope::{EnvelopeConstraint, EnvelopeOptions};
+                let z: Vec<f64> = fields[6].split(',').map(|s| s.parse().unwrap()).collect();
+                let extra: Vec<f64> = fields[7].split(':').map(|s| s.parse().unwrap()).collect();
+                let result = model.baseline_phase_envelope(
+                    &z,
+                    EnvelopeOptions {
+                        start: match options.start {
+                            PureSaturationStart::Temperature(t) => {
+                                EnvelopeConstraint::Temperature(t)
+                            }
+                            PureSaturationStart::Pressure(p) => EnvelopeConstraint::Pressure(p),
+                        },
+                        maximum_points: options.maximum_points,
+                        maximum_pressure: extra[0],
+                        minimum_temperature: Some(extra[1]),
+                        maximum_step: extra[2],
+                        initial_kind: if extra[3] == 0. {
+                            thermopack_rs::SaturationKind::Bubble
+                        } else {
+                            thermopack_rs::SaturationKind::Dew
+                        },
+                    },
+                );
+                match result {
+                    Ok(curve) => println!(
+                        "{:?}|{}",
+                        curve.end,
+                        curve
+                            .points
+                            .iter()
+                            .map(|p| [
+                                p.temperature,
+                                p.pressure,
+                                p.liquid_volume,
+                                p.vapor_volume,
+                                f64::from(p.kind == thermopack_rs::SaturationKind::Dew)
+                            ]
+                            .into_iter()
+                            .chain(p.liquid.iter().copied())
+                            .chain(p.vapor.iter().copied())
+                            .chain([p.fugacity_residual])
+                            .map(|v| format!("{v:.17e}"))
+                            .collect::<Vec<_>>()
+                            .join(","))
+                            .collect::<Vec<_>>()
+                            .join(";")
+                    ),
+                    Err(error) => println!("ERROR:{error}"),
+                }
+                continue;
+            }
             match model.baseline_pure_saturation_curve(opts[0].parse()?, options) {
                 Ok(curve) => println!(
                     "{:?}|{}",

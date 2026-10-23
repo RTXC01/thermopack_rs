@@ -613,7 +613,7 @@ def main(compiler_directory):
             v=float(model.specific_volume(t,p,z,phase)[0]);error=float(model.pressure_tv(t,v,z)[0])-p
             print('THERMOPACK_RESULT='+json.dumps(dict(values=[*map(float,dt),*map(float,dp),*map(float,dn.flatten())],volume=v,pressure_error=error)),flush=True)
             continue
-        if request['mode']=='PURE_CURVE':
+        if request['mode'] in ('PURE_CURVE','PURE_ENVELOPE'):
             from thermopack.cubic import cubic
             config=request.get('configuration','classic');eos=request['eos'];names=request['components']
             if config=='quantum':
@@ -623,19 +623,37 @@ def main(compiler_directory):
                 model=cubic(','.join(names),'SRK' if eos=='RK' else eos,alpha='RK' if eos=='RK' else 'Classic',
                     mixing={'unifac':'UNIFAC','hv1':'HV1','hv2':'HV2','nrtl':'NRTL'}.get(config,'vdW'),
                     volume_shift=config=='translated',parameter_reference=request.get('parameter_reference','DEFAULT'))
-            previous=None;component=request.get('component',0);z=[float(i==component) for i in range(len(names))]
+            previous=None;component=request.get('component',0);z=request.get('feed',[float(i==component) for i in range(len(names))])
             tc,vc,pc=map(float,model.get_critical_parameters(component+1))
             critical=[tc,pc,vc];value=request.get('initial_pressure')
             if value is not None and request.get('relative_start',False):value*=pc
             temp=request.get('initial_temperature')
             if temp is not None and request.get('relative_start',False):temp*=critical[0]
-            t,p,vl,vv=model.get_pure_fluid_saturation_curve(value,initial_temperature=temp,i=component+1,
-                max_delta_press=request.get('maximum_pressure_step',2e4),nmax=request.get('maximum_points',100),
-                log_linear_grid=request.get('logarithmic',False))
-            points=[]
+            envelope_output={}
+            if request['mode']=='PURE_ENVELOPE':
+                model.activate();nc=len(z);nmax=request.get('maximum_points',100)
+                amounts=(c_double*nc)(*z);tv=c_double(temp or 0.);pv=c_double(value or 0.)
+                spec=c_int(2 if temp is not None else 1);beta=c_double(request.get('initial_beta',1.))
+                maximum=c_double(request.get('maximum_pressure',1.5e7));limit=c_int(nmax);count=c_int()
+                t_values=(c_double*nmax)();p_values=(c_double*nmax)();ratios=(c_double*(nmax*nc))();fractions=(c_double*nmax)()
+                ds=c_double(request.get('maximum_step',.25));tmin=c_double(request.get('minimum_temperature',80.))
+                calculate=model.s_envelope_plot
+                calculate.argtypes=[POINTER(c_double)]*3+[POINTER(c_int)]+[POINTER(c_double)]*2+[POINTER(c_int)]+[POINTER(c_double)]*4+[POINTER(c_int)]+[POINTER(c_double)]*3+[POINTER(c_int)]+[POINTER(c_double)]*2
+                calculate.restype=None
+                calculate(amounts,byref(tv),byref(pv),byref(spec),byref(beta),byref(maximum),byref(limit),t_values,p_values,ratios,fractions,byref(count),None,None,byref(ds),None,byref(tmin),None)
+                t=list(t_values[:count.value]);p=list(p_values[:count.value])
+                vl=[float(model.specific_volume(ti,pi,z,model.LIQPH)[0]) for ti,pi in zip(t,p)]
+                vv=[float(model.specific_volume(ti,pi,z,model.VAPPH)[0]) for ti,pi in zip(t,p)]
+                envelope_output=dict(beta=list(fractions[:count.value]),ratios=[[ratios[j*nmax+i] for j in range(nc)] for i in range(count.value)])
+            else:
+                t,p,vl,vv=model.get_pure_fluid_saturation_curve(value,initial_temperature=temp,i=component+1,
+                    max_delta_press=request.get('maximum_pressure_step',2e4),nmax=request.get('maximum_points',100),
+                    log_linear_grid=request.get('logarithmic',False))
+            points=[];all_fugacity_differences=[]
             for ti,pi,li,vi in zip(t,p,vl,vv):
-                phi_l=model.thermo(ti,pi,z,model.LIQPH)[0][component]
-                phi_v=model.thermo(ti,pi,z,model.VAPPH)[0][component]
+                phi_l_all=model.thermo(ti,pi,z,model.LIQPH)[0];phi_v_all=model.thermo(ti,pi,z,model.VAPPH)[0]
+                phi_l=phi_l_all[component];phi_v=phi_v_all[component]
+                all_fugacity_differences.append(max(abs(float(a-b)) for a,b,x in zip(phi_l_all,phi_v_all,z) if x>0.))
                 pl=model.pressure_tv(ti,li,z)[0];pv=model.pressure_tv(ti,vi,z)[0]
                 points.append(list(map(float,[ti,pi,li,vi,pl-pi,pv-pi,phi_l-phi_v])))
             # Critical cubic coefficients in the source's L/mol convention.
@@ -655,7 +673,7 @@ def main(compiler_directory):
                 enabled,kind,dependent=c_int(),c_int(),c_int();params=(c_double*6)();derivatives=(c_double*3)()
                 probe.query_translation(component+1,tc,byref(enabled),byref(kind),params,derivatives,byref(dependent));shift=float(derivatives[0])
             print('THERMOPACK_RESULT='+json.dumps(dict(values=points,critical=critical,initial_pressure=value,initial_temperature=temp,
-                critical_polynomial=[pp,qq,rr],critical_shift=shift)),flush=True)
+                critical_polynomial=[pp,qq,rr],critical_shift=shift,all_fugacity_differences=all_fugacity_differences,**envelope_output)),flush=True)
             continue
         if request['mode']=='ENVELOPE':
             import numpy as np

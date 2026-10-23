@@ -7,13 +7,18 @@ adaptive grid and failure trajectory are qualified only for the subsets below.
 
 ## APIs and units
 
+The same APIs now support pure feeds through a separate
+[pure-envelope dispatch](pure-envelope.md). Its source grid, critical starts,
+one-point behavior and bound conventions differ from mixture continuation.
+
 `Cubic::phase_envelope(z, options)` returns a `PhaseEnvelope` containing
 `MixtureSaturation` points, a termination reason and an optional failure.
 The default start is a dew point at 0.1 MPa, the maximum pressure is 15 MPa,
 the maximum logarithmic coordinate step is 0.25 and the point limit is 1000.
 The minimum temperature defaults to the model's bound; positive lower user
 limits are clamped to that bound. Compositions must be normalized mole
-fractions, with at least two active species. Exact zero species remain absent.
+fractions. Mixture continuation requires at least two active species; pure
+feeds use the separate grid dispatch. Exact zero species remain absent.
 
 `EnvelopeConstraint::Pressure` takes Pa, `Temperature` takes K and
 `LogK { component, value }` uses the zero-based index in the original feed
@@ -156,7 +161,7 @@ the physical tracer attempts the exact temperature endpoint.
 
 This is local VLE continuation, with one phase composition fixed. Global
 multiphase stability, liquid/liquid/vapor and solid envelopes, general fixed
-quality, pure-fluid envelope routing, cricondenbar/cricondentherm refinement,
+quality, cricondenbar/cricondentherm refinement,
 critical-point insertion, other EOS families and complete raw iteration/error
 fidelity remain pending. Existing local critical-point APIs are separate;
 a maximum over sampled nodes is not an exact criconden point.

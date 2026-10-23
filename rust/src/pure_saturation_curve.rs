@@ -193,6 +193,21 @@ impl<'a> Problem<'a> {
             }
         }
     }
+    fn endpoint(&mut self, endpoint: crate::critical::CriticalPoint) -> Result<Saturation> {
+        if self.baseline {
+            return self
+                .evaluate(endpoint.temperature, endpoint.pressure)
+                .map(|p| p.point);
+        }
+        let state = self.model.prepare(endpoint.temperature, &self.z)?;
+        Ok(Saturation {
+            temperature: endpoint.temperature,
+            pressure: endpoint.pressure,
+            liquid_volume: endpoint.volume,
+            vapor_volume: endpoint.volume,
+            dpdt: state.pressure(endpoint.volume)?.dt,
+        })
+    }
 }
 
 fn conditions(fixed: PureSaturationStart, variable: f64) -> (f64, f64) {
@@ -205,6 +220,8 @@ fn conditions(fixed: PureSaturationStart, variable: f64) -> (f64, f64) {
 impl Cubic {
     /// Trace a selected pure component, retaining the original model and its
     /// parameters. The final node is the critical point of the active EOS.
+    /// A start at that point, within 32 machine epsilons in the specified
+    /// coordinate, returns one critical node.
     pub fn pure_saturation_curve(
         &self,
         component: usize,
@@ -215,6 +232,8 @@ impl Cubic {
     /// Retain the fork's grid, database-critical endpoint and raw cubic volume
     /// convention. A database endpoint need not be critical for modified EOS
     /// parameters. Raw iteration identity requires separate qualification.
+    /// A one-point buffer retains only the endpoint. Critical-temperature
+    /// starts retain the source's coarse metastable initialization estimate.
     pub fn baseline_pure_saturation_curve(
         &self,
         component: usize,
@@ -228,7 +247,7 @@ impl Cubic {
         options: PureSaturationOptions,
         baseline: bool,
     ) -> Result<PureSaturationCurve> {
-        if options.maximum_points < 2 {
+        if options.maximum_points == 0 || !baseline && options.maximum_points < 2 {
             return Err(Error::InvalidInput(
                 "pure saturation grid needs at least two points",
             ));
@@ -255,8 +274,43 @@ impl Cubic {
         } else {
             crate::critical::critical_point(self, &problem.z)?
         };
-        let start = problem.cold(options.start)?;
-        if start.temperature >= endpoint.temperature || start.pressure >= endpoint.pressure {
+        if !baseline {
+            let target = match options.start {
+                PureSaturationStart::Temperature(_) => endpoint.temperature,
+                PureSaturationStart::Pressure(_) => endpoint.pressure,
+            };
+            if (initial - target).abs() <= 32. * f64::EPSILON * target {
+                return Ok(PureSaturationCurve {
+                    points: vec![problem.endpoint(endpoint)?],
+                    component,
+                    end: PureSaturationEnd::CriticalPoint,
+                    failure: None,
+                });
+            }
+        }
+        // At a critical start the source can accept its coarse metastable
+        // PureSat estimate once the ordinary phase roots have coalesced.
+        let critical_temperature_start = baseline
+            && matches!(options.start,PureSaturationStart::Temperature(t) if t==endpoint.temperature);
+        let critical_pressure_start = baseline
+            && matches!(options.start,PureSaturationStart::Pressure(p) if p==endpoint.pressure);
+        let start = if critical_temperature_start {
+            let pressure = self
+                .baseline_pure_critical_pressure_seed(component)?
+                .ln()
+                .exp();
+            problem.evaluate(endpoint.temperature, pressure)?.point
+        } else if critical_pressure_start {
+            problem
+                .evaluate(endpoint.temperature.ln().exp(), endpoint.pressure)?
+                .point
+        } else {
+            problem.cold(options.start)?
+        };
+        if !critical_temperature_start
+            && !critical_pressure_start
+            && (start.temperature >= endpoint.temperature || start.pressure >= endpoint.pressure)
+        {
             return Err(Error::InvalidInput(
                 "pure saturation start below critical endpoint required",
             ));
@@ -266,7 +320,9 @@ impl Cubic {
         } else {
             (endpoint.pressure - start.pressure) / options.maximum_pressure_step
         };
-        let count = if requested_intervals >= (options.maximum_points - 2) as f64 {
+        let count = if options.maximum_points == 1 {
+            1
+        } else if requested_intervals >= (options.maximum_points - 2) as f64 {
             options.maximum_points
         } else {
             requested_intervals.round() as usize + 2
@@ -299,7 +355,7 @@ impl Cubic {
         } else {
             start
         };
-        let mut points = vec![first];
+        let mut points = if count == 1 { Vec::new() } else { vec![first] };
         for i in 1..count - 1 {
             let previous = points.last().unwrap();
             let value = grid(i);
@@ -337,22 +393,7 @@ impl Cubic {
                 }
             }
         }
-        let final_point = if baseline {
-            problem
-                .evaluate(endpoint.temperature, endpoint.pressure)
-                .map(|p| p.point)
-        } else {
-            self.prepare(endpoint.temperature, &problem.z)
-                .and_then(|state| {
-                    Ok(Saturation {
-                        temperature: endpoint.temperature,
-                        pressure: endpoint.pressure,
-                        liquid_volume: endpoint.volume,
-                        vapor_volume: endpoint.volume,
-                        dpdt: state.pressure(endpoint.volume)?.dt,
-                    })
-                })
-        };
+        let final_point = problem.endpoint(endpoint);
         let final_point = match final_point {
             Ok(point) => point,
             Err(error) => {

@@ -4,6 +4,8 @@ Complete mixture VLE curves have separate [envelope measurements and scope](enve
 with every sampled phase state compared before timing.
 Selected-component pure saturation grids have separate
 [complete-curve measurements and endpoint-conditioning scope](pure-curves.md#performance-and-remaining-scope).
+Pure routing through the general envelope API has its own
+[measurements and full phase-reporting scope](pure-envelope.md#performance).
 
 Fluid acoustic workloads have separate current [measurements and scope](sound.md#native-loop-measurements).
 Fixed-volume caloric flashes have separate [UV/SV measurements](isochoric.md#native-loop-measurements),

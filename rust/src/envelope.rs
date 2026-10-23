@@ -1,5 +1,8 @@
 //! Mixture VLE continuation in log(K), log(T), log(P) coordinates.
 //! Equations and coordinate switching follow `saturation`/`saturation_curve`.
+//! Pure feeds dispatch to a selected-component saturation grid instead of
+//! the mixture corrector. Physical traces honor pressure/temperature bounds;
+//! baseline traces retain the source's pure grid and critical endpoint.
 //!
 //! ```
 //! use thermopack_rs::{Cubic, CubicKind};
@@ -244,6 +247,9 @@ pub enum EnvelopeEnd {
     MinimumTemperature,
     PointLimit,
     NoConvergence,
+    CriticalPoint,
+    SourceCriticalParameters,
+    MaximumTemperature,
 }
 
 #[derive(Debug, Clone)]
@@ -661,14 +667,19 @@ impl Cubic {
             .or_else(|_| problem.solve(u, s, spec))?;
         problem.point(&u, s, iterations)
     }
-    /// Follow a mixture VLE envelope with adaptive most-sensitive log-variable
-    /// prediction/correction. Partial curves carry an explicit termination.
+    /// Follow a fluid VLE envelope. Mixtures use adaptive log-variable
+    /// prediction/correction; exact pure feeds use a saturation grid through
+    /// the EOS critical point, with pressure/temperature endpoint limits.
+    /// Partial curves carry an explicit termination.
     /// This is local VLE continuation; global VLLE stability is not established.
     pub fn phase_envelope(&self, z: &[f64], options: EnvelopeOptions) -> Result<PhaseEnvelope> {
         self.trace_phase_envelope(z, options, false)
     }
     /// Source convergence/pressure-limit conventions. Adaptive-grid and
     /// failure-trajectory identity require separate qualification.
+    /// Pure feeds retain source classification, bubble labels, ignored
+    /// mixture controls and the database-critical endpoint. A one-point pure
+    /// buffer contains that endpoint. See [`crate::pure_saturation_curve`].
     pub fn baseline_phase_envelope(
         &self,
         z: &[f64],
@@ -682,6 +693,19 @@ impl Cubic {
         options: EnvelopeOptions,
         source_conventions: bool,
     ) -> Result<PhaseEnvelope> {
+        let total = z.iter().sum::<f64>();
+        let largest = z.iter().enumerate().max_by(|a, b| a.1.total_cmp(b.1));
+        if let Some((component, &maximum)) = largest
+            && maximum.is_finite()
+            && maximum > 0.
+            && if source_conventions {
+                maximum == total
+            } else {
+                z.iter().filter(|&&x| x > 0.).count() == 1
+            }
+        {
+            return self.trace_pure_phase_envelope(z, component, options, source_conventions);
+        }
         positive(options.maximum_pressure, "envelope maximum pressure")?;
         positive(options.maximum_step, "envelope maximum step")?;
         let requested_minimum_temperature = options
@@ -942,6 +966,208 @@ impl Cubic {
             points,
             end: EnvelopeEnd::PointLimit,
             failure: None,
+        })
+    }
+    fn trace_pure_phase_envelope(
+        &self,
+        z: &[f64],
+        component: usize,
+        options: EnvelopeOptions,
+        baseline: bool,
+    ) -> Result<PhaseEnvelope> {
+        use crate::pure_saturation_curve::{
+            PureSaturationEnd, PureSaturationOptions, PureSaturationStart,
+        };
+        self.prepare(300., z)?;
+        if options.maximum_points == 0 {
+            return Err(Error::InvalidInput("envelope tracing limits"));
+        }
+        let start = match options.start {
+            EnvelopeConstraint::Temperature(t) => PureSaturationStart::Temperature(t),
+            EnvelopeConstraint::Pressure(p) => PureSaturationStart::Pressure(p),
+            _ => {
+                return Err(Error::InvalidInput(
+                    "temperature or pressure envelope start required",
+                ));
+            }
+        };
+        let minimum_temperature = options
+            .minimum_temperature
+            .unwrap_or(self.temperature_bounds().0)
+            .max(self.temperature_bounds().0);
+        if !baseline {
+            positive(options.maximum_pressure, "envelope maximum pressure")?;
+            if let Some(t) = options.minimum_temperature {
+                positive(t, "envelope minimum temperature")?;
+            }
+        }
+        let pure_options = PureSaturationOptions {
+            start,
+            maximum_points: if baseline {
+                options.maximum_points
+            } else {
+                options.maximum_points.max(2)
+            },
+            ..Default::default()
+        };
+        let curve = if baseline {
+            self.baseline_pure_saturation_curve(component, pure_options)?
+        } else {
+            self.pure_saturation_curve(component, pure_options)?
+        };
+        let sum = z.iter().sum::<f64>();
+        let feed: Vec<_> = z.iter().map(|x| x / sum).collect();
+        let exact_pure = feed.iter().filter(|&&x| x > 0.).count() == 1;
+        let first = curve
+            .points
+            .first()
+            .ok_or(Error::NotConverged("pure envelope initialization"))?;
+        let (tmin, tmax) = (minimum_temperature, self.temperature_bounds().1);
+        if !baseline
+            && (first.pressure > options.maximum_pressure * (1. + 1e-12)
+                || first.temperature < tmin * (1. - 1e-12)
+                || first.temperature > tmax * (1. + 1e-12))
+        {
+            return Err(Error::InvalidInput("envelope initial state outside limits"));
+        }
+        let critical = curve.end == PureSaturationEnd::CriticalPoint;
+        let mut end = match curve.end {
+            PureSaturationEnd::CriticalPoint => EnvelopeEnd::CriticalPoint,
+            PureSaturationEnd::SourceCriticalParameters => EnvelopeEnd::SourceCriticalParameters,
+            PureSaturationEnd::NoConvergence => EnvelopeEnd::NoConvergence,
+        };
+        let mut failure = curve.failure;
+        let mut points = Vec::new();
+        let mut phi_l = vec![0.; feed.len()];
+        let mut phi_v = phi_l.clone();
+        for (i, mut point) in curve.points.into_iter().enumerate() {
+            if !baseline {
+                if i == options.maximum_points {
+                    end = EnvelopeEnd::PointLimit;
+                    failure = None;
+                    break;
+                }
+                let at_critical = critical && point.liquid_volume == point.vapor_volume;
+                let crosses_p = point.pressure > options.maximum_pressure * (1. + 1e-12)
+                    || !at_critical && point.pressure >= options.maximum_pressure * (1. - 1e-12);
+                let crosses_t = point.temperature > tmax * (1. + 1e-12)
+                    || !at_critical && point.temperature >= tmax * (1. - 1e-12);
+                let mut boundary = None;
+                if crosses_p {
+                    let mut pure = vec![0.; feed.len()];
+                    pure[component] = 1.;
+                    boundary = Some((
+                        self.pseudo_saturation_temperature(options.maximum_pressure, &pure),
+                        EnvelopeEnd::MaximumPressure,
+                    ));
+                }
+                if crosses_t {
+                    let mut pure = vec![0.; feed.len()];
+                    pure[component] = 1.;
+                    let candidate = self.pseudo_saturation_pressure(tmax, &pure);
+                    if boundary.as_ref().is_none_or(|(a, _)| {
+                        candidate
+                            .as_ref()
+                            .is_ok_and(|b| a.as_ref().map_or(true, |a| b.pressure < a.pressure))
+                    }) {
+                        boundary = Some((candidate, EnvelopeEnd::MaximumTemperature));
+                    }
+                }
+                if let Some((result, reason)) = boundary {
+                    match result {
+                        Ok(bound) => {
+                            if bound.pressure > options.maximum_pressure * (1. + 1e-10)
+                                || bound.temperature > tmax * (1. + 1e-10)
+                                || bound.temperature < tmin * (1. - 1e-10)
+                            {
+                                end = EnvelopeEnd::NoConvergence;
+                                failure =
+                                    Some(Error::NotConverged("pure envelope endpoint bounds"));
+                                break;
+                            }
+                            point = bound;
+                            end = reason;
+                            failure = None;
+                        }
+                        Err(e) => {
+                            end = EnvelopeEnd::NoConvergence;
+                            failure = Some(e);
+                            break;
+                        }
+                    }
+                }
+            }
+            let converted = (|| {
+                let state = self.prepare(point.temperature, &feed)?;
+                if baseline && !exact_pure {
+                    point.liquid_volume = state.baseline_volume(point.pressure, Phase::Liquid)?;
+                    point.vapor_volume = state.baseline_volume(point.pressure, Phase::Vapor)?;
+                }
+                state.ln_fugacity_tp_into(point.pressure, point.liquid_volume, &mut phi_l)?;
+                state.ln_fugacity_tp_into(point.pressure, point.vapor_volume, &mut phi_v)?;
+                if feed
+                    .iter()
+                    .enumerate()
+                    .any(|(i, &x)| x > 0. && !(phi_l[i] - phi_v[i]).is_finite())
+                {
+                    return Err(Error::NotConverged("nonfinite pure envelope fugacity"));
+                }
+                let residual = feed
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, x)| **x > 0.)
+                    .map(|(i, _)| (phi_l[i] - phi_v[i]).abs())
+                    .fold(0., f64::max);
+                Ok(MixtureSaturation {
+                    kind: SaturationKind::Bubble,
+                    temperature: point.temperature,
+                    pressure: point.pressure,
+                    liquid: feed.clone(),
+                    vapor: feed.clone(),
+                    liquid_volume: point.liquid_volume,
+                    vapor_volume: point.vapor_volume,
+                    dpdt: point.dpdt,
+                    iterations: 0,
+                    fugacity_residual: residual,
+                })
+            })();
+            match converted {
+                Ok(point) => points.push(point),
+                Err(e) => {
+                    end = EnvelopeEnd::NoConvergence;
+                    failure = Some(e);
+                    break;
+                }
+            }
+            if !baseline
+                && matches!(
+                    end,
+                    EnvelopeEnd::MaximumPressure | EnvelopeEnd::MaximumTemperature
+                )
+            {
+                break;
+            }
+        }
+        if !baseline
+            && options.maximum_points == 1
+            && points.len() == 1
+            && !matches!(
+                end,
+                EnvelopeEnd::CriticalPoint
+                    | EnvelopeEnd::MaximumPressure
+                    | EnvelopeEnd::MaximumTemperature
+            )
+        {
+            end = EnvelopeEnd::PointLimit;
+            failure = None;
+        }
+        if points.is_empty() {
+            return Err(failure.unwrap_or(Error::NotConverged("pure envelope initialization")));
+        }
+        Ok(PhaseEnvelope {
+            points,
+            end,
+            failure,
         })
     }
 }

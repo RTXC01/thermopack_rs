@@ -168,6 +168,14 @@ impl PreparedState<'_> {
     /// not filtered by mechanical stability or pressure closure; use `volume`
     /// for physical root selection. Minimum-Gibbs selection is not this path.
     pub fn baseline_volume(&self, pressure: f64, phase: Phase) -> Result<f64> {
+        self.baseline_volume_with_extrema(pressure, phase, false)
+    }
+    pub(crate) fn baseline_volume_with_extrema(
+        &self,
+        pressure: f64,
+        phase: Phase,
+        meta: bool,
+    ) -> Result<f64> {
         positive(pressure, "cubic pressure")?;
         if phase == Phase::MinimumGibbs {
             return Err(Error::InvalidInput("baseline cubic phase"));
@@ -185,6 +193,7 @@ impl PreparedState<'_> {
         let f3 = rr + zc * (qq + zc * (pp + zc));
         let discriminant = (2.0 * pp).powi(2) - 12.0 * qq;
         let mut liquid = f3 > 0.0;
+        let mut extremum = None;
         if discriminant > 0.0 {
             let z1 = (-2.0 * pp - discriminant.sqrt()) / 6.0;
             let z2 = (-2.0 * pp + discriminant.sqrt()) / 6.0;
@@ -192,6 +201,13 @@ impl PreparedState<'_> {
             let f2 = rr + z2 * (qq + z2 * (pp + z2));
             if f1 * f2 <= 0.0 {
                 liquid = phase == Phase::Liquid;
+            } else if meta {
+                if liquid && phase == Phase::Vapor {
+                    extremum = Some(z2.max(b * 1.001));
+                }
+                if !liquid && phase == Phase::Liquid {
+                    extremum = Some(z1.max(b * 1.001));
+                }
             }
         }
         let solve = |mut z: f64| {
@@ -224,8 +240,9 @@ impl PreparedState<'_> {
             }
             z
         };
-        let mut z = solve(if liquid { b } else { 2.0_f64.max(b * 1.001) });
-        if liquid && z < b {
+        let mut z =
+            extremum.unwrap_or_else(|| solve(if liquid { b } else { 2.0_f64.max(b * 1.001) }));
+        if extremum.is_none() && liquid && z < b {
             z = solve(2.0_f64.max(b * 1.001));
         }
         let volume = z * R * t / pressure - self.volume_translation().value;
@@ -595,6 +612,127 @@ impl Cubic {
             }
         }
         Err(Error::NotConverged("fixed-composition critical point"))
+    }
+    // Source-order PureSat initialization at a pure database critical T.
+    // The L/mol arithmetic of cbCalcPseudo controls the T > Tpc branch;
+    // reducing it algebraically to SI can change that comparison by one ulp.
+    pub(crate) fn baseline_pure_critical_pressure_seed(&self, component: usize) -> Result<f64> {
+        let c = &self.components[component];
+        let (oa, ob, qc) = source_order_omega(self.kind);
+        let kr = 1000. * R;
+        let a0 = oa * (kr * c.critical_temperature).powi(2) / c.critical_pressure;
+        let b0 = ob * kr * c.critical_temperature / c.critical_pressure;
+        let coefficients = |t: f64| -> Result<(f64, f64, f64, f64, f64)> {
+            let alpha = self.alpha[component].evaluate(t, c.critical_temperature)?;
+            let beta = self.beta[component].evaluate(t, c.critical_temperature)?;
+            let f = (a0 * alpha.value).sqrt();
+            let ft = (0.5 * a0 / f) * alpha.dt;
+            let ftt =
+                -0.25 * a0 / f * (alpha.dt * alpha.dt - 2. * alpha.value * alpha.dtt) / alpha.value;
+            Ok((
+                f * f,
+                2. * f * ft,
+                2. * (ft * ft + f * ftt),
+                b0 * beta.value,
+                b0 * beta.dt,
+            ))
+        };
+        let mut tpc = c.critical_temperature;
+        let mut last = None;
+        let mut converged = false;
+        for iteration in 0..20 {
+            let (a, at, att, b, bt) = coefficients(tpc)?;
+            let f = a - oa / ob * kr * tpc * b;
+            let df = at - oa / ob * kr * (b + tpc * bt);
+            let arg = 1. - 2. * f * att / (df * df);
+            let arg = if arg < 0. { 1. } else { arg.sqrt() };
+            let step = (-f) / df * 2. / (1. + arg);
+            tpc += step;
+            last = Some((a, b));
+            if step.abs() <= 1e-10 {
+                converged = iteration < 19;
+                break;
+            }
+        }
+        if !converged {
+            return Err(Error::NotConverged("source pure pseudo critical"));
+        }
+        let (a, b) = last.ok_or(Error::NotConverged("source pure pseudo critical"))?;
+        let v = (ob * qc) * b / ob;
+        let (d1, d2) = self.kind.deltas();
+        let ppc = kr * tpc / (v - b) - a / ((v + d2 * b) * (v + d1 * b));
+        positive(ppc, "source pure pseudo critical pressure")?;
+        let t = c.critical_temperature;
+        if t > tpc {
+            return Ok(ppc);
+        }
+        let mut z = vec![0.; self.components.len()];
+        z[component] = 1.;
+        let state = self.prepare(t, &z)?;
+        let evaluate = |p: f64| -> Result<(f64, f64)> {
+            let mut values = [0.; 2];
+            let mut volumes = [0.; 2];
+            for (i, phase) in [Phase::Liquid, Phase::Vapor].into_iter().enumerate() {
+                let physical = state.baseline_volume_with_extrema(p, phase, true)?;
+                let v = state.eos_volume(physical);
+                let rt = R * t;
+                let zz = p * v / rt;
+                let integral = state.attraction_integral(v);
+                let f = -(1. - state.b / v).ln() - state.a * integral / rt;
+                values[i] = rt * f + p * v - rt * (1. + zz.ln());
+                volumes[i] = v;
+            }
+            let result = (values[1] - values[0], volumes[1] - volumes[0]);
+            if !result.0.is_finite() || !result.1.is_finite() {
+                return Err(Error::NotConverged("source PureSat seed equations"));
+            }
+            Ok(result)
+        };
+        let low = 10.;
+        let high = (1.5 * ppc * t / tpc).min(ppc);
+        if high < low {
+            return Err(Error::NotConverged("source PureSat pressure bounds"));
+        }
+        let mut p = (0.1 * ppc * t / tpc).max(low);
+        if evaluate(p)?.1.abs() < 1e-12 {
+            p = low + 1e-12;
+            if evaluate(p)?.1.abs() < 1e-12 {
+                p = ppc * t / tpc;
+            }
+        }
+        for _ in 0..30 {
+            let (f, df) = evaluate(p)?;
+            if df == 0. {
+                return Err(Error::NotConverged("source PureSat seed Jacobian"));
+            }
+            let mut step = -f / df;
+            if step.abs() > 1e-9 {
+                if p + step < low {
+                    step = low - p;
+                }
+                if p + step > high {
+                    step = high - p;
+                }
+            }
+            let mut fraction = 1.;
+            let mut next = (p + step).clamp(low, high);
+            let mut residual = evaluate(next)?.0;
+            for _ in 0..3 {
+                if residual.abs() < f.abs() {
+                    break;
+                }
+                fraction *= 0.5;
+                next = (p + fraction * step).clamp(low, high);
+                residual = evaluate(next)?.0;
+            }
+            p = next;
+            if residual.abs() < 1e-4 {
+                return Ok(p);
+            }
+        }
+        Err(Error::NotConverged(
+            "source PureSat critical initialization",
+        ))
     }
     pub fn new(kind: CubicKind, names: &[&str]) -> Result<Self> {
         Self::with_options(kind, names, CubicOptions::default())
@@ -2188,4 +2326,31 @@ fn omega_with_critical_ratio(kind: CubicKind) -> (f64, f64, f64) {
     let arg = n1 * n2 / (n * n1 + n * n2);
     let b = (1.0 - arg) / (zcomb - 1.0);
     (b * (1.0 / n - b) * n1 * n2, b, zcomb)
+}
+
+// Preserve Fortran's exponentiation grouping as well as its iteration order.
+// This compatibility helper is kept separate from the established SI kernels.
+fn source_order_omega(kind: CubicKind) -> (f64, f64, f64) {
+    let (d1, d2) = kind.deltas();
+    let (m1, m2) = (-d2, -d1);
+    let mut zcomb = 5.;
+    let (mut n, mut n1, mut n2) = (0., 0., 0.);
+    for _ in 0..9 {
+        n = zcomb - 1.;
+        n1 = zcomb - m1;
+        n2 = zcomb - m2;
+        let f = n * (n1 * n1) + n * n1 * n2 + n * (n2 * n2) - (n1 * n1) * n2 - n1 * (n2 * n2);
+        let fd = 3. * (n * n1 + n * n2 - n1 * n2);
+        let fdd = 6. * n;
+        let arg = 1. - 2. * f * fdd / (fd * fd);
+        let arg = if arg > 0. { arg.sqrt() } else { 1. };
+        let step = (-2.) * f / (fd * (1. + arg));
+        zcomb += step;
+        if step.abs() <= 1e-10 {
+            break;
+        }
+    }
+    let arg = n1 * n2 / (n * n1 + n * n2);
+    let b = (1. - arg) / (zcomb - 1.);
+    (b * (1. / n - b) * n1 * n2, b, zcomb)
 }

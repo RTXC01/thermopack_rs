@@ -29,8 +29,10 @@ The point limit redistributes the entire grid and includes both endpoints;
 it does not return an early bounded prefix. A failed interior or endpoint
 calculation does retain the accepted prefix with `NoConvergence` and a
 failure. Invalid inputs or initial-state construction fail before a curve
-exists. At least two points and a positive finite start are required. Linear
-grids require a positive finite pressure spacing; logarithmic grids ignore it,
+exists. Physical grids require a budget of at least two points and a positive
+finite start; a physical critical start returns one coincident-phase node.
+Baseline grids also support the source's single-point critical-endpoint buffer.
+Linear grids require a positive finite pressure spacing; logarithmic grids ignore it,
 including zero or nonfinite values, as in the source.
 
 `Cubic::pure_saturation_curve` ends at the critical point of the active EOS.
@@ -41,7 +43,10 @@ temperature bounds; this selected-component curve has the same convention.
 
 `Cubic::baseline_pure_saturation_curve` retains the fork's database-critical
 T/P endpoint, raw cubic volume iteration and 1e-10 fugacity tolerance. It
-returns `SourceCriticalParameters` at that endpoint. A modified model need
+returns `SourceCriticalParameters` at that endpoint. At a critical temperature
+start it now retains the source's coarse metastable initializer before that
+endpoint; see the [pure-envelope edge qualification](pure-envelope.md).
+A modified model need
 not be critical at its database endpoint. Complete raw iteration identity is
 not claimed, especially at the nearly triple critical root.
 
@@ -149,7 +154,8 @@ These qualify these workloads, not the speed of the entire library. The
 per-sample checksums, source identity, endpoint bounds and all native/harness/
 Cargo input hashes.
 
-Pure routing through the general envelope API, non-cubic pure curves,
+[Pure routing through the general envelope API](pure-envelope.md) is now
+implemented and separately qualified. Non-cubic pure curves,
 pure-fluid azeotrope end-point searches, broader parameter modifications
 and complete raw failure/iteration behavior remain pending. See the
 [coverage ledger](coverage.md) and [overall progress estimate](progress.md).

@@ -572,3 +572,26 @@ custom source-data checks and all-target benchmark executables, 40 selected
 release tests, 21 documentation tests, strict all-target Clippy and rustdoc,
 formatting and the integrity audit of all 111 fixtures. This records local
 checks; hosted CI has not been observed running.
+
+The [general-envelope pure dispatch qualification](pure-envelope.md) adds
+180 unique source attempts: 153 finite envelope curves and 16 finite
+dedicated-curve edge cases, totaling 13,917 stored states. Eleven source
+terminations remain explicit; no calls were censored. Counts, all T/P and
+both volumes match the declared tolerances, and general-envelope labels and
+compositions match exactly. At 175 database-critical nodes, all 350 volume
+comparisons pass source-polynomial backward-error and displacement bounds;
+348 require that explicit conditioning allowance. One derived critical-node
+trace-component fugacity diagnostic differs and is retained separately. The
+original envelope API does not return that diagnostic. Seven source
+roundoff-classified pure feeds remain distinct from physical mixture VLE.
+
+Independent checks cover full phase arrays, critical pressure inflections,
+physical pressure/temperature boundary closure, one-point buffers and
+critical starts. The local checkpoint passed 324 standard development tests
+plus the custom source-data checks and benchmark executables, 51 selected
+release tests, 21 documentation tests, strict all-target Clippy and rustdoc,
+formatting and the integrity audit of all 112 fixtures. Final endpoint guards
+also passed the 16 affected release tests. Hosted CI has not been observed
+running. Complete-curve performance preflight compares all 364 states of four
+identical grids before timing, with eight explicitly conditioned endpoint
+volumes. Full-library parity and performance remain unestablished.

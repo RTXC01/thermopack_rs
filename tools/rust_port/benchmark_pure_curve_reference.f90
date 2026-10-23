@@ -1,16 +1,19 @@
 program benchmark_pure_curve_reference
   use eoslibinit,only:init_cubic,init_quantum_cubic
-  use saturation_curve,only:pure_fluid_saturation_wrapper
-  use eos,only:getCriticalParam
+  use saturation_curve,only:pure_fluid_saturation_wrapper,envelopePlot
+  use eos,only:getCriticalParam,specificvolume
+  use thermopack_constants,only:LIQPH,VAPPH
   use thermopack_var,only:tpTmin
   implicit none
   integer,parameter :: nmax=100,iterations=20
-  integer :: profile,n,i,repeat
+  integer :: profile,n,i,repeat,point
   integer(kind=8) :: start,finish,rate
-  real :: z(1),t(nmax),p(nmax),vl(nmax),vv(nmax),tc,pc,w,value,sums(5)
-  logical :: from_t,log_grid
-  character(len=16) :: command
+  real :: z(1),t(nmax),p(nmax),vl(nmax),vv(nmax),tc,pc,w,value,sums(5),ratios(nmax,1),beta(nmax)
+  logical :: from_t,log_grid,envelope
+  character(len=16) :: command,mode
   call get_command_argument(1,command)
+  call get_command_argument(2,mode)
+  envelope=trim(mode)=='envelope'
   z=1.
   do profile=1,4
     select case(profile)
@@ -48,7 +51,21 @@ program benchmark_pure_curve_reference
   enddo
 contains
   subroutine solve()
-    call pure_fluid_saturation_wrapper(z,value,from_t,2e4,log_grid,t,p,vl,vv,nmax,n)
-    if(n/=nmax .or. abs(t(n)-tc)>1e-6 .or. abs(p(n)-pc)>.1) error stop 'Incomplete source curve'
+    if(envelope) then
+      if(from_t) then
+        call envelopePlot(z,value,0.,2,1.,1.5e7,nmax,t,p,ratios,beta,n)
+      else
+        call envelopePlot(z,0.,value,1,1.,1.5e7,nmax,t,p,ratios,beta,n)
+      endif
+      if(any(beta(:n)/=0.) .or. any(ratios(:n,:)/=1.)) error stop 'Source pure envelope labels'
+      do point=1,n
+        call specificvolume(t(point),p(point),z,LIQPH,vl(point))
+        call specificvolume(t(point),p(point),z,VAPPH,vv(point))
+      enddo
+    else
+      call pure_fluid_saturation_wrapper(z,value,from_t,2e4,log_grid,t,p,vl,vv,nmax,n)
+    endif
+    if(n<1 .or. abs(t(n)-tc)>1e-6 .or. abs(p(n)-pc)>.1) error stop 'Incomplete source curve'
+    if(.not.envelope .and. n/=nmax) error stop 'Incomplete source grid'
   end subroutine solve
 end program benchmark_pure_curve_reference

@@ -9,6 +9,10 @@ with explicit critical-root conditioning. The
 [overall progress estimate](../docs/rust/progress.md) describes the full
 replacement scope behind chat progress updates.
 
+[Pure-envelope dispatch](../docs/rust/pure-envelope.md) now connects those
+grids to the general envelope API, with explicit physical bounds and source
+critical-start, one-point and trace-classification conventions.
+
 [Mixture phase envelopes](../docs/rust/envelope.md) now provide adaptive cubic
 VLE tracing through turns, source-convention tracing, warm T/P/log-K correction
 and explicit partial-curve status. Read the remaining sampling differences

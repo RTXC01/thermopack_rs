@@ -1,0 +1,95 @@
+{
+  "generator": "tools/rust_port/compare_envelope_extrema_benchmarks.py",
+  "before_report": "docs/rust/envelope-extrema-before-cache-benchmark.json",
+  "before_report_sha256": "d98e168780232214fc87ab4c61ca678c44291851268139d084cd8e3246cd5b53",
+  "after_report": "docs/rust/envelope-extrema-benchmark.json",
+  "after_report_sha256": "7e7c80971ab57d57c374ca89ebecf2f47f881712cc99eb489cf3baa49455174b",
+  "changed_native_sources": [
+    "rust/src/envelope_extrema.rs"
+  ],
+  "identical_benchmark_and_cargo_inputs": true,
+  "identical_source_backed_reference_and_numeric_cases": true,
+  "compared_outputs": [
+    "temperature_K",
+    "pressure_Pa",
+    "source_phase_fraction",
+    "liquid_volume_m3_per_mol",
+    "vapor_volume_m3_per_mol",
+    "liquid_x1",
+    "liquid_x2",
+    "vapor_y1",
+    "vapor_y2",
+    "dimensionless_unscaled_stationarity"
+  ],
+  "maximum_absolute_checksum_differences": [
+    8.213100954890251e-08,
+    0.0012769699096679688,
+    0.0,
+    3.1674662892555716e-13,
+    6.342704139683519e-13,
+    0.0,
+    0.0,
+    1.776186309143668e-09,
+    1.776811586751137e-09,
+    9.124125977649775e-11
+  ],
+  "profiles": {
+    "native_1": {
+      "before_median_ns": 485871.5,
+      "after_median_ns": 228049.9,
+      "speedup": 2.1305490596575574,
+      "before_range_ns": [
+        476307.6,
+        488268.1
+      ],
+      "after_range_ns": [
+        225313.4,
+        239065.1
+      ],
+      "all_after_samples_faster_than_all_before": true
+    },
+    "native_2": {
+      "before_median_ns": 517830.8,
+      "after_median_ns": 247118.5,
+      "speedup": 2.0954756523692075,
+      "before_range_ns": [
+        504015.1,
+        529431.6
+      ],
+      "after_range_ns": [
+        244467.6,
+        251281.5
+      ],
+      "all_after_samples_faster_than_all_before": true
+    },
+    "native_3": {
+      "before_median_ns": 305107.6,
+      "after_median_ns": 215440.6,
+      "speedup": 1.4162028884063633,
+      "before_range_ns": [
+        301960.7,
+        305370.5
+      ],
+      "after_range_ns": [
+        206385.5,
+        219888.0
+      ],
+      "all_after_samples_faster_than_all_before": true
+    },
+    "native_4": {
+      "before_median_ns": 1522427.8,
+      "after_median_ns": 984967.4,
+      "speedup": 1.5456631356530175,
+      "before_range_ns": [
+        1486379.3,
+        1564291.5
+      ],
+      "after_range_ns": [
+        972293.6,
+        1000158.6
+      ],
+      "all_after_samples_faster_than_all_before": true
+    }
+  },
+  "scope": "Eight warm native P/T extrema refinements across four binary profiles. Ratios compare the previous Rust fixed-seed method with cached nearby predictors; they are not speedups against the original defective optional source solver."
+}

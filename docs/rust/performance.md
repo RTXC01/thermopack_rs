@@ -351,7 +351,10 @@ generation are excluded; complete caloric curves remain separate work.
 
 [Envelope extrema measurements](envelope-extrema.md#performance) time eight
 warm pressure/temperature refinements with source-backed coordinate preflight
-and ten separate checksum quantities. Local native medians are 0.306–1.547 ms
-per refinement across four binary profiles. The original optional solver has
+and ten separate checksum quantities. Local native medians are 0.215–0.985 ms
+per refinement across four binary profiles. Reusing nearby corrected states
+and tangents improves on the freshly measured fixed-seed Rust baseline by
+1.42–2.13x. The comparison audit verifies matching numerical/harness/Cargo
+inputs and one changed native file. The original optional solver has
 undefined phase-argument behavior, so this is a native-only measurement with
 no speedup claim against that path.

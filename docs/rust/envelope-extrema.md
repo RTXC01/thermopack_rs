@@ -70,6 +70,14 @@ orientation. The augmented Newton fallback retains analytic coexistence and
 material-balance rows and centrally differences only the stationarity row.
 It solves to 1e-10 and restricts steps to the warm ratio orientation.
 
+Up to eight corrected states and their analytic tangents are retained within
+one refinement call. A trial first uses the closest cached state's tangent
+prediction. Each trial still solves and checks the full coexistence and
+stationarity equations. The original fixed-seed predictors and ratio-inversion
+fallbacks remain available. Failed or unresolved states are excluded; oldest
+entries are evicted at the limit. The cache is discarded on return, so it
+cannot mix feeds, models, phase formulations or fixed-variable types.
+
 Q below 1e-12 is rejected. A separate arithmetic cancellation indicator,
 16*epsilon*scale*sum(abs(w_i)*(abs(derivative_inc_i)+abs(derivative_parent_i)))/Q,
 rejects values above 1e-8. This is a resolution guard, not an interval proof
@@ -176,20 +184,25 @@ excluded. This is an absolute native measurement, with no source speedup claim.
 
 Local Windows release medians per warm refinement:
 
-| Profile | Preflight states | Native median |
-|---|---:|---:|
-| PR methane/ethane | 2 | 493.53 µs |
-| SRK methane/ethane | 2 | 520.77 µs |
-| Translated PR methane/propane | 2 | 305.88 µs |
-| UNIFAC PR methane/propane | 2 | 1546.74 µs |
+| Profile | Preflight states | Fixed-seed median | Cached-seed median | Improvement |
+|---|---:|---:|---:|---:|
+| PR methane/ethane | 2 | 485.87 µs | 228.05 µs | 2.13x |
+| SRK methane/ethane | 2 | 517.83 µs | 247.12 µs | 2.10x |
+| Translated PR methane/propane | 2 | 305.11 µs | 215.44 µs | 1.42x |
+| UNIFAC PR methane/propane | 2 | 1522.43 µs | 984.97 µs | 1.55x |
 
 The report lists the ten compared fields explicitly. Branch dP/dT is computed
 as part of the returned state, but is singular at a temperature maximum and
 is not a coordinate-parity or checksum quantity. Inputs, raw timings, separate
 checksums and native/harness/Cargo fingerprints are retained and audited after
-timing. These measurements establish a reproducible starting point for further
-optimization.
+timing. The [fixed-seed baseline](envelope-extrema-before-cache-benchmark.json)
+was freshly measured before the cache change. The
+[comparison audit](envelope-extrema-cache-comparison.json) verifies identical
+source-backed references, numeric cases, harness and Cargo inputs, with only
+`rust/src/envelope_extrema.rs` changed among native sources. All five cached
+timings are below all five baseline timings in each profile. These are scoped
+improvements over the previous Rust implementation.
 
-The scalar path currently predicts every trial from one fixed corrected seed.
-Reusing nearer corrected states and their tangents is an optimization
-candidate, subject to the same separation/maximum checks and a fresh benchmark.
+Regenerate the benchmark using `python tools/rust_port/benchmark_envelope_extrema.py`
+and audit the stored comparison with
+`python tools/rust_port/compare_envelope_extrema_benchmarks.py`.

@@ -19,6 +19,7 @@ jobs:
           components: rustfmt, clippy
       - run: cargo fmt --all -- --check
       - run: python tools/rust_port/verify_fixtures.py
+      - run: python tools/rust_port/compare_envelope_extrema_benchmarks.py
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test --all-targets
       - run: cargo test --release --tests

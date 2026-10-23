@@ -739,3 +739,25 @@ states and its original 71 matching grids/27 sampling differences, with no
 fixture-byte changes. The native-only extrema benchmark preflights eight
 states and checks ten separate sums in every sample; no speedup over the
 defective legacy optional solver is claimed. Hosted CI has not been observed.
+
+The extrema predictor-cache follow-up retains all 147 automatic and 146 local
+matches, the same one explicitly named warm-guess error, and all 97 phase
+permutations. The fixture and metadata bytes remain unchanged. At most eight
+corrected states/tangents are retained within one refinement; each new trial
+still closes the full equations with the same tolerances and separation
+guards, and the original predictors remain as fallbacks.
+
+A fresh fixed-seed baseline and cached run use identical source references,
+eight numeric cases, benchmark code, compiler and Cargo inputs. Their native
+fingerprints differ only in `rust/src/envelope_extrema.rs`. The comparison
+script audits those invariants, normalized report hashes, five positive timing
+samples per profile and all ten separate checksum fields. Local median
+improvements over the previous Rust implementation are 1.42–2.13x, with every
+cached sample faster than every baseline sample in each profile. This is not
+a comparison with the defective optional Fortran solver.
+
+The follow-up passes all 344 standard development tests plus custom source
+harnesses/all-target executables, 46 selected release tests, 24 documentation
+examples, strict Clippy/rustdoc, formatting and all 118 fixture audits. The
+controlled comparison audit is also included in native CI. Hosted CI has not
+been observed running.

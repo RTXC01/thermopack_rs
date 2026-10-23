@@ -1,8 +1,8 @@
 {
-  "measured_at": "2026-10-23T18:22:50.800341+00:00",
+  "measured_at": "2026-10-23T18:44:25.638688+00:00",
   "platform": "Windows-10-10.0.19045-SP0",
   "processor": "AMD64 Family 23 Model 1 Stepping 1, AuthenticAMD",
-  "git_head": "fd660a7ec60be364c113db0c01017ed37c9aa6ed",
+  "git_head": "c190500f85a11fef82b8f686446f5f9fdba9018c",
   "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
   "reference": {
     "baseline": "d68c794",
@@ -51,7 +51,7 @@
     "rust/src/cubic.rs": "5ce1eeda376a78d29eb24a55ead3dee534def17de1d35bf0683dd0ad2115d36d",
     "rust/src/data.rs": "3f6ad9bf30887d7a658f3392920e6f9c7e728c628b323e39caded8dc2b0ef7ca",
     "rust/src/envelope.rs": "d4a760998417d5899af6d4946bd6d09281ade7db60237fa7be5387ee2824d269",
-    "rust/src/envelope_extrema.rs": "16a48329cfe7d69f4182570c0192846ea3fb74db2a60d956fd689b6f8a10d7d1",
+    "rust/src/envelope_extrema.rs": "7f6415846a74bda5e8b9ed719ef6baa39121e2be61a06985340bb21cfaf49330",
     "rust/src/error.rs": "6eb8c0feac20ddd951d2f1aa5c9d652f893f9fc8454e9ad1e1d9ab49266fdfb5",
     "rust/src/excess_gibbs.rs": "8b21dd4a18667e37f644e9e3d8ee0a0ba21dd7e1589a567cb77efc729dfcf74f",
     "rust/src/excess_gibbs_data.rs": "3c6c2bf7f69259c1ba5696a942136c6b08eecf6447c5df69d0142abe44c702b0",
@@ -146,16 +146,16 @@
   },
   "source_backed_reference_preflight_states": 8,
   "maximum_preflight_absolute_differences": [
-    7.870141871535452e-09,
-    0.0011330218985676765,
+    8.002473350643413e-09,
+    0.0011317180469632149,
     0.0,
-    6.677921019979105e-14,
-    6.570219086669826e-14,
+    6.691221470130071e-14,
+    6.694208447115269e-14,
     0.0,
     0.0,
-    1.8885604191609673e-10,
-    1.8885604191609673e-10,
-    6.479682369608913e-12
+    1.9213830526609854e-10,
+    1.9213830526609854e-10,
+    6.515828741651448e-12
   ],
   "compared_outputs": [
     "temperature_K",
@@ -172,92 +172,92 @@
   "iterations_per_sample": 1000,
   "samples_ns": {
     "native_1": [
-      494359.3,
-      484132.9,
-      488894.8,
-      493525.7,
-      501308.7
+      227891.6,
+      229049.1,
+      228049.9,
+      225313.4,
+      239065.1
     ],
     "native_2": [
-      520770.6,
-      515380.0,
-      521247.2,
-      512029.6,
-      522133.8
+      250803.8,
+      246295.0,
+      251281.5,
+      244467.6,
+      247118.5
     ],
     "native_3": [
-      305876.6,
-      304968.1,
-      305769.5,
-      314475.2,
-      308007.8
+      219135.3,
+      209018.9,
+      215440.6,
+      219888.0,
+      206385.5
     ],
     "native_4": [
-      1546738.6,
-      1526954.0,
-      1559155.1,
-      1564856.2,
-      1542981.8
+      983483.1,
+      984967.4,
+      972293.6,
+      1000158.6,
+      987335.9
     ]
   },
   "median_ns": {
-    "native_1": 493525.7,
-    "native_2": 520770.6,
-    "native_3": 305876.6,
-    "native_4": 1546738.6
+    "native_1": 228049.9,
+    "native_2": 247118.5,
+    "native_3": 215440.6,
+    "native_4": 984967.4
   },
   "checksums": {
     "native_1": [
-      501308.7,
-      266874.98191708076,
-      6569605196.745151,
+      239065.1,
+      266874.9819171247,
+      6569605196.745874,
       0.0,
-      0.13648194563952823,
-      0.1074896212711044,
+      0.13648194563969956,
+      0.1074896212705201,
       500.0,
       500.0,
-      453.0798479278815,
-      546.9201520721185,
-      -2.985705724423272e-10
+      453.0798479264665,
+      546.9201520735346,
+      -3.766709641235846e-10
     ],
     "native_2": [
-      522133.8,
-      267620.12731716566,
-      6599831860.213427,
+      247118.5,
+      267620.1273172478,
+      6599831860.214704,
       0.0,
-      0.14649285426243666,
-      0.11855930901455754,
+      0.1464928542627534,
+      0.11855930901392327,
       500.0,
       500.0,
-      455.74758781952215,
-      544.2524121804765,
-      3.1188956860281986e-11
+      455.74758781774597,
+      544.2524121822534,
+      -5.919555531045787e-11
     ],
     "native_3": [
-      308007.8,
-      319142.45421324443,
-      7961258026.580463,
+      206385.5,
+      319142.4542132383,
+      7961258026.581391,
       0.0,
-      0.1677809615176334,
-      0.13706549601650217,
+      0.16778096151763958,
+      0.137065496016499,
       500.0,
       500.0,
-      466.22623900484126,
-      533.77376099516,
-      -3.2411825096481935e-09
+      466.226239004902,
+      533.7737609950975,
+      -3.2505370841851427e-09
     ],
     "native_4": [
-      1542981.8,
-      321892.9282671804,
-      7548843689.331881,
+      987335.9,
+      321892.9282672156,
+      7548843689.332486,
       0.0,
-      0.1632226375260044,
-      0.13808340992219986,
+      0.16322263752607397,
+      0.13808340992220736,
       500.0,
       500.0,
-      475.4811637193519,
-      524.5188362806495,
-      -2.7289571582598752e-11
+      475.48116371919525,
+      524.5188362808042,
+      -1.185308313590965e-10
     ]
   },
   "workload": "Native-only warm local P/T extrema refinement, two source-backed guesses per binary profile. Ten outputs, including both phase volumes/compositions and stationarity, are checked before timing and as separate sums in every sample. The full returned state includes dP/dT, which is computed but is singular at a temperature maximum and is not used as a parity/checksum quantity. Five measured samples after one warm-up. Excludes construction, parsing, complete tracing and source-reference generation. No speedup comparison against the defective original optional criconden path."

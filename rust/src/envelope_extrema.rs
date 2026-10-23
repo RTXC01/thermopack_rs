@@ -45,6 +45,13 @@ pub struct EnvelopeExtrema {
     pub failures: Vec<EnvelopeExtremumFailure>,
 }
 
+struct ExtremumSeed {
+    point: Vec<f64>,
+    tangent: Vec<f64>,
+}
+
+const EXTREMUM_SEED_CACHE_CAPACITY: usize = 8;
+
 impl Problem<'_> {
     fn bracket_extremum(
         &mut self,
@@ -64,15 +71,43 @@ impl Problem<'_> {
             let (center, mut total) = self.solve(initial.to_vec(), s, initial[s])?;
             let tangent = self.tangent(&center, s)?;
             let origin = center[s];
+            // Local to this model/feed/formulation/specification. Failed or
+            // unresolved corrections never enter the bounded seed cache.
+            let mut seeds = Vec::<ExtremumSeed>::with_capacity(EXTREMUM_SEED_CACHE_CAPACITY);
             let mut evaluate = |value: f64| -> Result<(Vec<f64>, f64)> {
-                let predicted: Vec<_> = center
+                let nearby: Option<Vec<_>> = seeds
                     .iter()
-                    .zip(&tangent)
-                    .map(|(u, t)| u + t * (value - origin))
-                    .collect();
+                    .min_by(|a, b| {
+                        (a.point[s] - value)
+                            .abs()
+                            .total_cmp(&(b.point[s] - value).abs())
+                    })
+                    .filter(|p| p.point != center)
+                    .map(|p| {
+                        p.point
+                            .iter()
+                            .zip(&p.tangent)
+                            .map(|(u, t)| u + t * (value - p.point[s]))
+                            .collect()
+                    });
                 let mut last = Error::NotConverged("envelope extremum inner correction");
                 for inverted in [false, true] {
-                    for mut seed in [predicted.clone(), center.clone()] {
+                    // Try nearby continuation first, then retain both original
+                    // predictors and their ratio inversions as fallbacks.
+                    for predictor in 0..3 {
+                        let mut seed = match predictor {
+                            0 if !inverted => match &nearby {
+                                Some(p) => p.clone(),
+                                None => continue,
+                            },
+                            0 => continue,
+                            1 => center
+                                .iter()
+                                .zip(&tangent)
+                                .map(|(u, t)| u + t * (value - origin))
+                                .collect(),
+                            _ => center.clone(),
+                        };
                         if inverted {
                             for k in &mut seed[..m] {
                                 *k = -*k;
@@ -83,7 +118,22 @@ impl Problem<'_> {
                                 total += it;
                                 let mut e = Evaluation::new(d);
                                 match self.extremum_equations(&u, kind, &mut e) {
-                                    Ok(()) => return Ok((u, e.f[d - 1])),
+                                    Ok(()) => {
+                                        let stationarity = e.f[d - 1];
+                                        if stationarity.is_finite()
+                                            && let Ok(tangent) = self.tangent(&u, s)
+                                            && tangent.iter().all(|v| v.is_finite())
+                                        {
+                                            if seeds.len() == EXTREMUM_SEED_CACHE_CAPACITY {
+                                                seeds.remove(0);
+                                            }
+                                            seeds.push(ExtremumSeed {
+                                                point: u.clone(),
+                                                tangent,
+                                            });
+                                        }
+                                        return Ok((u, stationarity));
+                                    }
                                     Err(error) => last = error,
                                 }
                             }

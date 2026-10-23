@@ -8,8 +8,12 @@ program benchmark_envelope_reference
   integer :: profile,i,j,repeat,nc,n
   integer(kind=8) :: start,finish,rate
   real :: t(nmax),p(nmax),k(nmax,3),beta(nmax),vl(nmax),vv(nmax),x(nmax,3),y(nmax,3),z(3),sums(12)
-  character(len=16) :: command
+  character(len=16) :: command,mode
+  real :: beta_in
   call get_command_argument(1,command)
+  call get_command_argument(2,mode)
+  beta_in=1.
+  if(trim(mode)=='quality')beta_in=.25
   do profile=1,4
     nc=2;z(:2)=[.5,.5]
     select case(profile)
@@ -48,7 +52,7 @@ program benchmark_envelope_reference
 contains
   subroutine solve()
     integer :: point
-    call envelopePlot(z(:nc),0.,1e5,1,1.,1.5e7,nmax,t,p,k(:,:nc),beta,n,dS_override=.25,Tme=80.)
+    call envelopePlot(z(:nc),0.,1e5,1,beta_in,1.5e7,nmax,t,p,k(:,:nc),beta,n,dS_override=.25,Tme=80.)
     if(n<2 .or. abs(p(n)-1e5)>2.) error stop 'Source envelope incomplete'
     do point=1,n
       x(point,:nc)=z(:nc)/(1.-beta(point)+beta(point)*k(point,:nc))

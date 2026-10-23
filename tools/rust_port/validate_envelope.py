@@ -36,11 +36,18 @@ def ending(q,points):
     if len(points)>1 and abs(p-points[0][1])<2.:return 'InitialPressure'
     return 'NoConvergence'
 
-def validate(directory):
+def validate(directory,source_requests=None,case_label=label,fixture_stem='envelope',reuse_source=False,cache_source=False,source_classifier=None,prefer_matching_grid=False):
+    requests=list(cases()) if source_requests is None else source_requests
     records=[];failed=[];censored=[];unqualified=[];warnings=[]
+    cache=ROOT/f'.reference/{fixture_stem}_source.json'
+    identity=json.loads((ROOT/'.reference/metadata.json').read_text())
+    worker_hash=hashlib.sha256((ROOT/'tools/rust_port/oracle_worker.py').read_bytes().replace(b'\r\n',b'\n')).hexdigest()
+    if reuse_source:
+        saved=json.loads(cache.read_text());assert saved['requests']==requests and saved['reference']==identity and saved['oracle_sha256']==worker_hash
+        records,failed,censored,unqualified,warnings=[saved[k] for k in ['records','failed','censored','unqualified','warnings']]
     with DeadlineReferenceProcess(directory) as oracle:
-        for i,q in enumerate(cases()):
-            q=dict(q,mode='ENVELOPE');r=oracle.call(q,timeout=12.);record=dict(case=label(q),request=q,result=r)
+        for i,q in enumerate([] if reuse_source else requests):
+            q=dict(q,mode='ENVELOPE');r=oracle.call(q,timeout=12.);record=dict(case=case_label(q),request=q,result=r)
             if 'reference_timeout' in r:censored.append(record);continue
             if not r.get('values'):failed.append(record);continue
             points=r['values'];nc=len(q['feed']);width=8+2*nc
@@ -52,6 +59,16 @@ def validate(directory):
                 if p[-1]>1e-7:reasons.append('source VLE residual')
                 if reasons:warnings.append(dict(case=record['case'],index=j,reasons=reasons,values=p))
             print(i+1,'curves',len(records),'failed',len(failed),'censored',len(censored),flush=True)
+    if cache_source and not reuse_source:
+        cache.write_text(json.dumps(dict(requests=requests,reference=identity,oracle_sha256=worker_hash,
+            records=records,failed=failed,censored=censored,unqualified=unqualified,warnings=warnings))+'\n')
+    if source_classifier:
+        qualified=[]
+        for record in records:
+            reason=source_classifier(record['request'],record['result'])
+            if reason:unqualified.append(dict(record,unqualified_reason=reason))
+            else:qualified.append(record)
+        records=qualified
     subprocess.run(['cargo','build','--release','--example','parity','-j','2'],cwd=ROOT,check=True)
     inputs=[]
     for r in records:
@@ -60,7 +77,7 @@ def validate(directory):
     exe=ROOT/'target/release/examples'/('parity.exe' if os.name=='nt' else 'parity')
     output=subprocess.run([str(exe)],input='\n'.join(inputs)+'\n',capture_output=True,text=True,check=True).stdout.splitlines()
     assert len(output)==len(records)
-    rows=[];differences=[];grid_differences=[];whole=[];native_summary=[];curve_rows=[]
+    rows=[];differences=[];grid_differences=[];whole=[];native_summary=[];curve_rows=[];projection_differences=[]
     for r,out in zip(records,output):
         source=r['result']['values'];nc=len(r['request']['feed']);label_=r['case'];width=5+2*nc
         if out.startswith('ERROR'):differences.append(dict(case=label_,rust=out));continue
@@ -87,28 +104,38 @@ def validate(directory):
         for i,(a,b) in enumerate(zip(source,projections)):
             bound=r['result']['bounds'][i]
             rows.append([label_,i,*a,*bound['correction'],bound['condition'],bound['best_coordinate'],*bound['log_k']])
-            if b.startswith('ERROR'):differences.append(dict(case=label_,index=i,rust=b));continue
+            if b.startswith('ERROR'):
+                entry=dict(case=label_,index=i,rust=b)
+                if prefer_matching_grid and not grid_bad:projection_differences.append(entry)
+                else:differences.append(entry)
+                continue
             b=list(map(float,b.split(',')))
             bad=compare(a,b,i)
-            if bad:differences.append(dict(case=label_,projection=bad,bound=bound))
-    fixture=ROOT/'tests/fixtures/envelope.csv'
+            if bad:
+                entry=dict(case=label_,projection=bad,bound=bound)
+                if prefer_matching_grid and not grid_bad:projection_differences.append(entry)
+                else:differences.append(entry)
+    fixture=ROOT/f'tests/fixtures/{fixture_stem}.csv'
     # Mixtures have different widths. Encode source state and backward-error
     # vectors in two comma-separated columns within the semicolon CSV.
     with fixture.open('w',newline='') as f:
         w=csv.writer(f,delimiter=';',lineterminator='\n');w.writerow(['case','index','source_state_and_backward_error'])
         for row in rows:w.writerow([row[0],row[1],','.join(map(repr,row[2:]))])
-    metadata=json.loads((ROOT/'.reference/metadata.json').read_text());metadata.update(cases=len(rows),curve_attempts=sum(1 for _ in cases()),generator='tools/rust_port/validate_envelope.py',fixture_sha256=hashlib.sha256(fixture.read_bytes()).hexdigest(),
+    metadata=json.loads((ROOT/'.reference/metadata.json').read_text());metadata.update(cases=len(rows),curve_attempts=len(requests),generator=f'tools/rust_port/validate_{fixture_stem}.py',fixture_sha256=hashlib.sha256(fixture.read_bytes()).hexdigest(),
         relative_tolerance=RTOL,reference_errors=failed,censored_calls=censored,unqualified_returns=unqualified,source_coordinate_warnings=warnings,
         native_curves=native_summary,matching_adaptive_grids=whole,adaptive_grid_differences=grid_differences,
         source_termination_method='Inferred from returned pressure/temperature limits and point count; NoConvergence denotes an unclassified partial prefix because envelopePlot does not return its control returnCause.',
         source_partial_curves=[r for r in native_summary if r['source_end']=='NoConvergence'])
+    if prefer_matching_grid:
+        metadata.update(coordinate_recovery_differences=differences,projection_differences_on_matching_grids=projection_differences,
+            recovery_method='Direct independently traced grid when every sampled coordinate matches, otherwise a warm single-coordinate correction from an independent native trace. Raw grid and projection differences remain separate.')
     fixture.with_suffix('.metadata.json').write_text(json.dumps(metadata,indent=2)+'\n')
-    curve_fixture=ROOT/'tests/fixtures/envelope_curves.csv'
+    curve_fixture=ROOT/f'tests/fixtures/{fixture_stem}_curves.csv'
     with curve_fixture.open('w',newline='') as f:
         w=csv.writer(f,delimiter=';',lineterminator='\n');w.writerow(['case','source_count','source_end','matching_grid']);w.writerows(curve_rows)
     curve_metadata=dict(metadata,cases=len(curve_rows),fixture_sha256=hashlib.sha256(curve_fixture.read_bytes()).hexdigest())
     curve_fixture.with_suffix('.metadata.json').write_text(json.dumps(curve_metadata,indent=2)+'\n')
-    (ROOT/'.reference/envelope_differences.json').write_text(json.dumps(differences,indent=2)+'\n')
+    (ROOT/f'.reference/{fixture_stem}_differences.json').write_text(json.dumps(differences,indent=2)+'\n')
     print(json.dumps(dict(curve_attempts=metadata['curve_attempts'],finite_source_curves=len(records),source_states=len(rows),failed=len(failed),censored=len(censored),unqualified=len(unqualified),warnings=len(warnings),matching_grids=len(whole),grid_differences=len(grid_differences),differences=len(differences)),indent=2))
     if differences:print(json.dumps(differences[:8],indent=2));raise SystemExit(1)
 

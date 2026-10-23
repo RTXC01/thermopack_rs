@@ -69,6 +69,10 @@ physical endpoint bounds and their remaining diagnostic differences.
 branch slopes and warm continuation with an exactly preserved feed, with
 explicit source-convention and near-coincident-state qualification gaps.
 
+[Phase-fraction curves](quality-envelopes.md) add adaptive complete-curve
+tracing, critical phase interchange, physical endpoint closure and explicit
+sampled-grid/coordinate-recovery qualifications.
+
 See [coverage.md](coverage.md), [inventory.json](inventory.json),
 [numerics.md](numerics.md), [validation.md](validation.md),
 [performance.md](performance.md) and [baseline-defects.md](baseline-defects.md).

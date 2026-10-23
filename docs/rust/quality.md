@@ -3,8 +3,8 @@
 The native cubic API now solves local two-phase states with a specified molar
 vapor fraction beta. The source specification is `saturation::sat_newton`,
 including the log-ratio coordinate used by `saturation_curve` continuation.
-General fixed-quality envelope tracing remains pending; this checkpoint
-provides its point corrector and warm continuation primitives.
+[Fixed-quality curve tracing](quality-envelopes.md) builds on this point
+corrector and records its complete-grid qualification and remaining raw gaps.
 
 ## API
 
@@ -79,6 +79,13 @@ quality Jacobian does not rescale those derivatives by the original phase
 sums. The baseline path preserves that convention; the physical path uses
 the normalized chain rule.
 
+Source-convention correction rejects a K=1 trial immediately, matching the
+fork's ierr=-2 exit. It also rejects trials at the model temperature bounds
+and default source pressure bounds of 10 Pa/100 MPa, matching ierr=-1. Exact
+source probes and tests cover those boundaries. Raw failed-output vectors,
+nondefault global pressure controls and complete failure trajectories still
+need separate compatibility work.
+
 This distinction matters near coincident phases. Eight methane/water cases
 at 350 K and beta=0.1/0.4 have very small phase-composition separation. The
 physical cold initializer returns an error there while the source accepts a
@@ -96,7 +103,7 @@ tolerances. These observations establish neither an exact nonlinear
 trajectory nor a rigorous conditioning allowance for those raw differences.
 
 Full source failure/status identity, critical/coincident-phase regularization,
-general fixed-quality curves, entropy/enthalpy constraints, non-vapor second
+broader fixed-quality curve qualification, entropy/enthalpy constraints, non-vapor second
 phases and other EOS families remain pending.
 
 ## Qualification

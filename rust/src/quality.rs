@@ -20,6 +20,10 @@ use crate::{
     numerics::solve_linear_in_place,
 };
 
+#[path = "quality_envelope.rs"]
+mod curve;
+pub use curve::QualityEnvelope;
+
 /// Initial temperature, pressure and vapor/liquid mole-fraction ratios.
 /// Ratios for absent feed species are ignored. A guess need not close the
 /// material balance at the requested quality.
@@ -308,6 +312,24 @@ impl<'a> Problem<'a> {
         let mut trial = Evaluation::new(d);
         let mut q = u.clone();
         let mut step = vec![0.; d];
+        let trivial = |u: &[f64]| u[..d - 2].iter().all(|v| (v.exp() - 1.).abs() < 1e-8);
+        let (tmin, tmax) = self.model.temperature_bounds();
+        let epsilon = 5000. * f64::EPSILON;
+        let at_limit = |u: &[f64]| {
+            u[d - 2] <= tmin.ln() + epsilon
+                || u[d - 2] >= tmax.ln() - epsilon
+                || u[d - 1] <= 10.0_f64.ln() + epsilon
+                || u[d - 1] >= 1e8_f64.ln() - epsilon
+                || u[..d - 2]
+                    .iter()
+                    .any(|&v| v <= f64::MIN_POSITIVE.ln() + epsilon || v >= f64::MAX.ln() - epsilon)
+        };
+        if at_limit(&u) {
+            return Err(Error::NotConverged("source quality iterate at bounds"));
+        }
+        if trivial(&u) {
+            return Err(Error::NotConverged("source trivial quality root"));
+        }
         for iteration in 1..500 {
             self.evaluate(&u, s, spec, &mut e, true)?;
             for (v, f) in step.iter_mut().zip(&e.f) {
@@ -320,6 +342,18 @@ impl<'a> Problem<'a> {
             for _ in 0..=10 {
                 for i in 0..d {
                     q[i] = u[i] + fraction * step[i];
+                }
+                // setXv clips to these bounds and sat_var_at_limit reports
+                // ierr=-1 immediately, rather than backtracking into another
+                // formal high-pressure solution beyond the source domain.
+                if at_limit(&q) {
+                    return Err(Error::NotConverged("source quality iterate at bounds"));
+                }
+                // sat_fun_newton zeroes its equations at K=1; the caller
+                // immediately reports ierr=-2. It does not keep searching
+                // through that trial with progressively smaller line steps.
+                if trivial(&q) {
+                    return Err(Error::NotConverged("source trivial quality root"));
                 }
                 norm = if self.evaluate(&q, s, spec, &mut trial, false).is_ok() {
                     trial.f.iter().map(|f| f * f).sum::<f64>().sqrt()

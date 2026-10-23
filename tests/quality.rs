@@ -91,7 +91,40 @@ fn embedded_pure_quality_and_invalid_inputs_have_explicit_behavior() {
             .quality_state_with_guess(&[0.5, 0.5], 0.5, EnvelopeConstraint::Pressure(1e6), &guess)
             .is_err()
     );
+    let trivial = QualityGuess {
+        temperature: 200.,
+        pressure: 1e6,
+        ratios: vec![1., 1.],
+    };
+    assert!(
+        model
+            .baseline_quality_state_with_guess(
+                &[0.5, 0.5],
+                0.4,
+                EnvelopeConstraint::Pressure(1e6),
+                &trivial
+            )
+            .is_err()
+    );
     assert!(model.quality_temperature(-1., &[0.5, 0.5], 0.5).is_err());
+    // Exact-source probes report ierr=-1 at or outside these default bounds.
+    for pressure in [10., 1e8, 1e9] {
+        let guess = QualityGuess {
+            temperature: 200.,
+            pressure,
+            ratios: vec![1.2, 0.9],
+        };
+        assert!(
+            model
+                .baseline_quality_state_with_guess(
+                    &[0.5, 0.5],
+                    0.4,
+                    EnvelopeConstraint::Pressure(pressure),
+                    &guess
+                )
+                .is_err()
+        );
+    }
 }
 
 #[test]

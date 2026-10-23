@@ -336,3 +336,7 @@ Helmholtz energy, which prepares the model twice per component.
 The [fixed-quality correction measurements](quality.md#performance) compare
 identical source guesses and all returned coordinates before native-executable
 timing; cold initialization and complete quality curves remain separate work.
+
+The [phase-fraction curve measurements](quality-envelopes.md#performance)
+compare four complete source/native grids and all 201 reported states before
+timing full curves, including cold initialization and phase interchange.

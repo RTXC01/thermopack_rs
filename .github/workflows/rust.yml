@@ -53,6 +53,8 @@ jobs:
       - run: python tools/rust_port/validate_pure_curve.py
       - run: python tools/rust_port/validate_pure_envelope.py
       - run: python tools/rust_port/validate_quality.py
+      - run: python tools/rust_port/validate_quality_envelope.py --allow-known-gaps
+      - run: python tools/rust_port/benchmark_envelope.py --compiler /usr/bin/gfortran-13 --quality --preflight-only
       - run: python tools/rust_port/benchmark_quality.py --compiler /usr/bin/gfortran-13 --preflight-only
       - run: python tools/rust_port/benchmark_pure_curve.py --compiler /usr/bin/gfortran-13 --preflight-only
       - run: python tools/rust_port/benchmark_pure_curve.py --compiler /usr/bin/gfortran-13 --envelope --preflight-only

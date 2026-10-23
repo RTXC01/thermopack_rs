@@ -632,3 +632,41 @@ The fixed-quality benchmark preflight compares all ten returned quantities
 for 46 matching states across four workloads before executable timing.
 All ten separate sums are checked again for every timed sample; medians,
 exact inputs and source/harness/Cargo fingerprints are retained in the report.
+
+The [phase-fraction curve qualification](quality-envelopes.md) adds 158 source
+attempts. Two finite global-bound exits fail independent material balance and
+remain unqualified with raw outputs retained. The remaining 156 returns store
+8,019 states, including 1,960 repeated cap states and two source partial
+prefixes. All 133 matching complete sampled grids pass count/order/fraction
+and every returned phase coordinate. Direct grids or independent warm
+correction recover 8,010 states strictly; nine near-coincident coordinate gaps
+remain outside tolerance. Two secondary projection differences on already
+matching grids are recorded separately. Twenty-three raw sampled grids or
+partial trajectories still differ.
+
+Independent tests check feed and exact zeros, lever-rule/fugacity closure,
+phase-volume ordering, quality complement, pressure/temperature boundary
+closure and complete quantum H2/D2 recovery in source and physical paths.
+Trying full/half/double steps before critical recovery preserves the fork's
+jump-limit trajectory. The validator remains strict by default; the explicit
+`--allow-known-gaps` regression mode retains and reports the nine known raw
+gaps rather than counting them as parity.
+
+The local checkpoint passed 333 standard development tests plus custom source
+harnesses and all-target benchmark executables, 51 selected release tests,
+23 documentation examples, strict all-target Clippy/rustdoc, formatting and
+the integrity audit of all 115 fixtures. Hosted CI has not been observed
+running. Complete-curve benchmark preflight compares all 201 states on four
+identical sampled grids before timing, including both volumes and every phase
+composition. General constraints, global stability, other model families and
+the remaining raw differences stay open.
+
+The immediate source-exit follow-up passed the affected development checks
+and all 51 selected release tests again. Exact-source probes confirm ierr=-2
+for a K=1 guess and ierr=-1 at 10 Pa, 100 MPa and beyond the default pressure
+range. The fixed-quality point matrix remains 576/577 strict baseline matches
+and 491/499 matching physical cold starts, with its original gaps unchanged.
+The complete-curve before/after records differ in one native source file;
+every output checksum is identical, with the UNIFAC native median improving
+12.24x after preserving immediate bound exits. Current scoped source/native
+whole-curve speedups are 4.16–8.08x.

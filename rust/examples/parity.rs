@@ -87,6 +87,164 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for line in io::stdin().lock().lines() {
         let line = line?;
         let fields: Vec<_> = line.split('|').collect();
+        if fields[0] == "QENVELOPE" {
+            use thermopack_rs::envelope::{EnvelopeConstraint, EnvelopeOptions};
+            use thermopack_rs::quality::QualityState;
+            use thermopack_rs::{CubicOptions, MixingRule};
+            let kind = match fields[1] {
+                "SRK" => CubicKind::SoaveRedlichKwong,
+                "RK" => CubicKind::RedlichKwong,
+                "VDW" => CubicKind::VanDerWaals,
+                _ => CubicKind::PengRobinson,
+            };
+            let names: Vec<_> = fields[2].split(',').collect();
+            let model = if fields[3] == "quantum" {
+                Cubic::quantum(&names)?
+            } else {
+                Cubic::with_options(
+                    kind,
+                    &names,
+                    CubicOptions {
+                        volume_translation: fields[3] == "translated",
+                        mixing_rule: if fields[3] == "unifac" {
+                            MixingRule::Unifac
+                        } else {
+                            MixingRule::VdW
+                        },
+                        ..Default::default()
+                    },
+                )?
+            };
+            let z: Vec<f64> = fields[4].split(',').map(|v| v.parse().unwrap()).collect();
+            let o: Vec<_> = fields[5].split('@').collect();
+            let opts: Vec<f64> = o[0].split(':').map(|v| v.parse().unwrap()).collect();
+            let curve = model.baseline_quality_envelope(
+                &z,
+                opts[6],
+                EnvelopeOptions {
+                    start: if opts[5] > 0. {
+                        EnvelopeConstraint::Temperature(opts[5])
+                    } else {
+                        EnvelopeConstraint::Pressure(opts[0])
+                    },
+                    maximum_pressure: opts[1],
+                    minimum_temperature: Some(opts[2]),
+                    maximum_step: opts[3],
+                    maximum_points: opts[4] as usize,
+                    ..Default::default()
+                },
+            );
+            let encode = |p: &QualityState| {
+                [
+                    p.temperature,
+                    p.pressure,
+                    p.vapor_fraction,
+                    p.liquid_volume,
+                    p.vapor_volume,
+                ]
+                .into_iter()
+                .chain(p.liquid.iter().copied())
+                .chain(p.vapor.iter().copied())
+                .chain([p.dpdt, p.fugacity_residual])
+                .map(|v| format!("{v:.17e}"))
+                .collect::<Vec<_>>()
+                .join(",")
+            };
+            match curve {
+                Err(e) => println!("ERROR:{e}"),
+                Ok(curve) => {
+                    let mut projections = Vec::new();
+                    if o.len() > 1 && !o[1].is_empty() {
+                        for target in o[1].split(';') {
+                            let target: Vec<f64> =
+                                target.split(',').map(|v| v.parse().unwrap()).collect();
+                            let nc = z.len();
+                            let beta = target[0];
+                            let mut best = None;
+                            for p in &curve.points {
+                                for flip in [false, true] {
+                                    let b = if flip {
+                                        1. - p.vapor_fraction
+                                    } else {
+                                        p.vapor_fraction
+                                    };
+                                    if (b - beta).abs() > 1e-12 {
+                                        continue;
+                                    }
+                                    let mut guess = p.guess();
+                                    if flip {
+                                        for k in &mut guess.ratios {
+                                            *k = 1. / *k;
+                                        }
+                                    }
+                                    let distance = ((p.temperature / target[1]).ln() / 0.1).powi(2)
+                                        + ((p.pressure / target[2]).ln() / 0.2).powi(2)
+                                        + guess
+                                            .ratios
+                                            .iter()
+                                            .enumerate()
+                                            .filter(|(i, _)| z[*i] > 0.)
+                                            .map(|(i, k)| (k.ln() - target[3 + i]).powi(2))
+                                            .sum::<f64>();
+                                    if best.as_ref().is_none_or(|(a, _)| distance < *a) {
+                                        best = Some((distance, guess));
+                                    }
+                                }
+                            }
+                            let coordinate = target[3 + nc] as usize;
+                            let constraint = if coordinate < nc {
+                                EnvelopeConstraint::LogK {
+                                    component: coordinate,
+                                    value: target[3 + coordinate],
+                                }
+                            } else if coordinate == nc {
+                                EnvelopeConstraint::Temperature(target[1])
+                            } else {
+                                EnvelopeConstraint::Pressure(target[2])
+                            };
+                            projections.push(match best {
+                                Some((_, guess)) => match model
+                                    .baseline_quality_state_with_guess(&z, beta, constraint, &guess)
+                                {
+                                    Ok(p) => {
+                                        let p = if matches!(
+                                            constraint,
+                                            EnvelopeConstraint::LogK { .. }
+                                        ) {
+                                            model
+                                                .quality_state_with_guess(
+                                                    &z,
+                                                    beta,
+                                                    constraint,
+                                                    &p.guess(),
+                                                )
+                                                .unwrap_or(p)
+                                        } else {
+                                            p
+                                        };
+                                        encode(&p)
+                                    }
+                                    Err(e) => format!("ERROR:{e}"),
+                                },
+                                None => "ERROR:no native branch seed".into(),
+                            });
+                        }
+                    }
+                    println!(
+                        "{:?}|{}|{}",
+                        curve.end,
+                        curve
+                            .points
+                            .iter()
+                            .map(encode)
+                            .collect::<Vec<_>>()
+                            .join(";"),
+                        projections.join(";")
+                    );
+                }
+            }
+            continue;
+        }
         if fields[0] == "QUALITY" {
             use thermopack_rs::envelope::EnvelopeConstraint;
             use thermopack_rs::quality::QualityGuess;

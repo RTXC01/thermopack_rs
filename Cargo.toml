@@ -11,6 +11,11 @@ readme = "rust/README.md"
 path = "rust/src/lib.rs"
 
 [[bench]]
+name = "envelope"
+path = "rust/benches/envelope.rs"
+harness = false
+
+[[bench]]
 name = "spinodal_extrema"
 path = "rust/benches/spinodal_extrema.rs"
 harness = false

@@ -3,6 +3,11 @@
 Experimental native port; see [coverage](../docs/rust/coverage.md) before use.
 The original Fortran/Python implementation is retained as the reference.
 
+[Mixture phase envelopes](../docs/rust/envelope.md) now provide adaptive cubic
+VLE tracing through turns, source-convention tracing, warm T/P/log-K correction
+and explicit partial-curve status. Read the remaining sampling differences
+before relying on exact legacy grid identity.
+
 [Homogeneous PS and metastable isentropes](../docs/rust/metastable.md) now
 provide local root solves, pressure continuation with stability termination,
 and a separately qualified implementation of the fork's mapping convention.
@@ -114,7 +119,7 @@ See [numerical differences](../docs/rust/baseline-defects.md).
 
 See [validation](../docs/rust/validation.md),
 [benchmarks](../docs/rust/performance.md) and the
-[migration design](../docs/rust/README.md). Remaining SAFT capabilities, mu-T flashes, phase envelopes,
+[migration design](../docs/rust/README.md). Remaining SAFT capabilities, mu-T flashes, broader phase envelopes,
 solids/hydrates and existing language-interface compatibility remain pending.
 
 Regenerate data with `python tools/rust_port/generate_data.py`.

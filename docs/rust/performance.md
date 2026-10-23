@@ -1,5 +1,8 @@
 # Native cubic and flash benchmarks
 
+Complete mixture VLE curves have separate [envelope measurements and scope](envelope.md#performance),
+with every sampled phase state compared before timing.
+
 Fluid acoustic workloads have separate current [measurements and scope](sound.md#native-loop-measurements).
 Fixed-volume caloric flashes have separate [UV/SV measurements](isochoric.md#native-loop-measurements),
 including the initial SV performance gap and its measured optimization.

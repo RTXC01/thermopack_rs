@@ -70,6 +70,7 @@ pub mod cpa;
 pub mod cpa_data;
 pub mod critical;
 pub mod cubic;
+pub mod envelope;
 mod error;
 pub mod excess_gibbs;
 pub mod excess_gibbs_data;

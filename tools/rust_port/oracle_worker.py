@@ -613,6 +613,49 @@ def main(compiler_directory):
             v=float(model.specific_volume(t,p,z,phase)[0]);error=float(model.pressure_tv(t,v,z)[0])-p
             print('THERMOPACK_RESULT='+json.dumps(dict(values=[*map(float,dt),*map(float,dp),*map(float,dn.flatten())],volume=v,pressure_error=error)),flush=True)
             continue
+        if request['mode']=='ENVELOPE':
+            import numpy as np
+            from thermopack.cubic import cubic
+            eos=request['eos'];names=request['components'];z=np.array(request['feed']);nc=len(z);nmax=request.get('maximum_points',1000)
+            if request.get('quantum'):
+                from thermopack.quantum_cubic import qcubic
+                model=qcubic(','.join(names))
+            else:
+                model=cubic(','.join(names),'SRK' if eos=='RK' else eos,alpha='RK' if eos=='RK' else 'Classic',
+                    volume_shift=request.get('volume_shift',False),mixing=request.get('mixing','vdW'))
+            previous=None;model.activate()
+            amounts=(c_double*nc)(*z);tc=c_double(request.get('initial_temperature',0.));pc=c_double(request['initial_pressure'])
+            spec=c_int(2 if 'initial_temperature' in request else 1);beta=c_double(request.get('initial_beta',1.))
+            maximum=c_double(request.get('maximum_pressure',1.5e7));limit=c_int(nmax);count=c_int()
+            temperatures=(c_double*nmax)();pressures=(c_double*nmax)();ratios=(c_double*(nmax*nc))();fractions=(c_double*nmax)()
+            ds=c_double(request.get('maximum_step',.25));tmin=c_double(request.get('minimum_temperature',80.))
+            calculate=model.s_envelope_plot
+            calculate.argtypes=[POINTER(c_double)]*3+[POINTER(c_int)]+[POINTER(c_double)]*2+[POINTER(c_int)]+[POINTER(c_double)]*4+[POINTER(c_int)]+[POINTER(c_double)]*3+[POINTER(c_int)]+[POINTER(c_double)]*2
+            calculate.restype=None
+            calculate(amounts,byref(tc),byref(pc),byref(spec),byref(beta),byref(maximum),byref(limit),temperatures,pressures,ratios,fractions,byref(count),None,None,byref(ds),None,byref(tmin),None)
+            points=[];bounds=[]
+            fun=getattr(model.tp,model.get_export_name('saturation','sat_fun_newton'));fun.argtypes=[POINTER(c_double)]*3;fun.restype=None
+            jac=getattr(model.tp,model.get_export_name('saturation','sat_diff_newton'));jac.argtypes=[POINTER(c_double)]*3;jac.restype=None
+            for i in range(count.value):
+                t=temperatures[i];p=pressures[i];b=fractions[i];k=np.array([ratios[j*nmax+i] for j in range(nc)])
+                x=z/(1-b+b*k);y=k*x;x/=x.sum();y/=y.sum()
+                vl=float(model.specific_volume(t,p,x,model.LIQPH)[0]);vv=float(model.specific_volume(t,p,y,model.VAPPH)[0])
+                pl=float(model.pressure_tv(t,vl,x)[0]);pv=float(model.pressure_tv(t,vv,y)[0])
+                # Independent source Newton backward error at a nontrivial
+                # locked phase-ratio coordinate, including near critical states.
+                u=np.r_[np.log(k),math.log(t),math.log(p)];active=np.flatnonzero(z>0);locked=int(active[np.argmax(np.abs(u[active]))])
+                param=np.r_[z,b,float(locked+1),u[locked],2.]
+                uc=(c_double*(nc+2))(*u);params=(c_double*(nc+4))(*param);f=(c_double*(nc+2))();j=(c_double*((nc+2)**2))()
+                fun(f,uc,params);jac(j,uc,params)
+                matrix=np.array(j).reshape((nc+2,nc+2),order='F');residual=np.array(f)
+                try:
+                    correction=np.abs(np.linalg.solve(matrix,residual));condition=float(np.linalg.cond(matrix))
+                    rhs=np.zeros(nc+2);rhs[-1]=1.;tangent=np.linalg.solve(matrix,rhs);best=int(np.argmax(np.abs(tangent)))
+                except np.linalg.LinAlgError:correction=np.full(nc+2,math.inf);condition=math.inf;best=locked
+                points.append([t,p,b,vl,vv,*x,*y,pl-p,pv-p,float(np.max(np.abs(residual)))])
+                bounds.append(dict(correction=correction.tolist(),condition=condition,locked=locked,log_k=u[:nc].tolist(),best_coordinate=best))
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=points,bounds=bounds,count=count.value)),flush=True)
+            continue
         if request['mode'] in ('META_PS','META_CURVE'):
             from thermopack.cubic import cubic
             eos=request['eos'];comps=request['components'];z=request['feed']

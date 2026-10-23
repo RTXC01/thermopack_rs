@@ -464,7 +464,8 @@ unqualified source returns remain in metadata. Source pressure-root warnings
 for 21 separately returned volume pairs are retained alongside successful
 boundary-coordinate comparisons; native pressure/phase closure is checked. Independent tests cover the
 analytic Jacobian, branch slopes, inverse specifications and retrograde
-continuation; critical/envelope and raw iteration fidelity remain pending.
+continuation. Mixture envelope qualification is documented below; remaining
+critical degeneracies and complete raw iteration fidelity remain pending.
 
 CI contains native Windows/Linux/macOS checks and a Linux exact-source build
 that regenerates comparisons. It has been configured locally; hosted CI has
@@ -535,3 +536,22 @@ attraction Hessians replace the classical fallback in prepared activity-based
 models, and independent normalized mole perturbations check every entry,
 symmetry and Gibbs-Duhem sums. Broader GE critical/phase-envelope and mixed
 quantum-beta qualification remain separate work.
+
+The [mixture envelope qualification](envelope.md) compares 98 finite source
+curve returns and all 6185 stored states, including repeated cap states. All
+states are recovered from independent native curves with warm single-coordinate
+correction. Seventy-one complete sampled grids match count/order/labels and
+coordinates; 27 raw adaptive grids or partial trajectories remain different
+and are retained explicitly. Five source returns are unclassified partial
+prefixes, not successful complete envelopes. The physical API independently
+checks closure, zero species, reporting order and endpoint limits. Classic,
+translated, UNIFAC and quantum-cubic cases are covered. Global VLLE, pure-fluid
+routing, general quality, exact extrema/critical insertion and other model
+families remain pending. Whole-curve native benchmarks compare all 224 states
+on identical grids before timing.
+
+The local envelope checkpoint passed formatting, strict all-target Clippy,
+312 standard development tests plus the custom source-data checks and benchmark
+executables, 43 selected release tests, 20 documentation tests, warning-free
+API documentation and hashes/row counts/line endings of all 110 fixtures.
+Hosted CI remains unexecuted locally.

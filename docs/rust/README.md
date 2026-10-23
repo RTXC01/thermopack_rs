@@ -49,6 +49,10 @@ adapter, not a completed Rust port.
 [Activity-based cubic derivative qualification](ge-derivatives.md) documents
 the full attraction Hessian and its use in TP fugacity mole derivatives.
 
+[Mixture VLE envelope continuation](envelope.md) covers adaptive tracing,
+near-critical formulation changes, warm coordinate refinement, explicit
+termination and the remaining raw sampled-grid differences.
+
 See [coverage.md](coverage.md), [inventory.json](inventory.json),
 [numerics.md](numerics.md), [validation.md](validation.md),
 [performance.md](performance.md) and [baseline-defects.md](baseline-defects.md).

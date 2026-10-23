@@ -397,3 +397,18 @@ marks this ambiguity; qualification checks both complete assignments while
 retaining the original ordering and derived alternative pressures. This is
 candidate/reporting parity, not full raw ordered-result parity. See
 [pure extrema notes](spinodal-extrema.md).
+
+## Envelope pressure-cap stagnation and formulation labels
+
+`envelope_plot_epc` clamps log(P) to log(Pmax), but checks the exponentiated
+pressure against Pmax using a strict comparison. With Pmax=2 MPa on this host,
+rounding leaves the pressure just below the cap. Both PR and SRK methane/ethane
+cases fill the 1000-point buffer with repeated terminal states. Baseline
+envelope tracing preserves the arrays; the physical API recognizes the
+logarithmic bound and reports `MaximumPressure`.
+
+The source can switch its bubble/dew formulation once both compositions have
+one EOS volume root, before their density order changes. Baseline phase labels
+and volumes retain this convention. Physical tracing orders reported phases
+by molar volume and changes the fixed-phase label consistently. This reporting
+choice is separate from global stability. See [envelope notes](envelope.md).

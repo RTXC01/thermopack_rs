@@ -184,6 +184,188 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             continue;
         }
+        if fields[0] == "ENVELOPE" {
+            use thermopack_rs::envelope::{EnvelopeConstraint, EnvelopeOptions};
+            use thermopack_rs::{MixtureSaturation, SaturationKind};
+            let kind = match fields[1] {
+                "SRK" => CubicKind::SoaveRedlichKwong,
+                "RK" => CubicKind::RedlichKwong,
+                "VDW" => CubicKind::VanDerWaals,
+                _ => CubicKind::PengRobinson,
+            };
+            let names: Vec<_> = fields[2].split(',').collect();
+            let model = if fields[3] == "quantum" {
+                Cubic::quantum(&names)?
+            } else {
+                Cubic::with_options(
+                    kind,
+                    &names,
+                    thermopack_rs::CubicOptions {
+                        volume_translation: fields[3] == "translated",
+                        mixing_rule: if fields[3] == "unifac" {
+                            thermopack_rs::MixingRule::Unifac
+                        } else {
+                            thermopack_rs::MixingRule::VdW
+                        },
+                        ..Default::default()
+                    },
+                )?
+            };
+            let z: Vec<f64> = fields[4].split(',').map(|s| s.parse().unwrap()).collect();
+            let spec: Vec<_> = fields[5].split('@').collect();
+            let opts: Vec<f64> = spec[0].split(':').map(|s| s.parse().unwrap()).collect();
+            let result = model.baseline_phase_envelope(
+                &z,
+                EnvelopeOptions {
+                    start: if opts.get(5).is_some_and(|v| *v > 0.) {
+                        EnvelopeConstraint::Temperature(opts[5])
+                    } else {
+                        EnvelopeConstraint::Pressure(opts[0])
+                    },
+                    initial_kind: if opts.get(6) == Some(&0.) {
+                        SaturationKind::Bubble
+                    } else {
+                        SaturationKind::Dew
+                    },
+                    maximum_pressure: opts[1],
+                    minimum_temperature: Some(opts[2]),
+                    maximum_step: opts[3],
+                    maximum_points: opts.get(4).copied().unwrap_or(1000.) as usize,
+                },
+            );
+            let format_point = |p: &MixtureSaturation| {
+                [
+                    p.temperature,
+                    p.pressure,
+                    f64::from(p.kind == SaturationKind::Dew),
+                    p.liquid_volume,
+                    p.vapor_volume,
+                ]
+                .into_iter()
+                .chain(p.liquid.iter().copied())
+                .chain(p.vapor.iter().copied())
+                .chain([p.dpdt, p.fugacity_residual])
+                .map(|v| format!("{v:.17e}"))
+                .collect::<Vec<_>>()
+                .join(",")
+            };
+            match result {
+                Err(e) => println!("ERROR: {e}"),
+                Ok(curve) => {
+                    let mut projected = Vec::new();
+                    if spec.len() > 1 && !spec[1].is_empty() {
+                        for encoded in spec[1].split(';') {
+                            let target: Vec<f64> =
+                                encoded.split(',').map(|s| s.parse().unwrap()).collect();
+                            let target_kind = if target[0] > 0.5 {
+                                SaturationKind::Dew
+                            } else {
+                                SaturationKind::Bubble
+                            };
+                            let target_sign = if target_kind == SaturationKind::Bubble {
+                                1.
+                            } else {
+                                -1.
+                            };
+                            let distance = |p: &MixtureSaturation| {
+                                let sign = if p.kind == SaturationKind::Bubble {
+                                    1.
+                                } else {
+                                    -1.
+                                };
+                                ((p.temperature / target[1]).ln() / 0.1).powi(2)
+                                    + ((p.pressure / target[2]).ln() / 0.2).powi(2)
+                                    + (0..z.len())
+                                        .filter(|&i| z[i] > 0.)
+                                        .map(|i| {
+                                            (sign * (p.vapor[i] / p.liquid[i]).ln()
+                                                - target_sign * target[3 + i])
+                                                .powi(2)
+                                        })
+                                        .sum::<f64>()
+                            };
+                            let mut seed = curve
+                                .points
+                                .iter()
+                                .filter(|p| {
+                                    let sign = if p.kind == SaturationKind::Bubble {
+                                        1.
+                                    } else {
+                                        -1.
+                                    };
+                                    (0..z.len())
+                                        .filter(|&i| z[i] > 0.)
+                                        .map(|i| {
+                                            sign * (p.vapor[i] / p.liquid[i]).ln()
+                                                * target_sign
+                                                * target[3 + i]
+                                        })
+                                        .sum::<f64>()
+                                        > 0.
+                                })
+                                .min_by(|a, b| distance(a).total_cmp(&distance(b)))
+                                .or_else(|| {
+                                    curve
+                                        .points
+                                        .iter()
+                                        .min_by(|a, b| distance(a).total_cmp(&distance(b)))
+                                })
+                                .unwrap()
+                                .clone();
+                            if seed.kind != target_kind {
+                                std::mem::swap(&mut seed.liquid, &mut seed.vapor);
+                                std::mem::swap(&mut seed.liquid_volume, &mut seed.vapor_volume);
+                                seed.kind = target_kind;
+                            }
+                            let component = (0..z.len())
+                                .filter(|&i| z[i] > 0.)
+                                .max_by(|&i, &j| {
+                                    target[3 + i].abs().total_cmp(&target[3 + j].abs())
+                                })
+                                .unwrap();
+                            let constraint = if let Some(&index) = target.get(3 + z.len()) {
+                                let index = index as usize;
+                                if index < z.len() {
+                                    EnvelopeConstraint::LogK {
+                                        component: index,
+                                        value: target[3 + index],
+                                    }
+                                } else if index == z.len() {
+                                    EnvelopeConstraint::Temperature(target[1])
+                                } else {
+                                    EnvelopeConstraint::Pressure(target[2])
+                                }
+                            } else if target[3 + component].abs() < 0.5 {
+                                EnvelopeConstraint::LogK {
+                                    component,
+                                    value: target[3 + component],
+                                }
+                            } else if (seed.dpdt * seed.temperature / seed.pressure).abs() > 1. {
+                                EnvelopeConstraint::Pressure(target[2])
+                            } else {
+                                EnvelopeConstraint::Temperature(target[1])
+                            };
+                            projected.push(match model.refine_envelope_state(&seed, constraint) {
+                                Ok(p) => format_point(&p),
+                                Err(e) => format!("ERROR: {e}"),
+                            });
+                        }
+                    }
+                    println!(
+                        "{:?}|{}|{}",
+                        curve.end,
+                        curve
+                            .points
+                            .iter()
+                            .map(&format_point)
+                            .collect::<Vec<_>>()
+                            .join(";"),
+                        projected.join(";")
+                    );
+                }
+            }
+            continue;
+        }
         if fields[0] == "WSMIX" {
             let kind = match fields[1] {
                 "SRK" => thermopack_rs::CubicKind::SoaveRedlichKwong,

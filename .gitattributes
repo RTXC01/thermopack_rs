@@ -1,2 +1,4 @@
 # Reference fixture hashes cover exact bytes, independent of core.autocrlf.
 tests/fixtures/*.csv text eol=lf
+# Unified diff context represents an otherwise empty line with one space.
+docs/rust/*.patch text eol=lf whitespace=-blank-at-eol

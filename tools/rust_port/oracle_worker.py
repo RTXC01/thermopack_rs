@@ -116,7 +116,40 @@ def main(compiler_directory):
     probe=None
     for line in sys.stdin:
         request=json.loads(line)
-        if request['mode'] in ['MEOS','MEOS_DENSITY']:
+        if request['mode']=='MEOS_SAT':
+            if probe is None:probe=load_probe()
+            from thermopack.multiparameter import multiparam
+            reduced=request['eos']=='LJTS_REDUCED'
+            key=('MEOS_SAT',request['eos'],request['component'])
+            if previous!=key:
+                model=multiparam('NE' if reduced else request['component'],'LJTS_MEOS' if reduced else request['eos']);previous=key
+            model.activate();tscale=vscale=pscale=1.
+            if reduced:
+                output=(c_double*46)();metadata=(c_double*18)();probe.query_meos(300.,1.,1.,0,output,metadata)
+                tscale=float(metadata[14]);vscale=6.02214076e23*float(metadata[13])**3;pscale=float(metadata[10])*tscale/vscale
+            try:
+                if 'temperature' in request:
+                    t=request['temperature']*tscale;p=float(model.bubble_pressure(t,[1.])[0])
+                else:
+                    p=request['pressure']*pscale;t=float(model.bubble_temperature(p,[1.])[0])
+                vl=float(model.specific_volume(t,p,[1.],model.LIQPH)[0]);vv=float(model.specific_volume(t,p,[1.],model.VAPPH)[0])
+                pl,pvl=model.pressure_tv(t,vl,[1.],dpdv=True);pv,pvv=model.pressure_tv(t,vv,[1.],dpdv=True)
+                hl=float(model.enthalpy(t,p,[1.],model.LIQPH)[0]);hv=float(model.enthalpy(t,p,[1.],model.VAPPH)[0])
+                sl=float(model.entropy(t,p,[1.],model.LIQPH)[0]);sv=float(model.entropy(t,p,[1.],model.VAPPH)[0])
+                fl=float(model.thermo(t,p,[1.],model.LIQPH)[0][0]);fv=float(model.thermo(t,p,[1.],model.VAPPH)[0][0])
+                slope=(hv-hl)/(t*(vv-vl)) if vv!=vl else math.nan
+                result=dict(values=[t/tscale,p/pscale,vl/vscale,vv/vscale,slope*tscale/pscale],
+                    pressure_errors=[(float(pl)-p)/pscale,(float(pv)-p)/pscale],mechanically_stable=float(pvl)<0. and float(pvv)<0.,
+                    fugacity_residual=fl-fv,latent_entropy_identity=(hv-hl-t*(sv-sl))/(pscale*vscale))
+                nonfinite={str(i):repr(v) for i,v in enumerate(result['values']) if not math.isfinite(v)}
+                if nonfinite:
+                    result['nonfinite_values']=nonfinite
+                    result['values']=[v if math.isfinite(v) else None for v in result['values']]
+                print('THERMOPACK_RESULT='+json.dumps(result,allow_nan=False),flush=True)
+            except Exception as error:
+                print('THERMOPACK_RESULT='+json.dumps(dict(calculation_error=str(error))),flush=True)
+            continue
+        if request['mode'] in ['MEOS','MEOS_DENSITY','MEOS_COEX_CHECK']:
             if probe is None:probe=load_probe()
             reduced=int(request['eos']=='LJTS_REDUCED')
             key=('MEOS',request['eos'],request['component'])
@@ -125,6 +158,22 @@ def main(compiler_directory):
                     from thermopack.multiparameter import multiparam
                     model=multiparam(request['component'],request['eos']);previous=key
                 model.activate()
+            if request['mode']=='MEOS_COEX_CHECK':
+                t,p,vl,vv,dpdt=request['point'];left=(c_double*46)();right=(c_double*46)();metadata=(c_double*18)()
+                probe.query_meos(t,vl,1.,reduced,left,metadata);probe.query_meos(t,vv,1.,reduced,right,metadata)
+                mu=math.log(vv/vl)+left[6]-right[6]+left[9]-right[9]
+                latent=right[17]-left[17]
+                dl,dv=1./(metadata[2]*vl),1./(metadata[2]*vv)
+                barrier=None
+                for delta in [1.,.5*(dl+dv)]+[dv+(dl-dv)*i/32. for i in range(1,32) if i!=16]:
+                    volume=1./(metadata[2]*delta);middle=(c_double*46)()
+                    probe.query_meos(t,volume,1.,reduced,middle,metadata)
+                    if middle[14]>0.:
+                        barrier=dict(volume=volume,pressure_dv=middle[14]);break
+                result=dict(pressure_errors=[left[12]-p,right[12]-p],chemical_potential_residual=mu,
+                    mechanically_stable=left[14]<0. and right[14]<0.,dpdt=latent/(t*(vv-vl)),
+                    latent_entropy_identity=latent-t*(right[16]-left[16]),gas_constant=metadata[10],nonconvex_barrier=barrier)
+                print('THERMOPACK_RESULT='+json.dumps(result),flush=True);continue
             if request['mode']=='MEOS_DENSITY':
                 output=(c_double*5)()
                 probe.query_meos_density(request['temperature'],request['pressure'],request['phase'],reduced,output)

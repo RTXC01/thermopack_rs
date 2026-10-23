@@ -17,6 +17,9 @@ mod lj_data;
 mod density;
 pub use density::MultiparameterDensityIteration;
 
+#[path = "multiparameter_saturation.rs"]
+mod saturation;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LennardJonesKind {
     Full,

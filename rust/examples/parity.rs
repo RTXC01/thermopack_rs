@@ -2036,6 +2036,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     "LJTS_REDUCED" => Multiparameter::reduced_lennard_jones_truncated_shifted(),
                     _ => Multiparameter::new(config[1])?,
                 };
+                if matches!(fields[5], "SAT_P" | "SAT_T") {
+                    let value = fields[2].parse().unwrap();
+                    let q = if fields[5] == "SAT_P" {
+                        model.saturation_pressure(value)?
+                    } else {
+                        model.saturation_temperature(value)?
+                    };
+                    return Ok(vec![
+                        q.temperature,
+                        q.pressure,
+                        q.liquid_volume,
+                        q.vapor_volume,
+                        q.dpdt,
+                    ]);
+                }
                 if fields[5] == "DENSITY" {
                     let t = fields[2].parse().unwrap();
                     let p = fields[3].parse().unwrap();

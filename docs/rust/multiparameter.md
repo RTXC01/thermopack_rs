@@ -6,6 +6,11 @@ P-H2), the full Lennard-Jones fit and the truncated-shifted LJ fit from
 Ar, Kr and Xe. The public reduced `init_LJTS` initializer is also available
 before noble-gas SI scaling.
 
+[Pure coexistence](meos-saturation.md) adds saturation pressure, cold inverse
+temperature, both phase volumes and analytic Clapeyron slopes for all 14
+variants. Its direct public-source comparisons and independently checked
+recovery states have separate fixtures and explicit critical/branch limits.
+
 ```rust
 use thermopack_rs::{Multiparameter, LennardJonesKind};
 let eos = Multiparameter::lennard_jones("AR", LennardJonesKind::Full)?;

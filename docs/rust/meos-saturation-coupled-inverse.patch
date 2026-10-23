@@ -1,0 +1,169 @@
+diff --git a/rust/src/multiparameter_saturation.rs b/rust/src/multiparameter_saturation.rs
+index a65d1a8..ad17dcb 100644
+--- a/rust/src/multiparameter_saturation.rs
++++ b/rust/src/multiparameter_saturation.rs
+@@ -16,6 +16,38 @@ struct CoexistenceEvaluation {
+ }
+ 
+ impl PreparedMultiparameter<'_> {
++    // Columns are log liquid density, log vapor density and log temperature.
++    // The pressure specification adds one equation to the coexistence system.
++    fn isobaric_equations(
++        &self,
++        e: &CoexistenceEvaluation,
++        pressure: f64,
++    ) -> Result<([f64; 3], [f64; 9])> {
++        positive(e.vapor_pressure, "multiparameter inverse vapor pressure")?;
++        let log_pressure =
++            (e.vapor_pressure * self.eos.gas_constant() * self.temperature * self.eos.rc()
++                / pressure)
++                .ln();
++        let pt = -e.liquid_delta * e.liquid.d_deltatau + e.vapor_delta * e.vapor.d_deltatau;
++        let mt = -(e.liquid.d_tau - e.vapor.d_tau + e.liquid.d_deltatau - e.vapor.d_deltatau);
++        let density_response = e.vapor_delta * e.vapor_stiffness / e.vapor_pressure;
++        let temperature_response = 1. - e.vapor_delta * e.vapor.d_deltatau / e.vapor_pressure;
++        Ok((
++            [e.residual[0], e.residual[1], log_pressure],
++            [
++                e.jacobian[0],
++                e.jacobian[1],
++                pt,
++                e.jacobian[2],
++                e.jacobian[3],
++                mt,
++                0.,
++                density_response,
++                temperature_response,
++            ],
++        ))
++    }
++
+     fn coexistence_equations(&self, u: [f64; 2]) -> Result<CoexistenceEvaluation> {
+         let dl = u[0].exp();
+         let dv = u[1].exp();
+@@ -246,8 +278,9 @@ impl Multiparameter {
+         self.saturation_temperature_with_guess(pressure, 0.8 * self.tc())
+     }
+ 
+-    /// Invert the native coexistence curve using its analytic Clapeyron slope.
+-    /// Failed trial temperatures are backtracked toward the last valid state.
++    /// Invert the native coexistence curve using an analytic coupled solve for
++    /// temperature and both densities. A bounded Clapeyron temperature iteration
++    /// remains the fallback if coupled correction cannot resolve a valid pair.
+     pub fn saturation_temperature_with_guess(
+         &self,
+         pressure: f64,
+@@ -261,8 +294,70 @@ impl Multiparameter {
+                 "multiparameter inverse coexistence below critical point required",
+             ));
+         }
++        let point = self.saturation_pressure(temperature)?;
++        if let Ok(q) = self.isobaric_coexistence(pressure, point) {
++            return Ok(q);
++        }
++        self.nested_saturation_temperature(pressure, point)
++    }
++
++    fn isobaric_coexistence(&self, pressure: f64, point: Saturation) -> Result<Saturation> {
++        let mut u = [
++            (1. / (self.rc() * point.liquid_volume)).ln(),
++            (1. / (self.rc() * point.vapor_volume)).ln(),
++            point.temperature.ln(),
++        ];
++        for _ in 0..100 {
++            let prepared = self.prepare(u[2].exp())?;
++            let e = prepared.coexistence_equations([u[0], u[1]])?;
++            let (residual, mut matrix) = prepared.isobaric_equations(&e, pressure)?;
++            if residual[2].abs() < 2e-10
++                && residual[0].abs() < e.pressure_roundoff + 4e-11 * e.vapor_pressure.abs()
++                && residual[1].abs() / (u[0] - u[1]) < 2e-11
++            {
++                return prepared.saturation_from_log_densities([u[0], u[1]]);
++            }
++            let mut step = residual.map(|v| -v);
++            crate::numerics::solve_linear_in_place(&mut matrix, &mut step)?;
++            let limit = (step[0].abs().max(step[1].abs()) / 0.5)
++                .max(step[2].abs() / 0.15)
++                .max(1.);
++            step.iter_mut().for_each(|v| *v /= limit);
++            let norm = residual.into_iter().map(f64::abs).fold(0., f64::max);
++            let mut fraction = 1.;
++            let mut accepted = None;
++            for _ in 0..24 {
++                let trial = std::array::from_fn(|i| u[i] + fraction * step[i]);
++                let t = trial[2].exp();
++                if t > self.tc() * 1e-6
++                    && t < self.tc()
++                    && let Ok(p) = self.prepare(t)
++                    && let Ok(e) = p.coexistence_equations([trial[0], trial[1]])
++                    && e.liquid_stiffness > 0.
++                    && e.vapor_stiffness > 0.
++                    && let Ok((r, _)) = p.isobaric_equations(&e, pressure)
++                    && r.into_iter().map(f64::abs).fold(0., f64::max) < norm
++                {
++                    accepted = Some(trial);
++                    break;
++                }
++                fraction *= 0.5;
++            }
++            u = accepted.ok_or(Error::NotConverged(
++                "multiparameter isobaric coexistence backtracking",
++            ))?;
++        }
++        Err(Error::NotConverged(
++            "multiparameter isobaric coexistence iteration",
++        ))
++    }
++
++    fn nested_saturation_temperature(
++        &self,
++        pressure: f64,
++        mut point: Saturation,
++    ) -> Result<Saturation> {
+         let (mut lo, mut hi) = (self.tc() * 1e-6, self.tc() * (1. - 1e-10));
+-        let mut point = self.saturation_pressure(temperature)?;
+         for _ in 0..100 {
+             let f = (point.pressure / pressure).ln();
+             if f.abs() < 2e-10 {
+@@ -332,4 +427,41 @@ mod tests {
+             }
+         }
+     }
++
++    #[test]
++    fn isobaric_coexistence_jacobian_matches_off_root_differences() {
++        for model in [
++            Multiparameter::new("C3").unwrap(),
++            Multiparameter::new("R134A").unwrap(),
++            Multiparameter::new("N-H2").unwrap(),
++            Multiparameter::lennard_jones("KR", LennardJonesKind::Full).unwrap(),
++            Multiparameter::reduced_lennard_jones_truncated_shifted(),
++        ] {
++            let u = [2_f64.ln(), 0.05_f64.ln(), (0.8 * model.tc()).ln()];
++            let pressure = 0.2 * model.gas_constant() * model.tc() * model.rc();
++            let evaluate = |u: [f64; 3]| {
++                let p = model.prepare(u[2].exp()).unwrap();
++                let e = p.coexistence_equations([u[0], u[1]]).unwrap();
++                p.isobaric_equations(&e, pressure).unwrap()
++            };
++            let (_, jacobian) = evaluate(u);
++            for j in 0..3 {
++                let (mut up, mut um) = (u, u);
++                let h = 2e-6;
++                up[j] += h;
++                um[j] -= h;
++                let (a, _) = evaluate(up);
++                let (b, _) = evaluate(um);
++                for i in 0..3 {
++                    let finite = (a[i] - b[i]) / (2. * h);
++                    assert!(
++                        (finite - jacobian[3 * i + j]).abs() < 3e-7 + 3e-6 * finite.abs(),
++                        "{} ({i},{j}): {finite} vs {}",
++                        model.record.ident,
++                        jacobian[3 * i + j]
++                    );
++                }
++            }
++        }
++    }
+ }

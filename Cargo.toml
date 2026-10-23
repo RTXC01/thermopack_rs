@@ -162,6 +162,11 @@ name = "envelope_extrema"
 path = "rust/benches/envelope_extrema.rs"
 harness = false
 
+[[bench]]
+name = "meos_saturation"
+path = "rust/benches/meos_saturation.rs"
+harness = false
+
 [lints.rust]
 unsafe_code = "forbid"
 

@@ -358,3 +358,54 @@ and tangents improves on the freshly measured fixed-seed Rust baseline by
 inputs and one changed native file. The original optional solver has
 undefined phase-argument behavior, so this is a native-only measurement with
 no speedup claim against that path.
+
+## Pure multiparameter coexistence
+
+The [coexistence qualification](meos-saturation.md) and
+[current native-loop report](meos-saturation-benchmark.json) cover full
+five-output saturation calls. All 76 qualified source states in the five
+profiles are compared before timing. Each sample cycles 1000 calls and checks
+five separate sums for T, P, both volumes and Clapeyron slope. Five measured
+samples follow a warm-up. Model construction, parsing, Python and FFI are
+excluded. Temperature preparation and any native fallback are included;
+inverse queries start at 0.8 Tc without a previous-state guess.
+
+| Model | Source pressure us | Rust pressure us | Ratio | Source inverse us | Rust inverse us | Ratio |
+|---|---:|---:|---:|---:|---:|---:|
+| NIST C3 | 194.99 | 18.83 | 10.36x | 139.33 | 112.61 | 1.24x |
+| NIST R134A | 280.17 | 21.20 | 13.21x | 211.89 | 99.20 | 2.14x |
+| LJ krypton | 370.18 | 25.13 | 14.73x | 301.05 | 262.52 | 1.15x |
+| LJ argon | 367.77 | 25.63 | 14.35x | 318.33 | 292.70 | 1.09x |
+| LJTS krypton | 440.99 | 58.11 | 7.59x | 388.08 | 140.49 | 2.76x |
+
+Ratios divide source time by Rust time. The small LJ argon inverse difference
+is close to run-to-run spread and should be treated as roughly tied. Source
+calls safe_bubP/safe_bubT followed by phase-volume and enthalpy queries;
+Rust solves coexistence directly and obtains latent heat from the same
+residual jets. These are complete requested output workloads, not isolated
+iterations with identical algorithms.
+
+The [earlier nested inverse build](meos-saturation-before-coupled-inverse-benchmark.json)
+and [comparison audit](meos-saturation-inverse-comparison.json) retain the
+initial performance gaps. Coupling temperature and both densities reduces
+the recorded native inverse medians by 5.20x for propane, 2.84x for R134A and
+5.94x for LJTS krypton. LJ krypton remains similar, while LJ argon regresses
+from 242.20 to 292.70 us relative to the earlier native build. The bounded
+nested method remains a fallback; further per-state profiling is open.
+
+Only the native coexistence module changes between those builds. Numeric
+source fixtures, numeric benchmark inputs, benchmark code, Cargo inputs and
+toolchains are identical. Qualification metadata is refreshed to independently
+check the optimized native coordinates against the source kernels; that
+evidence change is explicit in the comparison audit. Pressure-query timing
+also changes under compiler optimization even though its algorithm is retained.
+The record does not attribute every timing difference to the inverse algorithm.
+The [reversible module patch](meos-saturation-coupled-inverse.patch) reconstructs
+the exact baseline module from this checkpoint. Its normalized SHA-256 was
+verified against the original measurement; reverse the patch in an isolated
+checkout to repeat that build. Both measurements retain all native hashes.
+
+Failed and coincident-phase source results remain in the qualification ledger
+and are explicitly outside these timings. Hydrogen, reduced LJTS, recovery
+states, other temperatures/models, global stability and full multiparameter
+flashes are not performance-qualified here. No whole-library speedup is claimed.

@@ -1,0 +1,160 @@
+{
+  "generator": "tools/rust_port/compare_meos_saturation_benchmarks.py",
+  "before_report": "docs/rust/meos-saturation-before-coupled-inverse-benchmark.json",
+  "before_report_sha256": "48bd1dd0085e46e3fbdfd72f7e3d74e2abf43c2bcff7a877cd21b778d3d0efc3",
+  "after_report": "docs/rust/meos-saturation-benchmark.json",
+  "after_report_sha256": "74354ce91441116d7e50f266ff355936d8411d9874d7bf3076ddc3f0daef9dbc",
+  "changed_native_sources": [
+    "rust/src/multiparameter_saturation.rs"
+  ],
+  "changed_qualification_evidence": [
+    "tests/fixtures/meos_saturation.metadata.json"
+  ],
+  "baseline_reproduction_patch": "docs/rust/meos-saturation-coupled-inverse.patch",
+  "baseline_reproduction_patch_sha256": "8d611669408c7f6fe84ded93ef43291f5297c4c64a94bfca9f5d411e34379d10",
+  "baseline_module_sha256": "77f0f0eb0fb115fa548022651448c79ecf05a96db5950f5f457655c072bc825d",
+  "identical_source_fixture_numeric_inputs_benchmark_code_and_cargo": true,
+  "profiles": {
+    "1_SAT_P": {
+      "before_native_median_ns": 33961.2,
+      "after_native_median_ns": 18827.1,
+      "native_build_speedup": 1.8038465828513153,
+      "source_over_current_native": 10.356895113958071,
+      "before_native_range_ns": [
+        32843.3,
+        34148.5
+      ],
+      "after_native_range_ns": [
+        18660.7,
+        19084.6
+      ]
+    },
+    "1_SAT_T": {
+      "before_native_median_ns": 585892.9,
+      "after_native_median_ns": 112607.2,
+      "native_build_speedup": 5.202979027984002,
+      "source_over_current_native": 1.2373480558969585,
+      "before_native_range_ns": [
+        582495.3,
+        588889.4
+      ],
+      "after_native_range_ns": [
+        109644.5,
+        116740.2
+      ]
+    },
+    "2_SAT_P": {
+      "before_native_median_ns": 21310.4,
+      "after_native_median_ns": 21202.5,
+      "native_build_speedup": 1.0050890225209292,
+      "source_over_current_native": 13.21387100577762,
+      "before_native_range_ns": [
+        20806.2,
+        21607.2
+      ],
+      "after_native_range_ns": [
+        20162.0,
+        21340.3
+      ]
+    },
+    "2_SAT_T": {
+      "before_native_median_ns": 281822.6,
+      "after_native_median_ns": 99203.2,
+      "native_build_speedup": 2.840861988322957,
+      "source_over_current_native": 2.1358696090448697,
+      "before_native_range_ns": [
+        276525.4,
+        285184.1
+      ],
+      "after_native_range_ns": [
+        97426.2,
+        100513.5
+      ]
+    },
+    "3_SAT_P": {
+      "before_native_median_ns": 50298.5,
+      "after_native_median_ns": 25130.2,
+      "native_build_speedup": 2.0015161041296925,
+      "source_over_current_native": 14.730340387263134,
+      "before_native_range_ns": [
+        48320.8,
+        51095.0
+      ],
+      "after_native_range_ns": [
+        24961.1,
+        25659.2
+      ]
+    },
+    "3_SAT_T": {
+      "before_native_median_ns": 274278.4,
+      "after_native_median_ns": 262519.1,
+      "native_build_speedup": 1.044794074031185,
+      "source_over_current_native": 1.1467889384048628,
+      "before_native_range_ns": [
+        271692.6,
+        278187.0
+      ],
+      "after_native_range_ns": [
+        260174.0,
+        271570.9
+      ]
+    },
+    "4_SAT_P": {
+      "before_native_median_ns": 50543.7,
+      "after_native_median_ns": 25630.9,
+      "native_build_speedup": 1.971983036100956,
+      "source_over_current_native": 14.348692398628218,
+      "before_native_range_ns": [
+        48926.4,
+        50852.0
+      ],
+      "after_native_range_ns": [
+        25339.6,
+        26164.9
+      ]
+    },
+    "4_SAT_T": {
+      "before_native_median_ns": 242202.9,
+      "after_native_median_ns": 292702.2,
+      "native_build_speedup": 0.8274720859631393,
+      "source_over_current_native": 1.08754973484996,
+      "before_native_range_ns": [
+        239724.7,
+        243553.4
+      ],
+      "after_native_range_ns": [
+        289408.8,
+        300603.6
+      ]
+    },
+    "5_SAT_P": {
+      "before_native_median_ns": 118726.7,
+      "after_native_median_ns": 58113.1,
+      "native_build_speedup": 2.0430281640456283,
+      "source_over_current_native": 7.588519628104507,
+      "before_native_range_ns": [
+        116339.1,
+        120728.7
+      ],
+      "after_native_range_ns": [
+        57432.5,
+        62043.6
+      ]
+    },
+    "5_SAT_T": {
+      "before_native_median_ns": 835142.3,
+      "after_native_median_ns": 140489.5,
+      "native_build_speedup": 5.944517561810669,
+      "source_over_current_native": 2.762370141540827,
+      "before_native_range_ns": [
+        833969.0,
+        843267.7
+      ],
+      "after_native_range_ns": [
+        139790.0,
+        141089.5
+      ]
+    }
+  },
+  "scope": "Five profiles and 76 qualified source states. Only the native coexistence module changes between builds. The public saturation-pressure method retains its algorithm; compiler optimization can change its timing too. Three cold inverse profiles improve substantially; LJ full krypton is similar and LJ full argon regresses relative to the nested Rust build. Separate source ratios apply only to the current measured workload. Independent source-kernel checks in metadata are refreshed for the optimized native points; the original numeric source fixture is unchanged."
+}

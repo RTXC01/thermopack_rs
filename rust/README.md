@@ -3,6 +3,11 @@
 Experimental native port; see [coverage](../docs/rust/coverage.md) before use.
 The original Fortran/Python implementation is retained as the reference.
 
+[Pure multiparameter saturation](../docs/rust/meos-saturation.md) provides
+pressure, temperature inversion, phase volumes and Clapeyron slopes for all
+14 native NIST/Lennard-Jones variants, with separate evidence for direct
+source matches and solutions recovered where the source solver fails.
+
 [Pure-fluid saturation grids](../docs/rust/pure-curves.md) provide selected
 components, linear/logarithmic sampling and physical/source critical endpoints,
 with explicit critical-root conditioning. The

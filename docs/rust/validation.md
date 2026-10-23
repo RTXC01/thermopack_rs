@@ -761,3 +761,41 @@ harnesses/all-target executables, 46 selected release tests, 24 documentation
 examples, strict Clippy/rustdoc, formatting and all 118 fixture audits. The
 controlled comparison audit is also included in native CI. Hosted CI has not
 been observed running.
+
+The [pure MEOS coexistence checkpoint](meos-saturation.md) adds saturation
+pressure and temperature inversion for all 14 native model variants. The
+public-source matrix contains 232 attempts: 164 qualified distinct-phase
+states, 24 reported errors, 44 coincident-phase inverse returns and no censored
+calls. All 164 qualified source states match in T, P, both molar volumes and
+Clapeyron slope. Raw failed/unqualified outcomes remain in metadata, with
+nonfinite values represented as JSON null plus their original nonfinite
+labels. All 232 native solutions, including the 68 separately recorded
+recoveries, pass independent source pressure, chemical-potential, mechanical
+stability, nonconvexity and latent-heat checks. These recovery checks do not
+claim coordinate identity with a successful original saturation call.
+
+Native tests cover the entire 14-model, nine-temperature pressure grid,
+cold pressure inversion, guesses on both sides of the target temperature,
+phase pressure/fugacity/latent-entropy closure and independently differenced
+Clapeyron slopes. Both the two-density Jacobian and the coupled isobaric
+three-variable Jacobian are independently differenced off root. Near-critical
+ortho-hydrogen uses bounded continuation rather than relaxed tolerances.
+Critical endpoints and unresolved or unsupported density pairs remain errors.
+
+The initial nested inverse benchmark exposed three profiles slower than the
+source. A coupled temperature/density correction now avoids repeated complete
+coexistence solves, with the nested method retained as a bounded fallback.
+Both builds and all five separate output checksums are recorded. The numeric
+source fixture, 76 timing inputs, benchmark code, compiler and Cargo inputs
+remain identical; only the native coexistence module and its independently
+refreshed qualification metadata differ. LJ argon inversion regresses relative
+to the earlier native build, and its current source comparison is roughly
+tied. The complete measurements and limitations are in the performance ledger.
+
+This checkpoint passes 352 standard development tests plus all custom source
+harnesses and all-target executables, 48 selected release tests, 25 documentation
+examples, strict all-target Clippy/rustdoc, formatting and all 120 fixture
+audits. The selected release run includes the complete 5082-state/46-field
+MEOS process-main reference harness and existing density regressions. Source
+validation and benchmark preflight are added to source CI; the before/after
+measurement audit is added to native CI. Hosted CI has not been observed here.

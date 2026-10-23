@@ -13,7 +13,7 @@
 //! # }
 //! ```
 use crate::{
-    Cubic, Error, MixtureSaturation, Phase, Result, SaturationKind, error::positive,
+    Cubic, Error, MixtureSaturation, Phase, PreparedState, Result, SaturationKind, error::positive,
     numerics::solve_linear_in_place,
 };
 
@@ -28,6 +28,47 @@ pub enum EnvelopeConstraint {
 mod tests {
     use super::*;
     use crate::{CubicKind, CubicOptions, MixingRule};
+    #[test]
+    fn phase_jet_cache_preserves_values_derivatives_and_root_counts_after_trials() {
+        let model = Cubic::with_options(
+            CubicKind::PengRobinson,
+            &["C1", "C3"],
+            CubicOptions {
+                mixing_rule: MixingRule::Unifac,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let mut jet = Jet::new(&model, 2);
+        for (t, p, z, phase) in [
+            (250., 1e5, [0.5, 0.5], Phase::Liquid),
+            (250., 1e5, [0.5, 0.5], Phase::Vapor),
+            (250., 2e6, [0.5, 0.5], Phase::Liquid),
+            (250., 2e6, [0.2, 0.8], Phase::Vapor),
+            (260., 2e6, [0.2, 0.8], Phase::Liquid),
+            (250., 1e5, [0.5, 0.5], Phase::Vapor),
+        ] {
+            let v = jet.fill(t, p, &z, phase, true).unwrap();
+            let fresh = model.prepare(t, &z).unwrap();
+            let expected = fresh.volume(p, phase).unwrap();
+            assert_eq!(v, expected);
+            assert_eq!(jet.roots(t, p, &z).unwrap().1, fresh.volumes(p).unwrap().1);
+            let mut phi = vec![0.; 2];
+            let mut dt = vec![0.; 2];
+            let mut dp = vec![0.; 2];
+            let mut dn = vec![0.; 4];
+            fresh.ln_fugacity_tp_into(p, v, &mut phi).unwrap();
+            fresh
+                .fugacity_derivatives_into(v, &mut dt, &mut dp, &mut dn)
+                .unwrap();
+            assert_eq!(jet.phi, phi);
+            assert_eq!(jet.dt, dt);
+            assert_eq!(jet.dp, dp);
+            assert_eq!(jet.dn, dn);
+            assert!(jet.fill(-1., p, &z, phase, true).is_err());
+            assert!(jet.fill(t, -1., &z, phase, true).is_err());
+        }
+    }
     #[test]
     fn quantum_envelope_jacobian_matches_independent_differences() {
         let model = Cubic::quantum(&["H2", "NE"]).unwrap();
@@ -225,32 +266,55 @@ fn reported_point(mut point: MixtureSaturation, source_conventions: bool) -> Mix
     point
 }
 
-struct Jet {
+struct Jet<'a> {
+    model: &'a Cubic,
+    prepared: Option<PreparedState<'a>>,
+    roots: Option<(f64, [f64; 3], usize)>,
     phi: Vec<f64>,
     dt: Vec<f64>,
     dp: Vec<f64>,
     dn: Vec<f64>,
 }
-impl Jet {
-    fn new(n: usize) -> Self {
+impl<'a> Jet<'a> {
+    fn new(model: &'a Cubic, n: usize) -> Self {
         Self {
+            model,
+            prepared: None,
+            roots: None,
             phi: vec![0.; n],
             dt: vec![0.; n],
             dp: vec![0.; n],
             dn: vec![0.; n * n],
         }
     }
-    fn fill(
-        &mut self,
-        model: &Cubic,
-        t: f64,
-        p: f64,
-        z: &[f64],
-        phase: Phase,
-        derivatives: bool,
-    ) -> Result<f64> {
-        let state = model.prepare(t, z)?;
-        let volume = state.volume(p, phase)?;
+    fn roots(&mut self, t: f64, p: f64, z: &[f64]) -> Result<([f64; 3], usize)> {
+        // Preparation depends on T and composition, not P. Each phase jet
+        // belongs to one immutable model for the duration of this trace.
+        if !self
+            .prepared
+            .as_ref()
+            .is_some_and(|s| s.temperature() == t && s.composition() == z)
+        {
+            self.prepared = Some(self.model.prepare(t, z)?);
+            self.roots = None;
+        }
+        if let Some((pressure, roots, count)) = self.roots
+            && pressure == p
+        {
+            return Ok((roots, count));
+        }
+        let (roots, count) = self.prepared.as_ref().unwrap().volumes(p)?;
+        self.roots = Some((p, roots, count));
+        Ok((roots, count))
+    }
+    fn fill(&mut self, t: f64, p: f64, z: &[f64], phase: Phase, derivatives: bool) -> Result<f64> {
+        let (roots, count) = self.roots(t, p, z)?;
+        let state = self.prepared.as_ref().unwrap();
+        let volume = match phase {
+            Phase::Liquid => roots[0],
+            Phase::Vapor => roots[count - 1],
+            Phase::MinimumGibbs => return Err(Error::InvalidInput("envelope phase selection")),
+        };
         state.ln_fugacity_tp_into(p, volume, &mut self.phi)?;
         if derivatives {
             state.fugacity_derivatives_into(volume, &mut self.dt, &mut self.dp, &mut self.dn)?;
@@ -281,8 +345,8 @@ struct Problem<'a> {
     z: Vec<f64>,
     active: Vec<usize>,
     kind: SaturationKind,
-    parent: Jet,
-    other: Jet,
+    parent: Jet<'a>,
+    other: Jet<'a>,
     weights: Vec<f64>,
     composition: Vec<f64>,
     tolerance: f64,
@@ -309,8 +373,8 @@ impl<'a> Problem<'a> {
             z,
             active,
             kind,
-            parent: Jet::new(n),
-            other: Jet::new(n),
+            parent: Jet::new(model, n),
+            other: Jet::new(model, n),
             weights: vec![0.; n],
             composition: vec![0.; n],
             tolerance: 1e-9,
@@ -414,12 +478,10 @@ impl<'a> Problem<'a> {
         } else {
             (Phase::Vapor, Phase::Liquid)
         };
-        let vf = self
-            .parent
-            .fill(self.model, t, p, &self.z, fixed, derivatives)?;
+        let vf = self.parent.fill(t, p, &self.z, fixed, derivatives)?;
         let vo = self
             .other
-            .fill(self.model, t, p, &self.composition, trial, derivatives)?;
+            .fill(t, p, &self.composition, trial, derivatives)?;
         if self.kind == SaturationKind::Bubble {
             out.vl = vf;
             out.vv = vo;
@@ -544,7 +606,7 @@ impl<'a> Problem<'a> {
             fugacity_residual: e.norm,
         })
     }
-    fn single_roots(&self, u: &[f64]) -> Result<bool> {
+    fn single_roots(&mut self, u: &[f64]) -> Result<bool> {
         let m = self.active.len();
         let t = u[m].exp();
         let p = u[m + 1].exp();
@@ -556,8 +618,7 @@ impl<'a> Problem<'a> {
         for v in &mut other {
             *v /= sum;
         }
-        Ok(self.model.prepare(t, &self.z)?.volumes(p)?.1 == 1
-            && self.model.prepare(t, &other)?.volumes(p)?.1 == 1)
+        Ok(self.parent.roots(t, p, &self.z)?.1 == 1 && self.other.roots(t, p, &other)?.1 == 1)
     }
     fn flip(&mut self, u: &mut [f64]) {
         self.tangent_cache = None;

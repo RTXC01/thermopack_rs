@@ -91,6 +91,16 @@ composition rather than relying on a previous failed trial. Tests independently
 check Jacobians, cache invalidation and normalized coexistence equations.
 Models own their parameters; trace workspaces and caches are call-local.
 
+Each phase also keeps its prepared EOS parameters keyed by exact temperature
+and composition, and its physical volume roots keyed by pressure. This reuses
+preparation between an accepted line-search trial and its Jacobian, between
+point reporting and the next predictor, and for phase root-count checks.
+Temperature or composition changes discard roots before reuse; phase selection
+chooses from the current root set. The model is bound to the workspace, so a
+cache cannot cross model configurations. Independent tests compare cached and
+fresh values, all fugacity derivatives and root counts exactly after changes
+of T, P, composition and phase, including failed intermediate trials.
+
 ## Qualification against this fork
 
 `tools/rust_port/validate_envelope.py` makes 98 isolated exact-source calls:
@@ -167,16 +177,26 @@ sum separately. Cold initialization and the entire continuation are included;
 model construction and Python/FFI are excluded. The source post-evaluates both
 volumes; Rust carries them and additionally computes branch slopes.
 
-The 2026-10-23 local medians, per complete curve, are:
+The 2026-10-23 local medians after parameter/root reuse, per complete curve, are:
 
 | Curve | Fortran ms | Rust ms | Speedup |
 |---|---:|---:|---:|
-| PR methane/ethane | 5.010 | 1.901 | 2.64× |
-| SRK methane/ethane | 5.490 | 1.900 | 2.89× |
-| PR methane/ethane/propane | 6.154 | 1.245 | 4.94× |
-| PR-UNIFAC methane/propane | 16.987 | 15.681 | 1.08× |
+| PR methane/ethane | 4.991 | 1.719 | 2.90× |
+| SRK methane/ethane | 5.128 | 1.735 | 2.96× |
+| PR methane/ethane/propane | 5.915 | 0.956 | 6.18× |
+| PR-UNIFAC methane/propane | 15.624 | 10.887 | 1.44× |
 
-The UNIFAC workload is only slightly faster and remains an optimization
-target. The [machine-readable report](envelope-benchmark.json) records compiler settings, five samples after one
+The [current report](envelope-cache-benchmark.json) retains five samples after
+one warm-up and hashes of every native source, harness and Cargo input. Its
+timed native output checksums are exactly unchanged from the
+[initial report](envelope-benchmark.json), which predates parameter/root reuse.
+Recorded native medians improve 1.10–1.44×; UNIFAC falls from 15.681 to
+10.887 ms per curve. Source times also vary between runs, so these are local
+workload measurements. UNIFAC remains a further optimization target.
+
+Both reports record compiler settings, five samples after one
 warm-up, hashes of native/harness/Cargo inputs and the exact-source identity.
 These are scoped workload measurements, not whole-library performance claims.
+
+Reproduce the current measurement with
+`python tools/rust_port/benchmark_envelope.py --compiler <gfortran> --output docs/rust/envelope-cache-benchmark.json`.

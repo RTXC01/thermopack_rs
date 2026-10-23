@@ -637,11 +637,11 @@ The [phase-fraction curve qualification](quality-envelopes.md) adds 158 source
 attempts. Two finite global-bound exits fail independent material balance and
 remain unqualified with raw outputs retained. The remaining 156 returns store
 8,019 states, including 1,960 repeated cap states and two source partial
-prefixes. All 133 matching complete sampled grids pass count/order/fraction
+prefixes. All 148 matching complete sampled grids pass count/order/fraction
 and every returned phase coordinate. Direct grids or independent warm
 correction recover 8,010 states strictly; nine near-coincident coordinate gaps
 remain outside tolerance. Two secondary projection differences on already
-matching grids are recorded separately. Twenty-three raw sampled grids or
+matching grids are recorded separately. Eight raw sampled grids or
 partial trajectories still differ.
 
 Independent tests check feed and exact zeros, lever-rule/fugacity closure,
@@ -670,3 +670,37 @@ The complete-curve before/after records differ in one native source file;
 every output checksum is identical, with the UNIFAC native median improving
 12.24x after preserving immediate bound exits. Current scoped source/native
 whole-curve speedups are 4.16–8.08x.
+
+The [caloric fixed-quality checkpoint](quality-caloric.md) adds 292 source
+attempts: 203 finite closing H/S states, 12 earlier quality-initialization
+failures and 77 caloric failures, with no censored or discarded finite returns.
+The baseline matches all 203 finite states and rejects all 77 reachable source
+caloric failures. Physical correction closes all 280 reachable guesses; the
+77 additional roots pass independent source fugacity, pressure and H/S checks.
+Physical coordinate parity holds for 200 of the 203 source states. Two small
+weak-source-closure differences and one distinct valid branch remain named,
+bounded and independently checked, without changing ordinary tolerances.
+
+The 280 source analytic caloric Jacobian rows and independently differenced
+source-function rows are retained. Baseline and physical derivatives are
+tested against their respective references, including guesses where the
+source later fails. Additional tests check off-root normalized phases,
+reference shifts and zero targets, exact absent species, quality endpoints,
+embedded-pure physical recovery and H=U+PV. Full caloric curves and global
+stability remain open.
+
+The broad regression run also exposed a stale count assertion and prose from
+the previous checkpoint: its checked-in curve fixtures already contained 148
+matching sampled grids after the immediate source-bound exit optimization,
+while the assertion still required 133. Correcting that assertion and the
+documentation leaves every numerical fixture byte unchanged. Fresh exact-source
+T/P/log-K and phase-fraction curve regenerations retain their existing raw gaps.
+
+The corrected local checkpoint passes 340 standard development tests plus
+custom source harnesses and all-target benchmark executables, 58 selected
+release tests, 23 documentation examples, strict all-target Clippy/rustdoc,
+formatting and all 117 fixture audits. The caloric benchmark checks all twelve
+outputs for 27 identical-seed states before timing source, compatible Rust and
+physical Rust, and checks twelve separate sums per sample. Its 109 native,
+harness and Cargo fingerprints still match the current files after timing.
+Hosted CI has not been observed running.

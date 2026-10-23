@@ -330,7 +330,7 @@ fn complete_source_grids_and_independent_warm_recovery_keep_raw_gaps_explicit() 
         }
         cases += 1;
     }
-    assert_eq!((cases, grids), (156, 133));
+    assert_eq!((cases, grids), (156, 148));
     assert_eq!(states + gaps, 8019);
     assert!(gaps <= 9);
 }

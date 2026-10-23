@@ -23,6 +23,9 @@ use crate::{
 #[path = "quality_envelope.rs"]
 mod curve;
 pub use curve::QualityEnvelope;
+#[path = "quality_caloric.rs"]
+mod caloric;
+pub use caloric::{QualityCaloricProperties, QualitySpecification};
 
 /// Initial temperature, pressure and vapor/liquid mole-fraction ratios.
 /// Ratios for absent feed species are ignored. A guess need not close the
@@ -143,18 +146,18 @@ impl<'a> Problem<'a> {
         u.extend([g.temperature.ln(), g.pressure.ln()]);
         Ok(u)
     }
-    fn constraint(&self, c: EnvelopeConstraint) -> Result<(usize, f64)> {
+    fn constraint(&self, c: impl Into<QualitySpecification>) -> Result<(usize, f64)> {
         let m = self.active.len();
-        Ok(match c {
-            EnvelopeConstraint::Temperature(t) => {
+        Ok(match c.into() {
+            QualitySpecification::Temperature(t) => {
                 positive(t, "quality temperature")?;
                 (m, t.ln())
             }
-            EnvelopeConstraint::Pressure(p) => {
+            QualitySpecification::Pressure(p) => {
                 positive(p, "quality pressure")?;
                 (m + 1, p.ln())
             }
-            EnvelopeConstraint::LogK { component, value } => {
+            QualitySpecification::LogK { component, value } => {
                 if !value.is_finite() {
                     return Err(Error::InvalidInput("finite quality log K required"));
                 }
@@ -164,6 +167,18 @@ impl<'a> Problem<'a> {
                     .position(|&i| i == component)
                     .ok_or(Error::InvalidInput("active quality component required"))?;
                 (i, value)
+            }
+            QualitySpecification::Entropy(value) => {
+                if !value.is_finite() {
+                    return Err(Error::InvalidInput("finite quality entropy required"));
+                }
+                (m + 2, value)
+            }
+            QualitySpecification::Enthalpy(value) => {
+                if !value.is_finite() {
+                    return Err(Error::InvalidInput("finite quality enthalpy required"));
+                }
+                (m + 3, value)
             }
         })
     }
@@ -238,12 +253,50 @@ impl<'a> Problem<'a> {
                 e.j[r * d + m + 1] = p * (self.right.dp[i] - self.left.dp[i]);
             }
         }
-        e.f[m + 1] = u[s] - spec;
+        if s < d {
+            e.f[m + 1] = u[s] - spec;
+        } else {
+            let entropy = s == d;
+            let l = caloric::phase_jet(
+                self.model,
+                &self.left,
+                e.vl,
+                p,
+                entropy,
+                self.baseline,
+                derivatives,
+            )?;
+            let v = caloric::phase_jet(
+                self.model,
+                &self.right,
+                e.vv,
+                p,
+                entropy,
+                self.baseline,
+                derivatives,
+            )?;
+            let scale = spec.abs().max(1.);
+            e.f[m + 1] = ((1. - self.beta) * l.value + self.beta * v.value - spec) / scale;
+            if derivatives {
+                for (k, &i) in self.active.iter().enumerate() {
+                    e.j[(m + 1) * d + k] = self.beta * (1. - self.beta) * self.weights[i] / scale
+                        * if self.baseline {
+                            v.partial[i] + l.partial[i]
+                        } else {
+                            (v.partial[i] - v.value) / sy - (l.partial[i] - l.value) / sx
+                        };
+                }
+                e.j[(m + 1) * d + m] = t * ((1. - self.beta) * l.dt + self.beta * v.dt) / scale;
+                e.j[(m + 1) * d + m + 1] = p * ((1. - self.beta) * l.dp + self.beta * v.dp) / scale;
+            }
+        }
         if derivatives {
             for (k, &i) in self.active.iter().enumerate() {
                 e.j[m * d + k] = self.weights[i];
             }
-            e.j[(m + 1) * d + s] = 1.;
+            if s < d {
+                e.j[(m + 1) * d + s] = 1.;
+            }
         }
         e.norm = e.f.iter().map(|v| v.abs()).fold(0., f64::max);
         if e.f.iter().any(|v| !v.is_finite()) {
@@ -257,7 +310,9 @@ impl<'a> Problem<'a> {
         }
         let d = self.active.len() + 2;
         let m = d - 2;
-        u[s] = spec;
+        if s < d {
+            u[s] = spec;
+        }
         let mut e = Evaluation::new(d);
         let mut trial = Evaluation::new(d);
         let mut q = u.clone();
@@ -285,7 +340,9 @@ impl<'a> Problem<'a> {
                 for i in 0..d {
                     q[i] = u[i] + fraction * step[i];
                 }
-                q[s] = spec;
+                if s < d {
+                    q[s] = spec;
+                }
                 if self.evaluate(&q, s, spec, &mut trial, false).is_ok() && trial.norm < e.norm {
                     accepted = true;
                     break;
@@ -379,10 +436,19 @@ impl<'a> Problem<'a> {
         Err(Error::NotConverged("source quality Newton iteration"))
     }
     fn point(&mut self, u: &[f64], s: usize, iterations: usize) -> Result<QualityState> {
+        self.point_at(u, s, u[s], iterations)
+    }
+    fn point_at(
+        &mut self,
+        u: &[f64],
+        s: usize,
+        spec: f64,
+        iterations: usize,
+    ) -> Result<QualityState> {
         let m = self.active.len();
         let d = m + 2;
         let mut e = Evaluation::new(d);
-        self.evaluate(u, s, u[s], &mut e, true)?;
+        self.evaluate(u, s, spec, &mut e, true)?;
         let mut tangent = vec![0.; d];
         tangent[d - 1] = 1.;
         solve_linear_in_place(&mut e.j, &mut tangent)?;
@@ -423,6 +489,18 @@ impl Cubic {
         constraint: EnvelopeConstraint,
         guess: &QualityGuess,
     ) -> Result<QualityState> {
+        self.baseline_quality_state_with_specification(z, beta, constraint.into(), guess)
+    }
+    /// Source sat_newton correction including entropy/enthalpy specifications.
+    /// Preserves the fork's caloric Jacobian, including its documented sign
+    /// and heat-capacity conventions. Global stability is not tested.
+    pub fn baseline_quality_state_with_specification(
+        &self,
+        z: &[f64],
+        beta: f64,
+        specification: QualitySpecification,
+        guess: &QualityGuess,
+    ) -> Result<QualityState> {
         let mut problem = Problem::new(self, z, beta)?;
         problem.baseline = true;
         if problem.active.len() < 2 {
@@ -431,9 +509,9 @@ impl Cubic {
             ));
         }
         let u = problem.coordinates(guess)?;
-        let (s, spec) = problem.constraint(constraint)?;
+        let (s, spec) = problem.constraint(specification)?;
         let (u, it) = problem.solve(u, s, spec)?;
-        problem.point(&u, s, it)
+        problem.point_at(&u, s, spec, it)
     }
     /// Local coexistence at specified T, feed and molar vapor fraction.
     pub fn quality_pressure(&self, t: f64, z: &[f64], beta: f64) -> Result<QualityState> {
@@ -453,14 +531,41 @@ impl Cubic {
         constraint: EnvelopeConstraint,
         guess: &QualityGuess,
     ) -> Result<QualityState> {
+        self.quality_state_with_specification(z, beta, constraint.into(), guess)
+    }
+    /// Local correction with a T/P/log-K or molar entropy/enthalpy target.
+    /// Caloric targets use J/(mol K) and J/mol, including model reference levels.
+    pub fn quality_state_with_specification(
+        &self,
+        z: &[f64],
+        beta: f64,
+        specification: QualitySpecification,
+        guess: &QualityGuess,
+    ) -> Result<QualityState> {
         let mut problem = Problem::new(self, z, beta)?;
         let u = problem.coordinates(guess)?;
-        let (s, spec) = problem.constraint(constraint)?;
+        let (s, spec) = problem.constraint(specification)?;
         if problem.active.len() == 1 {
-            return self.quality_pure(&problem.z, beta, constraint);
+            return match specification {
+                QualitySpecification::Temperature(t) => {
+                    self.quality_pure(&problem.z, beta, EnvelopeConstraint::Temperature(t))
+                }
+                QualitySpecification::Pressure(p) => {
+                    self.quality_pure(&problem.z, beta, EnvelopeConstraint::Pressure(p))
+                }
+                QualitySpecification::Entropy(value) => {
+                    self.pure_quality_caloric(&problem.z, beta, value, true, guess)
+                }
+                QualitySpecification::Enthalpy(value) => {
+                    self.pure_quality_caloric(&problem.z, beta, value, false, guess)
+                }
+                _ => Err(Error::InvalidInput(
+                    "pure quality requires T/P/H/S specification",
+                )),
+            };
         }
         let (u, it) = problem.solve(u, s, spec)?;
-        problem.point(&u, s, it)
+        problem.point_at(&u, s, spec, it)
     }
     /// Warm continuation at the same feed and quality as a previous state.
     /// The stored feed is preserved, avoiding cumulative material-balance drift.
@@ -604,6 +709,167 @@ impl Cubic {
 mod tests {
     use super::*;
     use crate::{CubicKind, CubicOptions, MixingRule};
+    #[test]
+    fn caloric_quality_source_rows_and_independent_source_differences_are_retained() {
+        let mut count = 0;
+        for row in include_str!("../../tests/fixtures/quality_caloric_jacobian.csv")
+            .lines()
+            .skip(1)
+        {
+            let c: Vec<_> = row.split(';').collect();
+            let f: Vec<_> = c[0].split('|').collect();
+            let names: Vec<_> = f[2].split(',').collect();
+            let model = if f[3] == "quantum" {
+                Cubic::quantum(&names).unwrap()
+            } else {
+                Cubic::with_options(
+                    match f[1] {
+                        "SRK" => CubicKind::SoaveRedlichKwong,
+                        "RK" => CubicKind::RedlichKwong,
+                        "VDW" => CubicKind::VanDerWaals,
+                        _ => CubicKind::PengRobinson,
+                    },
+                    &names,
+                    CubicOptions {
+                        volume_translation: f[3] == "translated",
+                        mixing_rule: match f[3] {
+                            "unifac" => MixingRule::Unifac,
+                            "hv1" => MixingRule::HuronVidal1,
+                            "hv2" => MixingRule::HuronVidal2,
+                            "nrtl" => MixingRule::Nrtl,
+                            _ => MixingRule::VdW,
+                        },
+                        ..Default::default()
+                    },
+                )
+                .unwrap()
+            };
+            let z: Vec<f64> = f[4].split(',').map(|v| v.parse().unwrap()).collect();
+            let beta = f[5].parse().unwrap();
+            let o: Vec<_> = f[6].split(':').collect();
+            let target = o[1].parse().unwrap();
+            let constraint = if o[0] == "H" {
+                QualitySpecification::Enthalpy(target)
+            } else {
+                QualitySpecification::Entropy(target)
+            };
+            let g: Vec<f64> = f[7].split(',').map(|v| v.parse().unwrap()).collect();
+            let guess = QualityGuess {
+                temperature: g[0],
+                pressure: g[1],
+                ratios: g[2..].to_vec(),
+            };
+            let mut problem = Problem::new(&model, &z, beta).unwrap();
+            let d = problem.active.len() + 2;
+            let u = problem.coordinates(&guess).unwrap();
+            let (s, spec) = problem.constraint(constraint).unwrap();
+            let source: Vec<f64> = c[1].split(',').map(|v| v.parse().unwrap()).collect();
+            let fun: Vec<f64> = c[2].split(',').map(|v| v.parse().unwrap()).collect();
+            let fd: Vec<f64> = c[3].split(',').map(|v| v.parse().unwrap()).collect();
+            let indices: Vec<_> = problem
+                .active
+                .iter()
+                .copied()
+                .chain([z.len(), z.len() + 1])
+                .collect();
+            let mut e = Evaluation::new(d);
+            problem.baseline = true;
+            problem.evaluate(&u, s, spec, &mut e, true).unwrap();
+            for (i, &source_i) in indices.iter().enumerate() {
+                let a = e.f[i];
+                let b = fun[source_i];
+                assert!(
+                    (a - b).abs() < 2e-8 + 2e-7 * a.abs().max(b.abs()),
+                    "{} F{i}: {a} vs {b}",
+                    c[0]
+                );
+                let a = e.j[(d - 1) * d + i];
+                let b = source[source_i];
+                assert!(
+                    (a - b).abs() < 1e-8 + 2e-7 * a.abs().max(b.abs()),
+                    "{} J{i}: {a} vs {b}",
+                    c[0]
+                );
+            }
+            problem.baseline = false;
+            problem.evaluate(&u, s, spec, &mut e, true).unwrap();
+            for (i, &source_i) in indices.iter().enumerate() {
+                let a = e.j[(d - 1) * d + i];
+                let b = fd[source_i];
+                assert!(
+                    (a - b).abs() < 3e-6 + 3e-5 * a.abs().max(b.abs()),
+                    "{} finite {i}: {a} vs {b}",
+                    c[0]
+                );
+            }
+            count += 1;
+        }
+        assert_eq!(count, 280);
+    }
+    #[test]
+    fn caloric_quality_rows_differentiate_normalized_phases_off_the_rr_root() {
+        for (names, rule, translated, quantum) in [
+            (vec!["C1", "C2"], MixingRule::VdW, false, false),
+            (vec!["C1", "C3"], MixingRule::Unifac, false, false),
+            (vec!["C1", "H2O"], MixingRule::HuronVidal1, false, false),
+            (vec!["C1", "C2", "C3"], MixingRule::VdW, true, false),
+            (vec!["H2", "NE"], MixingRule::VdW, false, true),
+        ] {
+            let model = if quantum {
+                Cubic::quantum(&names).unwrap()
+            } else {
+                Cubic::with_options(
+                    CubicKind::PengRobinson,
+                    &names,
+                    CubicOptions {
+                        mixing_rule: rule,
+                        volume_translation: translated,
+                        ..Default::default()
+                    },
+                )
+                .unwrap()
+            };
+            let mut z = vec![0.5, 0.5];
+            if names.len() == 3 {
+                z.push(0.);
+            }
+            for beta in [0., 0.1, 0.4, 0.9, 1.] {
+                let mut problem = Problem::new(&model, &z, beta).unwrap();
+                let m = problem.active.len();
+                let d = m + 2;
+                let mut u = vec![0.7, -0.4];
+                u.extend([
+                    if quantum { 30_f64.ln() } else { 250_f64.ln() },
+                    if quantum { 1e5_f64.ln() } else { 1e6_f64.ln() },
+                ]);
+                for constraint in [
+                    QualitySpecification::Enthalpy(-1e5),
+                    QualitySpecification::Entropy(100.),
+                ] {
+                    let (s, spec) = problem.constraint(constraint).unwrap();
+                    let mut base = Evaluation::new(d);
+                    problem.evaluate(&u, s, spec, &mut base, true).unwrap();
+                    for j in 0..d {
+                        let h = 2e-6;
+                        let mut plus = u.clone();
+                        let mut minus = u.clone();
+                        plus[j] += h;
+                        minus[j] -= h;
+                        let mut a = Evaluation::new(d);
+                        let mut b = Evaluation::new(d);
+                        problem.evaluate(&plus, s, spec, &mut a, false).unwrap();
+                        problem.evaluate(&minus, s, spec, &mut b, false).unwrap();
+                        let fd = (a.f[d - 1] - b.f[d - 1]) / (2. * h);
+                        let exact = base.j[(d - 1) * d + j];
+                        assert!(
+                            (fd - exact).abs() < 2e-6 + 2e-5 * fd.abs().max(exact.abs()),
+                            "{names:?} {beta} {constraint:?} {j}: {exact} vs {fd}"
+                        );
+                    }
+                }
+            }
+        }
+    }
     #[test]
     fn normalized_quality_jacobian_matches_differences_away_from_material_balance() {
         for (names, feed, rule, translated) in [

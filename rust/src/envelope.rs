@@ -282,6 +282,11 @@ pub(crate) struct Jet<'a> {
     pub(crate) dn: Vec<f64>,
 }
 impl<'a> Jet<'a> {
+    pub(crate) fn prepared_state(&self) -> Result<&PreparedState<'a>> {
+        self.prepared
+            .as_ref()
+            .ok_or(Error::InvalidInput("phase jet has not been evaluated"))
+    }
     pub(crate) fn new(model: &'a Cubic, n: usize) -> Self {
         Self {
             model,

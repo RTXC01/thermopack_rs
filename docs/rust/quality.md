@@ -103,8 +103,12 @@ tolerances. These observations establish neither an exact nonlinear
 trajectory nor a rigorous conditioning allowance for those raw differences.
 
 Full source failure/status identity, critical/coincident-phase regularization,
-broader fixed-quality curve qualification, entropy/enthalpy constraints, non-vapor second
+broader fixed-quality curve qualification, non-vapor second
 phases and other EOS families remain pending.
+
+[Caloric fixed-quality correction](quality-caloric.md) adds local H/S
+specifications with independently checked analytic derivatives, explicit
+source Jacobian compatibility and separate numerical qualification.
 
 ## Qualification
 

@@ -17,6 +17,10 @@ critical-start, one-point and trace-classification conventions.
 correction at a specified molar vapor fraction, with analytic slopes and
 explicit source compatibility limits near coincident phases.
 
+[Caloric quality constraints](../docs/rust/quality-caloric.md) add molar H/S
+specifications and lever-rule properties, with a corrected physical Jacobian
+and a separately qualified implementation of the fork's derivative convention.
+
 [Phase-fraction curves](../docs/rust/quality-envelopes.md) continue those states
 through coordinate turns and phase interchange, retaining full compositions
 and explicit endpoint/partial-curve status.

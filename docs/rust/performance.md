@@ -340,3 +340,11 @@ timing; cold initialization and complete quality curves remain separate work.
 The [phase-fraction curve measurements](quality-envelopes.md#performance)
 compare four complete source/native grids and all 201 reported states before
 timing full curves, including cold initialization and phase interchange.
+
+The [caloric fixed-quality measurements](quality-caloric.md#performance)
+compare 27 H/S corrections from identical perturbed seeds. Local medians give
+5.89–8.37x source/compatible-Rust speedups and 32.00–46.46x source/physical-Rust
+speedups. The physical path uses the corrected analytic caloric Jacobian.
+Every phase coordinate, slope, H and S is compared before timing, and all
+twelve output sums are checked for every sample. Construction and seed
+generation are excluded; complete caloric curves remain separate work.

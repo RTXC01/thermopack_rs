@@ -84,11 +84,16 @@ quantum H2/Ne and H2/D2; fractions 0.25/0.5/0.75; pressure and temperature
 starts, point caps, pressure limits and temperature exits.
 
 All counts, order, fractions, T/P, phase volumes and compositions match on
-**133 complete sampled grids**. The other 23 sampled grids or partial
+**148 complete sampled grids**. The other eight sampled grids or partial
 trajectories remain different. Independent native traces recover **8,010
 stored source states** directly or by warm single-coordinate correction.
 Two H2/Ne source returns are unclassified partial prefixes; they are not
 counted as complete curves.
+
+The immediate source-bound exit optimization in this checkpoint's predecessor
+already raised the matching-grid count from 133 to 148 in the checked-in
+fixtures. The caloric follow-up corrects the stale test assertion and prose;
+the freshly regenerated source comparison leaves those fixture bytes unchanged.
 
 Nine coordinate recovery gaps remain outside ordinary tolerance:
 

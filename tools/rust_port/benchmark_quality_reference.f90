@@ -1,15 +1,17 @@
 program benchmark_quality_reference
   use eoslibinit,only:init_cubic
-  use eos,only:specificVolume
+  use eos,only:specificVolume,enthalpy,entropy
   use saturation,only:sat_newton
   use saturation_curve,only:newton_extrapolate
   implicit none
   integer,parameter::iterations=1000,capacity=256
-  integer::profile,i,n,j,unit,counts(4),groups(capacity),specs(capacity),indexes(capacity)
+  integer::profile,i,n,j,unit,counts(4),groups(capacity),specs(capacity),indexes(capacity),outputs
   integer(kind=8)::start,finish,rate
-  real::ts(capacity),ps(capacity),bs(capacity),ss(capacity),ks(2,capacity),v(10),sums(10)
-  character(len=1024)::command,input
+  real::ts(capacity),ps(capacity),bs(capacity),ss(capacity),ks(2,capacity),v(12),sums(12)
+  character(len=1024)::command,input,mode
   call get_command_argument(1,command);call get_command_argument(2,input)
+  call get_command_argument(3,mode);outputs=10
+  if(trim(mode)=='caloric')outputs=12
   open(newunit=unit,file=trim(input),status='old',action='read');read(unit,*)n
   if(n>capacity)error stop 'quality input capacity'
   counts=0
@@ -37,7 +39,7 @@ program benchmark_quality_reference
     if(trim(command)=='check')then
       do i=1,j
         call solve(indexes(i),v)
-        write(*,'(a,i0,a,i0,a,*(es24.16,:,","))')'check_',profile,'_',i-1,',',v
+        write(*,'(a,i0,a,i0,a,*(es24.16,:,","))')'check_',profile,'_',i-1,',',v(:outputs)
       enddo
     else
       sums=0.;call system_clock(start,rate)
@@ -45,14 +47,14 @@ program benchmark_quality_reference
         call solve(indexes(mod(i,j)+1),v);sums=sums+v
       enddo
       call system_clock(finish)
-      write(*,'(a,i0,a,*(es24.16,:,","))')'source_',profile,',',real(finish-start)/real(rate)*1e9/iterations,sums
+      write(*,'(a,i0,a,*(es24.16,:,","))')'source_',profile,',',real(finish-start)/real(rate)*1e9/iterations,sums(:outputs)
     endif
   enddo
 contains
   subroutine solve(i,v)
     integer,intent(in)::i
-    real,intent(out)::v(10)
-    real::t,p,k(2),z(2),x(2),y(2),vl,vv,u(4),tangent(4)
+    real,intent(out)::v(12)
+    real::t,p,k(2),z(2),x(2),y(2),vl,vv,u(4),tangent(4),hl,hv,sl,sv
     integer::iteration,status
     z=.5;t=ts(i);p=ps(i);k=ks(:,i)
     iteration=sat_newton(z,k,t,p,bs(i),specs(i),ss(i),ierr=status)
@@ -61,6 +63,11 @@ contains
     call specificVolume(t,p,x,1,vl);call specificVolume(t,p,y,2,vv)
     u=[log(k),log(t),log(p)]
     call newton_extrapolate(z,u,tangent,bs(i),specs(i),ss(i))
-    v=[t,p,bs(i),vl,vv,x,y,p*tangent(4)/(t*tangent(3))]
+    v=0.;v(:10)=[t,p,bs(i),vl,vv,x,y,p*tangent(4)/(t*tangent(3))]
+    if(outputs==12)then
+      call enthalpy(t,p,x,1,hl);call enthalpy(t,p,y,2,hv)
+      call entropy(t,p,x,1,sl);call entropy(t,p,y,2,sv)
+      v(11)=(1.-bs(i))*hl+bs(i)*hv;v(12)=(1.-bs(i))*sl+bs(i)*sv
+    endif
   end subroutine solve
 end program benchmark_quality_reference

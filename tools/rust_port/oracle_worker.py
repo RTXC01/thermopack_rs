@@ -675,6 +675,79 @@ def main(compiler_directory):
             print('THERMOPACK_RESULT='+json.dumps(dict(values=points,critical=critical,initial_pressure=value,initial_temperature=temp,
                 critical_polynomial=[pp,qq,rr],critical_shift=shift,all_fugacity_differences=all_fugacity_differences,**envelope_output)),flush=True)
             continue
+        if request['mode']=='QUALITY_CALORIC':
+            import numpy as np
+            from thermopack.cubic import cubic
+            eos=request['eos'];names=request['components'];z=np.array(request['feed'],dtype=float);z/=z.sum();nc=len(z)
+            config=request.get('configuration','classic');beta=request['beta'];property_=request['property']
+            if config=='quantum':
+                from thermopack.quantum_cubic import qcubic
+                model=qcubic(','.join(names))
+            else:
+                model=cubic(','.join(names),'SRK' if eos=='RK' else eos,alpha='RK' if eos=='RK' else 'Classic',volume_shift=config=='translated',
+                    mixing={'unifac':'UNIFAC','hv1':'HV1','hv2':'HV2','nrtl':'NRTL'}.get(config,'vdW'))
+            previous=None;model.activate();p=request.get('base_pressure',1e6)
+            if 'check_state' in request:
+                point=request['check_state'];t=point['temperature'];p=point['pressure'];x=np.array(point['liquid']);y=np.array(point['vapor']);active=np.flatnonzero(z>0)
+                fl=np.array(model.thermo(t,p,x,model.LIQPH)[0]);fv=np.array(model.thermo(t,p,y,model.VAPPH)[0])
+                fugacity=float(np.max(np.abs((np.log(x)+fl-np.log(y)-fv)[active])))
+                h=(1.-beta)*float(model.enthalpy(t,p,x,model.LIQPH)[0])+beta*float(model.enthalpy(t,p,y,model.VAPPH)[0])
+                s=(1.-beta)*float(model.entropy(t,p,x,model.LIQPH)[0])+beta*float(model.entropy(t,p,y,model.VAPPH)[0])
+                value=h if property_=='H' else s;target=request['target']
+                result=dict(fugacity_residual=fugacity,material_balance_residual=float(np.max(np.abs((1.-beta)*x+beta*y-z))),
+                    enthalpy=h,entropy=s,caloric_residual=(value-target)/max(abs(target),1.),
+                    pressure_errors=[float(model.pressure_tv(t,point['liquid_volume'],x)[0])-p,float(model.pressure_tv(t,point['vapor_volume'],y)[0])-p])
+                print('THERMOPACK_RESULT='+json.dumps(result),flush=True);continue
+            try:
+                if beta<.5:t,y=model.bubble_temperature(p,z);k=np.divide(y,z,out=np.ones(nc),where=z>0)
+                else:t,x=model.dew_temperature(p,z);k=np.divide(z,x,out=np.ones(nc),where=x>0)
+            except Exception as error:
+                print('THERMOPACK_RESULT='+json.dumps(dict(initialization_error=str(error))),flush=True);continue
+            calculate=getattr(model.tp,model.get_export_name('saturation','sat_newton'))
+            calculate.argtypes=[POINTER(c_double)]*5+[POINTER(c_int),POINTER(c_double),POINTER(c_int),POINTER(c_int)];calculate.restype=c_int
+            amounts=(c_double*nc)(*z);ratios=(c_double*nc)(*k);tc=c_double(t);pc=c_double(p);bc=c_double(beta);sc=c_int(nc+2);lc=c_double(math.log(p));status=c_int()
+            initial_iterations=calculate(amounts,ratios,byref(tc),byref(pc),byref(bc),byref(sc),byref(lc),None,byref(status))
+            if status.value:
+                print('THERMOPACK_RESULT='+json.dumps(dict(initialization_status=status.value,initialization_iterations=initial_iterations)),flush=True);continue
+            def properties(t,p,k):
+                x=z/(1.-beta+beta*k);y=k*x;x/=x.sum();y/=y.sum()
+                h=(1.-beta)*float(model.enthalpy(t,p,x,model.LIQPH)[0])+beta*float(model.enthalpy(t,p,y,model.VAPPH)[0])
+                s=(1.-beta)*float(model.entropy(t,p,x,model.LIQPH)[0])+beta*float(model.entropy(t,p,y,model.VAPPH)[0])
+                return x,y,h,s
+            k=np.array(ratios);t=tc.value;p=pc.value;x,y,h,s=properties(t,p,k)
+            target=(h if property_=='H' else s)+request.get('offset',0.)
+            t*=request.get('temperature_factor',1.005);p*=request.get('pressure_factor',.99);k=np.exp(np.log(k)*request.get('ratio_factor',.98))
+            guess=dict(temperature=float(t),pressure=float(p),ratios=k.tolist())
+            sc=c_int(nc+4 if property_=='H' else nc+3);lc=c_double(target)
+            fun=getattr(model.tp,model.get_export_name('saturation','sat_fun_newton'));fun.argtypes=[POINTER(c_double)]*3;fun.restype=None
+            jac=getattr(model.tp,model.get_export_name('saturation','sat_diff_newton'));jac.argtypes=[POINTER(c_double)]*3;jac.restype=None
+            u=np.r_[np.log(k),math.log(t),math.log(p)];param=np.r_[z,beta,float(sc.value),target,2.]
+            uc=(c_double*(nc+2))(*u);params=(c_double*(nc+4))(*param);f=(c_double*(nc+2))();j=(c_double*((nc+2)**2))()
+            fun(f,uc,params);jac(j,uc,params);initial_row=np.array(j).reshape((nc+2,nc+2),order='F')[-1].tolist()
+            finite_row=[]
+            for column in range(nc+2):
+                step=2e-6;up=u.copy();um=u.copy();up[column]+=step;um[column]-=step
+                upc=(c_double*(nc+2))(*up);umc=(c_double*(nc+2))(*um);fp=(c_double*(nc+2))();fm=(c_double*(nc+2))()
+                fun(fp,upc,params);fun(fm,umc,params);finite_row.append((fp[nc+1]-fm[nc+1])/(2.*step))
+            ratios=(c_double*nc)(*k);tc=c_double(t);pc=c_double(p);status=c_int()
+            iterations=calculate(amounts,ratios,byref(tc),byref(pc),byref(bc),byref(sc),byref(lc),None,byref(status))
+            result=dict(status=status.value,iterations=iterations,guess=guess,target=target,initial_function=list(f),initial_caloric_jacobian_row=initial_row,
+                initial_caloric_finite_difference_row=finite_row,values=[])
+            if status.value==0:
+                t=tc.value;p=pc.value;k=np.array(ratios);x,y,h,s=properties(t,p,k)
+                vl=float(model.specific_volume(t,p,x,model.LIQPH)[0]);vv=float(model.specific_volume(t,p,y,model.VAPPH)[0])
+                fl=np.array(model.thermo(t,p,x,model.LIQPH)[0]);fv=np.array(model.thermo(t,p,y,model.VAPPH)[0]);active=np.flatnonzero(z>0)
+                residual=float(np.max(np.abs((np.log(k)+fv-fl)[active])))
+                balance=float(np.max(np.abs((1.-beta)*x+beta*y-z)))
+                u=np.r_[np.log(k),math.log(t),math.log(p)];uc=(c_double*(nc+2))(*u);jac(j,uc,params)
+                matrix=np.array(j).reshape((nc+2,nc+2),order='F');rhs=np.zeros(nc+2);rhs[-1]=1.
+                try:
+                    tangent=np.linalg.solve(matrix,rhs);dpdt=p*tangent[-1]/(t*tangent[-2])
+                except np.linalg.LinAlgError:dpdt=math.nan
+                result.update(values=[t,p,beta,vl,vv,*x,*y,float(dpdt),h,s],fugacity_residual=residual,material_balance_residual=balance,
+                    caloric_residual=((h if property_=='H' else s)-target)/max(abs(target),1.),
+                    pressure_errors=[float(model.pressure_tv(t,vl,x)[0])-p,float(model.pressure_tv(t,vv,y)[0])-p])
+            print('THERMOPACK_RESULT='+json.dumps(result),flush=True);continue
         if request['mode']=='QUALITY':
             import numpy as np
             from thermopack.cubic import cubic

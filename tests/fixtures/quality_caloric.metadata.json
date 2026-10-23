@@ -1,0 +1,5936 @@
+{
+  "baseline": "d68c794",
+  "compiler": "GNU Fortran (MinGW-W64 x86_64-ucrt-posix-seh, built by Brecht Sanders) 14.3.0",
+  "flags": [
+    "-O3",
+    "-cpp",
+    "-fdefault-real-8",
+    "-fdefault-double-8",
+    "-frecursive",
+    "-fopenmp",
+    "-fallow-argument-mismatch",
+    "-ffree-line-length-none"
+  ],
+  "lapack_commit": "3c351aad417ae1ad8552bc742a6f039d6a298f2c",
+  "library_sha256": "05c5eeb892302a0700ad079073d160fe607275ac673d7b1d6791073fca26a6ac",
+  "sources": {
+    "numconstants": "81b2771fa060b08c6dc551a32eafcb61b91f139d1864644fc25ca7d89ab4f330",
+    "stringmod": "0c2459ae3cd3a0c227b15107337d66d8c79ced4eb868ce69dd8bb5bd4af352e2",
+    "quadratures": "158894a2caa55fb4781275fb720862d0be19b03df13fba29ab21346f4d684820",
+    "thermopack_constants": "9046988b81e338f895ee05189087bbdd89a10759774e1f8021cb198ef2dc9b86",
+    "error": "5c275dd4808c6ad373c826ce5ddcab3e02e73410859afc4f4dac800a528c5706",
+    "parameters": "d7c3a50c4745afac77fc5fa031d49cab1571e24af6c8bb15878c2cada2bfdd2f",
+    "hyperdual_mod": "41b121f1b66d45325ec9f87937c95101e88bccbaac75f2d7cad06e95f32a411e",
+    "linear_numerics": "ce49eeef25d1c3e5ae0f27f26f3537b6cced8e8c0e9ab113ae8194bbd917527f",
+    "optimizer": "7648d0d88a30163e36462015db91dd189702d8c389eb3c3cb617d522d4111355",
+    "nonlinear_solvers": "693ac124cb25aa12c805ce09f8ec553087b0789dcfacaf28b79112cf1f31e063",
+    "utilities": "77d315d2eadaecf47d24ca2d92d671b86c9515672afaba369a7b8c3d6cf6981e",
+    "apparent_composition": "3536e3eab063855aefc6dab1621746f74bd7e31f28ad9f25bce74d164442c377",
+    "solid_correlation_datadb": "013f25ec37dac3fe647e00c84fef5525c0f3c6dd718a7364290e05f0c273ae82",
+    "compdata": "ce941b7b3266ec2260e1f8f9635fd3fd383e772f1b8f704c11175523451e7047",
+    "association_var": "10ecb2dac187bb8500b522bbc6aebf522a79e888baa8e04bf8a2aeb1851c5cfc",
+    "multipol_var": "2f9bf2a453b03cd3f7b784f74ba6a1b358d58906581dc2171f37366adaf00006",
+    "thermopack_var": "1e75d96aebc50ee5e9d63d63034625b46fd6fa352ffb18dd0f62bd9544627801",
+    "hyperdual_utility": "6924c70a6821989595276279d56da82a86f647830bde52d96c069dd68ce62589",
+    "fmt": "b94b7b91a454511fa5446b8f84604cc593fa5aa2d0e17dd9e154b8bee48eaafa",
+    "eosdata": "5347e25c79f23cb3752ba692bd2be2ce5b94ab3382fec1a6c379a4e5adfd804c",
+    "assocschemeutils": "06352929c097aa2864b646565e9dc591fb08d60a4d2824eb47f56820a74174ec",
+    "unifacdata": "225d321b1fe3818c20ecfcc56ca565a817a99877198c1848843204631d3c1d8a",
+    "unifac": "dd0d41c70800dc5a8a3c5c3c58b8de9b467167bc8a4c3e34484cbe93dd4dacf0",
+    "cubic_eos": "5331b361c38f23636b746d8b93446662944bce17aa676d7d43a815c8dfe82530",
+    "compdatadb": "c54497d27f95539576545cdf9ba78bfcf4159749b60dccaa709be286682148a2",
+    "compdata_init": "cd85a3e560ac24cfc7318ae4d8ab3bd491282330264f878c6a71a276fcbb31ac",
+    "volume_shift": "0de6b71bbf9f8833d335bb9b1c5619f7225cc2f17cc8a055dc9e662745edf6bd",
+    "multiparameter_base": "228e9bad560f4ee6f8d6ff9e6aab057c887df5a82d030357d461e0e7cfa13399",
+    "multiparameter_c3": "025f3e94c7abca6a1ea08e3c1a4b5cfdc972629e5879109e523199437097be44",
+    "multiparameter_para_h2": "579951c3fa36fff2e97a8bfeabe615927deb65f631082690a66452d458bbb250",
+    "multiparameter_ortho_h2": "f65855b3b2438454b2117d3e8f19eba6a67279a4139ac2485fb08ef8710a6974",
+    "multiparameter_normal_h2": "385e1d177b6def4f0cf637318380d2fc00738f1b9f7b6eb28ca956cbba073b92",
+    "multiparameter_r134a": "17740e7f977376bafd39faeac6c1d71e4467e783a8d9c3e33f8d9fcdaac007a5",
+    "multiparameter_lj": "035bae279e62dcdb7b42b358dfb3c17562bd7a8ddd178a3092ac75f0b34342cf",
+    "mbwrdata": "64f67102fbb97a0c6bd241a6430f05d00fcb5772892d62f28d7f0e2e41f82675",
+    "mbwr": "783f624958e3c1228f8433ee00965fc99f170364250d876bcd0b5d9484b4579a",
+    "mbwr_additional": "a57ea631169f2ba51282fb326038e22433cfb1dcc242e28a6debc042b4d4ec3c",
+    "pets": "2f7a472ad252f0952aa49f5491dd3c7795106c080c36079b9bea33926ab70b9c",
+    "pc_saft_datadb": "24667d3bf38092d05329762ae21ce1d829a90f0da5cf5491ebf0598dd71a7ef6",
+    "pc_saft_parameters": "39cb10930ae3f2b0f705b8ef47fd703113b0104601f0c699f053c9d1f6ae4fab",
+    "eos_parameters": "eb7b41483e973f4701008861ffd1e47e0e5a7549fe40ac34eca8c417a8f27ea8",
+    "mixdatadb": "a208994066d699b441362ca9c078dc6965c6020c29c6fe334562a97fb2df1aaa",
+    "cbalpha": "40475a554d43f8e0e2b5137460c60b7ee7fa1706b59cc1df6454c12b0c410b02",
+    "cbbeta": "f9ac7e9e686c79affc2c12ff17db5693332f294e9df8df25ec4a2d0938c085ec",
+    "excess_gibbs": "91db5a4da578e85def8b6c7c4a384ac3e8dc3370faaba29d40c12191198152b5",
+    "wong_sandler": "310e1df96f792d62a4b4c8c488a5c9501bb802853d273b7c4b1dc27e5112b208",
+    "cbmix": "14a973e85f0a768715e7896125e070c0888082c407391f60e4d4ad598dc22e7f",
+    "cbhelm": "a092ae02bbfb0f39ec227ac936366fb4394b403dc24d782206bc7bd49a28cd4b",
+    "cubic": "4fc1c75b5083500754436076a2472478a99463fffe8d578f0560baee095ea606",
+    "idealh2": "e02374dec47754a196b3102de89210df5a4c01d18a1203bf24468716b129bade",
+    "ideal": "4abeed45be71e58aebc14473b15cbf90df2c260b3152dc68e09183c148cb2fc2",
+    "cpa_parameters": "8eca97665cf0c22281bfbc0ef156022be3be0bbedf1d3f0236571ab892ac1a6b",
+    "cbselect": "4840cd70d733cfd61638b6fb59e7d0069074b71121d17977c5ec33f7fd5fbc0c",
+    "hardsphere_bmcsl": "aaa5be55f77fb1def8d15962c1e7df2d353f3b0cfd6fd47d0739ffca3620d301",
+    "pc_saft_nonassoc": "a2512afe7ad8da09c7737ab955be209734d773822a24ca4c34cd508cc9aa0db4",
+    "saftvrmie_options": "5d4b9891ea470f49dd5c4d5d624e901de4894d6642221b5a23c1ae6fd2c5b9e4",
+    "saftvrmie_datadb": "5673b761a3698429dff898135fba4675c8ce000408898ac70106f6688d119842",
+    "saftvrmie_parameters": "9f9522f18419781b75ca699240e9327d9836186922a64f033c4b30241e4fbac9",
+    "saftvrmie_containers": "ecd4aa67a916f260006c5ec87d58bc48bd08a3fe808d0cdc5ab17095a0c56447",
+    "saftvrmie_utils": "3073a53eb1e4ca53d0c99215cff5bb0374c6111f17950be79c8ff0ef738af193",
+    "saftvrmie_hardsphere": "69eadfad516eaf43bd4635b5cf9c19a794cfb862795ab3b1ea554bac3c516add",
+    "saftvrmie_dispersion": "9970200beba5b09c40675c8d815795c9e53f6cfb015264bd8323a471d2dfcb8a",
+    "saftvrmie_chain": "313951dcb61c081aee2edeabf5ad08b827475f02af3b056b3d660234039f6253",
+    "saftvrmie_association": "9ba1a54816cb0fc2eef93faa5101e953c41c30c3310926f1d376c7c0160dc8c3",
+    "saftvrmie_interface": "6bc6d39e595b7fda87a5b4ca69f4b589dd699c410c7ea8d3e10adc191b700cc6",
+    "hardsphere_wca": "568bdef8f6f16f5ff636b369e3824d1a9aea4393ccce9cc59ae0980d878e4819",
+    "lj_splined": "21b26d0e68b20281fc91b6f93d587fb7562d40036e364481e4e4384cd8cdefae",
+    "saft_globals": "cd491377b6e647ca1c8da737bd5be6761f3e994859ed9052840fa0acfb6948b9",
+    "saft_rdf": "80cd38594817aea99c75402d7e6669a1eca5d834a42428e3e091712c78d4963e",
+    "saft_association": "df3a5f9b6e871d005427fcfaf167989256395e55017110227ca0f1c8181dd5b6",
+    "multipol": "b227a20226ceb793e13c6153f3e678f2cfd0dbfa2463a93f3da012a60ae23f3a",
+    "saft_interface": "df8725cb15f2bb2b2a54898989ba1af7ae59c49dd578120a85b18d95ae471750",
+    "extcsp": "b452c5397da6e45de151caa10bbc35529742448148ad989ae43c5e71c737cc70",
+    "leekesler": "6dfcf59b3188e174f48403e435f8253dac1add0a95bdcee169a24d9c5c3f7af8",
+    "multiparameter_idealmix": "43adb5de94054eea91a54a241a4a71eb0b6b2ae1757f13d9c8d462113fb79f9f",
+    "co2_gibbs": "8b2351c798fb1b4f89a7f7e3b0ef1af34859bc65477a354b3ed0628ccdad6829",
+    "h2o_gibbs": "a12fc215f7a41fdd1d019c654b2fc4f2a0f87cac83fa4e505f7e15fe25198d0e",
+    "single_component": "329ed5bec79c4fa4e5b66ccd51c3ba28819eda6b67537477bda453e7a8ab60ba",
+    "eos_container": "cc9c69a832a85a6338a7b21d6c3372ede4cde1b2cebe971a0d2b432fad2ac8fa",
+    "single_phase": "02c00dbf65e25e014ce3d7bce8ba626435b8f928dd1d380bf22718a2d0592790",
+    "eostv": "306093cddf7098985eb729d463c966a7dfb230009c722249842c3e320b3ab7a5",
+    "eos": "befee3261d285fdcfa2c83b0cb9ab8b235ad311147d6d42c53f07fa5d26ece23",
+    "puresaturation": "70efebbb25d9659b5921770ba15d484b66df79d34502d8787c4cb790302f5888",
+    "thermo_utils": "7fa5c3db69531986d9928ce0271b36765c94080862224355cce987c1ba010eae",
+    "critical": "8ff578626a8512de7ec8c5b0b34631632e6f02662d8e0981f5a08b7e46ae3e58",
+    "stability": "e82e20c659b339477a9116648b07f03aa78090792903b68385fcbb95e18901c7",
+    "saturation": "c3841bfe67898ad420044a3191a07d7b6ff1c5e16e8c52a31900133eec1d1ea8",
+    "solideos": "2b0a45599d7faed4f166e03e630d5b8a9620f2de996d8517db0a2feb7d2787de",
+    "vls": "3ecc60a8b527374c1a6903a6f4b6b5785b0e2228c1c52da4258e0eb9367d41f8",
+    "tuning": "ea7ad3173d0e1a19f3175319dfb4536a0c9e496904babe9bdc7c259b752acb89",
+    "tp_solver": "9826e826da68e5a7058ec57b3d17e5442bfd4db628679a3bd00d15e271efbb0f",
+    "state_functions": "2ecbac8dffc1094f2350fbcbb5a0b7efa47b28c193007428751e01fa88dd6fa3",
+    "saturation_curve": "3129cc1e181bb3e67fb11000164265e1783fa3d9d0d7fa48deb898241e198406",
+    "saturation_tv": "fd1ee2d47482fc212815b2ae26fb510d11ddef704077e515940b0809e0b42887",
+    "multi_phase_envelope_tv": "0fb3a57447e34bb610c960f7476037db1031d84c1fa514f9229e6644fc13a607",
+    "solid_saturation": "75bd97d719d7d57ddefc3622b479612e941072499381cd316fa645fb4a552fa6",
+    "saturation_point_locators": "daa38b0ff695031b3d1f3e00ba354f16eed2d21e2434ea9ca22cf202df5d8bd0",
+    "joule_thompson_inversion": "e285640f5558ea4973202c0abacbf005db919c7f89da883e583251f6ad35a93e",
+    "ph_solver": "00d134e44f95c6c5521d59d86f627fb95710c3f0e176cbfe801e6ffcee7f5754",
+    "ps_solver": "34d11b86595713aba761e27163bfb8dfbcab4fe15a18a51e92b7df6be0de2c56",
+    "uv_solver": "efbd86537a6578b8f318daaaa4d0bb37cb9540ffef90392585f10838d9b4bbd6",
+    "sv_solver": "1f51cf123ff8fcbe264e1cc9d1142c70545331a8a4eab12ad49225fa49302b75",
+    "spinodal": "ae12a892a1c1f34845ba81750cdb47d93a801b3ef06df2647787163b4a58f80f",
+    "mut_solver": "6ddbb514d5d6e241b0a03478a17641decb496d10f65557838ff59132af6c3bc1",
+    "isolines": "660e6d90c2e92d4315302d1fa5b5dc62316b283a0af4d59ab32d86c93eb40d2c",
+    "binaryplot": "bc8ff596e437a41e18585a9bd67faa40cfda6a13c09cf36b65219a0f4091f622",
+    "speed_of_sound": "85fb9206528061cbdcce58c20cf824ed7455a7c5ee1f0a539a42cbd76a7f133f",
+    "saftvrmie_testing": "931b50a23a6384d10ceeb32184ae7618bc4a2e4d04fd4efd0cd321e22fc33d85",
+    "hydrate": "dffef9c31c571a3b365e72923c01812eb2edfc39f2aa36c36b6b8f81bb3653ab",
+    "hydrate_curves": "1d5a48516803bb81e64d6dd3a3d79723abf0700356ae0d662b09efcff1725731",
+    "consistency": "1ed20d6dd79e6474d237ff5795cefde81c11e4223911a30a3d6d222377f8daf8",
+    "eoslibinit": "7df67e296f5b79105714fecc897c80ab0cb1bd2844a18b01027877da87351258",
+    "complexmodelinit": "6ffae447c3e2be271d9720f3b5217bebf669fa879cf9291be7f5d0a407a96b41",
+    "external": "e57f6391c43791ae80fde558f66d9c39ed40b3d3b27859579fc11d3ef0c97f9d"
+  },
+  "cases": 203,
+  "attempts": 292,
+  "fixture_sha256": "fd1330e52c5daacfac94ab41a1fe93c1e1fa81b8700b11671e28bc44ac377bbe",
+  "generator": "tools/rust_port/validate_quality_caloric.py",
+  "reference_errors": [
+    {
+      "request": {
+        "eos": "PR",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 0.5,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 229.13234321702552,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            8.414642714358799,
+            0.11884046187623055
+          ]
+        },
+        "target": -102292.07014966183,
+        "initial_function": [
+          -0.06357365136583004,
+          -0.011403941760989245,
+          5.069141550961831e-09,
+          0.0009962747762922166
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.0742695865143699,
+          -0.11077798258324736,
+          0.1464354784735462,
+          -0.0017321449497593058
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.017318336855353614,
+          -0.011434394987168243,
+          0.1464354784683577,
+          -0.0017321449329119748
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "PR",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 0.75,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": -1,
+        "iterations": 6,
+        "guess": {
+          "temperature": 262.1013283405157,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            11.393356282088781,
+            0.3789463245522012
+          ]
+        },
+        "target": 191.34506382041934,
+        "initial_function": [
+          -0.06572661159161841,
+          -0.026014288673257502,
+          0.00958355361596508,
+          0.002672112599089603
+        ],
+        "initial_caloric_jacobian_row": [
+          0.022880299541118074,
+          0.28136461823490844,
+          0.32859213659961806,
+          -0.038536245545961724
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.00021461149957852088,
+          0.03307223727516684,
+          0.3285921365211997,
+          -0.038536245554202445
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "PR",
+        "components": [
+          "CO2",
+          "C1"
+        ],
+        "feed": [
+          0.8,
+          0.2
+        ],
+        "beta": 0.25,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 205.16547128281573,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            0.3336997354721494,
+            17.051708461606545
+          ]
+        },
+        "target": -344969.66695277713,
+        "initial_function": [
+          -0.032068603036182974,
+          -0.06474720120329014,
+          0.0008346498168796401,
+          0.00016341459671365905
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.16930850646796336,
+          -0.011673044008920441,
+          0.039041516425629655,
+          -0.0003095155450915847
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.042514713169462835,
+          -0.016066984725899854,
+          0.03904151642142876,
+          -0.0003095155325479526
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "PR",
+        "components": [
+          "CO2",
+          "C1"
+        ],
+        "feed": [
+          0.8,
+          0.2
+        ],
+        "beta": 0.5,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 221.13616308011643,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            0.6370128065571429,
+            18.770376550711557
+          ]
+        },
+        "target": -340446.13741450926,
+        "initial_function": [
+          -0.039792776411506026,
+          -0.06740548541603486,
+          0.0047553544177687534,
+          -0.00017701651807200766
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.4517238357117427,
+          -0.004406459635859565,
+          0.03831201170885963,
+          -0.0007995332029679641
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.06360230415247822,
+          -0.0036550457812480736,
+          0.03831201173536581,
+          -0.0007995331820925562
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "PR",
+        "components": [
+          "CO2",
+          "C1"
+        ],
+        "feed": [
+          0.8,
+          0.2
+        ],
+        "beta": 0.75,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 225.78465038060676,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            0.7516448885958472,
+            19.142377459636183
+          ]
+        },
+        "target": -336594.75831060647,
+        "initial_function": [
+          -0.041745827446497186,
+          -0.06832130707422124,
+          0.004246772599701604,
+          -1.108394089518561e-06
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.4088168590198591,
+          -0.0015545946733886106,
+          0.032977922652897354,
+          -0.0013296862659675837
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.039910115339873174,
+          -0.0009445946151262277,
+          0.032977922685130806,
+          -0.0013296862672338113
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "SRK",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 0.5,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 229.3236102657562,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            8.540999527081357,
+            0.11708231967523507
+          ]
+        },
+        "target": -102438.5002607395,
+        "initial_function": [
+          -0.06383595945115461,
+          -0.012075489076299295,
+          6.9385412970746074e-09,
+          0.0010220264388912808
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.07326011961610453,
+          -0.10946714678641979,
+          0.15054956126605457,
+          -0.0016419069231611203
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.017302113873519844,
+          -0.011315134478798346,
+          0.15054956131169053,
+          -0.0016419069449858346
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "SRK",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 0.75,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": -1,
+        "iterations": 5,
+        "guess": {
+          "temperature": 262.14414252267335,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            11.487086832488513,
+            0.3786195401113287
+          ]
+        },
+        "target": 191.11810039051318,
+        "initial_function": [
+          -0.06568585492253964,
+          -0.026611619261348363,
+          0.009611811697403327,
+          0.0027070819738977563
+        ],
+        "initial_caloric_jacobian_row": [
+          0.022762578332803898,
+          0.28108285798012667,
+          0.33398920497131046,
+          -0.03866346792274735
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.00012362376790656104,
+          0.03316206784566636,
+          0.3339892048249711,
+          -0.03866346790783962
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "SRK",
+        "components": [
+          "CO2",
+          "C1"
+        ],
+        "feed": [
+          0.8,
+          0.2
+        ],
+        "beta": 0.25,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 204.96657777738307,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            0.32906256113440335,
+            17.764108941857263
+          ]
+        },
+        "target": -345160.19596258394,
+        "initial_function": [
+          -0.032608583061414675,
+          -0.0649482969547055,
+          0.0009616796556056739,
+          0.00015782906180555003
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.16738046863433845,
+          -0.011317828079370804,
+          0.04072869510156108,
+          -0.0002985573777430161
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.04237028960638826,
+          -0.015759659425139613,
+          0.040728695119964325,
+          -0.00029855743968927335
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "SRK",
+        "components": [
+          "CO2",
+          "C1"
+        ],
+        "feed": [
+          0.8,
+          0.2
+        ],
+        "beta": 0.5,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 220.97970554027947,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            0.6361194030660516,
+            19.33557622067922
+          ]
+        },
+        "target": -340537.7721688325,
+        "initial_function": [
+          -0.0403348360116248,
+          -0.06738063633372393,
+          0.004812604139843579,
+          -0.00017662695372592193
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.4515639689941577,
+          -0.004281824249399042,
+          0.03955354419011463,
+          -0.0007856857306620575
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.0637634319830183,
+          -0.0035798859267523425,
+          0.03955354417940375,
+          -0.0007856857509020267
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "SRK",
+        "components": [
+          "CO2",
+          "C1"
+        ],
+        "feed": [
+          0.8,
+          0.2
+        ],
+        "beta": 0.75,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 225.5887222133659,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            0.7512802037199486,
+            19.655175220906543
+          ]
+        },
+        "target": -336636.58367835707,
+        "initial_function": [
+          -0.04225734651137847,
+          -0.06822957199431512,
+          0.004274385887560461,
+          5.82999508229274e-07
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.40892868438627333,
+          -0.0015125367466005488,
+          0.03364273479976106,
+          -0.0013122989813474555
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.03998902875337162,
+          -0.0009263312241529766,
+          0.033642734754587636,
+          -0.0013122989724734986
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "RK",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 0.5,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 225.74953460143303,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            7.629700303076807,
+            0.13106674813249555
+          ]
+        },
+        "target": -102263.03403577185,
+        "initial_function": [
+          -0.06130318594877493,
+          -0.013463874724146674,
+          1.6289279924919242e-09,
+          0.0011091298099519828
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.08015474112536496,
+          -0.11964927389334998,
+          0.16740408708722634,
+          -0.0017187912174245867
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.01834068149995016,
+          -0.012000686306018818,
+          0.16740408698980808,
+          -0.0017187912116798862
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "RK",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 0.75,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": -1,
+        "iterations": 7,
+        "guess": {
+          "temperature": 256.0076988154543,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            10.039236358679581,
+            0.38437769426387247
+          ]
+        },
+        "target": -96491.98301094591,
+        "initial_function": [
+          -0.06303463780640728,
+          -0.02554787188942864,
+          0.00913195340212436,
+          0.0006845200567683981
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.025222702602886844,
+          -0.3008450427946745,
+          0.17498783391457948,
+          -0.004240111898944154
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.004909604941317298,
+          -0.023045503000330373,
+          0.17498783399486248,
+          -0.004240111947965627
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "RK",
+        "components": [
+          "CO2",
+          "C1"
+        ],
+        "feed": [
+          0.8,
+          0.2
+        ],
+        "beta": 0.25,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 197.9359261634839,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            0.3682492284522684,
+            13.018640075946095
+          ]
+        },
+        "target": -344006.56557769136,
+        "initial_function": [
+          -0.03107838122017026,
+          -0.06172838163872951,
+          3.8880777400440714e-05,
+          0.000266005839098107
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.18327936581199322,
+          -0.0141151916734184,
+          0.0428752357417118,
+          -0.0003152317679762657
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.043233263521033606,
+          -0.017931738511970437,
+          0.042875235793505655,
+          -0.00031523178467237397
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "RK",
+        "components": [
+          "CO2",
+          "C1"
+        ],
+        "feed": [
+          0.8,
+          0.2
+        ],
+        "beta": 0.5,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 212.25383438870642,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            0.6447932493328012,
+            14.943636928529248
+          ]
+        },
+        "target": -339905.7222163492,
+        "initial_function": [
+          -0.03718278155228838,
+          -0.06495451889175641,
+          0.0042899659603165,
+          -0.0001271093156443987
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.4530319468687195,
+          -0.005453060750549975,
+          0.03893122488622283,
+          -0.0007725982536374652
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.06215351618430289,
+          -0.0042852834839312934,
+          0.038931224865972114,
+          -0.0007725982632247799
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "RK",
+        "components": [
+          "CO2",
+          "C1"
+        ],
+        "feed": [
+          0.8,
+          0.2
+        ],
+        "beta": 0.75,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 216.8454455540313,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            0.7549855235519736,
+            15.454735101659958
+          ]
+        },
+        "target": -336453.2348713924,
+        "initial_function": [
+          -0.038914870626778564,
+          -0.06615849775393068,
+          0.004006249889963925,
+          9.117062126270885e-06
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.4077243671991925,
+          -0.001928944732003865,
+          0.03248895813822328,
+          -0.0012672476900237914
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.03916579354625905,
+          -0.0011124034466579132,
+          0.03248895816690369,
+          -0.001267247700570128
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 0.0,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 157.97182232803286,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            1.7576865171442821,
+            0.22874912184926466
+          ]
+        },
+        "target": -91521.66542851976,
+        "initial_function": [
+          -0.03644765003793626,
+          -0.004961417810990465,
+          -0.006782180503226598,
+          0.00037356868948437726
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.0,
+          -0.0,
+          39759.95809122995,
+          0.000400840662248103
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.0,
+          0.0,
+          0.07603181093378752,
+          0.00040084064984336615
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 0.0,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 157.97182232803286,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            1.7576865171442821,
+            0.22874912184926466
+          ]
+        },
+        "target": 133.55784444133818,
+        "initial_function": [
+          -0.03644765003793626,
+          -0.004961417810990465,
+          -0.006782180503226598,
+          0.0016586026825592408
+        ],
+        "initial_caloric_jacobian_row": [
+          0.0,
+          0.0,
+          172472.87513293052,
+          -0.0016303192975073953
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.0,
+          0.0,
+          0.32981486060399035,
+          -0.0016303193243116451
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 0.25,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 165.75319858831136,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            2.074707209823321,
+            0.29515597484904926
+          ]
+        },
+        "target": -89967.3752291992,
+        "initial_function": [
+          -0.03877688428769843,
+          -0.009222797321559062,
+          -0.004251797042946648,
+          0.0004991093455469247
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.21990676296902872,
+          -0.08572999193643992,
+          33619.52137299768,
+          -0.0009774450875746515
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.008888964079937275,
+          -0.0016304208084810205,
+          0.07975025391175508,
+          -0.0009774450542574323
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 0.25,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 165.75319858831136,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            2.074707209823321,
+            0.29515597484904926
+          ]
+        },
+        "target": 143.2199832612198,
+        "initial_function": [
+          -0.03877688428769843,
+          -0.009222797321559062,
+          -0.004251797042946648,
+          0.0017720868090580135
+        ],
+        "initial_caloric_jacobian_row": [
+          0.2271315900912053,
+          0.09852040171437015,
+          127412.20744815719,
+          -0.01873314865083358
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.007731097902488604,
+          0.007865983953764515,
+          0.30223975479922327,
+          -0.018733148663861113
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 0.5,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 175.8154164832659,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            2.5059067962841897,
+            0.3990571403331198
+          ]
+        },
+        "target": -88167.59038754916,
+        "initial_function": [
+          -0.04139244888436877,
+          -0.013947061712884068,
+          2.7114754885815273e-11,
+          0.0005160921283096558
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.18836447954903598,
+          -0.2176356250300839,
+          25606.444103712805,
+          -0.0025307029545153154
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.008078714955632362,
+          -0.004494242487358821,
+          0.08524558212243778,
+          -0.00253070292250291
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 0.5,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 175.8154164832659,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            2.5059067962841897,
+            0.3990571403331198
+          ]
+        },
+        "target": 153.8118412264451,
+        "initial_function": [
+          -0.04139244888436877,
+          -0.013947061712884068,
+          2.7114754885815273e-11,
+          0.0019376509295528435
+        ],
+        "initial_caloric_jacobian_row": [
+          0.18393296708917514,
+          0.22956213139433146,
+          83485.58992898386,
+          -0.03337214078824633
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.004031968734580227,
+          0.015567316879148974,
+          0.27792916811443613,
+          -0.03337214078799784
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 0.75,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 184.79981213826173,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            2.9030530162630317,
+            0.5090620015922347
+          ]
+        },
+        "target": -86236.67353008848,
+        "initial_function": [
+          -0.04350734219963903,
+          -0.01758297758022076,
+          0.0034864978921724243,
+          0.0005021060026028954
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.08687765909219965,
+          -0.2598237555711368,
+          14335.281565014971,
+          -0.0043934653349245985
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.0036606213937092225,
+          -0.005072197360202462,
+          0.09033502782897326,
+          -0.004393465356875969
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 0.75,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 184.79981213826173,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            2.9030530162630317,
+            0.5090620015922347
+          ]
+        },
+        "target": 164.56314170132643,
+        "initial_function": [
+          -0.04350734219963903,
+          -0.01758297758022076,
+          0.0034864978921724243,
+          0.0019198398864043438
+        ],
+        "initial_caloric_jacobian_row": [
+          0.08017850703493996,
+          0.25236467768234155,
+          40650.3349073252,
+          -0.046258305852543674
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.0005981806746983842,
+          0.013623778113893564,
+          0.2561616330306552,
+          -0.0462583058942717
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 1.0,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 191.17364682786408,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            3.187072677712985,
+            0.5967240230895711
+          ]
+        },
+        "target": -84307.09443719713,
+        "initial_function": [
+          -0.0449416167685619,
+          -0.019920047726848633,
+          0.005207942466791848,
+          0.0005331978188099364
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.0,
+          -0.0,
+          166.68291312552816,
+          -0.006543443137032998
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.0,
+          0.0,
+          0.09370464825145144,
+          -0.006543443141656096
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 1.0,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 191.17364682786408,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            3.187072677712985,
+            0.5967240230895711
+          ]
+        },
+        "target": 174.86924320436233,
+        "initial_function": [
+          -0.0449416167685619,
+          -0.019920047726848633,
+          0.005207942466791848,
+          0.001763503069502313
+        ],
+        "initial_caloric_jacobian_row": [
+          0.0,
+          0.0,
+          420.35261037093187,
+          -0.0579200001340287
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.0,
+          0.0,
+          0.23631092542459678,
+          -0.057920000164730576
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 0.0,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 161.8032008945937,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            1.907314665630753,
+            0.07112046311003453
+          ]
+        },
+        "target": -103768.62544839426,
+        "initial_function": [
+          -0.0380446363621314,
+          0.014773492986419612,
+          -0.01078243562960629,
+          0.00037675902810232776
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.0,
+          -0.0,
+          36571.05603490178,
+          0.000508390393865662
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.0,
+          0.0,
+          0.07683825957179957,
+          0.0005083904154726043
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 0.0,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 161.8032008945937,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            1.907314665630753,
+            0.07112046311003453
+          ]
+        },
+        "target": 150.0618326597515,
+        "initial_function": [
+          -0.0380446363621314,
+          0.014773492986419612,
+          -0.01078243562960629,
+          0.0016492956725973173
+        ],
+        "initial_caloric_jacobian_row": [
+          0.0,
+          0.0,
+          156295.40507008502,
+          -0.0012974088647695653
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.0,
+          0.0,
+          0.3283872059325877,
+          -0.0012974088635570903
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 0.25,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 176.51124077615117,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            2.5307930366917626,
+            0.12270859704483078
+          ]
+        },
+        "target": -101868.9574029337,
+        "initial_function": [
+          -0.04217672068493239,
+          0.005199200942169302,
+          -0.008325676316761399,
+          0.0007999236325760069
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.1985737483889685,
+          -0.04367390949798754,
+          32940.12777440432,
+          -0.0005351222778648473
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.026725929669650303,
+          -0.0032688819414717404,
+          0.08481696102977197,
+          -0.0005351222683556717
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 0.25,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 176.51124077615117,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            2.5307930366917626,
+            0.12270859704483078
+          ]
+        },
+        "target": 161.3900559018432,
+        "initial_function": [
+          -0.04217672068493239,
+          0.005199200942169302,
+          -0.008325676316761399,
+          0.0014840792092685828
+        ],
+        "initial_caloric_jacobian_row": [
+          0.20997259905652263,
+          0.04938108706303902,
+          117792.59810336526,
+          -0.01593000172089998
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.024946164185572772,
+          0.006869415912567466,
+          0.303302108574377,
+          -0.015930001645157905
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 0.5,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 202.3670472192301,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            3.712121730729577,
+            0.2693877172852458
+          ]
+        },
+        "target": -99135.22540289926,
+        "initial_function": [
+          -0.047409836984857234,
+          -0.007367745059669639,
+          -2.252952269188313e-10,
+          0.0006298478145414298
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.1357333675438343,
+          -0.19613397267548432,
+          28248.283018731512,
+          -0.0018475599309876831
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.019367898031836996,
+          -0.015396440295161861,
+          0.10182124880880342,
+          -0.0018475599327077551
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 0.5,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 202.3670472192301,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            3.712121730729577,
+            0.2693877172852458
+          ]
+        },
+        "target": 175.90393359065337,
+        "initial_function": [
+          -0.047409836984857234,
+          -0.007367745059669639,
+          -2.252952269188313e-10,
+          0.0019856521698811734
+        ],
+        "initial_caloric_jacobian_row": [
+          0.13746729872575308,
+          0.20383516674846644,
+          78669.1953240662,
+          -0.027967294842638206
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.013648446170119732,
+          0.02455042647279103,
+          0.28356398523189924,
+          -0.027967294859219775
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 0.75,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 222.566815747936,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            4.63120327401046,
+            0.44062857003395595
+          ]
+        },
+        "target": -96253.47153893259,
+        "initial_function": [
+          -0.05044378300475305,
+          -0.014464427628121168,
+          0.005793841486537499,
+          0.0004975865847215733
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.05182601293874987,
+          -0.29309438083840794,
+          16767.743602666582,
+          -0.003877941480002693
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.00662262996585462,
+          -0.01955677175982814,
+          0.11757759345071457,
+          -0.003877941494697312
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 0.75,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 222.566815747936,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            4.63120327401046,
+            0.44062857003395595
+          ]
+        },
+        "target": 189.4950015056017,
+        "initial_function": [
+          -0.05044378300475305,
+          -0.014464427628121168,
+          0.005793841486537499,
+          0.002068692637731236
+        ],
+        "initial_caloric_jacobian_row": [
+          0.05003850777813093,
+          0.28162967366104313,
+          38267.743599612215,
+          -0.03895754734844439
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.0031850262454573633,
+          0.0259621972008902,
+          0.26833838253107967,
+          -0.03895754737727464
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 1.0,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 233.9013229585109,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            5.113584971711339,
+            0.5588247361185187
+          ]
+        },
+        "target": -93651.75056833567,
+        "initial_function": [
+          -0.051974084899481854,
+          -0.017792268146417323,
+          0.00748632950642486,
+          0.0006977670508687612
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.0,
+          -0.0,
+          203.2273566348462,
+          -0.0064128449897801355
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.0,
+          0.0,
+          0.12715215865565063,
+          -0.0064128449934748415
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 1.0,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 233.9013229585109,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            5.113584971711339,
+            0.5588247361185187
+          ]
+        },
+        "target": 200.93210424850867,
+        "initial_function": [
+          -0.051974084899481854,
+          -0.017792268146417323,
+          0.00748632950642486,
+          0.001761188302326084
+        ],
+        "initial_caloric_jacobian_row": [
+          0.0,
+          0.0,
+          404.96366428606643,
+          -0.049384443920522894
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.0,
+          0.0,
+          0.25337142075236185,
+          -0.04938444392419035
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "CO2",
+          "C1"
+        ],
+        "feed": [
+          0.8,
+          0.2
+        ],
+        "beta": 0.0,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 173.1945563974398,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            0.5226061769134032,
+            2.874465133034272
+          ]
+        },
+        "target": -341456.2472384238,
+        "initial_function": [
+          -0.02111676115557204,
+          -0.04421712470919592,
+          -0.007022031862423117,
+          9.788376607889554e-05
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.0,
+          -0.0,
+          18575.431505469474,
+          8.911162144173802e-05
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.0,
+          0.0,
+          0.019892190467072024,
+          8.911162204596227e-05
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "CO2",
+          "C1"
+        ],
+        "feed": [
+          0.8,
+          0.2
+        ],
+        "beta": 0.0,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 173.1945563974398,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            0.5226061769134032,
+            2.874465133034272
+          ]
+        },
+        "target": 135.72905519548925,
+        "initial_function": [
+          -0.02111676115557204,
+          -0.04421712470919592,
+          -0.007022031862423117,
+          0.001449369338029388
+        ],
+        "initial_caloric_jacobian_row": [
+          0.0,
+          0.0,
+          269815.50962757366,
+          -0.0010806480290425592
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.0,
+          0.0,
+          0.2889419554870615,
+          -0.0010806480086320881
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "CO2",
+          "C1"
+        ],
+        "feed": [
+          0.8,
+          0.2
+        ],
+        "beta": 0.25,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 181.41115203058675,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            0.6556521389227525,
+            3.40243687210119
+          ]
+        },
+        "target": -339633.3136112005,
+        "initial_function": [
+          -0.024744703554941294,
+          -0.045784109669038564,
+          -0.0012369375220698253,
+          0.00018398942692554078
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.27862242560709316,
+          -0.02378390130810017,
+          15680.130016458153,
+          -0.0002745249973368788
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.0331297475236766,
+          -0.014486274035256479,
+          0.02068984137787195,
+          -0.00027452498877389344
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "CO2",
+          "C1"
+        ],
+        "feed": [
+          0.8,
+          0.2
+        ],
+        "beta": 0.25,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 181.41115203058675,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            0.6556521389227525,
+            3.40243687210119
+          ]
+        },
+        "target": 146.04706242948134,
+        "initial_function": [
+          -0.024744703554941294,
+          -0.045784109669038564,
+          -0.0012369375220698253,
+          0.0016529880963622675
+        ],
+        "initial_caloric_jacobian_row": [
+          0.2575465767158437,
+          0.09919705364854242,
+          201003.27539977722,
+          -0.017676616043431286
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.007864985262292113,
+          -0.0034400356707089616,
+          0.26522266593874544,
+          -0.017676615962798885
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "CO2",
+          "C1"
+        ],
+        "feed": [
+          0.8,
+          0.2
+        ],
+        "beta": 0.5,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 186.51297108019062,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            0.7485615719060427,
+            3.7378606248152826
+          ]
+        },
+        "target": -337741.1086608465,
+        "initial_function": [
+          -0.026741497954567484,
+          -0.047060938347000425,
+          0.0010717423469641663,
+          6.22910066776888e-05
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.4658425239497938,
+          -0.01594992757149663,
+          11203.955362932147,
+          -0.0006578409110532739
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.042491350009399714,
+          -0.007621815772803828,
+          0.02094389678828875,
+          -0.000657840921872762
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "CO2",
+          "C1"
+        ],
+        "feed": [
+          0.8,
+          0.2
+        ],
+        "beta": 0.5,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 186.51297108019062,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            0.7485615719060427,
+            3.7378606248152826
+          ]
+        },
+        "target": 156.3714756053476,
+        "initial_function": [
+          -0.026741497954567484,
+          -0.047060938347000425,
+          0.0010717423469641663,
+          0.0016543055642484546
+        ],
+        "initial_caloric_jacobian_row": [
+          0.4004343259405778,
+          0.06364160637431283,
+          129744.42923208287,
+          -0.03205989535710548
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.007915001187070673,
+          -0.002819348625599568,
+          0.24253523379349964,
+          -0.032059895398877956
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "CO2",
+          "C1"
+        ],
+        "feed": [
+          0.8,
+          0.2
+        ],
+        "beta": 0.75,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 189.47437766786194,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            0.8060363949634002,
+            3.934414393974303
+          ]
+        },
+        "target": -335846.55057479534,
+        "initial_function": [
+          -0.02784365688406565,
+          -0.047921845611152314,
+          0.0017676344980470937,
+          6.123262051861136e-05
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.3959138921762444,
+          -0.006924799109349479,
+          5848.948188069739,
+          -0.0010548952069397385
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.028654477251230156,
+          -0.0026758189664096866,
+          0.020811758954038154,
+          -0.0010548951793704975
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "CO2",
+          "C1"
+        ],
+        "feed": [
+          0.8,
+          0.2
+        ],
+        "beta": 0.75,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 189.47437766786194,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            0.8060363949634002,
+            3.934414393974303
+          ]
+        },
+        "target": 166.4931178798813,
+        "initial_function": [
+          -0.02784365688406565,
+          -0.047921845611152314,
+          0.0017676344980470937,
+          0.0016110985688475752
+        ],
+        "initial_caloric_jacobian_row": [
+          0.31811741252580183,
+          0.02635035131745864,
+          62268.99992052698,
+          -0.04473321071629647
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.004363960753634051,
+          -0.0013001696321131295,
+          0.22156589118467074,
+          -0.04473321069879514
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "CO2",
+          "C1"
+        ],
+        "feed": [
+          0.8,
+          0.2
+        ],
+        "beta": 1.0,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 191.3213860629818,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            0.8431800072171644,
+            4.05751543291044
+          ]
+        },
+        "target": -333958.135195745,
+        "initial_function": [
+          -0.028515327314207806,
+          -0.048504814793576045,
+          0.0019196520888210555,
+          0.00011678880185742213
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.0,
+          -0.0,
+          36.71237720718736,
+          -0.0014611972175400238
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.0,
+          0.0,
+          0.020471025544075823,
+          -0.0014611972271425411
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "CO2",
+          "C1"
+        ],
+        "feed": [
+          0.8,
+          0.2
+        ],
+        "beta": 1.0,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 191.3213860629818,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            0.8431800072171644,
+            4.05751543291044
+          ]
+        },
+        "target": 176.45762003742414,
+        "initial_function": [
+          -0.028515327314207806,
+          -0.048504814793576045,
+          0.0019196520888210555,
+          0.0015751962360913844
+        ],
+        "initial_caloric_jacobian_row": [
+          0.0,
+          0.0,
+          363.16216651640605,
+          -0.0560165456281892
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.0,
+          0.0,
+          0.2025012423730022,
+          -0.056016545619760626
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.2,
+          0.3,
+          0.5
+        ],
+        "beta": 0.0,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 195.53568220210462,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            3.3916362043112915,
+            0.6565937221932576,
+            0.22526687204066106
+          ]
+        },
+        "target": -106253.80652802184,
+        "initial_function": [
+          -0.046505826010571294,
+          -0.021972853919298707,
+          -0.00470396727747846,
+          -0.012061206459433815,
+          0.0004943085801058464
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.0,
+          -0.0,
+          -0.0,
+          50137.89141493851,
+          0.0004929465005029298
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.0,
+          0.0,
+          0.0,
+          0.10053027072387186,
+          0.0004929465123582315
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.2,
+          0.3,
+          0.5
+        ],
+        "beta": 0.0,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 195.53568220210462,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            3.3916362043112915,
+            0.6565937221932576,
+            0.22526687204066106
+          ]
+        },
+        "target": 172.86437268939451,
+        "initial_function": [
+          -0.046505826010571294,
+          -0.021972853919298707,
+          -0.00470396727747846,
+          -0.012061206459433815,
+          0.001586286233759349
+        ],
+        "initial_caloric_jacobian_row": [
+          0.0,
+          0.0,
+          0.0,
+          157608.28654174536,
+          -0.0012733825058538239
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.0,
+          0.0,
+          0.0,
+          0.31601655536909723,
+          -0.0012733825351584835
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.2,
+          0.3,
+          0.5
+        ],
+        "beta": 0.25,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 215.93643374767217,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            4.314133636923901,
+            1.0004854812927524,
+            0.3825041866423177
+          ]
+        },
+        "target": -103607.21897294362,
+        "initial_function": [
+          -0.04964842805504399,
+          -0.028036924286217235,
+          -0.012343790209503158,
+          -0.002475102752791558,
+          0.0007087858234766366
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.07460824524687161,
+          -0.10010720778724388,
+          -0.11181322357368874,
+          44609.62582155149,
+          -0.0009980336671919744
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.007384403755925648,
+          -0.006911106582201468,
+          -0.005391947857197018,
+          0.11741840267025673,
+          -0.000998033679707128
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.2,
+          0.3,
+          0.5
+        ],
+        "beta": 0.25,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 215.93643374767217,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            4.314133636923901,
+            1.0004854812927524,
+            0.3825041866423177
+          ]
+        },
+        "target": 185.76595303594576,
+        "initial_function": [
+          -0.04964842805504399,
+          -0.028036924286217235,
+          -0.012343790209503158,
+          -0.002475102752791558,
+          0.0017415827363915172
+        ],
+        "initial_caloric_jacobian_row": [
+          0.07935699673412959,
+          0.1130625363696125,
+          0.11841788681335069,
+          115219.65020318834,
+          -0.014387591548404854
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.0029022485420774832,
+          0.007716485045394534,
+          0.008919977655542487,
+          0.3032732736585309,
+          -0.014387591543282494
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.2,
+          0.3,
+          0.5
+        ],
+        "beta": 0.5,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 228.65247084459443,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            4.859136548749219,
+            1.2460883610356215,
+            0.506074050779593
+          ]
+        },
+        "target": -101083.50375266813,
+        "initial_function": [
+          -0.05140080527521862,
+          -0.031193639891160946,
+          -0.016304226805836097,
+          0.001243006648279421,
+          0.0006904088702075028
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.04442660279138417,
+          -0.13417429889455465,
+          -0.25315937865876964,
+          32965.514251094406,
+          -0.0030001093491832807
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.003976022355946891,
+          -0.008093287690334261,
+          -0.010322316075516997,
+          0.1289735265952853,
+          -0.003000109343815
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.2,
+          0.3,
+          0.5
+        ],
+        "beta": 0.5,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 228.65247084459443,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            4.859136548749219,
+            1.2460883610356215,
+            0.506074050779593
+          ]
+        },
+        "target": 197.15450981130928,
+        "initial_function": [
+          -0.05140080527521862,
+          -0.031193639891160946,
+          -0.016304226805836097,
+          0.001243006648279421,
+          0.0018520327535991236
+        ],
+        "initial_caloric_jacobian_row": [
+          0.04542970553871037,
+          0.1425649286853703,
+          0.2499960425152614,
+          73919.24585161183,
+          -0.02633423846400403
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.0005995344972971155,
+          0.006655580776771235,
+          0.014031641028993194,
+          0.28919997275672066,
+          -0.026334238477962024
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.2,
+          0.3,
+          0.5
+        ],
+        "beta": 0.75,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 236.61079676233044,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            5.181245969182318,
+            1.4088022223857994,
+            0.5927044427253938
+          ]
+        },
+        "target": -98694.07398319352,
+        "initial_function": [
+          -0.0524276476573462,
+          -0.0330051207551989,
+          -0.01857896949318316,
+          0.002836053815082451,
+          0.0007126707710471107
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.018173333191814488,
+          -0.08568475998856008,
+          -0.2665223744779359,
+          17746.175786237094,
+          -0.005366575189380748
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.00149391430503314,
+          -0.004602760082117073,
+          -0.009398363823000461,
+          0.13639698003621886,
+          -0.0053665751551836005
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.2,
+          0.3,
+          0.5
+        ],
+        "beta": 0.75,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 236.61079676233044,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            5.181245969182318,
+            1.4088022223857994,
+            0.5927044427253938
+          ]
+        },
+        "target": 207.4672398989778,
+        "initial_function": [
+          -0.0524276476573462,
+          -0.0330051207551989,
+          -0.01857896949318316,
+          0.002836053815082451,
+          0.0018411000696036649
+        ],
+        "initial_caloric_jacobian_row": [
+          0.017769887614187727,
+          0.08601682505948481,
+          0.24637199395462753,
+          35678.925640530186,
+          -0.03737026858200582
+        ],
+        "initial_caloric_finite_difference_row": [
+          -1.5544403654879635e-05,
+          0.002869199394836975,
+          0.010922770890076181,
+          0.27422796710654085,
+          -0.037370268598374556
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.2,
+          0.3,
+          0.5
+        ],
+        "beta": 1.0,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 242.06527872192757,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            5.391895044697101,
+            1.523325442098924,
+            0.6558941687084924
+          ]
+        },
+        "target": -96381.05652016916,
+        "initial_function": [
+          -0.05310434090817928,
+          -0.03418543852022016,
+          -0.020061216164665607,
+          0.003651621655929971,
+          0.0007852068531293584
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.0,
+          -0.0,
+          -0.0,
+          257.65532930428276,
+          -0.008016176633575709
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.0,
+          0.0,
+          0.0,
+          0.14142659389735712,
+          -0.008016176610578605
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.2,
+          0.3,
+          0.5
+        ],
+        "beta": 1.0,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 242.06527872192757,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            5.391895044697101,
+            1.523325442098924,
+            0.6558941687084924
+          ]
+        },
+        "target": 217.17434641092666,
+        "initial_function": [
+          -0.05310434090817928,
+          -0.03418543852022016,
+          -0.020061216164665607,
+          0.003651621655929971,
+          0.0017733301987157644
+        ],
+        "initial_caloric_jacobian_row": [
+          0.0,
+          0.0,
+          0.0,
+          472.37813758494616,
+          -0.04761620482951381
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.0,
+          0.0,
+          0.0,
+          0.25928759647849114,
+          -0.047616204822446224
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5,
+          0.0
+        ],
+        "beta": 0.0,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 157.97182232803286,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            1.7576865171442821,
+            0.22874912184926466,
+            1.0
+          ]
+        },
+        "target": -91521.66542851976,
+        "initial_function": [
+          -0.03644765003793626,
+          -0.004961417810990465,
+          0.0,
+          -0.006782180503226598,
+          0.00037356868948437726
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.0,
+          -0.0,
+          0.0,
+          39759.95809122995,
+          0.000400840662248103
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.0,
+          0.0,
+          0.0,
+          0.07603181093378752,
+          0.00040084064984336615
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5,
+          0.0
+        ],
+        "beta": 0.0,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 157.97182232803286,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            1.7576865171442821,
+            0.22874912184926466,
+            1.0
+          ]
+        },
+        "target": 133.55784444133818,
+        "initial_function": [
+          -0.03644765003793626,
+          -0.004961417810990465,
+          0.0,
+          -0.006782180503226598,
+          0.0016586026825592408
+        ],
+        "initial_caloric_jacobian_row": [
+          0.0,
+          0.0,
+          0.0,
+          172472.87513293052,
+          -0.0016303192975073953
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.0,
+          0.0,
+          0.0,
+          0.32981486060399035,
+          -0.0016303193243116451
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5,
+          0.0
+        ],
+        "beta": 0.25,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 165.75319858831136,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            2.074707209823321,
+            0.29515597484904926,
+            1.0
+          ]
+        },
+        "target": -89967.3752291992,
+        "initial_function": [
+          -0.03877688428769843,
+          -0.009222797321559062,
+          0.0,
+          -0.004251797042946648,
+          0.0004991093455469247
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.21990676296902872,
+          -0.08572999193643992,
+          0.0,
+          33619.52137299768,
+          -0.0009774450875746515
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.008888964079937275,
+          -0.0016304208084810205,
+          0.0,
+          0.07975025391175508,
+          -0.0009774450542574323
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5,
+          0.0
+        ],
+        "beta": 0.25,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 165.75319858831136,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            2.074707209823321,
+            0.29515597484904926,
+            1.0
+          ]
+        },
+        "target": 143.2199832612198,
+        "initial_function": [
+          -0.03877688428769843,
+          -0.009222797321559062,
+          0.0,
+          -0.004251797042946648,
+          0.0017720868090580135
+        ],
+        "initial_caloric_jacobian_row": [
+          0.2271315900912053,
+          0.09852040171437015,
+          0.0,
+          127412.20744815719,
+          -0.01873314865083358
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.007731097902488604,
+          0.007865983953764515,
+          0.0,
+          0.30223975479922327,
+          -0.018733148663861113
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5,
+          0.0
+        ],
+        "beta": 0.5,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 175.8154164832659,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            2.5059067962841897,
+            0.3990571403331198,
+            1.0
+          ]
+        },
+        "target": -88167.59038754916,
+        "initial_function": [
+          -0.04139244888436877,
+          -0.013947061712884068,
+          0.0,
+          2.7114754885815273e-11,
+          0.0005160921283096558
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.18836447954903598,
+          -0.2176356250300839,
+          0.0,
+          25606.444103712805,
+          -0.0025307029545153154
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.008078714955632362,
+          -0.004494242487358821,
+          0.0,
+          0.08524558212243778,
+          -0.00253070292250291
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5,
+          0.0
+        ],
+        "beta": 0.5,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 175.8154164832659,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            2.5059067962841897,
+            0.3990571403331198,
+            1.0
+          ]
+        },
+        "target": 153.8118412264451,
+        "initial_function": [
+          -0.04139244888436877,
+          -0.013947061712884068,
+          0.0,
+          2.7114754885815273e-11,
+          0.0019376509295528435
+        ],
+        "initial_caloric_jacobian_row": [
+          0.18393296708917514,
+          0.22956213139433146,
+          0.0,
+          83485.58992898386,
+          -0.03337214078824633
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.004031968734580227,
+          0.015567316879148974,
+          0.0,
+          0.27792916811443613,
+          -0.03337214078799784
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5,
+          0.0
+        ],
+        "beta": 0.75,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 184.79981213826173,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            2.9030530162630317,
+            0.5090620015922347,
+            1.0
+          ]
+        },
+        "target": -86236.67353008848,
+        "initial_function": [
+          -0.04350734219963903,
+          -0.01758297758022076,
+          0.0,
+          0.0034864978921724243,
+          0.0005021060026028954
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.08687765909219965,
+          -0.2598237555711368,
+          0.0,
+          14335.281565014971,
+          -0.0043934653349245985
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.0036606213937092225,
+          -0.005072197360202462,
+          0.0,
+          0.09033502782897326,
+          -0.004393465356875969
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5,
+          0.0
+        ],
+        "beta": 0.75,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 184.79981213826173,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            2.9030530162630317,
+            0.5090620015922347,
+            1.0
+          ]
+        },
+        "target": 164.56314170132643,
+        "initial_function": [
+          -0.04350734219963903,
+          -0.01758297758022076,
+          0.0,
+          0.0034864978921724243,
+          0.0019198398864043438
+        ],
+        "initial_caloric_jacobian_row": [
+          0.08017850703493996,
+          0.25236467768234155,
+          0.0,
+          40650.3349073252,
+          -0.046258305852543674
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.0005981806746983842,
+          0.013623778113893564,
+          0.0,
+          0.2561616330306552,
+          -0.0462583058942717
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5,
+          0.0
+        ],
+        "beta": 1.0,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 191.17364682786408,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            3.187072677712985,
+            0.5967240230895711,
+            1.0
+          ]
+        },
+        "target": -84307.09443719713,
+        "initial_function": [
+          -0.0449416167685619,
+          -0.019920047726848633,
+          0.0,
+          0.005207942466791848,
+          0.0005331978188099364
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.0,
+          -0.0,
+          0.0,
+          166.68291312552816,
+          -0.006543443137032998
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.0,
+          0.0,
+          0.0,
+          0.09370464825145144,
+          -0.006543443141656096
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "VDW",
+        "components": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5,
+          0.0
+        ],
+        "beta": 1.0,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 191.17364682786408,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            3.187072677712985,
+            0.5967240230895711,
+            1.0
+          ]
+        },
+        "target": 174.86924320436233,
+        "initial_function": [
+          -0.0449416167685619,
+          -0.019920047726848633,
+          0.0,
+          0.005207942466791848,
+          0.001763503069502313
+        ],
+        "initial_caloric_jacobian_row": [
+          0.0,
+          0.0,
+          0.0,
+          420.35261037093187,
+          -0.0579200001340287
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.0,
+          0.0,
+          0.0,
+          0.23631092542459678,
+          -0.057920000164730576
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "PR",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 0.5,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "configuration": "translated",
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 229.13234321702572,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            8.414642714358806,
+            0.11884046187623046
+          ]
+        },
+        "target": -102286.46314927729,
+        "initial_function": [
+          -0.06357365136583093,
+          -0.011403941760992353,
+          5.069141550961831e-09,
+          0.0009957812223142508
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.07426898384647233,
+          -0.11077842494302227,
+          0.14644350557467792,
+          -0.001677971425006323
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.01731890960949157,
+          -0.01143464527458924,
+          0.1464435055694769,
+          -0.001677971448094985
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "PR",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 0.75,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "configuration": "translated",
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": -1,
+        "iterations": 6,
+        "guess": {
+          "temperature": 262.1013283405159,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            11.393356282088762,
+            0.3789463245522011
+          ]
+        },
+        "target": 191.34506382041934,
+        "initial_function": [
+          -0.06572661159161663,
+          -0.0260142886732615,
+          0.009583553615964968,
+          0.0026721125990897513
+        ],
+        "initial_caloric_jacobian_row": [
+          0.022880299541118126,
+          0.2813646182349085,
+          0.32859213659961845,
+          -0.038536245545961696
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.00021461142531067207,
+          0.03307223727516684,
+          0.32859213644693186,
+          -0.038536245554202445
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "PR",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 0.5,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "configuration": "unifac",
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 232.3592945295088,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            7.315607742502313,
+            0.13669404371370927
+          ]
+        },
+        "target": -101987.02721006062,
+        "initial_function": [
+          -0.06067731448355951,
+          -0.013103104849170766,
+          9.618739138517185e-10,
+          0.0010274928923463217
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.0827782302934384,
+          -0.1235603768214595,
+          0.14987683093790716,
+          -0.0017876421179337792
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.018799975429499224,
+          -0.012173592154945609,
+          0.14987683100397806,
+          -0.0017876421033020083
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "PR",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 0.75,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "configuration": "unifac",
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": -1,
+        "iterations": 11,
+        "guess": {
+          "temperature": 262.6528899184882,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            9.473093547519783,
+            0.38712962316260263
+          ]
+        },
+        "target": 191.64093516941494,
+        "initial_function": [
+          -0.06236587208893507,
+          -0.026183694508041144,
+          0.00891523969739727,
+          0.0026482379047911503
+        ],
+        "initial_caloric_jacobian_row": [
+          0.027214733693218213,
+          0.28077012423473807,
+          0.32843934533814495,
+          -0.038501983164591226
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.00018413634039846777,
+          0.03252602647949802,
+          0.32843934487782145,
+          -0.03850198318272515
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "PR",
+        "components": [
+          "C1",
+          "H2O"
+        ],
+        "feed": [
+          0.8,
+          0.2
+        ],
+        "beta": 0.75,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "configuration": "hv1",
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "initialization_status": -1,
+        "initialization_iterations": 4
+      }
+    },
+    {
+      "request": {
+        "eos": "PR",
+        "components": [
+          "C1",
+          "H2O"
+        ],
+        "feed": [
+          0.8,
+          0.2
+        ],
+        "beta": 0.75,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "configuration": "hv1",
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "initialization_status": -1,
+        "initialization_iterations": 4
+      }
+    },
+    {
+      "request": {
+        "eos": "PR",
+        "components": [
+          "C1",
+          "H2O"
+        ],
+        "feed": [
+          0.8,
+          0.2
+        ],
+        "beta": 0.75,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "configuration": "hv2",
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "initialization_status": -1,
+        "initialization_iterations": 4
+      }
+    },
+    {
+      "request": {
+        "eos": "PR",
+        "components": [
+          "C1",
+          "H2O"
+        ],
+        "feed": [
+          0.8,
+          0.2
+        ],
+        "beta": 0.75,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "configuration": "hv2",
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "initialization_status": -1,
+        "initialization_iterations": 4
+      }
+    },
+    {
+      "request": {
+        "eos": "PR",
+        "components": [
+          "C1",
+          "H2O"
+        ],
+        "feed": [
+          0.8,
+          0.2
+        ],
+        "beta": 0.75,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "configuration": "nrtl",
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "initialization_status": -1,
+        "initialization_iterations": 3
+      }
+    },
+    {
+      "request": {
+        "eos": "PR",
+        "components": [
+          "C1",
+          "H2O"
+        ],
+        "feed": [
+          0.8,
+          0.2
+        ],
+        "beta": 0.75,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "configuration": "nrtl",
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "initialization_status": -1,
+        "initialization_iterations": 3
+      }
+    },
+    {
+      "request": {
+        "eos": "SRK",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 0.5,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "configuration": "translated",
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 229.3236102657564,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            8.54099952708137,
+            0.1170823196752348
+          ]
+        },
+        "target": -102441.49534834147,
+        "initial_function": [
+          -0.06383595945115417,
+          -0.012075489076308177,
+          6.938541186052305e-09,
+          0.0010222889283955916
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.07325864121049355,
+          -0.10946871428477324,
+          0.1505451596402985,
+          -0.0016708036027813687
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.017303230019811988,
+          -0.011316425702274143,
+          0.15054515965041765,
+          -0.001670803639647507
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "SRK",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 0.75,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "configuration": "translated",
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": -1,
+        "iterations": 10,
+        "guess": {
+          "temperature": 262.14414252267335,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            11.487086832488519,
+            0.37861954011132865
+          ]
+        },
+        "target": -96442.95085508502,
+        "initial_function": [
+          -0.06568585492253831,
+          -0.026611619261345698,
+          0.009611811697403105,
+          0.0006542506196143657
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.022182263308359436,
+          -0.3015480280117501,
+          0.1735017734137242,
+          -0.004268360474013599
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.004498410823851849,
+          -0.02344789697632634,
+          0.17350177322880192,
+          -0.004268360480222475
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "SRK",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 0.75,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "configuration": "translated",
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": -1,
+        "iterations": 5,
+        "guess": {
+          "temperature": 262.14414252267335,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            11.487086832488519,
+            0.37861954011132865
+          ]
+        },
+        "target": 191.1181003905132,
+        "initial_function": [
+          -0.06568585492253831,
+          -0.026611619261345698,
+          0.009611811697403105,
+          0.002707081973897607
+        ],
+        "initial_caloric_jacobian_row": [
+          0.022762578332803884,
+          0.28108285798012667,
+          0.33398920497131035,
+          -0.03866346792274737
+        ],
+        "initial_caloric_finite_difference_row": [
+          0.00012362380509469556,
+          0.03316206784566636,
+          0.3339892048249711,
+          -0.03866346790783962
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "SRK",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 0.5,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "configuration": "unifac",
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 232.35415860816732,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            7.469551355826327,
+            0.1338768501220613
+          ]
+        },
+        "target": -102139.83789996404,
+        "initial_function": [
+          -0.06088179105148628,
+          -0.013688912080305204,
+          1.5292458410698373e-09,
+          0.0010532014694164225
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.08129452763878096,
+          -0.12159841083492104,
+          0.1537753570952447,
+          -0.0016927920314489366
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.018762129331227877,
+          -0.012024393719872045,
+          0.15377535712130486,
+          -0.0016927920513357293
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "SRK",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 0.75,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "configuration": "unifac",
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 262.6628677030273,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            9.605818576210346,
+            0.3864540776759422
+          ]
+        },
+        "target": -96374.30174987523,
+        "initial_function": [
+          -0.06231027305984238,
+          -0.026772597446696356,
+          0.008967730793686401,
+          0.0007006450195594555
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.026227659435964706,
+          -0.30121591094028816,
+          0.17410026400883208,
+          -0.004309896308708913
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.005232925050474135,
+          -0.022646316138541858,
+          0.1741002639664565,
+          -0.004309896306541657
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "SRK",
+        "components": [
+          "C1",
+          "C3"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 0.75,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "configuration": "unifac",
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": -1,
+        "iterations": 10,
+        "guess": {
+          "temperature": 262.6628677030273,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            9.605818576210346,
+            0.3864540776759422
+          ]
+        },
+        "target": 191.40970633989943,
+        "initial_function": [
+          -0.06231027305984238,
+          -0.026772597446696356,
+          0.008967730793686401,
+          0.0026847870756436707
+        ],
+        "initial_caloric_jacobian_row": [
+          0.026946931778668828,
+          0.28050962185832257,
+          0.33373214187998756,
+          -0.03861898858586465
+        ],
+        "initial_caloric_finite_difference_row": [
+          6.597682112013253e-05,
+          0.03265504077386294,
+          0.33373214164834475,
+          -0.038618988613134744
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "SRK",
+        "components": [
+          "C1",
+          "H2O"
+        ],
+        "feed": [
+          0.8,
+          0.2
+        ],
+        "beta": 0.75,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "configuration": "hv1",
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "initialization_status": -1,
+        "initialization_iterations": 5
+      }
+    },
+    {
+      "request": {
+        "eos": "SRK",
+        "components": [
+          "C1",
+          "H2O"
+        ],
+        "feed": [
+          0.8,
+          0.2
+        ],
+        "beta": 0.75,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "configuration": "hv1",
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "initialization_status": -1,
+        "initialization_iterations": 5
+      }
+    },
+    {
+      "request": {
+        "eos": "SRK",
+        "components": [
+          "C1",
+          "H2O"
+        ],
+        "feed": [
+          0.8,
+          0.2
+        ],
+        "beta": 0.75,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "configuration": "hv2",
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "initialization_status": -1,
+        "initialization_iterations": 5
+      }
+    },
+    {
+      "request": {
+        "eos": "SRK",
+        "components": [
+          "C1",
+          "H2O"
+        ],
+        "feed": [
+          0.8,
+          0.2
+        ],
+        "beta": 0.75,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "configuration": "hv2",
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "initialization_status": -1,
+        "initialization_iterations": 5
+      }
+    },
+    {
+      "request": {
+        "eos": "SRK",
+        "components": [
+          "C1",
+          "H2O"
+        ],
+        "feed": [
+          0.8,
+          0.2
+        ],
+        "beta": 0.75,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "configuration": "nrtl",
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "initialization_status": -1,
+        "initialization_iterations": 3
+      }
+    },
+    {
+      "request": {
+        "eos": "SRK",
+        "components": [
+          "C1",
+          "H2O"
+        ],
+        "feed": [
+          0.8,
+          0.2
+        ],
+        "beta": 0.75,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "configuration": "nrtl",
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "initialization_status": -1,
+        "initialization_iterations": 3
+      }
+    },
+    {
+      "request": {
+        "eos": "PR",
+        "components": [
+          "H2",
+          "NE"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 0.75,
+        "property": "S",
+        "base_pressure": 1000000.0,
+        "configuration": "quantum",
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": 1,
+        "iterations": 501,
+        "guess": {
+          "temperature": 32.026754879275074,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            3.0084902907174587,
+            0.5023383534983955
+          ]
+        },
+        "target": 61.704126995167115,
+        "initial_function": [
+          -0.004853413442267751,
+          -0.02216134890433863,
+          0.0036622149009000182,
+          0.007248319363192918
+        ],
+        "initial_caloric_jacobian_row": [
+          0.08662335182318014,
+          0.2397629347802713,
+          0.7688162758511029,
+          -0.23113255527321042
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.01906340251585023,
+          0.03667733310596874,
+          0.7688162756019652,
+          -0.23113255530338161
+        ],
+        "values": []
+      }
+    },
+    {
+      "request": {
+        "eos": "PR",
+        "components": [
+          "C1",
+          "C2"
+        ],
+        "feed": [
+          0.5,
+          0.5
+        ],
+        "beta": 0.75,
+        "property": "H",
+        "base_pressure": 1000000.0,
+        "offset": 500.0,
+        "mode": "QUALITY_CALORIC"
+      },
+      "result": {
+        "status": -1,
+        "iterations": 2,
+        "guess": {
+          "temperature": 212.73815659263434,
+          "pressure": 989999.9999999995,
+          "ratios": [
+            5.487961419039688,
+            0.4237882611463477
+          ]
+        },
+        "target": -86157.89234262746,
+        "initial_function": [
+          -0.056660703762921205,
+          -0.02689298814286012,
+          0.006600090309674345,
+          -0.005115512037552562
+        ],
+        "initial_caloric_jacobian_row": [
+          -0.05054388496705132,
+          -0.27324945847973725,
+          0.1250536334405349,
+          -0.005097602992459077
+        ],
+        "initial_caloric_finite_difference_row": [
+          -0.003936322773593834,
+          -0.006755281003415631,
+          0.12505363341098857,
+          -0.005097602967562079
+        ],
+        "values": []
+      }
+    }
+  ],
+  "censored_calls": [],
+  "unqualified_returns": [],
+  "source_pressure_warnings": [],
+  "baseline_differences": [],
+  "physical_differences": [
+    {
+      "case": "QCAL|RK|C1,C3|classic|0.5,0.5|0.75|S:190.51925764024247:0|256.0076988154543,989999.9999999995,10.039236358679581,0.38437769426387247",
+      "differences": [
+        [
+          4,
+          0.0019391901427925737,
+          0.0019391849236628507
+        ],
+        [
+          9,
+          34902.32457598068,
+          34902.39941392016
+        ]
+      ]
+    },
+    {
+      "case": "QCAL|PR|C1,C2,C3|unifac|0.2,0.3,0.5|0.75|S:209.51337340756282:0|272.2341715187845,989999.9999999995,9.866584292655709,1.858100889938243,0.5127834351081507",
+      "differences": [
+        [
+          4,
+          0.0019618464575495566,
+          0.0019618504931535946
+        ]
+      ]
+    },
+    {
+      "case": "QCAL|SRK|C1,H2O|hv1|0.8,0.2|0.25|H:-130836.02382670136:0|136.63654272610015,989999.9999999995,1.3552037739961738,1.8511149193457654e-13",
+      "differences": [
+        [
+          0,
+          142.1116835423075,
+          135.95675893142663
+        ],
+        [
+          1,
+          1687775.5235040125,
+          999999.999998765
+        ],
+        [
+          3,
+          3.1015040416058846e-05,
+          3.075735460120627e-05
+        ],
+        [
+          4,
+          0.0003524685721787449,
+          0.0008694646470823152
+        ],
+        [
+          9,
+          179694.31026446543,
+          79450.13705046294
+        ],
+        [
+          11,
+          68.39861981034463,
+          69.23896819678106
+        ]
+      ]
+    }
+  ],
+  "worst_state_relative_differences": [
+    0.04331047565873435,
+    0.4075041460948242,
+    0.008308414607744674,
+    0.5946142567595673
+  ],
+  "failed_source_case_native_outcomes": [
+    {
+      "case": "QCAL|PR|C1,C3|classic|0.5,0.5|0.5|H:-102292.07014966183:0|229.13234321702552,989999.9999999995,8.414642714358799,0.11884046187623055",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "2.27992380777990348e2,9.99999996084392187e5,5.00000000000000000e-1,6.81878939106860086e-5,1.76400136084104179e-3,1.02160867612861223e-1,8.97839132387138750e-1,8.97839132387138861e-1,1.02160867612861125e-1,3.17677063448176814e4,-1.02292070149661842e5,1.67437719145267550e2",
+      "independent_source_check": {
+        "fugacity_residual": 1.1601830607332886e-14,
+        "material_balance_residual": 5.551115123125783e-17,
+        "enthalpy": -102292.07014966178,
+        "entropy": 167.43771914526747,
+        "caloric_residual": 4.2677546383828737e-16,
+        "pressure_errors": [
+          -1.6030389815568924e-07,
+          0.0
+        ]
+      }
+    },
+    {
+      "case": "QCAL|PR|C1,C3|classic|0.5,0.5|0.75|S:191.34506382041934:0|262.1013283405157,989999.9999999995,11.393356282088781,0.3789463245522012",
+      "source_status": -1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality iterate at bounds",
+      "physical": "2.60797343496278188e2,1.00000006505229580e6,7.50000000000000000e-1,7.50454246255942322e-5,1.97869713260530235e-3,5.41710713802503394e-2,9.45828928619749654e-1,6.48609642873249848e-1,3.51390357126750152e-1,3.51391761178782908e4,-9.63990043075674039e4,1.91345063820419341e2",
+      "independent_source_check": {
+        "fugacity_residual": 5.495603971894525e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -96399.00430756735,
+        "entropy": 191.34506382041957,
+        "caloric_residual": 1.1882913042200357e-15,
+        "pressure_errors": [
+          -3.9814040064811707e-08,
+          -4.656612873077393e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|PR|CO2,C1|classic|0.8,0.2|0.25|H:-344969.66695277713:0|205.16547128281573,989999.9999999995,0.3336997354721494,17.051708461606545",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "2.04144747502693320e2,9.99999998461393872e5,2.50000000000000000e-1,3.47889523380319135e-5,1.53834251181897267e-3,9.62027415167030164e-1,3.79725848329698981e-2,3.13917754498910073e-1,6.86082245501089871e-1,3.98711826127615786e4,-3.44969666952777188e5,1.27071288488255846e2",
+      "independent_source_check": {
+        "fugacity_residual": 6.189493362285248e-15,
+        "material_balance_residual": 1.1102230246251565e-16,
+        "enthalpy": -344969.66695277713,
+        "entropy": 127.07128848825585,
+        "caloric_residual": 0.0,
+        "pressure_errors": [
+          -3.0384398996829987e-07,
+          2.3283064365386963e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|PR|CO2,C1|classic|0.8,0.2|0.5|H:-340446.13741450926:0|221.13616308011643,989999.9999999995,0.6370128065571429,18.770376550711557",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "2.20035983164158381e2,9.99999999994471553e5,5.00000000000000000e-1,3.64050651168082277e-5,1.64495808352845625e-3,9.80886787926110171e-1,1.91132120738899056e-2,6.19113212073889918e-1,3.80886787926110137e-1,4.17259558166613788e4,-3.40446137414509198e5,1.48242948531358081e2",
+      "independent_source_check": {
+        "fugacity_residual": 1.304512053934559e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -340446.1374145092,
+        "entropy": 148.24294853135808,
+        "caloric_residual": 1.7097465506737951e-16,
+        "pressure_errors": [
+          -2.8300564736127853e-07,
+          1.1641532182693481e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|PR|CO2,C1|classic|0.8,0.2|0.75|H:-336594.75831060647:0|225.78465038060676,989999.9999999995,0.7516448885958472,19.142377459636183",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "2.24661343662301505e2,1.00000000000017183e6,7.50000000000000000e-1,3.69401216717538306e-5,1.66933147705469113e-3,9.87095326463255041e-1,1.29046735367450288e-2,7.37634891178915009e-1,2.62365108821084991e-1,4.04461934309187636e4,-3.36594758310606470e5,1.65541109349924710e2",
+      "independent_source_check": {
+        "fugacity_residual": 4.218847493575595e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -336594.75831060647,
+        "entropy": 165.5411093499247,
+        "caloric_residual": 0.0,
+        "pressure_errors": [
+          -1.3457611203193665e-07,
+          -2.3283064365386963e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|SRK|C1,C3|classic|0.5,0.5|0.5|H:-102438.5002607395:0|229.3236102657562,989999.9999999995,8.540999527081357,0.11708231967523507",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "2.28182696071152805e2,9.99999995205838000e5,5.00000000000000000e-1,7.71159676592435148e-5,1.78032608289344736e-3,1.00774267452634944e-1,8.99225732547364931e-1,8.99225732547365042e-1,1.00774267452635000e-1,3.19463329180522851e4,-1.02438500260739514e5,1.66794018555620539e2",
+      "independent_source_check": {
+        "fugacity_residual": 2.7200464103316335e-15,
+        "material_balance_residual": 5.551115123125783e-17,
+        "enthalpy": -102438.5002607395,
+        "entropy": 166.79401855562048,
+        "caloric_residual": 0.0,
+        "pressure_errors": [
+          -1.9720755517482758e-07,
+          4.656612873077393e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|SRK|C1,C3|classic|0.5,0.5|0.75|S:191.11810039051318:0|262.14414252267335,989999.9999999995,11.487086832488513,0.3786195401113287",
+      "source_status": -1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality iterate at bounds",
+      "physical": "2.60839932105946673e2,9.99999621173724998e5,7.50000000000000000e-1,8.50034428004899182e-5,1.99611845406180927e-3,5.37321696819033703e-2,9.46267830318096692e-1,6.48755943439394578e-1,3.51244056560605422e-1,3.53504054615522618e4,-9.64399563428185211e4,1.91118100390511245e2",
+      "independent_source_check": {
+        "fugacity_residual": 6.206563041288859e-13,
+        "material_balance_residual": 2.1760371282653068e-14,
+        "enthalpy": -96439.95634281845,
+        "entropy": 191.1181003905114,
+        "caloric_residual": -9.368906924340347e-15,
+        "pressure_errors": [
+          -9.73232090473175e-08,
+          -4.656612873077393e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|SRK|CO2,C1|classic|0.8,0.2|0.25|H:-345160.19596258394:0|204.96657777738307,989999.9999999995,0.32906256113440335,17.764108941857263",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "2.03946840046813065e2,9.99999871349664056e5,2.50000000000000000e-1,3.93260457177574700e-5,1.54979821023118057e-3,9.63367305157946774e-1,3.66326948420532816e-2,3.09898084526160245e-1,6.90101915473839700e-1,4.03855871621006809e4,-3.45160195962583995e5,1.26097028488029252e2",
+      "independent_source_check": {
+        "fugacity_residual": 8.895661984809067e-15,
+        "material_balance_residual": 1.1102230246251565e-16,
+        "enthalpy": -345160.19596258394,
+        "entropy": 126.0970284880292,
+        "caloric_residual": 0.0,
+        "pressure_errors": [
+          -1.2817326933145523e-07,
+          -2.3283064365386963e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|SRK|CO2,C1|classic|0.8,0.2|0.5|H:-340537.7721688325:0|220.97970554027947,989999.9999999995,0.6361194030660516,19.33557622067922",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "2.19880304020034458e2,9.99999999994107406e5,5.00000000000000000e-1,4.12222969309310481e-5,1.65611106258637016e-3,9.81430259359735269e-1,1.85697406402648355e-2,6.18569740640264820e-1,3.81430259359735124e-1,4.21512997679823093e4,-3.40537772168832482e5,1.47748994179502063e2",
+      "independent_source_check": {
+        "fugacity_residual": 7.299716386910404e-15,
+        "material_balance_residual": 2.7755575615628914e-17,
+        "enthalpy": -340537.7721688325,
+        "entropy": 147.7489941795021,
+        "caloric_residual": 0.0,
+        "pressure_errors": [
+          -2.764863893389702e-07,
+          5.820766091346741e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|SRK|CO2,C1|classic|0.8,0.2|0.75|H:-336636.58367835707:0|225.5887222133659,989999.9999999995,0.7512802037199486,19.655175220906543",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "2.24466390262064834e2,1.00000000000028906e6,7.50000000000000000e-1,4.18398355745678874e-5,1.67991167266243191e-3,9.87433389239939507e-1,1.25666107600604163e-2,7.37522203586686742e-1,2.62477796413313202e-1,4.08296545435576190e4,-3.36636583678356896e5,1.65284865732986475e2",
+      "independent_source_check": {
+        "fugacity_residual": 3.2335245592207684e-15,
+        "material_balance_residual": 1.1102230246251565e-16,
+        "enthalpy": -336636.583678357,
+        "entropy": 165.28486573298645,
+        "caloric_residual": 1.7290949271598635e-16,
+        "pressure_errors": [
+          -1.6239937394857407e-07,
+          9.313225746154785e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|RK|C1,C3|classic|0.5,0.5|0.5|H:-102263.03403577185:0|225.74953460143303,989999.9999999995,7.629700303076807,0.13106674813249555",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "2.24626402444597431e2,9.99999999267357169e5,5.00000000000000000e-1,7.73637194624736445e-5,1.74356405584980174e-3,1.11697407786164646e-1,8.88302592213835451e-1,8.88302592213835451e-1,1.11697407786164604e-1,3.20547332020335707e4,-1.02263034035771809e5,1.66602158821622140e2",
+      "independent_source_check": {
+        "fugacity_residual": 6.356026815979021e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -102263.03403577177,
+        "entropy": 166.6021588216223,
+        "caloric_residual": 8.537932811543548e-16,
+        "pressure_errors": [
+          -3.9814040064811707e-08,
+          2.3283064365386963e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|RK|C1,C3|classic|0.5,0.5|0.75|H:-96491.98301094591:0|256.0076988154543,989999.9999999995,10.039236358679581,0.38437769426387247",
+      "source_status": -1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality iterate at bounds",
+      "physical": "2.54734028668869627e2,9.99999999075086089e5,7.50000000000000000e-1,8.50950293558871442e-5,1.93918490330030179e-3,6.14075419693790037e-2,9.38592458030620969e-1,6.46197486010206990e-1,3.53802513989792955e-1,3.49023997058949535e4,-9.64919830109459726e4,1.90519257646186901e2",
+      "independent_source_check": {
+        "fugacity_residual": 6.6058269965196814e-15,
+        "material_balance_residual": 5.551115123125783e-17,
+        "enthalpy": -96491.98301094591,
+        "entropy": 190.519257646187,
+        "caloric_residual": 0.0,
+        "pressure_errors": [
+          -1.6880221664905548e-07,
+          -5.820766091346741e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|RK|CO2,C1|classic|0.8,0.2|0.25|H:-344006.56557769136:0|197.9359261634839,989999.9999999995,0.3682492284522684,13.018640075946095",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.96951170311921857e2,9.99999999999924912e5,2.50000000000000000e-1,3.98517949855766720e-5,1.48194797581916956e-3,9.52149290009003613e-1,4.78507099909964012e-2,3.43552129972989284e-1,6.56447870027010771e-1,3.85060719400304806e4,-3.44006565577691246e5,1.29305857053622276e2",
+      "independent_source_check": {
+        "fugacity_residual": 3.83026943495679e-15,
+        "material_balance_residual": 1.1102230246251565e-16,
+        "enthalpy": -344006.56557769125,
+        "entropy": 129.30585705362228,
+        "caloric_residual": 3.3841017432745267e-16,
+        "pressure_errors": [
+          -1.9313301891088486e-07,
+          0.0
+        ]
+      }
+    },
+    {
+      "case": "QCAL|RK|CO2,C1|classic|0.8,0.2|0.5|H:-339905.7222163492:0|212.25383438870642,989999.9999999995,0.6447932493328012,14.943636928529248",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "2.11197845162845653e2,9.99999999998264015e5,5.00000000000000000e-1,4.14951067525190170e-5,1.57978247895272997e-3,9.76178496794809170e-1,2.38215032051908339e-2,6.23821503205190919e-1,3.76178496794809136e-1,4.02324753814254509e4,-3.39905722216349328e5,1.49282353522078438e2",
+      "independent_source_check": {
+        "fugacity_residual": 5.218048215738236e-15,
+        "material_balance_residual": 2.7755575615628914e-17,
+        "enthalpy": -339905.72221634927,
+        "entropy": 149.28235352207838,
+        "caloric_residual": -1.7124648721394095e-16,
+        "pressure_errors": [
+          -2.3096799850463867e-07,
+          -6.984919309616089e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|RK|CO2,C1|classic|0.8,0.2|0.75|H:-336453.2348713924:0|216.8454455540313,989999.9999999995,0.7549855235519736,15.454735101659958",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "2.15766612491579195e2,1.00000000000013458e6,7.50000000000000000e-1,4.20772429586749585e-5,1.60542017897767901e-3,9.84009142819418314e-1,1.59908571805816545e-2,7.38663619060193954e-1,2.61336380939806157e-1,3.89550722154816031e4,-3.36453234871392313e5,1.65433563607259003e2",
+      "independent_source_check": {
+        "fugacity_residual": 4.2049697057677804e-15,
+        "material_balance_residual": 2.7755575615628914e-17,
+        "enthalpy": -336453.2348713924,
+        "entropy": 165.43356360725898,
+        "caloric_residual": 0.0,
+        "pressure_errors": [
+          -1.494772732257843e-07,
+          1.5133991837501526e-09
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C2|classic|0.5,0.5|0.0|H:-91521.66542851976:0|157.97182232803286,989999.9999999995,1.7576865171442821,0.22874912184926466",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.57185892863714599e2,1.00000000000000489e6,0.00000000000000000e0,7.16242441182412642e-5,1.13244799187801047e-3,5.00000000000000000e-1,5.00000000000000000e-1,8.89017336684752468e-1,1.10982663315247615e-1,2.79814276121240109e4,-9.15216654285197583e4,1.33557844441338261e2",
+      "independent_source_check": {
+        "fugacity_residual": 5.995204332975845e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -91521.66542851976,
+        "entropy": 133.55784444133826,
+        "caloric_residual": 0.0,
+        "pressure_errors": [
+          -9.42964106798172e-08,
+          1.1641532182693481e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C2|classic|0.5,0.5|0.0|S:133.55784444133818:0|157.97182232803286,989999.9999999995,1.7576865171442821,0.22874912184926466",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.57185892863714315e2,9.99999999999999534e5,0.00000000000000000e0,7.16242441182411965e-5,1.13244799187801480e-3,5.00000000000000000e-1,5.00000000000000000e-1,8.89017336684752912e-1,1.10982663315247088e-1,2.79814276121241601e4,-9.15216654285197583e4,1.33557844441338176e2",
+      "independent_source_check": {
+        "fugacity_residual": 1.7763568394002505e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -91521.66542851976,
+        "entropy": 133.55784444133818,
+        "caloric_residual": 0.0,
+        "pressure_errors": [
+          -5.541369318962097e-08,
+          2.3283064365386963e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C2|classic|0.5,0.5|0.25|H:-89967.3752291992:0|165.75319858831136,989999.9999999995,2.074707209823321,0.29515597484904926",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.64928555807461663e2,1.00000000000158942e6,2.50000000000000000e-1,7.47434717246390861e-5,1.19537732087620220e-3,3.91708336240048582e-1,6.08291663759951473e-1,8.24874991279854197e-1,1.75125008720145747e-1,2.77240681061956820e4,-8.99673752291991841e4,1.43219983260538811e2",
+      "independent_source_check": {
+        "fugacity_residual": 1.3877787807814457e-15,
+        "material_balance_residual": 1.1102230246251565e-16,
+        "enthalpy": -89967.37522919918,
+        "entropy": 143.21998326053884,
+        "caloric_residual": 1.6174657970508382e-16,
+        "pressure_errors": [
+          -1.1047814041376114e-07,
+          -1.1641532182693481e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C2|classic|0.5,0.5|0.25|S:143.2199832612198:0|165.75319858831136,989999.9999999995,2.074707209823321,0.29515597484904926",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.64928555810905124e2,1.00000000009705790e6,2.50000000000000000e-1,7.47434717253008695e-5,1.19537732077563247e-3,3.91708336242685029e-1,6.08291663757314915e-1,8.24874991271944746e-1,1.75125008728055198e-1,2.77240681078720663e4,-8.99673752290529810e4,1.43219983261219795e2",
+      "independent_source_check": {
+        "fugacity_residual": 1.4432899320127035e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -89967.375229053,
+        "entropy": 143.2199832612198,
+        "caloric_residual": 0.0,
+        "pressure_errors": [
+          -8.85920599102974e-08,
+          -1.1641532182693481e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C2|classic|0.5,0.5|0.5|H:-88167.59038754916:0|175.8154164832659,989999.9999999995,2.5059067962841897,0.3990571403331198",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.74940712917365659e2,9.99999999894038076e5,5.00000000000000000e-1,7.83817731421401737e-5,1.27092612326598371e-3,2.81426105301332719e-1,7.18573894698667281e-1,7.18573894698667281e-1,2.81426105301332774e-1,2.89548240441504822e4,-8.81675903875491640e4,1.53811841226533375e2",
+      "independent_source_check": {
+        "fugacity_residual": 4.468647674116255e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -88167.59038754916,
+        "entropy": 153.81184122653337,
+        "caloric_residual": 0.0,
+        "pressure_errors": [
+          -1.157168298959732e-07,
+          -1.1641532182693481e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C2|classic|0.5,0.5|0.5|S:153.8118412264451:0|175.8154164832659,989999.9999999995,2.5059067962841897,0.3990571403331198",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.74940712916566696e2,9.99999999870902742e5,5.00000000000000000e-1,7.83817731419947551e-5,1.27092612329256010e-3,2.81426105299903251e-1,7.18573894700096805e-1,7.18573894700096694e-1,2.81426105299903251e-1,2.89548240437133973e4,-8.81675903875802032e4,1.53811841226445125e2",
+      "independent_source_check": {
+        "fugacity_residual": 5.995204332975845e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -88167.59038758022,
+        "entropy": 153.81184122644513,
+        "caloric_residual": 1.8478232367403338e-16,
+        "pressure_errors": [
+          -9.580980986356735e-08,
+          1.1641532182693481e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C2|classic|0.5,0.5|0.75|H:-86236.67353008848:0|184.79981213826173,989999.9999999995,2.9030530162630317,0.5090620015922347",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.83880410087730041e2,9.99999999988151249e5,7.50000000000000000e-1,8.13968858190964781e-5,1.33251552155685027e-3,2.02006722361914359e-1,7.97993277638085696e-1,5.99331092546028565e-1,4.00668907453971435e-1,2.98854005187037219e4,-8.62366735300884902e4,1.64563141701395352e2",
+      "independent_source_check": {
+        "fugacity_residual": 2.0539125955565396e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -86236.67353008848,
+        "entropy": 164.56314170139535,
+        "caloric_residual": 0.0,
+        "pressure_errors": [
+          -4.6100467443466187e-08,
+          1.1641532182693481e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C2|classic|0.5,0.5|0.75|S:164.56314170132643:0|184.79981213826173,989999.9999999995,2.9030530162630317,0.5090620015922347",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.83880410080677137e2,9.99999999777413090e5,7.50000000000000000e-1,8.13968858177926708e-5,1.33251552181530824e-3,2.02006722346542655e-1,7.97993277653457400e-1,5.99331092551153799e-1,4.00668907448846146e-1,2.98854005144626790e4,-8.62366735303161258e4,1.64563141701326089e2",
+      "independent_source_check": {
+        "fugacity_residual": 5.6066262743570405e-14,
+        "material_balance_residual": 9.992007221626409e-16,
+        "enthalpy": -86236.67353031611,
+        "entropy": 164.56314170132612,
+        "caloric_residual": -1.8998106167775244e-15,
+        "pressure_errors": [
+          -5.133915692567825e-08,
+          0.0
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C2|classic|0.5,0.5|1.0|H:-84307.09443719713:0|191.17364682786408,989999.9999999995,3.187072677712985,0.5967240230895711",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.90222534157079565e2,1.00000000000002084e6,1.00000000000000000e0,8.34611162817748510e-5,1.37255763682968767e-3,1.53216215779049592e-1,8.46783784220950464e-1,5.00000000000000000e-1,5.00000000000000000e-1,2.96808286689168162e4,-8.43070944371970982e4,1.74869243204362277e2",
+      "independent_source_check": {
+        "fugacity_residual": 5.745404152435185e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -84307.09443719711,
+        "entropy": 174.86924320436228,
+        "caloric_residual": 1.7260605795407892e-16,
+        "pressure_errors": [
+          -6.55418261885643e-08,
+          1.1641532182693481e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C2|classic|0.5,0.5|1.0|S:174.86924320436233:0|191.17364682786408,989999.9999999995,3.187072677712985,0.5967240230895711",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.90222534157077689e2,9.99999999999971129e5,1.00000000000000000e0,8.34611162817744986e-5,1.37255763682974860e-3,1.53216215779046205e-1,8.46783784220953684e-1,5.00000000000000000e-1,5.00000000000000000e-1,2.96808286689154993e4,-8.43070944371971709e4,1.74869243204362363e2",
+      "independent_source_check": {
+        "fugacity_residual": 4.440892098500626e-16,
+        "material_balance_residual": 0.0,
+        "enthalpy": -84307.09443719716,
+        "entropy": 174.8692432043624,
+        "caloric_residual": 3.250624170333802e-16,
+        "pressure_errors": [
+          -1.2014061212539673e-07,
+          1.1641532182693481e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C3|classic|0.5,0.5|0.0|H:-103768.62544839426:0|161.8032008945937,989999.9999999995,1.907314665630753,0.07112046311003453",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.60998209845368308e2,1.00000000000003329e6,0.00000000000000000e0,8.49458825293337858e-5,1.18285785450711117e-3,5.00000000000000000e-1,5.00000000000000000e-1,9.66307293551013080e-1,3.36927064489869407e-2,2.53692078095793440e4,-1.03768625448394218e5,1.50061832659751701e2",
+      "independent_source_check": {
+        "fugacity_residual": 6.106226635438361e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -103768.62544839417,
+        "entropy": 150.06183265975181,
+        "caloric_residual": 8.414054921988194e-16,
+        "pressure_errors": [
+          -1.35740265250206e-07,
+          0.0
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C3|classic|0.5,0.5|0.0|S:150.0618326597515:0|161.8032008945937,989999.9999999995,1.907314665630753,0.07112046311003453",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.60998209845367711e2,1.00000000000001735e6,0.00000000000000000e0,8.49458825293336774e-5,1.18285785450712700e-3,5.00000000000000000e-1,5.00000000000000000e-1,9.66307293551013635e-1,3.36927064489863995e-2,2.53692078095791585e4,-1.03768625448394276e5,1.50061832659751531e2",
+      "independent_source_check": {
+        "fugacity_residual": 2.9282132274488504e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -103768.62544839422,
+        "entropy": 150.06183265975162,
+        "caloric_residual": 7.575999553423307e-16,
+        "pressure_errors": [
+          -1.1979136615991592e-07,
+          0.0
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C3|classic|0.5,0.5|0.25|H:-101868.9574029337:0|176.51124077615117,989999.9999999995,2.5307930366917626,0.12270859704483078",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.75633075346349585e2,9.99999998989902670e5,2.50000000000000000e-1,9.34927094320302845e-5,1.31039235824744220e-3,3.58473822834326161e-1,6.41526177165673839e-1,9.24578531497021516e-1,7.54214685029784560e-2,2.30731843415677831e4,-1.01868957402933709e5,1.61390055884752201e2",
+      "independent_source_check": {
+        "fugacity_residual": 2.067790383364354e-15,
+        "material_balance_residual": 5.551115123125783e-17,
+        "enthalpy": -101868.9574029337,
+        "entropy": 161.39005588475231,
+        "caloric_residual": 0.0,
+        "pressure_errors": [
+          -1.641456037759781e-07,
+          1.1641532182693481e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C3|classic|0.5,0.5|0.25|S:161.3900559018432:0|176.51124077615117,989999.9999999995,2.5307930366917626,0.12270859704483078",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.75633075420959557e2,1.00000000071138958e6,2.50000000000000000e-1,9.34927094443187539e-5,1.31039235638602796e-3,3.58473822873541459e-1,6.41526177126458541e-1,9.24578531379375512e-1,7.54214686206245433e-2,2.30731843650656374e4,-1.01868957399247331e5,1.61390055901843255e2",
+      "independent_source_check": {
+        "fugacity_residual": 2.1788126858268697e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -101868.95739924727,
+        "entropy": 161.39005590184308,
+        "caloric_residual": -7.04422816426558e-16,
+        "pressure_errors": [
+          -1.2549571692943573e-07,
+          1.1641532182693481e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C3|classic|0.5,0.5|0.5|H:-99135.22540289926:0|202.3670472192301,989999.9999999995,3.712121730729577,0.2693877172852458",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "2.01360246011900131e2,1.00000000001983787e6,5.00000000000000000e-1,1.04700120304230035e-4,1.51116729407119676e-3,2.07778069884617972e-1,7.92221930115382000e-1,7.92221930115382000e-1,2.07778069884617944e-1,2.47740944043808049e4,-9.91352254028992465e4,1.75903933598766457e2",
+      "independent_source_check": {
+        "fugacity_residual": 3.9968028886505635e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -99135.22540289922,
+        "entropy": 175.9039335987669,
+        "caloric_residual": 4.4036562692703395e-16,
+        "pressure_errors": [
+          -1.701992005109787e-07,
+          2.3283064365386963e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C3|classic|0.5,0.5|0.5|S:175.90393359065337:0|202.3670472192301,989999.9999999995,3.712121730729577,0.2693877172852458",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "2.01360245955800394e2,9.99999998630018090e5,5.00000000000000000e-1,1.04700120296455980e-4,1.51116729591452325e-3,2.07778069790094916e-1,7.92221930209905056e-1,7.92221930209905167e-1,2.07778069790094860e-1,2.47740943820789689e4,-9.91352254056558158e4,1.75903933590653310e2",
+      "independent_source_check": {
+        "fugacity_residual": 2.0539125955565396e-15,
+        "material_balance_residual": 5.551115123125783e-17,
+        "enthalpy": -99135.22540565573,
+        "entropy": 175.90393359065314,
+        "caloric_residual": -1.2926014262555044e-15,
+        "pressure_errors": [
+          -1.5937257558107376e-07,
+          0.0
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C3|classic|0.5,0.5|0.75|H:-96253.47153893259:0|222.566815747936,989999.9999999995,4.63120327401046,0.44062857003395595",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "2.21459518156683117e2,9.99999999886092381e5,7.50000000000000000e-1,1.12173229068640776e-4,1.64378489705359820e-3,1.30419767191223474e-1,8.69580232808776499e-1,6.23193410936258907e-1,3.76806589063741149e-1,2.58239506297285807e4,-9.62534715389326011e4,1.89495001506354583e2",
+      "independent_source_check": {
+        "fugacity_residual": 2.609024107869118e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -96253.47153893253,
+        "entropy": 189.4950015063546,
+        "caloric_residual": 6.047331071058937e-16,
+        "pressure_errors": [
+          -1.3469252735376358e-07,
+          0.0
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C3|classic|0.5,0.5|0.75|S:189.4950015056017:0|222.566815747936,989999.9999999995,4.63120327401046,0.44062857003395595",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "2.21459518140771252e2,9.99999999475183780e5,7.50000000000000000e-1,1.12173229066043258e-4,1.64378489766756693e-3,1.30419767163222899e-1,8.69580232836777212e-1,6.23193410945592330e-1,3.76806589054407615e-1,2.58239506223694152e4,-9.62534715396173997e4,1.89495001505601664e2",
+      "independent_source_check": {
+        "fugacity_residual": 7.216449660063518e-16,
+        "material_balance_residual": 0.0,
+        "enthalpy": -96253.47153961734,
+        "entropy": 189.49500150560164,
+        "caloric_residual": -2.9997318350968564e-16,
+        "pressure_errors": [
+          -8.463393896818161e-08,
+          2.3283064365386963e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C3|classic|0.5,0.5|1.0|H:-93651.75056833567:0|233.9013229585109,989999.9999999995,5.113584971711339,0.5588247361185187",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "2.32737634784589005e2,1.00000000000001909e6,1.00000000000000000e0,1.16268109408302966e-4,1.70625231625257156e-3,9.45759564751870313e-2,9.05424043524812983e-1,5.00000000000000000e-1,5.00000000000000000e-1,2.48893666184566355e4,-9.36517505683356721e4,2.00932104248508580e2",
+      "independent_source_check": {
+        "fugacity_residual": 3.747002708109903e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -93651.75056833561,
+        "entropy": 200.93210424850886,
+        "caloric_residual": 6.215330793095483e-16,
+        "pressure_errors": [
+          -1.0477378964424133e-07,
+          -1.1641532182693481e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C3|classic|0.5,0.5|1.0|S:200.93210424850867:0|233.9013229585109,989999.9999999995,5.113584971711339,0.5588247361185187",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "2.32737634784505303e2,9.99999999998178799e5,1.00000000000000000e0,1.16268109408286405e-4,1.70625231625535557e-3,9.45759564750660586e-2,9.05424043524933997e-1,4.99999999999999944e-1,5.00000000000000000e-1,2.48893666184265785e4,-9.36517505683388008e4,2.00932104248508665e2",
+      "independent_source_check": {
+        "fugacity_residual": 2.4302782009044677e-13,
+        "material_balance_residual": 5.551115123125783e-17,
+        "enthalpy": -93651.75056833873,
+        "entropy": 200.9321042485087,
+        "caloric_residual": 1.4144931959331211e-16,
+        "pressure_errors": [
+          -9.546056389808655e-08,
+          -1.1641532182693481e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|CO2,C1|classic|0.8,0.2|0.0|H:-341456.2472384238:0|173.1945563974398,989999.9999999995,0.5226061769134032,2.874465133034272",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.72332891937750475e2,9.99999999999978230e5,0.00000000000000000e0,5.62657159298339890e-5,1.25919775255962994e-3,8.00000000000000044e-1,2.00000000000000011e-1,4.12584573303399038e-1,5.87415426696601073e-1,2.65911324396597556e4,-3.41456247238423792e5,1.35729055195489110e2",
+      "independent_source_check": {
+        "fugacity_residual": 8.049116928532385e-16,
+        "material_balance_residual": 0.0,
+        "enthalpy": -341456.2472384238,
+        "entropy": 135.72905519548905,
+        "caloric_residual": 0.0,
+        "pressure_errors": [
+          -1.905718818306923e-07,
+          2.3283064365386963e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|CO2,C1|classic|0.8,0.2|0.0|S:135.72905519548925:0|173.1945563974398,989999.9999999995,0.5226061769134032,2.874465133034272",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.72332891937751072e2,9.99999999999990687e5,0.00000000000000000e0,5.62657159298340703e-5,1.25919775255961780e-3,8.00000000000000044e-1,2.00000000000000011e-1,4.12584573303401037e-1,5.87415426696599074e-1,2.65911324396604796e4,-3.41456247238423792e5,1.35729055195489224e2",
+      "independent_source_check": {
+        "fugacity_residual": 3.3861802251067274e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -341456.2472384238,
+        "entropy": 135.72905519548925,
+        "caloric_residual": 0.0,
+        "pressure_errors": [
+          -1.6577541828155518e-07,
+          0.0
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|CO2,C1|classic|0.8,0.2|0.25|H:-339633.3136112005:0|181.41115203058675,989999.9999999995,0.6556521389227525,3.40243687210119",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.80508608723924823e2,9.99999992987143458e5,2.50000000000000000e-1,5.65932651223287998e-5,1.32140841938990284e-3,8.76705581883549079e-1,1.23294418116451018e-1,5.69883254349353163e-1,4.30116745650646892e-1,2.86290948121234869e4,-3.39633313611200545e5,1.46047062388340095e2",
+      "independent_source_check": {
+        "fugacity_residual": 7.965850201685498e-15,
+        "material_balance_residual": 2.7755575615628914e-17,
+        "enthalpy": -339633.3136112005,
+        "entropy": 146.0470623883401,
+        "caloric_residual": 0.0,
+        "pressure_errors": [
+          -1.4773104339838028e-07,
+          2.3283064365386963e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|CO2,C1|classic|0.8,0.2|0.25|S:146.04706242948134:0|181.41115203058675,989999.9999999995,0.6556521389227525,3.40243687210119",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.80508608996446668e2,1.00000000078919937e6,2.50000000000000000e-1,5.65932651625807406e-5,1.32140841011040553e-3,8.76705581680412571e-1,1.23294418319587526e-1,5.69883254958762575e-1,4.30116745041237536e-1,2.86290949584228110e4,-3.39633313600865658e5,1.46047062429481315e2",
+      "independent_source_check": {
+        "fugacity_residual": 3.608224830031759e-16,
+        "material_balance_residual": 0.0,
+        "enthalpy": -339633.31360086566,
+        "entropy": 146.04706242948134,
+        "caloric_residual": 0.0,
+        "pressure_errors": [
+          -4.505272954702377e-08,
+          1.1641532182693481e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|CO2,C1|classic|0.8,0.2|0.5|H:-337741.1086608465:0|186.51297108019062,989999.9999999995,0.7485615719060427,3.7378606248152826",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.85585045850935131e2,9.99999999999960419e5,5.00000000000000000e-1,5.68649040121099649e-5,1.35819690838149100e-3,9.17352060136803593e-1,8.26479398631964901e-2,6.82647939863196607e-1,3.17352060136803504e-1,2.94393631443182967e4,-3.37741108660846483e5,1.56371475605347655e2",
+      "independent_source_check": {
+        "fugacity_residual": 2.3592239273284576e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -337741.10866084654,
+        "entropy": 156.37147560534765,
+        "caloric_residual": -1.7234402156214417e-16,
+        "pressure_errors": [
+          -1.9883736968040466e-07,
+          0.0
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|CO2,C1|classic|0.8,0.2|0.5|S:156.3714756053476:0|186.51297108019062,989999.9999999995,0.7485615719060427,3.7378606248152826",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.85585045850935472e2,9.99999999999969383e5,5.00000000000000000e-1,5.68649040121100191e-5,1.35819690838148060e-3,9.17352060136803260e-1,8.26479398631967954e-2,6.82647939863196718e-1,3.17352060136803227e-1,2.94393631443197301e4,-3.37741108660846483e5,1.56371475605347598e2",
+      "independent_source_check": {
+        "fugacity_residual": 3.247402347028583e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -337741.1086608465,
+        "entropy": 156.37147560534763,
+        "caloric_residual": 1.8175763399544234e-16,
+        "pressure_errors": [
+          -1.5937257558107376e-07,
+          1.1641532182693481e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|CO2,C1|classic|0.8,0.2|0.75|H:-335846.55057479534:0|189.47437766786194,989999.9999999995,0.8060363949634002,3.934414393974303",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.88531719072498817e2,9.99999999999976484e5,7.50000000000000000e-1,5.70413504625656367e-5,1.37888460610260445e-3,9.39107235836789789e-1,6.08927641632102321e-2,7.53630921387736685e-1,2.46369078612263259e-1,2.94463699436229726e4,-3.35846550574795401e5,1.66493117879881311e2",
+      "independent_source_check": {
+        "fugacity_residual": 7.771561172376096e-16,
+        "material_balance_residual": 0.0,
+        "enthalpy": -335846.5505747954,
+        "entropy": 166.4931178798813,
+        "caloric_residual": -1.7331623866270486e-16,
+        "pressure_errors": [
+          -1.441221684217453e-07,
+          0.0
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|CO2,C1|classic|0.8,0.2|0.75|S:166.4931178798813:0|189.47437766786194,989999.9999999995,0.8060363949634002,3.934414393974303",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.88531719072491285e2,9.99999999999782769e5,7.50000000000000000e-1,5.70413504625644983e-5,1.37888460610283863e-3,9.39107235836795229e-1,6.08927641632047781e-2,7.53630921387734798e-1,2.46369078612265147e-1,2.94463699436200623e4,-3.35846550574795576e5,1.66493117879881254e2",
+      "independent_source_check": {
+        "fugacity_residual": 2.2037927038809357e-14,
+        "material_balance_residual": 1.1102230246251565e-16,
+        "enthalpy": -335846.5505747956,
+        "entropy": 166.49311787988125,
+        "caloric_residual": -3.4141602718869415e-16,
+        "pressure_errors": [
+          -1.2922100722789764e-07,
+          0.0
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|CO2,C1|classic|0.8,0.2|1.0|H:-333958.135195745:0|191.3213860629818,989999.9999999995,0.8431800072171644,4.05751543291044",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.90369538371123781e2,9.99999999999923166e5,1.00000000000000000e0,5.71575461429922892e-5,1.39153370737069709e-3,9.52097702654185474e-1,4.79022973458145471e-2,8.00000000000000044e-1,2.00000000000000011e-1,2.92594617882911261e4,-3.33958135195744981e5,1.76457620037424476e2",
+      "independent_source_check": {
+        "fugacity_residual": 2.0261570199409107e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -333958.1351957449,
+        "entropy": 176.45762003742448,
+        "caloric_residual": 1.7429628081780305e-16,
+        "pressure_errors": [
+          -1.6530975699424744e-07,
+          0.0
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|CO2,C1|classic|0.8,0.2|1.0|S:176.45762003742414:0|191.3213860629818,989999.9999999995,0.8431800072171644,4.05751543291044",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.90369538371127334e2,1.00000000000002794e6,1.00000000000000000e0,5.71575461429928177e-5,1.39153370737056352e-3,9.52097702654183031e-1,4.79022973458169757e-2,8.00000000000000044e-1,2.00000000000000011e-1,2.92594617882931962e4,-3.33958135195744864e5,1.76457620037424164e2",
+      "independent_source_check": {
+        "fugacity_residual": 5.662137425588298e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -333958.13519574486,
+        "entropy": 176.45762003742414,
+        "caloric_residual": 0.0,
+        "pressure_errors": [
+          -1.5087425708770752e-07,
+          1.1641532182693481e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C2,C3|classic|0.2,0.3,0.5|0.0|H:-106253.80652802184:0|195.53568220210462,989999.9999999995,3.3916362043112915,0.6565937221932576,0.22526687204066106",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.94562867862791194e2,1.00000000000000664e6,0.00000000000000000e0,9.61618928461041957e-5,1.44111344925581196e-3,2.00000000000000011e-1,2.99999999999999989e-1,5.00000000000000000e-1,6.95446838275309953e-1,1.95294198678796993e-1,1.09258963045893068e-1,2.00803428922087260e4,-1.06253806528021858e5,1.72864372689394173e2",
+      "independent_source_check": {
+        "fugacity_residual": 4.6629367034256575e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -106253.80652802181,
+        "entropy": 172.86437268939432,
+        "caloric_residual": 2.7390859120946675e-16,
+        "pressure_errors": [
+          -1.183943822979927e-07,
+          0.0
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C2,C3|classic|0.2,0.3,0.5|0.0|S:172.86437268939451:0|195.53568220210462,989999.9999999995,3.3916362043112915,0.6565937221932576,0.22526687204066106",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.94562867862792558e2,1.00000000000003679e6,0.00000000000000000e0,9.61618928461044668e-5,1.44111344925577445e-3,2.00000000000000011e-1,2.99999999999999989e-1,5.00000000000000000e-1,6.95446838275304957e-1,1.95294198678799352e-1,1.09258963045895580e-1,2.00803428922094754e4,-1.06253806528021785e5,1.72864372689394543e2",
+      "independent_source_check": {
+        "fugacity_residual": 2.6645352591003757e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -106253.8065280217,
+        "entropy": 172.86437268939477,
+        "caloric_residual": 1.4797461205800535e-15,
+        "pressure_errors": [
+          -8.521601557731628e-08,
+          -1.1641532182693481e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C2,C3|classic|0.2,0.3,0.5|0.25|H:-103607.21897294362:0|215.93643374767217,989999.9999999995,4.314133636923901,1.0004854812927524,0.3825041866423177",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "2.14862123132012698e2,1.00000000000002445e6,2.50000000000000000e-1,1.04260424894658541e-4,1.57341969506472751e-3,1.07457793287327977e-1,2.99962850236324075e-1,5.92579356476347963e-1,4.77626620138016156e-1,3.00111449291027732e-1,2.22261930570956168e-1,2.19556259597128264e4,-1.03607218972943621e5,1.85765953035945699e2",
+      "independent_source_check": {
+        "fugacity_residual": 1.5265566588595902e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -103607.21897294355,
+        "entropy": 185.76595303594576,
+        "caloric_residual": 7.022635764486157e-16,
+        "pressure_errors": [
+          -1.25030055642128e-07,
+          0.0
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C2,C3|classic|0.2,0.3,0.5|0.25|S:185.76595303594576:0|215.93643374767217,989999.9999999995,4.314133636923901,1.0004854812927524,0.3825041866423177",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "2.14862123132012897e2,1.00000000000002619e6,2.50000000000000000e-1,1.04260424894658582e-4,1.57341969506472621e-3,1.07457793287328088e-1,2.99962850236324075e-1,5.92579356476347852e-1,4.77626620138015767e-1,3.00111449291027677e-1,2.22261930570956584e-1,2.19556259597129902e4,-1.03607218972943650e5,1.85765953035945756e2",
+      "independent_source_check": {
+        "fugacity_residual": 2.942091015256665e-15,
+        "material_balance_residual": 1.1102230246251565e-16,
+        "enthalpy": -103607.21897294353,
+        "entropy": 185.76595303594578,
+        "caloric_residual": 1.5299740865272765e-16,
+        "pressure_errors": [
+          -1.1932570487260818e-07,
+          1.1641532182693481e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C2,C3|classic|0.2,0.3,0.5|0.5|H:-101083.50375266813:0|228.65247084459443,989999.9999999995,4.859136548749219,1.2460883610356215,0.506074050779593",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "2.27514896362738511e2,9.99999999994659796e5,5.00000000000000000e-1,1.09679431729458761e-4,1.64562732640882508e-3,6.64621786951164056e-2,2.66465827203193451e-1,6.67071994101690158e-1,3.33537821304883630e-1,3.33534172796806527e-1,3.32928005898309898e-1,2.27266458347811022e4,-1.01083503752668126e5,1.97154509811324203e2",
+      "independent_source_check": {
+        "fugacity_residual": 1.8318679906315083e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -101083.5037526681,
+        "entropy": 197.15450981132454,
+        "caloric_residual": 2.879186947055691e-16,
+        "pressure_errors": [
+          -1.3224780559539795e-07,
+          0.0
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C2,C3|classic|0.2,0.3,0.5|0.5|S:197.15450981130928:0|228.65247084459443,989999.9999999995,4.859136548749219,1.2460883610356215,0.506074050779593",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "2.27514896362631617e2,9.99999999992233352e5,5.00000000000000000e-1,1.09679431729435545e-4,1.64562732641246236e-3,6.64621786950419235e-2,2.66465827203161310e-1,6.67071994101796850e-1,3.33537821304958126e-1,3.33534172796838613e-1,3.32928005898203205e-1,2.27266458347450680e4,-1.01083503752673671e5,1.97154509811309254e2",
+      "independent_source_check": {
+        "fugacity_residual": 1.5265566588595902e-15,
+        "material_balance_residual": 5.551115123125783e-17,
+        "enthalpy": -101083.50375267366,
+        "entropy": 197.15450981130917,
+        "caloric_residual": -5.766382814698092e-16,
+        "pressure_errors": [
+          -1.1606607586145401e-07,
+          -1.1641532182693481e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C2,C3|classic|0.2,0.3,0.5|0.75|H:-98694.07398319352:0|236.61079676233044,989999.9999999995,5.181245969182318,1.4088022223857994,0.5927044427253938",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "2.35433628619228870e2,9.99999999999219668e5,7.50000000000000000e-1,1.13345786820213265e-4,1.68748078366840935e-3,4.68536694939397230e-2,2.28307344075481089e-1,7.24838986430579202e-1,2.51048776835353427e-1,3.23897551974839548e-1,4.25053671189806970e-1,2.27151785394046165e4,-9.86940739831935061e4,2.07467239898982569e2",
+      "independent_source_check": {
+        "fugacity_residual": 1.7486012637846216e-15,
+        "material_balance_residual": 5.551115123125783e-17,
+        "enthalpy": -98694.07398319346,
+        "entropy": 207.46723989898274,
+        "caloric_residual": 5.89778682389578e-16,
+        "pressure_errors": [
+          -4.854518920183182e-08,
+          2.3283064365386963e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C2,C3|classic|0.2,0.3,0.5|0.75|S:207.4672398989778:0|236.61079676233044,989999.9999999995,5.181245969182318,1.4088022223857994,0.5927044427253938",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "2.35433628619158611e2,9.99999999997620936e5,7.50000000000000000e-1,1.13345786820197463e-4,1.68748078367089867e-3,4.68536694938974860e-2,2.28307344075434959e-1,7.24838986430667687e-1,2.51048776835367471e-1,3.23897551974854980e-1,4.25053671189777493e-1,2.27151785393797036e4,-9.86940739831966930e4,2.07467239898977823e2",
+      "independent_source_check": {
+        "fugacity_residual": 3.913536161803677e-15,
+        "material_balance_residual": 5.551115123125783e-17,
+        "enthalpy": -98694.07398319665,
+        "entropy": 207.46723989897782,
+        "caloric_residual": 1.3699372221003862e-16,
+        "pressure_errors": [
+          -1.2619420886039734e-07,
+          2.3283064365386963e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C2,C3|classic|0.2,0.3,0.5|1.0|H:-96381.05652016916:0|242.06527872192757,989999.9999999995,5.391895044697101,1.523325442098924,0.6558941687084924",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "2.40860973852664898e2,1.00000000000001374e6,1.00000000000000000e0,1.15975195560775662e-4,1.71472405613701446e-3,3.58389326588621979e-2,1.95253171091859606e-1,7.68907896249278133e-1,2.00000000000000011e-1,2.99999999999999989e-1,4.99999999999999944e-1,2.24829926740576338e4,-9.63810565201691643e4,2.17174346410926319e2",
+      "independent_source_check": {
+        "fugacity_residual": 4.08006961549745e-15,
+        "material_balance_residual": 5.551115123125783e-17,
+        "enthalpy": -96381.05652016909,
+        "entropy": 217.17434641092657,
+        "caloric_residual": 7.549157351954141e-16,
+        "pressure_errors": [
+          -7.706694304943085e-08,
+          2.3283064365386963e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C2,C3|classic|0.2,0.3,0.5|1.0|S:217.17434641092666:0|242.06527872192757,989999.9999999995,5.391895044697101,1.523325442098924,0.6558941687084924",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "2.40860973455097735e2,9.99999991072690929e5,1.00000000000000000e0,1.15975195467557803e-4,1.71472407034376721e-3,3.58389324586146016e-2,1.95253170755432859e-1,7.68907896785952505e-1,2.00000000000000011e-1,2.99999999999999989e-1,5.00000000000000000e-1,2.24829925354913285e4,-9.63810565354811988e4,2.17174346410909038e2",
+      "independent_source_check": {
+        "fugacity_residual": 1.6014523041008033e-11,
+        "material_balance_residual": 0.0,
+        "enthalpy": -96381.05653548118,
+        "entropy": 217.17434641090927,
+        "caloric_residual": -8.009272945385094e-14,
+        "pressure_errors": [
+          -7.904600352048874e-08,
+          1.1641532182693481e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C2,C3|classic|0.5,0.5,0.0|0.0|H:-91521.66542851976:0|157.97182232803286,989999.9999999995,1.7576865171442821,0.22874912184926466,1.0",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.57185892863714599e2,1.00000000000000489e6,0.00000000000000000e0,7.16242441182412642e-5,1.13244799187801047e-3,5.00000000000000000e-1,5.00000000000000000e-1,0.00000000000000000e0,8.89017336684752468e-1,1.10982663315247615e-1,0.00000000000000000e0,2.79814276121240109e4,-9.15216654285197583e4,1.33557844441338261e2",
+      "independent_source_check": {
+        "fugacity_residual": 5.995204332975845e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -91521.66542851976,
+        "entropy": 133.55784444133826,
+        "caloric_residual": 0.0,
+        "pressure_errors": [
+          -9.42964106798172e-08,
+          1.1641532182693481e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C2,C3|classic|0.5,0.5,0.0|0.0|S:133.55784444133818:0|157.97182232803286,989999.9999999995,1.7576865171442821,0.22874912184926466,1.0",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.57185892863714315e2,9.99999999999999534e5,0.00000000000000000e0,7.16242441182411965e-5,1.13244799187801480e-3,5.00000000000000000e-1,5.00000000000000000e-1,0.00000000000000000e0,8.89017336684752912e-1,1.10982663315247088e-1,0.00000000000000000e0,2.79814276121241601e4,-9.15216654285197583e4,1.33557844441338176e2",
+      "independent_source_check": {
+        "fugacity_residual": 1.7763568394002505e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -91521.66542851976,
+        "entropy": 133.55784444133818,
+        "caloric_residual": 0.0,
+        "pressure_errors": [
+          -5.541369318962097e-08,
+          2.3283064365386963e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C2,C3|classic|0.5,0.5,0.0|0.25|H:-89967.3752291992:0|165.75319858831136,989999.9999999995,2.074707209823321,0.29515597484904926,1.0",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.64928555807461663e2,1.00000000000158942e6,2.50000000000000000e-1,7.47434717246390861e-5,1.19537732087620220e-3,3.91708336240048582e-1,6.08291663759951473e-1,0.00000000000000000e0,8.24874991279854197e-1,1.75125008720145747e-1,0.00000000000000000e0,2.77240681061956820e4,-8.99673752291991841e4,1.43219983260538811e2",
+      "independent_source_check": {
+        "fugacity_residual": 1.3877787807814457e-15,
+        "material_balance_residual": 1.1102230246251565e-16,
+        "enthalpy": -89967.37522919918,
+        "entropy": 143.21998326053884,
+        "caloric_residual": 1.6174657970508382e-16,
+        "pressure_errors": [
+          -1.1047814041376114e-07,
+          -1.1641532182693481e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C2,C3|classic|0.5,0.5,0.0|0.25|S:143.2199832612198:0|165.75319858831136,989999.9999999995,2.074707209823321,0.29515597484904926,1.0",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.64928555810905124e2,1.00000000009705790e6,2.50000000000000000e-1,7.47434717253008695e-5,1.19537732077563247e-3,3.91708336242685029e-1,6.08291663757314915e-1,0.00000000000000000e0,8.24874991271944746e-1,1.75125008728055198e-1,0.00000000000000000e0,2.77240681078720663e4,-8.99673752290529810e4,1.43219983261219795e2",
+      "independent_source_check": {
+        "fugacity_residual": 1.4432899320127035e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -89967.375229053,
+        "entropy": 143.2199832612198,
+        "caloric_residual": 0.0,
+        "pressure_errors": [
+          -8.85920599102974e-08,
+          -1.1641532182693481e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C2,C3|classic|0.5,0.5,0.0|0.5|H:-88167.59038754916:0|175.8154164832659,989999.9999999995,2.5059067962841897,0.3990571403331198,1.0",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.74940712917365659e2,9.99999999894038076e5,5.00000000000000000e-1,7.83817731421401737e-5,1.27092612326598371e-3,2.81426105301332719e-1,7.18573894698667281e-1,0.00000000000000000e0,7.18573894698667281e-1,2.81426105301332774e-1,0.00000000000000000e0,2.89548240441504822e4,-8.81675903875491640e4,1.53811841226533375e2",
+      "independent_source_check": {
+        "fugacity_residual": 4.468647674116255e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -88167.59038754916,
+        "entropy": 153.81184122653337,
+        "caloric_residual": 0.0,
+        "pressure_errors": [
+          -1.157168298959732e-07,
+          -1.1641532182693481e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C2,C3|classic|0.5,0.5,0.0|0.5|S:153.8118412264451:0|175.8154164832659,989999.9999999995,2.5059067962841897,0.3990571403331198,1.0",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.74940712916566696e2,9.99999999870902742e5,5.00000000000000000e-1,7.83817731419947551e-5,1.27092612329256010e-3,2.81426105299903251e-1,7.18573894700096805e-1,0.00000000000000000e0,7.18573894700096694e-1,2.81426105299903251e-1,0.00000000000000000e0,2.89548240437133973e4,-8.81675903875802032e4,1.53811841226445125e2",
+      "independent_source_check": {
+        "fugacity_residual": 5.995204332975845e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -88167.59038758022,
+        "entropy": 153.81184122644513,
+        "caloric_residual": 1.8478232367403338e-16,
+        "pressure_errors": [
+          -9.580980986356735e-08,
+          1.1641532182693481e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C2,C3|classic|0.5,0.5,0.0|0.75|H:-86236.67353008848:0|184.79981213826173,989999.9999999995,2.9030530162630317,0.5090620015922347,1.0",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.83880410087730041e2,9.99999999988151249e5,7.50000000000000000e-1,8.13968858190964781e-5,1.33251552155685027e-3,2.02006722361914359e-1,7.97993277638085696e-1,0.00000000000000000e0,5.99331092546028565e-1,4.00668907453971435e-1,0.00000000000000000e0,2.98854005187037219e4,-8.62366735300884902e4,1.64563141701395352e2",
+      "independent_source_check": {
+        "fugacity_residual": 2.0539125955565396e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -86236.67353008848,
+        "entropy": 164.56314170139535,
+        "caloric_residual": 0.0,
+        "pressure_errors": [
+          -4.6100467443466187e-08,
+          1.1641532182693481e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C2,C3|classic|0.5,0.5,0.0|0.75|S:164.56314170132643:0|184.79981213826173,989999.9999999995,2.9030530162630317,0.5090620015922347,1.0",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.83880410080677137e2,9.99999999777413090e5,7.50000000000000000e-1,8.13968858177926708e-5,1.33251552181530824e-3,2.02006722346542655e-1,7.97993277653457400e-1,0.00000000000000000e0,5.99331092551153799e-1,4.00668907448846146e-1,0.00000000000000000e0,2.98854005144626790e4,-8.62366735303161258e4,1.64563141701326089e2",
+      "independent_source_check": {
+        "fugacity_residual": 5.6066262743570405e-14,
+        "material_balance_residual": 9.992007221626409e-16,
+        "enthalpy": -86236.67353031611,
+        "entropy": 164.56314170132612,
+        "caloric_residual": -1.8998106167775244e-15,
+        "pressure_errors": [
+          -5.133915692567825e-08,
+          0.0
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C2,C3|classic|0.5,0.5,0.0|1.0|H:-84307.09443719713:0|191.17364682786408,989999.9999999995,3.187072677712985,0.5967240230895711,1.0",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.90222534157079565e2,1.00000000000002084e6,1.00000000000000000e0,8.34611162817748510e-5,1.37255763682968767e-3,1.53216215779049592e-1,8.46783784220950464e-1,0.00000000000000000e0,5.00000000000000000e-1,5.00000000000000000e-1,0.00000000000000000e0,2.96808286689168162e4,-8.43070944371970982e4,1.74869243204362277e2",
+      "independent_source_check": {
+        "fugacity_residual": 5.745404152435185e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -84307.09443719711,
+        "entropy": 174.86924320436228,
+        "caloric_residual": 1.7260605795407892e-16,
+        "pressure_errors": [
+          -6.55418261885643e-08,
+          1.1641532182693481e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|VDW|C1,C2,C3|classic|0.5,0.5,0.0|1.0|S:174.86924320436233:0|191.17364682786408,989999.9999999995,3.187072677712985,0.5967240230895711,1.0",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "1.90222534157077689e2,9.99999999999971129e5,1.00000000000000000e0,8.34611162817744986e-5,1.37255763682974860e-3,1.53216215779046205e-1,8.46783784220953684e-1,0.00000000000000000e0,5.00000000000000000e-1,5.00000000000000000e-1,0.00000000000000000e0,2.96808286689154993e4,-8.43070944371971709e4,1.74869243204362363e2",
+      "independent_source_check": {
+        "fugacity_residual": 4.440892098500626e-16,
+        "material_balance_residual": 0.0,
+        "enthalpy": -84307.09443719716,
+        "entropy": 174.8692432043624,
+        "caloric_residual": 3.250624170333802e-16,
+        "pressure_errors": [
+          -1.2014061212539673e-07,
+          1.1641532182693481e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|PR|C1,C3|translated|0.5,0.5|0.5|H:-102286.46314927729:0|229.13234321702572,989999.9999999995,8.414642714358806,0.11884046187623046",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "2.27992380778315948e2,9.99999996094735921e5,5.00000000000000000e-1,7.42089219193267733e-5,1.76919433358269053e-3,1.02160867613421372e-1,8.97839132386578642e-1,8.97839132386578531e-1,1.02160867613421386e-1,3.17677063450559544e4,-1.02286463149277261e5,1.67437719145326582e2",
+      "independent_source_check": {
+        "fugacity_residual": 1.970645868709653e-15,
+        "material_balance_residual": 5.551115123125783e-17,
+        "enthalpy": -102286.46314927717,
+        "entropy": 167.43771914532687,
+        "caloric_residual": 1.138130288629081e-15,
+        "pressure_errors": [
+          -2.4458859115839005e-07,
+          -4.656612873077393e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|PR|C1,C3|translated|0.5,0.5|0.75|S:191.34506382041934:0|262.1013283405159,989999.9999999995,11.393356282088762,0.3789463245522011",
+      "source_status": -1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality iterate at bounds",
+      "physical": "2.60797343496262670e2,1.00000006505175587e6,7.50000000000000000e-1,8.11163951857084173e-5,1.98414947626431417e-3,5.41710713802278226e-2,9.45828928619772191e-1,6.48609642873257397e-1,3.51390357126742603e-1,3.51391761178612069e4,-9.63933973068198975e4,1.91345063820419284e2",
+      "independent_source_check": {
+        "fugacity_residual": 1.5543122344752192e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -96393.39730681982,
+        "entropy": 191.34506382041954,
+        "caloric_residual": 1.0397548911925312e-15,
+        "pressure_errors": [
+          -4.7497451305389404e-08,
+          1.1641532182693481e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|PR|C1,C3|unifac|0.5,0.5|0.5|H:-101987.02721006062:0|232.3592945295088,989999.9999999995,7.315607742502313,0.13669404371370927",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "2.31203278042983158e2,9.99999999298120034e5,5.00000000000000000e-1,6.83101636056335183e-5,1.78631635082477833e-3,1.16025054700138616e-1,8.83974945299861425e-1,8.83974945299861425e-1,1.16025054700138616e-1,3.06009437680714109e4,-1.01987027210060623e5,1.68854022281140828e2",
+      "independent_source_check": {
+        "fugacity_residual": 2.4980018054066022e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -101987.02721006062,
+        "entropy": 168.85402228114106,
+        "caloric_residual": 0.0,
+        "pressure_errors": [
+          -2.888264134526253e-07,
+          -3.4924596548080444e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|PR|C1,C3|unifac|0.5,0.5|0.75|S:191.64093516941494:0|262.6528899184882,989999.9999999995,9.473093547519783,0.38712962316260263",
+      "source_status": -1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality iterate at bounds",
+      "physical": "2.61346158623746817e2,9.99999982415536069e5,7.50000000000000000e-1,7.49061530862270893e-5,1.97582629851959356e-3,6.50327512173696776e-2,9.34967248782630378e-1,6.44989082927543422e-1,3.55010917072456522e-1,3.45043616412708216e4,-9.63326557509521226e4,1.91640935169415002e2",
+      "independent_source_check": {
+        "fugacity_residual": 1.609823385706477e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -96332.65575095205,
+        "entropy": 191.64093516941483,
+        "caloric_residual": -5.932283602201914e-16,
+        "pressure_errors": [
+          -8.719507604837418e-08,
+          -1.1641532182693481e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|SRK|C1,C3|translated|0.5,0.5|0.5|H:-102441.49534834147:0|229.3236102657564,989999.9999999995,8.54099952708137,0.1170823196752348",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "2.28182696070871714e2,9.99999995196856791e5,5.00000000000000000e-1,7.23137160757400961e-5,1.77913815929994562e-3,1.00774267452147515e-1,8.99225732547852541e-1,8.99225732547852541e-1,1.00774267452147473e-1,3.19463329178465865e4,-1.02441495348341443e5,1.66794018555567220e2",
+      "independent_source_check": {
+        "fugacity_residual": 4.052314039881821e-15,
+        "material_balance_residual": 0.0,
+        "enthalpy": -102441.49534834141,
+        "entropy": 166.79401855556722,
+        "caloric_residual": 5.682039364569837e-16,
+        "pressure_errors": [
+          -1.4551915228366852e-07,
+          -3.4924596548080444e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|SRK|C1,C3|translated|0.5,0.5|0.75|H:-96442.95085508502:0|262.14414252267335,989999.9999999995,11.487086832488519,0.37861954011132865",
+      "source_status": -1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality iterate at bounds",
+      "physical": "2.60839942807028649e2,9.99999999460937455e5,7.50000000000000000e-1,7.99882494154468941e-5,1.99379601433487090e-3,5.37321854701959811e-2,9.46267814529804019e-1,6.48755938176601377e-1,3.51244061823398568e-1,3.53504161285508308e4,-9.64429508550849714e4,1.91118100394193164e2",
+      "independent_source_check": {
+        "fugacity_residual": 5.828670879282072e-16,
+        "material_balance_residual": 5.551115123125783e-17,
+        "enthalpy": -96442.95085508493,
+        "entropy": 191.11810039419316,
+        "caloric_residual": 9.05317502171778e-16,
+        "pressure_errors": [
+          -1.1734664440155029e-07,
+          1.3969838619232178e-09
+        ]
+      }
+    },
+    {
+      "case": "QCAL|SRK|C1,C3|translated|0.5,0.5|0.75|S:191.1181003905132:0|262.14414252267335,989999.9999999995,11.487086832488519,0.37861954011132865",
+      "source_status": -1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality iterate at bounds",
+      "physical": "2.60839932106158415e2,9.99999621181214112e5,7.50000000000000000e-1,7.99882470652664597e-5,1.99379673583156792e-3,5.37321696822159328e-2,9.46267830317784164e-1,6.48755943439290328e-1,3.51244056560709617e-1,3.53504054617630900e4,-9.64429514292683161e4,1.91118100390511302e2",
+      "independent_source_check": {
+        "fugacity_residual": 6.202122149190359e-13,
+        "material_balance_residual": 2.1760371282653068e-14,
+        "enthalpy": -96442.95142926826,
+        "entropy": 191.11810039051144,
+        "caloric_residual": -9.220194116017484e-15,
+        "pressure_errors": [
+          -2.327142283320427e-07,
+          -3.4924596548080444e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|SRK|C1,C3|unifac|0.5,0.5|0.5|H:-102139.83789996404:0|232.35415860816732,989999.9999999995,7.469551355826327,0.1338768501220613",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "2.31198167620338268e2,9.99999999001500430e5,5.00000000000000000e-1,7.72670203057521061e-5,1.80140123036997158e-3,1.13863323934359634e-1,8.86136676065640394e-1,8.86136676065640505e-1,1.13863323934359523e-1,3.07519674571658179e4,-1.02139837899964041e5,1.68176266790660293e2",
+      "independent_source_check": {
+        "fugacity_residual": 6.328271240363392e-15,
+        "material_balance_residual": 1.1102230246251565e-16,
+        "enthalpy": -102139.83789996392,
+        "entropy": 168.17626679066052,
+        "caloric_residual": 1.1397641137922327e-15,
+        "pressure_errors": [
+          -2.6193447411060333e-07,
+          -3.4924596548080444e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|SRK|C1,C3|unifac|0.5,0.5|0.75|H:-96374.30174987523:0|262.6628677030273,989999.9999999995,9.605818576210346,0.3864540776759422",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "2.61356087265383906e2,9.99999999557496631e5,7.50000000000000000e-1,8.48554373315455569e-5,1.99324227716505230e-3,6.41453800363881999e-2,9.35854619963611745e-1,6.45284873321203989e-1,3.54715126678795956e-1,3.47282124808858425e4,-9.63743017498751578e4,1.91409706342864894e2",
+      "independent_source_check": {
+        "fugacity_residual": 4.3576253716537394e-15,
+        "material_balance_residual": 1.1102230246251565e-16,
+        "enthalpy": -96374.30174987513,
+        "entropy": 191.40970634286518,
+        "caloric_residual": 1.0569561049888471e-15,
+        "pressure_errors": [
+          -1.3189855962991714e-07,
+          0.0
+        ]
+      }
+    },
+    {
+      "case": "QCAL|SRK|C1,C3|unifac|0.5,0.5|0.75|S:191.40970633989943:0|262.6628677030273,989999.9999999995,9.605818576210346,0.3864540776759422",
+      "source_status": -1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality iterate at bounds",
+      "physical": "2.61356086880371492e2,9.99999986186705995e5,7.50000000000000000e-1,8.48554372508798310e-5,1.99324230268906662e-3,6.41453793756009555e-2,9.35854620624399058e-1,6.45284873541466464e-1,3.54715126458533647e-1,3.47282121168820522e4,-9.63743017709223204e4,1.91409706339899373e2",
+      "independent_source_check": {
+        "fugacity_residual": 6.38378239159465e-15,
+        "material_balance_residual": 1.1102230246251565e-16,
+        "enthalpy": -96374.30177092232,
+        "entropy": 191.40970633989954,
+        "caloric_residual": 5.93944998378162e-16,
+        "pressure_errors": [
+          -1.6437843441963196e-07,
+          -1.1641532182693481e-09
+        ]
+      }
+    },
+    {
+      "case": "QCAL|PR|H2,NE|quantum|0.5,0.5|0.75|S:61.704126995167115:0|32.026754879275074,989999.9999999995,3.0084902907174587,0.5023383534983955",
+      "source_status": 1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality Newton iteration",
+      "physical": "3.18674177846005300e1,9.99999999080956914e5,7.50000000000000000e-1,2.18700011901604095e-5,1.65988382824551245e-4,1.95491080251081611e-1,8.04508919748918250e-1,6.01502973253260853e-1,3.98497026746739147e-1,1.56604045077482442e5,-6.66794842319261716e3,6.17041269950655931e1",
+      "independent_source_check": {
+        "fugacity_residual": 1.55134793899947e-11,
+        "material_balance_residual": 2.716049607442983e-12,
+        "enthalpy": -6667.948423192618,
+        "entropy": 61.70412699506555,
+        "caloric_residual": -1.6459997668795095e-12,
+        "pressure_errors": [
+          -4.190951585769653e-08,
+          1.1641532182693481e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|PR|C1,C2|classic|0.5,0.5|0.75|H:-86157.89234262746:0|212.73815659263434,989999.9999999995,5.487961419039688,0.4237882611463477",
+      "source_status": -1,
+      "baseline_rejected": true,
+      "physical_solved": true,
+      "baseline": "ERROR:solver did not converge: source quality iterate at bounds",
+      "physical": "2.25705284849218032e2,1.68850585560828401e6,7.50000000000000000e-1,5.69825358370732029e-5,9.22204510114787469e-4,1.49651533833695033e-1,8.50348466166304995e-1,6.16782822055441993e-1,3.83217177944558007e-1,5.95077934332048317e4,-8.61578923426287074e4,1.64006092262981269e2",
+      "independent_source_check": {
+        "fugacity_residual": 4.560796185160143e-13,
+        "material_balance_residual": 5.218048215738236e-15,
+        "enthalpy": -86157.8923426287,
+        "entropy": 164.00609226298133,
+        "caloric_residual": -1.435634926504821e-14,
+        "pressure_errors": [
+          -8.89413058757782e-08,
+          0.0
+        ]
+      }
+    }
+  ],
+  "physical_difference_source_checks": [
+    {
+      "case": "QCAL|RK|C1,C3|classic|0.5,0.5|0.75|S:190.51925764024247:0|256.0076988154543,989999.9999999995,10.039236358679581,0.38437769426387247",
+      "native_state": {
+        "temperature": 254.7340283542587,
+        "pressure": 999999.9880949378,
+        "liquid_volume": 8.509502928848438e-05,
+        "vapor_volume": 0.0019391849236628507,
+        "liquid": [
+          0.06140754145508738,
+          0.9385924585449127
+        ],
+        "vapor": [
+          0.6461974861816959,
+          0.3538025138183041
+        ]
+      },
+      "source_check": {
+        "fugacity_residual": 1.044511699355155e-12,
+        "material_balance_residual": 4.374278717023117e-14,
+        "enthalpy": -96491.9830286627,
+        "entropy": 190.51925764023525,
+        "caloric_residual": -3.789178209456638e-14,
+        "pressure_errors": [
+          -1.6088597476482391e-07,
+          0.0
+        ]
+      }
+    },
+    {
+      "case": "QCAL|PR|C1,C2,C3|unifac|0.2,0.3,0.5|0.75|S:209.51337340756282:0|272.2341715187845,989999.9999999995,9.866584292655709,1.858100889938243,0.5127834351081507",
+      "native_state": {
+        "temperature": 270.87977265258525,
+        "pressure": 999999.9999001665,
+        "liquid_volume": 7.586849801801726e-05,
+        "vapor_volume": 0.0019618504931535946,
+        "liquid": [
+          0.024987984697992377,
+          0.18058061637993478,
+          0.7944313989220729
+        ],
+        "vapor": [
+          0.25833733843400264,
+          0.33980646120668845,
+          0.4018562003593089
+        ]
+      },
+      "source_check": {
+        "fugacity_residual": 5.9674487573602164e-15,
+        "material_balance_residual": 1.1102230246251565e-16,
+        "enthalpy": -98696.18029858563,
+        "entropy": 209.51337340756277,
+        "caloric_residual": -2.713116491625166e-16,
+        "pressure_errors": [
+          -1.1606607586145401e-07,
+          -1.1641532182693481e-10
+        ]
+      }
+    },
+    {
+      "case": "QCAL|SRK|C1,H2O|hv1|0.8,0.2|0.25|H:-130836.02382670136:0|136.63654272610015,989999.9999999995,1.3552037739961738,1.8511149193457654e-13",
+      "native_state": {
+        "temperature": 135.95675893142663,
+        "pressure": 999999.999998765,
+        "liquid_volume": 3.075735460120627e-05,
+        "vapor_volume": 0.0008694646470823152,
+        "liquid": [
+          0.7333333333333424,
+          0.2666666666666576
+        ],
+        "vapor": [
+          0.9999999999999729,
+          2.713649889592277e-14
+        ]
+      },
+      "source_check": {
+        "fugacity_residual": 3.2751579226442118e-15,
+        "material_balance_residual": 2.7755575615628914e-17,
+        "enthalpy": -130836.02382670139,
+        "entropy": 69.23896819678109,
+        "caloric_residual": -2.2244508511878297e-16,
+        "pressure_errors": [
+          -1.3279495760798454e-06,
+          -6.984919309616089e-10
+        ]
+      }
+    }
+  ],
+  "baseline_relative_tolerance": 2e-07,
+  "physical_relative_tolerance": 2e-06,
+  "slope_relative_tolerance": 2e-06,
+  "qualification": "Finite closing source sat_newton H/S returns from independently generated fixed-P quality states, perturbed T/P/K guesses and selected shifted H/S targets. Complete failed-call/iteration identity and global stability remain separate."
+}

@@ -245,9 +245,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             continue;
         }
-        if fields[0] == "QUALITY" {
-            use thermopack_rs::envelope::EnvelopeConstraint;
-            use thermopack_rs::quality::QualityGuess;
+        if fields[0] == "QUALITY" || fields[0] == "QCAL" {
+            use thermopack_rs::quality::{QualityGuess, QualitySpecification};
             let kind = match fields[1] {
                 "SRK" => CubicKind::SoaveRedlichKwong,
                 "RK" => CubicKind::RedlichKwong,
@@ -279,9 +278,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let o: Vec<_> = fields[6].split(':').collect();
             let value = o[1].parse::<f64>()?;
             let constraint = match o[0] {
-                "T" => EnvelopeConstraint::Temperature(value),
-                "P" => EnvelopeConstraint::Pressure(value),
-                _ => EnvelopeConstraint::LogK {
+                "T" => QualitySpecification::Temperature(value),
+                "P" => QualitySpecification::Pressure(value),
+                "H" => QualitySpecification::Enthalpy(value),
+                "S" => QualitySpecification::Entropy(value),
+                _ => QualitySpecification::LogK {
                     component: o[2].parse()?,
                     value,
                 },
@@ -292,10 +293,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 pressure: guess[1],
                 ratios: guess[2..].to_vec(),
             };
-            let warm = model.baseline_quality_state_with_guess(&z, beta, constraint, &guess);
+            let warm =
+                model.baseline_quality_state_with_specification(&z, beta, constraint, &guess);
             let cold = match constraint {
-                EnvelopeConstraint::Temperature(t) => model.quality_pressure(t, &z, beta),
-                EnvelopeConstraint::Pressure(p) => model.quality_temperature(p, &z, beta),
+                QualitySpecification::Temperature(t) => model.quality_pressure(t, &z, beta),
+                QualitySpecification::Pressure(p) => model.quality_temperature(p, &z, beta),
+                QualitySpecification::Enthalpy(_) | QualitySpecification::Entropy(_) => {
+                    model.quality_state_with_specification(&z, beta, constraint, &guess)
+                }
                 _ => warm.clone(),
             };
             let encode = |result: thermopack_rs::Result<thermopack_rs::quality::QualityState>| {
@@ -308,9 +313,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             p.liquid_volume,
                             p.vapor_volume,
                         ];
-                        v.extend(p.liquid);
-                        v.extend(p.vapor);
+                        v.extend(p.liquid.iter().copied());
+                        v.extend(p.vapor.iter().copied());
                         v.push(p.dpdt);
+                        if fields[0] == "QCAL" {
+                            let properties = model.quality_properties(&p).unwrap();
+                            v.extend([properties.enthalpy, properties.entropy]);
+                        }
                         v.iter()
                             .map(|v| format!("{v:.17e}"))
                             .collect::<Vec<_>>()

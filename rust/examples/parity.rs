@@ -87,6 +87,73 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for line in io::stdin().lock().lines() {
         let line = line?;
         let fields: Vec<_> = line.split('|').collect();
+        if fields[0] == "PURE_CURVE" {
+            use thermopack_rs::pure_saturation_curve::{
+                PureSaturationOptions, PureSaturationStart,
+            };
+            let kind = match fields[1] {
+                "SRK" => CubicKind::SoaveRedlichKwong,
+                "RK" => CubicKind::RedlichKwong,
+                "VDW" => CubicKind::VanDerWaals,
+                _ => CubicKind::PengRobinson,
+            };
+            let names: Vec<_> = fields[2].split(',').collect();
+            let model = if fields[3] == "quantum" {
+                Cubic::quantum(&names)?
+            } else {
+                Cubic::with_options(
+                    kind,
+                    &names,
+                    thermopack_rs::CubicOptions {
+                        volume_translation: fields[3] == "translated",
+                        parameter_reference: fields[5],
+                        mixing_rule: match fields[3] {
+                            "unifac" => thermopack_rs::MixingRule::Unifac,
+                            "hv1" => thermopack_rs::MixingRule::HuronVidal1,
+                            "hv2" => thermopack_rs::MixingRule::HuronVidal2,
+                            "nrtl" => thermopack_rs::MixingRule::Nrtl,
+                            _ => thermopack_rs::MixingRule::VdW,
+                        },
+                        ..Default::default()
+                    },
+                )?
+            };
+            let opts: Vec<_> = fields[4].split(':').collect();
+            let options = PureSaturationOptions {
+                start: if opts[1] == "T" {
+                    PureSaturationStart::Temperature(opts[2].parse()?)
+                } else {
+                    PureSaturationStart::Pressure(opts[2].parse()?)
+                },
+                maximum_pressure_step: opts[3].parse()?,
+                maximum_points: opts[4].parse()?,
+                logarithmic: opts[5] == "1",
+            };
+            match model.baseline_pure_saturation_curve(opts[0].parse()?, options) {
+                Ok(curve) => println!(
+                    "{:?}|{}",
+                    curve.end,
+                    curve
+                        .points
+                        .iter()
+                        .map(|p| [
+                            p.temperature,
+                            p.pressure,
+                            p.liquid_volume,
+                            p.vapor_volume,
+                            p.dpdt
+                        ]
+                        .iter()
+                        .map(|v| format!("{v:.17e}"))
+                        .collect::<Vec<_>>()
+                        .join(","))
+                        .collect::<Vec<_>>()
+                        .join(";")
+                ),
+                Err(error) => println!("ERROR:{error}"),
+            }
+            continue;
+        }
         if fields[0] != "SOLIDCO2"
             && fields[0] != "HYPERDUAL"
             && fields[0] != "PSEUDOC"

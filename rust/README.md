@@ -3,6 +3,12 @@
 Experimental native port; see [coverage](../docs/rust/coverage.md) before use.
 The original Fortran/Python implementation is retained as the reference.
 
+[Pure-fluid saturation grids](../docs/rust/pure-curves.md) provide selected
+components, linear/logarithmic sampling and physical/source critical endpoints,
+with explicit critical-root conditioning. The
+[overall progress estimate](../docs/rust/progress.md) describes the full
+replacement scope behind chat progress updates.
+
 [Mixture phase envelopes](../docs/rust/envelope.md) now provide adaptive cubic
 VLE tracing through turns, source-convention tracing, warm T/P/log-K correction
 and explicit partial-curve status. Read the remaining sampling differences

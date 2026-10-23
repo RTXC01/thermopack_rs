@@ -555,3 +555,20 @@ The local envelope checkpoint passed formatting, strict all-target Clippy,
 executables, 43 selected release tests, 20 documentation tests, warning-free
 API documentation and hashes/row counts/line endings of all 110 fixtures.
 Hosted CI remains unexecuted locally.
+
+The [selected-component pure saturation curves](pure-curves.md) add 201 finite
+source grids and 19,352 states from 203 attempts. Two source initialization
+terminations are retained. All counts, T/P and interior volumes pass ordinary
+tolerances. The 402 final volumes use explicit source-cubic backward-error and
+multiple-root displacement bounds; raw critical-volume differences remain
+recorded. Physical curves independently close coexistence and terminate at a
+pressure inflection. Complete-curve timing first compares all 400 states of
+four identical 100-point grids, including both critical volumes with the same
+conditioning bounds. Full raw critical-iteration identity and non-cubic curves
+remain pending.
+
+The local pure-curve checkpoint passed 319 standard development tests plus
+custom source-data checks and all-target benchmark executables, 40 selected
+release tests, 21 documentation tests, strict all-target Clippy and rustdoc,
+formatting and the integrity audit of all 111 fixtures. This records local
+checks; hosted CI has not been observed running.

@@ -98,6 +98,7 @@ pub mod numerics;
 pub mod pc_saft;
 pub mod pc_saft_data;
 pub mod pets;
+pub mod pure_saturation_curve;
 pub mod quadrature;
 pub mod quadrature_data;
 pub mod rdf;

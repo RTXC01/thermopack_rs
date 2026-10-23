@@ -5,6 +5,10 @@ Fortran, Python and C++ sources remain the numerical specification.
 The Rust implementation is additive until every capability has passed
 the acceptance criteria below. Apache-2.0 attribution is retained.
 
+The [overall progress estimate](progress.md) explains the percentage reported
+after each commit and its uncertainty. It is separate from scoped numerical
+qualification in the coverage ledger.
+
 ## Acceptance criteria
 
 * Native Rust implementation of each model, solver and public capability.
@@ -52,6 +56,10 @@ the full attraction Hessian and its use in TP fugacity mole derivatives.
 [Mixture VLE envelope continuation](envelope.md) covers adaptive tracing,
 near-critical formulation changes, warm coordinate refinement, explicit
 termination and the remaining raw sampled-grid differences.
+
+[Pure-fluid saturation curves](pure-curves.md) cover selected components,
+linear/logarithmic grids, physical/source critical endpoints, explicit
+multiple-root conditioning and complete-curve measurements.
 
 See [coverage.md](coverage.md), [inventory.json](inventory.json),
 [numerics.md](numerics.md), [validation.md](validation.md),

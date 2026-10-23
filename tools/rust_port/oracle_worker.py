@@ -613,6 +613,50 @@ def main(compiler_directory):
             v=float(model.specific_volume(t,p,z,phase)[0]);error=float(model.pressure_tv(t,v,z)[0])-p
             print('THERMOPACK_RESULT='+json.dumps(dict(values=[*map(float,dt),*map(float,dp),*map(float,dn.flatten())],volume=v,pressure_error=error)),flush=True)
             continue
+        if request['mode']=='PURE_CURVE':
+            from thermopack.cubic import cubic
+            config=request.get('configuration','classic');eos=request['eos'];names=request['components']
+            if config=='quantum':
+                from thermopack.quantum_cubic import qcubic
+                model=qcubic(','.join(names))
+            else:
+                model=cubic(','.join(names),'SRK' if eos=='RK' else eos,alpha='RK' if eos=='RK' else 'Classic',
+                    mixing={'unifac':'UNIFAC','hv1':'HV1','hv2':'HV2','nrtl':'NRTL'}.get(config,'vdW'),
+                    volume_shift=config=='translated',parameter_reference=request.get('parameter_reference','DEFAULT'))
+            previous=None;component=request.get('component',0);z=[float(i==component) for i in range(len(names))]
+            tc,vc,pc=map(float,model.get_critical_parameters(component+1))
+            critical=[tc,pc,vc];value=request.get('initial_pressure')
+            if value is not None and request.get('relative_start',False):value*=pc
+            temp=request.get('initial_temperature')
+            if temp is not None and request.get('relative_start',False):temp*=critical[0]
+            t,p,vl,vv=model.get_pure_fluid_saturation_curve(value,initial_temperature=temp,i=component+1,
+                max_delta_press=request.get('maximum_pressure_step',2e4),nmax=request.get('maximum_points',100),
+                log_linear_grid=request.get('logarithmic',False))
+            points=[]
+            for ti,pi,li,vi in zip(t,p,vl,vv):
+                phi_l=model.thermo(ti,pi,z,model.LIQPH)[0][component]
+                phi_v=model.thermo(ti,pi,z,model.VAPPH)[0][component]
+                pl=model.pressure_tv(ti,li,z)[0];pv=model.pressure_tv(ti,vi,z)[0]
+                points.append(list(map(float,[ti,pi,li,vi,pl-pi,pv-pi,phi_l-phi_v])))
+            # Critical cubic coefficients in the source's L/mol convention.
+            a=float(model.get_energy_constants()[component]);b=float(model.get_covolumes()[component]);kr=1000.*8.31446261815324
+            if probe is None:probe=load_probe()
+            method=c_int();params_a=(c_double*3)();alpha_values=(c_double*3)()
+            probe.query_alpha(component+1,tc,byref(method),params_a,alpha_values)
+            params_b=(c_double*2)();beta_values=(c_double*3)();critical_data=(c_double*3)()
+            probe.query_beta(component+1,tc,byref(method),params_b,beta_values,critical_data)
+            a*=alpha_values[0];b*=beta_values[0]
+            aa=a*pc/(tc*kr*tc*kr);bb=b*pc/(tc*kr)
+            m1,m2=(-1.+math.sqrt(2.),-1.-math.sqrt(2.)) if eos=='PR' else (0.,-1.) if eos in ('SRK','RK') else (0.,0.)
+            pp=bb*(-m1-m2-1.)-1.;qq=bb*((m1+m2)*(bb+1.)+bb*m1*m2)+aa;rr=-(bb**3+bb**2)*(m1*m2)-aa*bb
+            shift=0.
+            if config in ('translated','quantum'):
+                if probe is None:probe=load_probe()
+                enabled,kind,dependent=c_int(),c_int(),c_int();params=(c_double*6)();derivatives=(c_double*3)()
+                probe.query_translation(component+1,tc,byref(enabled),byref(kind),params,derivatives,byref(dependent));shift=float(derivatives[0])
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=points,critical=critical,initial_pressure=value,initial_temperature=temp,
+                critical_polynomial=[pp,qq,rr],critical_shift=shift)),flush=True)
+            continue
         if request['mode']=='ENVELOPE':
             import numpy as np
             from thermopack.cubic import cubic

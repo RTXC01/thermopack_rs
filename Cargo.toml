@@ -11,6 +11,11 @@ readme = "rust/README.md"
 path = "rust/src/lib.rs"
 
 [[bench]]
+name = "pure_curve"
+path = "rust/benches/pure_curve.rs"
+harness = false
+
+[[bench]]
 name = "envelope"
 path = "rust/benches/envelope.rs"
 harness = false

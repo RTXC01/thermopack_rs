@@ -797,7 +797,7 @@ def main(compiler_directory):
                 result.update(values=[t,p,beta,vl,vv,*x,*y,float(dpdt)],fugacity_residual=residual,material_balance_residual=balance,pressure_errors=[pl,pv])
             print('THERMOPACK_RESULT='+json.dumps(result),flush=True)
             continue
-        if request['mode']=='ENVELOPE':
+        if request['mode'] in ('ENVELOPE','ENVELOPE_CRICONDEN','ENVELOPE_EXTREMA_REFERENCE'):
             import numpy as np
             from thermopack.cubic import cubic
             eos=request['eos'];names=request['components'];z=np.array(request['feed']);nc=len(z);nmax=request.get('maximum_points',1000)
@@ -816,7 +816,12 @@ def main(compiler_directory):
             calculate=model.s_envelope_plot
             calculate.argtypes=[POINTER(c_double)]*3+[POINTER(c_int)]+[POINTER(c_double)]*2+[POINTER(c_int)]+[POINTER(c_double)]*4+[POINTER(c_int)]+[POINTER(c_double)]*3+[POINTER(c_int)]+[POINTER(c_double)]*2
             calculate.restype=None
-            calculate(amounts,byref(tc),byref(pc),byref(spec),byref(beta),byref(maximum),byref(limit),temperatures,pressures,ratios,fractions,byref(count),None,None,byref(ds),None,byref(tmin),None)
+            extrema=(c_double*4)() if request['mode']=='ENVELOPE_CRICONDEN' else None
+            try:
+                calculate(amounts,byref(tc),byref(pc),byref(spec),byref(beta),byref(maximum),byref(limit),temperatures,pressures,ratios,fractions,byref(count),extrema,None,byref(ds),None,byref(tmin),None)
+            except OSError as error:
+                if request['mode']!='ENVELOPE_CRICONDEN':raise
+                print('THERMOPACK_RESULT='+json.dumps(dict(calculation_error=str(error))),flush=True);continue
             points=[];bounds=[]
             fun=getattr(model.tp,model.get_export_name('saturation','sat_fun_newton'));fun.argtypes=[POINTER(c_double)]*3;fun.restype=None
             jac=getattr(model.tp,model.get_export_name('saturation','sat_diff_newton'));jac.argtypes=[POINTER(c_double)]*3;jac.restype=None
@@ -838,7 +843,106 @@ def main(compiler_directory):
                 except np.linalg.LinAlgError:correction=np.full(nc+2,math.inf);condition=math.inf;best=locked
                 points.append([t,p,b,vl,vv,*x,*y,pl-p,pv-p,float(np.max(np.abs(residual)))])
                 bounds.append(dict(correction=correction.tolist(),condition=condition,locked=locked,log_k=u[:nc].tolist(),best_coordinate=best))
-            print('THERMOPACK_RESULT='+json.dumps(dict(values=points,bounds=bounds,count=count.value)),flush=True)
+            extra={}
+            if request['mode']=='ENVELOPE_EXTREMA_REFERENCE':
+                # Independent scalar reference: explicit Yphase/ierr arguments
+                # bypass the uninitialized phase argument in fun_criconden.
+                correct=getattr(model.tp,model.get_export_name('saturation','sat_newton'))
+                correct.argtypes=[POINTER(c_double)]*5+[POINTER(c_int),POINTER(c_double),POINTER(c_int),POINTER(c_int)];correct.restype=c_int
+                roots=[];root_errors=[]
+                for index in range(1,len(points)-1):
+                    a,b,c=points[index-1:index+2]
+                    for kind,axis in [('P',1),('T',0)]:
+                        if b[axis]<=a[axis] or b[axis]<c[axis]:continue
+                        beta_value=b[2];k=np.array([ratios[j*nmax+index] for j in range(nc)])
+                        base=np.r_[np.log(k),math.log(b[0]),math.log(b[1])];fixed=nc if kind=='P' else nc+1
+                        ubase=(c_double*(nc+2))(*base);params=(c_double*(nc+4))(*z,beta_value,float(fixed+1),base[fixed],2.)
+                        matrix=(c_double*((nc+2)**2))();jac(matrix,ubase,params);rhs=np.zeros(nc+2);rhs[-1]=1.
+                        observations=[]
+                        try:
+                            tangent=np.linalg.solve(np.array(matrix).reshape((nc+2,nc+2),order='F'),rhs)
+                            def evaluate(value):
+                                initial=base+tangent*(value-base[fixed]);ks=(c_double*nc)(*np.exp(initial[:nc]));tv=c_double(math.exp(initial[nc]));pv=c_double(math.exp(initial[nc+1]))
+                                bv=c_double(beta_value);sv=c_int(fixed+1);lv=c_double(value);status=c_int();phase=c_int(model.VAPPH)
+                                iterations=correct(amounts,ks,byref(tv),byref(pv),byref(bv),byref(sv),byref(lv),byref(phase),byref(status))
+                                if status.value:
+                                    observations.append(dict(log_coordinate=value,status=status.value,iterations=iterations));raise ValueError('source inner quality solve failed')
+                                # Source sat_newton stops at 1e-8. Polish only
+                                # through its own residual/Jacobian functions,
+                                # so near-critical extrema do not inherit that
+                                # loose inner error as a coordinate reference.
+                                cleaned=np.r_[np.log(np.array(ks)),math.log(tv.value),math.log(pv.value)]
+                                pars=(c_double*(nc+4))(*z,beta_value,float(fixed+1),value,2.)
+                                for polish in range(5):
+                                    clean_buffer=(c_double*(nc+2))(*cleaned);residual=(c_double*(nc+2))();fun(residual,clean_buffer,pars)
+                                    if np.max(np.abs(residual))<2e-12:break
+                                    matrix=(c_double*((nc+2)**2))();jac(matrix,clean_buffer,pars)
+                                    delta=np.linalg.solve(np.array(matrix).reshape((nc+2,nc+2),order='F'),-np.array(residual))
+                                    if np.max(np.abs(delta))>.02:raise ValueError('source residual polishing left local neighborhood')
+                                    cleaned+=delta
+                                else:raise ValueError('source residual polishing failed')
+                                tv.value=math.exp(cleaned[nc]);pv.value=math.exp(cleaned[nc+1]);ks=(c_double*nc)(*np.exp(cleaned[:nc]))
+                                kval=np.array(ks);xx=z/(1.-beta_value+beta_value*kval);yy=kval*xx;xx/=xx.sum();yy/=yy.sum()
+                                fl,dtl,dpl=model.thermo(tv.value,pv.value,xx,model.LIQPH,dlnfugdt=True,dlnfugdp=True)
+                                fv,dtv,dpv=model.thermo(tv.value,pv.value,yy,model.VAPPH,dlnfugdt=True,dlnfugdp=True)
+                                weight=yy if beta_value==0. else xx;sign=1. if beta_value==0. else -1.
+                                stationary=sign*float(np.sum(weight*((np.array(dtv)-dtl)*tv.value if kind=='P' else (np.array(dpv)-dpl)*pv.value)))
+                                contrast=float(np.sum((xx-yy)**2))
+                                if contrast<1e-12:raise ValueError('source reference phases coincide')
+                                vl=float(model.specific_volume(tv.value,pv.value,xx,model.LIQPH)[0]);vv=float(model.specific_volume(tv.value,pv.value,yy,model.VAPPH)[0])
+                                state=[tv.value,pv.value,beta_value,vl,vv,*xx,*yy]
+                                fugacity=float(np.max(np.abs((np.log(kval)+np.array(fv)-fl)[z>0.])))
+                                return stationary/contrast,state,kval.tolist(),fugacity
+                            center=base[fixed];fcenter,_,_,_=evaluate(center);bracket=None
+                            radius=max(abs(math.log(a[1-axis]/b[1-axis])),abs(math.log(c[1-axis]/b[1-axis])),.002)
+                            for factor in [.25,.5,1.,2.]:
+                                for value in [center-radius*factor,center+radius*factor]:
+                                    try:fvalue,_,_,_=evaluate(value)
+                                    except ValueError:continue
+                                    if fcenter*fvalue<=0.:
+                                        bracket=(min(center,value),max(center,value));break
+                                if bracket is not None:break
+                            if bracket is None:raise ValueError('source scalar stationarity bracket unavailable')
+                            lo,hi=bracket;fl,*_=evaluate(lo)
+                            for iteration in range(80):
+                                mid=.5*(lo+hi);fm,state,kval,fugacity=evaluate(mid)
+                                if abs(fm)<2e-9:break
+                                if fm*fl>0.:lo=mid;fl=fm
+                                else:hi=mid
+                            else:raise ValueError('source scalar stationarity bisection did not converge')
+                            neighbors=[];neighbor_error=None
+                            try:
+                                for side in [-1.,1.]:neighbors.append(evaluate(mid+side*min(5e-5,.1*(bracket[1]-bracket[0])))[1])
+                            except (ValueError,np.linalg.LinAlgError) as error:neighbor_error=str(error)
+                            roots.append(dict(kind=kind,index=index,point=state,stationarity=fm*float(np.sum((np.array(state[5:5+nc])-state[5+nc:])**2)),
+                                scaled_stationarity=fm,neighbor_states=neighbors,neighbor_error=neighbor_error,
+                                maximum_verified=neighbor_error is None and all(v[axis]<state[axis] for v in neighbors),fugacity_residual=fugacity,
+                                pressure_errors=[float(model.pressure_tv(state[0],state[3],state[5:5+nc])[0])-state[1],float(model.pressure_tv(state[0],state[4],state[5+nc:])[0])-state[1]],
+                                iterations=iteration+1,bracket=list(bracket),guess=[b[0],b[1],*k],inner_failures=observations))
+                        except (ValueError,np.linalg.LinAlgError) as error:
+                            root_errors.append(dict(kind=kind,index=index,error=str(error),inner_failures=observations))
+                extra=dict(reference_extrema=roots,reference_extrema_errors=root_errors)
+            if extrema is not None:
+                roots=[]
+                for offset,kind in [(0,'P'),(2,'T')]:
+                    reported=list(extrema[offset:offset+2])
+                    if min(reported)<=0 or not points:
+                        roots.append(dict(kind=kind,reported=reported));continue
+                    index=min(range(len(points)),key=lambda i:abs(math.log(points[i][0]/reported[0]))+abs(math.log(points[i][1]/reported[1])))
+                    point=points[index];b=point[2];k=[ratios[j*nmax+index] for j in range(nc)]
+                    u=np.r_[np.log(k),math.log(point[0]),math.log(point[1])]
+                    x=z/(1.-b+b*np.array(k));y=np.array(k)*x
+                    fl,dtl,dpl=model.thermo(point[0],point[1],x,model.LIQPH,dlnfugdt=True,dlnfugdp=True)
+                    fv,dtv,dpv=model.thermo(point[0],point[1],y,model.VAPPH,dlnfugdt=True,dlnfugdp=True)
+                    weight=y if b==0. else x;sign=1. if b==0. else -1.
+                    stationary=sign*float(np.sum(weight*((np.array(dtv)-dtl)*point[0] if kind=='P' else (np.array(dpv)-dpl)*point[1])))
+                    xn=x/x.sum();yn=y/y.sum();active=z>0.
+                    physical_fugacity=float(np.max(np.abs(np.log(xn[active])+np.array(fl)[active]-np.log(yn[active])-np.array(fv)[active])))
+                    roots.append(dict(kind=kind,reported=reported,index=index,point=point,source_property_stationarity=stationary,
+                        physical_fugacity_residual=physical_fugacity,material_balance_residual=float(np.max(np.abs((1.-b)*xn+b*yn-z))),
+                        log_k=u[:nc].tolist(),guess=[point[0]*1.001,point[1]*.999,*k]))
+                extra=dict(extrema=roots)
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=points,bounds=bounds,count=count.value,**extra)),flush=True)
             continue
         if request['mode'] in ('META_PS','META_CURVE'):
             from thermopack.cubic import cubic

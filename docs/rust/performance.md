@@ -348,3 +348,10 @@ speedups. The physical path uses the corrected analytic caloric Jacobian.
 Every phase coordinate, slope, H and S is compared before timing, and all
 twelve output sums are checked for every sample. Construction and seed
 generation are excluded; complete caloric curves remain separate work.
+
+[Envelope extrema measurements](envelope-extrema.md#performance) time eight
+warm pressure/temperature refinements with source-backed coordinate preflight
+and ten separate checksum quantities. Local native medians are 0.306–1.547 ms
+per refinement across four binary profiles. The original optional solver has
+undefined phase-argument behavior, so this is a native-only measurement with
+no speedup claim against that path.

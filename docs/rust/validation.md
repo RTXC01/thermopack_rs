@@ -704,3 +704,38 @@ outputs for 27 identical-seed states before timing source, compatible Rust and
 physical Rust, and checks twelve separate sums per sample. Its 109 native,
 harness and Cargo fingerprints still match the current files after timing.
 Hosted CI has not been observed running.
+
+The [envelope-extrema checkpoint](envelope-extrema.md) adds 110 source-backed
+curve/reference attempts and 147 verified maxima. The reference uses scalar
+bisection through the unmodified source EOS/sat_newton with explicit phase
+and status arguments, plus source residual/Jacobian polishing and independent
+neighboring-state checks. It is not the defective legacy optional criconden
+solver. Thirty-nine scalar-search errors across 29 curves remain explicit;
+there are no discarded finite maxima or phase-pressure warnings.
+
+Automatic native analysis matches all 147 verified maxima, with 97 explicitly
+recorded phase permutations. It checks neighboring corrected states before
+reporting a maximum. Tests preserve absent species, check pressure/fugacity
+closure and compare both sides of every recovered maximum. An independent
+off-root difference test covers all augmented-Jacobian rows in both fixed-phase
+formulations for classic, translated, UNIFAC, HV and quantum models.
+
+The local warm primitive matches 146/147 supplied guesses. One named PR
+methane/ethane pressure-maximum guess from a 180 K dew-start trace reaches the
+phase-contrast guard; automatic analysis recovers its maximum from a neighbor.
+The strict validator still fails on that error. The explicit known-gap mode
+requires this exact error identity and every automatic comparison to pass.
+Fourteen raw optional-solver observations remain separately classified: eight
+access violations, six returned curves, twelve coordinates, ten coordinate
+matches and seven independently stationary/closing coordinate matches.
+
+The checkpoint passes 344 standard development tests plus custom source
+harnesses/all-target executables, 62 selected release tests, 24 documentation
+examples, strict all-target Clippy/rustdoc and all 118 fixture audits. After
+adding the final automatic maximum-classification guard, the affected three
+development tests and 36 release tests (library, extrema and envelope) pass
+again. Fresh ordinary source-envelope regeneration retains all 6,185 recovered
+states and its original 71 matching grids/27 sampling differences, with no
+fixture-byte changes. The native-only extrema benchmark preflights eight
+states and checks ten separate sums in every sample; no speedup over the
+defective legacy optional solver is claimed. Hosted CI has not been observed.

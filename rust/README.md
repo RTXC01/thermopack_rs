@@ -30,6 +30,10 @@ VLE tracing through turns, source-convention tracing, warm T/P/log-K correction
 and explicit partial-curve status. Read the remaining sampling differences
 before relying on exact legacy grid identity.
 
+[Envelope pressure/temperature maxima](../docs/rust/envelope-extrema.md)
+provide local refinement and automatic analysis of sampled curves, with
+independent source-backed checks and explicit legacy solver limitations.
+
 [Homogeneous PS and metastable isentropes](../docs/rust/metastable.md) now
 provide local root solves, pressure continuation with stability termination,
 and a separately qualified implementation of the fork's mapping convention.

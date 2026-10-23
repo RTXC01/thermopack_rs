@@ -161,10 +161,16 @@ the physical tracer attempts the exact temperature endpoint.
 
 This is local VLE continuation, with one phase composition fixed. Global
 multiphase stability, liquid/liquid/vapor and solid envelopes, general fixed
-quality, cricondenbar/cricondentherm refinement,
+quality,
 critical-point insertion, other EOS families and complete raw iteration/error
 fidelity remain pending. Existing local critical-point APIs are separate;
 a maximum over sampled nodes is not an exact criconden point.
+
+[Native envelope extrema](envelope-extrema.md) now refine pressure and
+temperature maxima separately from sampled nodes, with an independently
+source-backed reference, explicit phase permutations and a documented defect
+in the fork's optional extrema solver. Exact legacy insertion and raw solver
+fidelity remain outside that qualification.
 
 Full raw sampled-grid parity is specifically **not established for 27 of
 these 98 curves**, even though every observed source state is recovered.

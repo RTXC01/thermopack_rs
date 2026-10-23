@@ -245,6 +245,144 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             continue;
         }
+        if fields[0] == "EXTREMUM" {
+            use thermopack_rs::envelope::{
+                EnvelopeExtremum, EnvelopeExtremumPoint, EnvelopeOptions,
+            };
+            use thermopack_rs::{CubicOptions, MixingRule, MixtureSaturation, SaturationKind};
+            let names: Vec<_> = fields[2].split(',').collect();
+            let model = if fields[3] == "quantum" {
+                Cubic::quantum(&names)?
+            } else {
+                Cubic::with_options(
+                    match fields[1] {
+                        "SRK" => CubicKind::SoaveRedlichKwong,
+                        "RK" => CubicKind::RedlichKwong,
+                        "VDW" => CubicKind::VanDerWaals,
+                        _ => CubicKind::PengRobinson,
+                    },
+                    &names,
+                    CubicOptions {
+                        volume_translation: fields[3] == "translated",
+                        mixing_rule: match fields[3] {
+                            "unifac" => MixingRule::Unifac,
+                            "hv1" => MixingRule::HuronVidal1,
+                            "hv2" => MixingRule::HuronVidal2,
+                            "nrtl" => MixingRule::Nrtl,
+                            _ => MixingRule::VdW,
+                        },
+                        ..Default::default()
+                    },
+                )?
+            };
+            let z: Vec<f64> = fields[4]
+                .split(',')
+                .map(str::parse)
+                .collect::<Result<_, _>>()?;
+            let kind = if fields[5] == "P" {
+                EnvelopeExtremum::Pressure
+            } else {
+                EnvelopeExtremum::Temperature
+            };
+            let beta = fields[6].parse::<f64>()?;
+            let g: Vec<f64> = fields[7]
+                .split(',')
+                .map(str::parse)
+                .collect::<Result<_, _>>()?;
+            let mut x: Vec<_> = z
+                .iter()
+                .zip(&g[2..])
+                .map(|(z, k)| z / (1. - beta + beta * k))
+                .collect();
+            let mut y: Vec<_> = x.iter().zip(&g[2..]).map(|(x, k)| x * k).collect();
+            let sx = x.iter().sum::<f64>();
+            let sy = y.iter().sum::<f64>();
+            x.iter_mut().for_each(|v| *v /= sx);
+            y.iter_mut().for_each(|v| *v /= sy);
+            let guess = MixtureSaturation {
+                kind: if beta == 0. {
+                    SaturationKind::Bubble
+                } else {
+                    SaturationKind::Dew
+                },
+                temperature: g[0],
+                pressure: g[1],
+                liquid: x,
+                vapor: y,
+                liquid_volume: 1.,
+                vapor_volume: 1.,
+                dpdt: 0.,
+                iterations: 0,
+                fugacity_residual: 0.,
+            };
+            let encode = |p: EnvelopeExtremumPoint| {
+                let p = p.state;
+                let mut values = vec![
+                    p.temperature,
+                    p.pressure,
+                    f64::from(p.kind == SaturationKind::Dew),
+                    p.liquid_volume,
+                    p.vapor_volume,
+                ];
+                values.extend(p.liquid);
+                values.extend(p.vapor);
+                values
+                    .iter()
+                    .map(|v| format!("{v:.17e}"))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            };
+            let local = model
+                .refine_envelope_extremum(&z, &guess, kind)
+                .map(encode)
+                .unwrap_or_else(|e| format!("ERROR:{e}"));
+            let o: Vec<f64> = fields[8]
+                .split(',')
+                .map(str::parse)
+                .collect::<Result<_, _>>()?;
+            let automatic = model.phase_envelope(
+                &z,
+                EnvelopeOptions {
+                    maximum_pressure: o[1],
+                    start: if o[3] > 0. {
+                        thermopack_rs::envelope::EnvelopeConstraint::Temperature(o[3])
+                    } else {
+                        thermopack_rs::envelope::EnvelopeConstraint::Pressure(o[0])
+                    },
+                    initial_kind: if o[4] == 0. {
+                        SaturationKind::Bubble
+                    } else {
+                        SaturationKind::Dew
+                    },
+                    maximum_step: o[5],
+                    maximum_points: o[6] as usize,
+                    minimum_temperature: Some(o[2]),
+                },
+            );
+            let auto = match automatic {
+                Err(e) => format!("ERROR:{e}"),
+                Ok(curve) => match model.envelope_extrema(&z, &curve) {
+                    Err(e) => format!("ERROR:{e}"),
+                    Ok(result) => {
+                        let missing = format!(
+                            "NONE:{:?}:{}:{:?}",
+                            curve.end,
+                            curve.points.len(),
+                            result.failures
+                        );
+                        if kind == EnvelopeExtremum::Pressure {
+                            result.pressure
+                        } else {
+                            result.temperature
+                        }
+                        .map(encode)
+                        .unwrap_or(missing)
+                    }
+                },
+            };
+            println!("{local}|{auto}");
+            continue;
+        }
         if fields[0] == "QUALITY" || fields[0] == "QCAL" {
             use thermopack_rs::quality::{QualityGuess, QualitySpecification};
             let kind = match fields[1] {

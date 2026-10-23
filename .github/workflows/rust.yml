@@ -50,6 +50,8 @@ jobs:
       - run: python tools/rust_port/validate_saturation.py
       - run: python tools/rust_port/validate_mixture_saturation.py
       - run: python tools/rust_port/validate_envelope.py
+      - run: python tools/rust_port/validate_envelope_extrema.py --allow-known-gaps
+      - run: python tools/rust_port/benchmark_envelope_extrema.py --preflight-only
       - run: python tools/rust_port/validate_pure_curve.py
       - run: python tools/rust_port/validate_pure_envelope.py
       - run: python tools/rust_port/validate_quality.py

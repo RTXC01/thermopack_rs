@@ -157,6 +157,11 @@ name = "quality_caloric"
 path = "rust/benches/quality_caloric.rs"
 harness = false
 
+[[bench]]
+name = "envelope_extrema"
+path = "rust/benches/envelope_extrema.rs"
+harness = false
+
 [lints.rust]
 unsafe_code = "forbid"
 

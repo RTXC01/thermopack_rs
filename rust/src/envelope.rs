@@ -20,6 +20,12 @@ use crate::{
     numerics::solve_linear_in_place,
 };
 
+#[path = "envelope_extrema.rs"]
+mod extrema;
+pub use extrema::{
+    EnvelopeExtrema, EnvelopeExtremum, EnvelopeExtremumFailure, EnvelopeExtremumPoint,
+};
+
 #[derive(Debug, Clone, Copy)]
 pub enum EnvelopeConstraint {
     Temperature(f64),

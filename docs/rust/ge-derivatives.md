@@ -31,7 +31,7 @@ nondefault covolume interactions are not qualified by the present cases.
 
 ## Qualification
 
-`tools/rust_port/validate_ge_derivatives.py` compares all 252 finite source
+`tools/rust_port/validate_ge_derivatives.py` compares all 378 finite source
 returns against the library compiled from this fork. Every T, P and mole
 derivative of every log fugacity coefficient matches. There were no source
 failures, censored calls, nonfinite returns or source volume-pressure warnings.
@@ -40,7 +40,15 @@ The cases cover 250, 300 and 400 K; 0.1, 1 and 10 MPa; liquid and vapor root
 selection; PR/SRK UNIFAC binary and ternary mixtures, including a zero species
 and translated models; SRK/PR HV1/HV2 methane/water; PR HV1 water/ethylene
 glycol with Hemmingsen2011 data; and PR NRTL hydrogen sulfide/propane with
-Dicko2012 data. Default missing-pair HV fallbacks are included.
+Dicko2012 data. Default missing-pair HV and NRTL fallbacks are included,
+alongside a PR H2S/propane/methane model with fitted and missing NRTL pairs.
+
+The no-record NRTL branch stores its off-diagonal `C_ji = b_j` in the
+source's L/mol units. Native covolumes use m³/mol, so this branch explicitly
+multiplies by 1000. Its diagonal is dimensionless one, preventing that scale
+from cancelling between numerator and denominator. Fitted NRTL pairs and the
+HV fallback retain their own conventions. The added 126 source derivative
+states and independent mole perturbations exercise this correction.
 
 Tolerances are relative 2e-7 with absolute floors 1e-9 K⁻¹, 1e-11 Pa⁻¹ and
 1e-8 mol⁻¹. Worst scaled errors, using max(1, |source|, |native|), are

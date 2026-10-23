@@ -73,7 +73,7 @@ fn every_qualified_activity_model_tp_derivative_matches_the_source() {
         }
         count += 1;
     }
-    assert_eq!(count, 252);
+    assert_eq!(count, 378);
 }
 
 #[test]
@@ -118,6 +118,30 @@ fn activity_mixing_fugacity_mole_derivatives_match_independent_differences() {
         (
             CubicKind::PengRobinson,
             vec!["H2S", "C3"],
+            MixingRule::Nrtl,
+            "Dicko2012",
+        ),
+        (
+            CubicKind::PengRobinson,
+            vec!["C1", "H2O"],
+            MixingRule::Nrtl,
+            "DEFAULT",
+        ),
+        (
+            CubicKind::SoaveRedlichKwong,
+            vec!["C1", "H2O"],
+            MixingRule::Nrtl,
+            "DEFAULT",
+        ),
+        (
+            CubicKind::PengRobinson,
+            vec!["C1", "C2", "C3"],
+            MixingRule::Nrtl,
+            "DEFAULT",
+        ),
+        (
+            CubicKind::PengRobinson,
+            vec!["H2S", "C3", "C1"],
             MixingRule::Nrtl,
             "Dicko2012",
         ),

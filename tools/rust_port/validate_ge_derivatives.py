@@ -12,6 +12,11 @@ def models():
         yield 'PR','C1,H2O',[.4,.6],rule,'DEFAULT',False
     yield 'PR','H2O,MEG',[.3,.7],'HV1','Hemmingsen2011',False
     yield 'PR','H2S,C3',[.4,.6],'NRTL','Dicko2012',False
+    for eos in ['PR','SRK']:
+        for names,z in [('C1,H2O',[.4,.6]),('C1,C2',[.5,.5]),('C1,C2,C3',[.2,.3,.5])]:
+            yield eos,names,z,'NRTL','DEFAULT',False
+    # A fitted NRTL pair and missing pairs in the same model.
+    yield 'PR','H2S,C3,C1',[.2,.3,.5],'NRTL','Dicko2012',False
 
 def validate(directory):
     good=[];failed=[];censored=[];unqualified=[];warnings=[]

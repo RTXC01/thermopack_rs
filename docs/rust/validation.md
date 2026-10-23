@@ -595,3 +595,10 @@ also passed the 16 affected release tests. Hosted CI has not been observed
 running. Complete-curve performance preflight compares all 364 states of four
 identical grids before timing, with eight explicitly conditioned endpoint
 volumes. Full-library parity and performance remain unestablished.
+
+The NRTL fallback correction extends activity-model derivative qualification
+from 252 to 378 source states. The 126 additional states cover missing-pair
+PR/SRK mixtures and a ternary model combining fitted and missing NRTL pairs.
+All derivatives match, with no failed, censored, nonfinite or pressure-warning
+source returns. Independent mole perturbations verify the corrected Hessians.
+The correction preserves the fork's L/mol off-diagonal covolume weight.

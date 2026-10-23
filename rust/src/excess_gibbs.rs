@@ -591,7 +591,10 @@ fn hv_nrtl_kernel(
                         + 2.0 * ((1.0 - kij) * t1 * t4 - gii) / (RGAS * t * t * t);
 
                     cij[idx_ji] = if ge_mix.mrule == MixingRule::Nrtl {
-                        bj
+                        // Unlike fitted dimensionless C_ji, the source's
+                        // no-record NRTL fallback stores b_j in L/mol. The
+                        // diagonal stays one, so this unit cannot cancel.
+                        1000.0 * bj
                     } else {
                         1.0
                     };

@@ -129,9 +129,9 @@
     "complexmodelinit": "6ffae447c3e2be271d9720f3b5217bebf669fa879cf9291be7f5d0a407a96b41",
     "external": "e57f6391c43791ae80fde558f66d9c39ed40b3d3b27859579fc11d3ef0c97f9d"
   },
-  "cases": 252,
+  "cases": 378,
   "generator": "tools/rust_port/validate_ge_derivatives.py",
-  "fixture_sha256": "49bc6e3feec4ce5564000404e44a180a2434895f00482100540b6fa94f8747c5",
+  "fixture_sha256": "810c9b3e74b1fcb44d65b8167a927c2a1bd6921ec5fd25393de83e33bf7c067e",
   "relative_tolerance": 2e-07,
   "absolute_tolerances": [
     1e-09,

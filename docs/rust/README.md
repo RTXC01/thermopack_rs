@@ -159,6 +159,8 @@ the double power that the original writes in the arc tangent.
 The [multiparameter notes](multiparameter.md) cover five NIST fluids, both LJ
 fits for four noble gases, reduced LJTS, shared state/Helmholtz derivatives,
 source sound mass units, strict qualification and native-loop measurements.
+The [MEOS response notes](meos-response.md) cover pure homogeneous response,
+coexistence sound, source mass conventions and strict wrapper/kernel checks.
 The [MEOS flash notes](meos-flash.md) cover pure TP/PH/PS, explicit quality,
 near-critical continuation, original-kernel checks and remaining endpoint gaps.
 The [Lee-Kesler notes](lee-kesler.md) cover the Lee-Kesler corresponding states equation of state,

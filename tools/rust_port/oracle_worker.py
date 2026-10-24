@@ -268,6 +268,51 @@ def main(compiler_directory):
                     raise
                 emit_meos_flash(dict(calculation_error=str(error),stage=stage,input_pressure=input_pressure,
                                      result_pressure=result_pressure,specification=target_native,seed=seed_info));continue
+        if request['mode']=='MEOS_EQ':
+            from thermopack.multiparameter import multiparam
+            key=('MEOS_EQ',request['eos'],request['component'])
+            if previous!=key:
+                model=multiparam(request['component'],request['eos']);previous=key
+            model.activate();t=float(request['temperature']);p=float(request['pressure']);z=[1.]
+            quality=request.get('quality');stage='phase_properties';context={}
+            def emit_response(payload):
+                nonfinite={}
+                def clean(value,path=''):
+                    if isinstance(value,float) and not math.isfinite(value):
+                        nonfinite[path]=repr(value);return None
+                    if isinstance(value,dict):return {str(k):clean(v,f'{path}.{k}') for k,v in value.items()}
+                    if isinstance(value,(list,tuple)):return [clean(v,f'{path}[{i}]') for i,v in enumerate(value)]
+                    return value
+                result=clean(payload)
+                if nonfinite:result['nonfinite_metadata']=nonfinite
+                print('THERMOPACK_RESULT='+json.dumps(result,allow_nan=False),flush=True)
+            try:
+                with warnings.catch_warnings(record=True) as messages:
+                    warnings.simplefilter('always')
+                    if quality is None:
+                        phase=int(request.get('phase',model.SINGLEPH));root=model.LIQPH if phase==model.SINGLEPH else phase
+                        h,cp=model.enthalpy(t,p,z,root,dhdt=True)
+                        volume,vt,vp=model.specific_volume(t,p,z,root,dvdt=True,dvdp=True)
+                        response=[float(cp),float(vt),float(vp)];volumes=[float(volume)]
+                        beta_v=beta_l=-1. if phase==model.SINGLEPH else 0.
+                        if phase==model.LIQPH:beta_l=1.
+                        if phase==model.VAPPH:beta_v=1.
+                    else:
+                        phase=model.TWOPH;beta_v=float(quality);beta_l=1.-beta_v
+                        response=[None,None,None]
+                        volumes=[float(model.specific_volume(t,p,z,ph)[0]) for ph in (model.LIQPH,model.VAPPH)]
+                    closure=[model.pressure_tv(t,v,z,dpdv=True) for v in volumes]
+                    context=dict(pressure=p,response=response,volumes=volumes,
+                        phase=phase,beta_v=beta_v,beta_l=beta_l,
+                        source_molar_mass=float(model.moleweight(z)),
+                        pressure_errors=[float(a)-p for a,b in closure],pressure_dv=[float(b) for a,b in closure])
+                    stage='sound'
+                    sound=float(model.speed_of_sound(t,p,z,z,z,beta_v,beta_l,phase))
+                emit_response(dict(context,sound=sound,stage=stage,warnings=[str(m.message) for m in messages]))
+            except Exception as error:
+                if not isinstance(error,(ValueError,ArithmeticError)):raise
+                emit_response(dict(context,calculation_error=str(error),stage=stage))
+            continue
         if request['mode'] in ['MEOS','MEOS_DENSITY','MEOS_COEX_CHECK','MEOS_PRESSURE_GRID']:
             if probe is None:probe=load_probe()
             reduced=int(request['eos']=='LJTS_REDUCED')

@@ -49,3 +49,9 @@ closure checks, 240 qualified source returns and 320 source-failure recoveries.
 The 59 endpoint phase-flag differences and missing global-stability, broad
 derivative/integration and performance evidence keep the overall estimate
 at about 35%.
+
+The first integrated pure-MEOS flash timing record covers six profiles and
+36 operation groups with 1,484 preflight rows. Thirty groups have lower native
+medians, but guessed propane PH/PS regress substantially and broad model/
+interface/performance work remains. This bounded evidence does not raise the
+overall estimate above about 35%.

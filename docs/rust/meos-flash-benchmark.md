@@ -85,5 +85,43 @@ Git head, every Rust/Cargo/harness/input fingerprint, actual source and native
 executables, DLL/probe identities, and complete source object/module paths and hashes.
 Source object names retain their full paths to prevent basename collisions.
 
-Timing results are pending integration and a quiet-host run. No speedup is
-claimed by this preflight alone.
+## Recorded Windows GNU baseline
+
+The [immutable baseline record](meos-flash-baseline.json) measures the integrated
+`5ae8d7a` tree on this Windows GNU host, with one warm-up and five measured
+samples. Its checksums and complete frozen-input checks passed. The standalone
+report audit verifies recorded cohorts, visit counts, raw sums, medians and
+provenance structure without rebuilding Fortran:
+
+```text
+python tools/rust_port/compare_meos_flash_benchmarks.py
+python -m unittest discover -s tools/rust_port -p test_compare_meos_flash_benchmarks.py
+```
+
+The following ratios are **original median / Rust median**; values above one
+mean lower observed Rust duration. They describe only this common successful
+cohort, these outputs and this host.
+
+| Model | TP | PH cold | PH guessed | PS cold | PS guessed | Scalar TV H/S |
+|---|---:|---:|---:|---:|---:|---:|
+
+| C3 | 1.45 | 0.97 | 0.74 | 0.98 | 0.58 | 0.93 |
+| R134A | 2.63 | 1.62 | 1.34 | 1.78 | 1.35 | 0.98 |
+| Full LJ KR | 5.07 | 1.45 | 1.48 | 1.49 | 1.50 | 1.61 |
+| Full LJ AR | 5.26 | 1.48 | 1.53 | 1.56 | 1.54 | 1.62 |
+| LJTS KR | 5.10 | 2.91 | 2.86 | 2.83 | 2.75 | 1.67 |
+| Reduced LJTS | 5.16 | 2.86 | 2.80 | 2.88 | 2.83 | 1.67 |
+
+Rust has lower observed medians in 30 of 36 groups. TP is 1.45..5.26 times
+faster here, and most caloric groups improve, but propane guessed PH/PS regress:
+216.08 versus 159.39 microseconds for PH, and 280.53 versus 162.98 microseconds
+for PS (about 36% and 72% longer). Those are optimization targets, not omitted
+results. The small cold-propane and R134A scalar differences lie within the
+observed run-to-run spread; they are not strong evidence of a repeatable win
+or loss. Some scalar runs have substantial variability, and all raw samples,
+including the warm-up, remain available. No whole-library speedup is inferred.
+
+Within each lane, original and Rust workers use identical inputs. Different
+lanes can have different successful-case subsets, so cold/guessed medians are
+not a controlled experiment of guess quality by themselves. The record retains
+the exact per-group counts and original source request context.

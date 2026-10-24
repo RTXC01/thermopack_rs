@@ -8,7 +8,7 @@ use super::*;
 use crate::caloric::{CaloricFlashOptions, EquilibriumProperties};
 use crate::{Error, FlashPhase, FlashResult, Phase};
 
-fn homogeneous(t: f64, p: f64, v: f64, phase: FlashPhase) -> FlashResult {
+pub(super) fn homogeneous(t: f64, p: f64, v: f64, phase: FlashPhase) -> FlashResult {
     let liquid = phase != FlashPhase::Vapor;
     FlashResult {
         temperature: t,
@@ -38,7 +38,7 @@ fn homogeneous(t: f64, p: f64, v: f64, phase: FlashPhase) -> FlashResult {
     }
 }
 
-fn split(sat: crate::Saturation, beta: f64) -> FlashResult {
+pub(super) fn split(sat: crate::Saturation, beta: f64) -> FlashResult {
     FlashResult {
         temperature: sat.temperature,
         pressure: sat.pressure,
@@ -55,7 +55,10 @@ fn split(sat: crate::Saturation, beta: f64) -> FlashResult {
     }
 }
 
-fn properties(prep: &PreparedMultiparameter<'_>, v: f64) -> Result<EquilibriumProperties> {
+pub(super) fn properties(
+    prep: &PreparedMultiparameter<'_>,
+    v: f64,
+) -> Result<EquilibriumProperties> {
     // Evaluate each Helmholtz jet once, retaining finite caloric properties
     // even when the critical Cp denominator vanishes.
     let ideal = prep.ideal_jet(v)?;

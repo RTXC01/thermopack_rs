@@ -38,3 +38,9 @@ Reassess the workstream estimates when a material gap closes, and record why;
 do not increment the percentage merely because a commit or test was added.
 The final 100% requires an exhaustive completion audit against the full user
 objective and the checked-in fork. No such completion claim is made here.
+
+Pure MEOS fixed-volume equilibrium and UV/SV add 560 original-kernel native
+closure checks, 240 qualified source returns and 320 source-failure recoveries.
+The 59 endpoint phase-flag differences and missing global-stability, broad
+derivative/integration and performance evidence keep the overall estimate
+at about 35%.

@@ -12,6 +12,8 @@ pub struct Component {
     pub critical_temperature: f64,
     /// Critical pressure (Pa).
     pub critical_pressure: f64,
+    /// Component database triple temperature used by the source UV solver.
+    pub(crate) source_triple_temperature: f64,
     pub acentric_factor: f64,
     pub rackett_factor: f64,
     pub critical_compressibility: f64,
@@ -20,6 +22,13 @@ pub struct Component {
     pub(crate) reference_enthalpy: f64,
     pub(crate) reference_entropy: f64,
     pub(crate) reference_pressure: f64,
+}
+
+impl Component {
+    /// Source component-database triple temperature used to bound pure UV flashes.
+    pub fn source_triple_temperature(&self) -> f64 {
+        self.source_triple_temperature
+    }
 }
 
 #[derive(Debug, Clone, Copy)]

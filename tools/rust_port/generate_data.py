@@ -56,6 +56,7 @@ def generate():
             "molar_mass: " + number(baseline['mw']),
             "critical_temperature: " + number(baseline['Tc']),
             "critical_pressure: " + number(baseline['Pc']),
+            "source_triple_temperature: " + number(baseline['Ttr']),
             "acentric_factor: " + number(baseline['acf']),
             "rackett_factor: " + number(baseline['Zra']),
             "critical_compressibility: " + number(baseline['Zc']),
@@ -130,4 +131,5 @@ def generate():
 
 
 if __name__ == "__main__":
-    (ROOT / "rust/src/data.rs").write_text(generate(), encoding="utf-8")
+    with (ROOT / "rust/src/data.rs").open("w", encoding="utf-8", newline="\n") as output:
+        output.write(generate())

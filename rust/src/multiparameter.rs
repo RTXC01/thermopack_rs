@@ -23,6 +23,10 @@ mod saturation;
 #[path = "multiparameter_flash.rs"]
 mod flash;
 
+#[path = "multiparameter_isochoric.rs"]
+mod isochoric;
+pub use isochoric::MultiparameterEquilibriumTv;
+
 #[path = "multiparameter_equilibrium.rs"]
 mod equilibrium;
 pub use equilibrium::{

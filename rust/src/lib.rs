@@ -149,8 +149,9 @@ pub use mbwr::{MbwrResidualTp, MbwrTpDerivatives, MbwrTpQuantity};
 pub use mixture_saturation::{MixtureSaturation, SaturationKind};
 pub use multiparameter::{
     HelmholtzJet, LennardJonesKind, LennardJonesParameters, Multiparameter,
-    MultiparameterDensityIteration, MultiparameterEquilibrium, MultiparameterPressureJet,
-    MultiparameterSpinodalBracket, MultiparameterState, PreparedMultiparameter,
+    MultiparameterDensityIteration, MultiparameterEquilibrium, MultiparameterEquilibriumTv,
+    MultiparameterPressureJet, MultiparameterSpinodalBracket, MultiparameterState,
+    PreparedMultiparameter,
 };
 pub use multiparameter_data::{
     AncillarySatDensity, IdealGasHelmholtz, MultiparameterRecord, lookup_multiparameter_record,

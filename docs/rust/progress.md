@@ -32,9 +32,14 @@ After each commit the chat reports the rounded overall estimate and the
 concrete completed change. It may remain unchanged across several commits.
 The pure MEOS TP/PH/PS addition qualifies a bounded surface across fourteen
 models, with 1,890 independent source-kernel checks. Its 36 endpoint
-coordinate gaps, missing response/phase-diagram capabilities and unmeasured
+coordinate gaps, incomplete response/phase-diagram capabilities and unmeasured
 flash performance leave the overall estimate at about 35%.
 Reassess the workstream estimates when a material gap closes, and record why;
 do not increment the percentage merely because a commit or test was added.
 The final 100% requires an exhaustive completion audit against the full user
 objective and the checked-in fork. No such completion claim is made here.
+
+Pure MEOS response and sound add 854 strict source comparisons across fourteen
+variants. This closes a bounded response subset; broad singular cases, global
+stability, mixture integration and performance measurements remain pending.
+The overall estimate remains about 35%.

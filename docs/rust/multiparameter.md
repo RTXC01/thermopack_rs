@@ -195,6 +195,14 @@ The record covers this Windows GNU host, these isotherms and the complete
 APIs, singular responses, changing-temperature trajectories and the entire
 library. Source/harness/Cargo fingerprints protect measurement inputs.
 
+## Pure-fluid equilibrium response and sound
+
+The [response and sound notes](meos-response.md) describe homogeneous TP
+response, coexistence acoustics, physical and source-compatible mass
+conventions, 854 strict source comparisons, and independent original-kernel
+checks. These methods cover all fourteen pure variants. Global stability,
+mixture response and broad singular behavior remain outside this qualification.
+
 ```
 python tools/rust_port/generate_lj_meos_data.py
 python tools/rust_port/validate_meos.py --compiler-directory /path/to/compiler/bin

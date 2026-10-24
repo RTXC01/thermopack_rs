@@ -23,6 +23,10 @@ mod saturation;
 #[path = "multiparameter_flash.rs"]
 mod flash;
 
+#[path = "multiparameter_response.rs"]
+mod response;
+pub use crate::caloric::EquilibriumResponse;
+
 #[path = "multiparameter_equilibrium.rs"]
 mod equilibrium;
 pub use equilibrium::{

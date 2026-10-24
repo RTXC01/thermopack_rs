@@ -624,6 +624,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             && fields[0] != "WSSTATE"
             && fields[0] != "QUAD"
             && fields[0] != "CRITICAL"
+            && fields[0] != "MPRESP"
             && fields.len() != 6
         {
             return Err("expected six fields".into());
@@ -2021,6 +2022,90 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "{:.17e},{:.17e},{:.17e},{:.17e}",
                 volume, enthalpy, entropy, compressibility
             );
+            continue;
+        }
+        if fields[0] == "MPRESP" {
+            let outcome = (|| -> thermopack_rs::Result<Vec<f64>> {
+                use thermopack_rs::{LennardJonesKind, Multiparameter};
+                let t: f64 = fields[2].parse().unwrap();
+                let p: f64 = fields[3].parse().unwrap();
+                let config: Vec<_> = fields[1].split(':').collect();
+                let model = match config[0] {
+                    "LJ_MEOS" => Multiparameter::lennard_jones(config[1], LennardJonesKind::Full)?,
+                    "LJTS_MEOS" => Multiparameter::lennard_jones(
+                        config[1],
+                        LennardJonesKind::TruncatedShifted,
+                    )?,
+                    "LJTS_REDUCED" => Multiparameter::reduced_lennard_jones_truncated_shifted(),
+                    _ => Multiparameter::new(config[1])?,
+                };
+                let mut flash = if fields[4].starts_with("HOM") {
+                    let mut f = model.tp_flash(t, p)?;
+                    f.phase = match fields[4] {
+                        "HOM:L" => thermopack_rs::FlashPhase::Liquid,
+                        "HOM:V" => thermopack_rs::FlashPhase::Vapor,
+                        _ => thermopack_rs::FlashPhase::Single,
+                    };
+                    f.vapor_fraction = match f.phase {
+                        thermopack_rs::FlashPhase::Liquid => 0.,
+                        thermopack_rs::FlashPhase::Vapor => 1.,
+                        _ => -1.,
+                    };
+                    f.liquid_fraction = if f.vapor_fraction < 0. {
+                        -1.
+                    } else {
+                        1. - f.vapor_fraction
+                    };
+                    f
+                } else {
+                    model.saturated_flash(t, fields[4].parse().unwrap())?
+                };
+                // This qualifies properties of the supplied TP state. Do not
+                // substitute the native saturation solver's slightly different
+                // pressure for the source input at a near-critical point.
+                flash.pressure = p;
+                let response = model.equilibrium_response(&flash)?;
+                let (cp, vt, vp) = response.map_or((0., 0., 0.), |r| {
+                    (r.heat_capacity, r.volume_dt, r.volume_dp)
+                });
+                let (vl, vv) = if flash.phase == thermopack_rs::FlashPhase::TwoPhase {
+                    let s = model.saturation_pressure(t)?;
+                    (s.liquid_volume, s.vapor_volume)
+                } else {
+                    let ph = if flash.phase == thermopack_rs::FlashPhase::Vapor {
+                        thermopack_rs::Phase::Vapor
+                    } else {
+                        thermopack_rs::Phase::Liquid
+                    };
+                    let v = model.prepare(t)?.volume(flash.pressure, ph)?;
+                    (v, v)
+                };
+                Ok(vec![
+                    f64::from(response.is_some()),
+                    cp,
+                    vt,
+                    vp,
+                    model.equilibrium_speed_of_sound(&flash)?,
+                    model.baseline_equilibrium_speed_of_sound(&flash)?,
+                    flash.pressure,
+                    model.molar_mass(),
+                    vl,
+                    vv,
+                    flash.vapor_fraction,
+                    flash.phase as i32 as f64,
+                ])
+            })();
+            match outcome {
+                Ok(values) => println!(
+                    "{}",
+                    values
+                        .iter()
+                        .map(|v| format!("{v:.17e}"))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                ),
+                Err(e) => println!("ERROR:{e}"),
+            }
             continue;
         }
         if fields[0] == "MEOS" {

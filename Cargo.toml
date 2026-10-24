@@ -114,6 +114,11 @@ path = "rust/benches/preparation.rs"
 harness = false
 
 [[bench]]
+name = "meos_flash"
+path = "rust/benches/meos_flash.rs"
+harness = false
+
+[[bench]]
 name = "transcendental"
 path = "rust/benches/transcendental.rs"
 harness = false

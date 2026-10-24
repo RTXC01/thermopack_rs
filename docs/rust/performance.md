@@ -416,9 +416,9 @@ The [bounded root/critical qualification](meos-equilibrium.md) has a separate
 [native-only measurement record](meos-branches-benchmark.json). It preflights
 40 source-backed pressure states across five isotherms, then times complete
 stable root sets plus minimum-Gibbs selection, including five separate output
-sums. Caller-buffer queries with reused branch data take 7.65-19.20 us on
-these profiles. Fresh complete queries take 0.739-5.487 ms, dominated by
-0.736-5.457 ms of interval discovery. These setup costs remain an optimization
+sums. Caller-buffer queries with reused branch data take 7.61-19.51 us on
+these profiles. Fresh complete queries take 0.470-2.879 ms, dominated by
+0.463-2.818 ms of interval discovery. These setup costs remain an optimization
 target; batch pressure calculations should reuse the prepared branch object.
 
 The fresh and reused paths return the same requested outputs. The original
@@ -427,3 +427,15 @@ so these measurements make no speedup claim against that source routine.
 Five measured samples follow a warm-up; model construction and parsing are
 excluded. Root-domain, conditioning and source-selection limits remain in the
 qualification document.
+
+The [controlled cache comparison](meos-bounds-cache-comparison.json) records
+1.55-2.14x discovery improvement and 1.54-2.09x fresh-query improvement over
+a fresh uncached build. Source references, all 40 numerical cases, benchmark
+code, Cargo inputs and toolchain match, and only the interval module changes.
+All five output sums are identical. The cache keeps eight interval keys and
+reuses exponential bounds/natural sums within one preparation; it never
+shortcuts root closure. All measured timing pressures have one stable root,
+so multi-root-query performance remains separate work. Prepared C3 rises
+from 11.75 to 13.41 us; the other prepared medians change by less than 3%.
+The record supports a cold-discovery improvement, without a prepared-query
+or original-Fortran speedup claim.

@@ -1,0 +1,314 @@
+{
+  "scope": "Native-only forty source-backed root/Gibbs states across five isotherms; unchanged numerical inputs. These timing pressures each have one stable root, while their isotherms still require branch discovery. No Fortran or multi-root-query speedup claim.",
+  "generator": "tools/rust_port/compare_meos_bounds_cache_benchmarks.py",
+  "before_report": "docs/rust/meos-branches-before-cache-benchmark.json",
+  "after_report": "docs/rust/meos-branches-benchmark.json",
+  "before_report_sha256": "a24d72b3c143b66707a1d444d5f40212d0b3c30c6bec2c43caaf8f96e1df55c8",
+  "after_report_sha256": "77d830d22d0ac4018553517668323f0997b030c9725c025d67f3a26b8ceb9a5c",
+  "normalized_inputs_sha256": "721401c05a258a2be89dc4945ee5ff1365ba4123c6e63eb3e94fd40d2fb417c5",
+  "native_source_files_changed": [
+    "rust/src/multiparameter_intervals.rs"
+  ],
+  "profiles": [
+    {
+      "profile": [
+        "NIST_MEOS:C3",
+        0.95
+      ],
+      "setup": {
+        "before_median_ns": 3010490.0,
+        "after_median_ns": 1404800.0,
+        "before_range_ns": [
+          2862040.0,
+          3088140.0
+        ],
+        "after_range_ns": [
+          1379990.0,
+          1671140.0
+        ],
+        "median_speedup": 2.143002562642369,
+        "all_after_samples_beat_all_before": true
+      },
+      "fresh": {
+        "before_median_ns": 2964225.0,
+        "after_median_ns": 1415142.0,
+        "before_range_ns": [
+          2833347.0,
+          3114230.0
+        ],
+        "after_range_ns": [
+          1394817.0,
+          1427521.0
+        ],
+        "median_speedup": 2.0946484522401287,
+        "all_after_samples_beat_all_before": true
+      },
+      "prepared": {
+        "before_median_ns": 11752.9,
+        "after_median_ns": 13405.8,
+        "before_range_ns": [
+          10573.0,
+          12900.8
+        ],
+        "after_range_ns": [
+          12536.1,
+          15741.3
+        ],
+        "median_speedup": 0.8767026212534873,
+        "all_after_samples_beat_all_before": false
+      },
+      "checksum_validation": {
+        "fresh": {
+          "root_count_sum": 100.0,
+          "iterations": 100,
+          "maximum_absolute_difference": 0.0
+        },
+        "prepared": {
+          "root_count_sum": 1000.0,
+          "iterations": 1000,
+          "maximum_absolute_difference": 0.0
+        }
+      }
+    },
+    {
+      "profile": [
+        "NIST_MEOS:R134A",
+        1.05
+      ],
+      "setup": {
+        "before_median_ns": 727120.0,
+        "after_median_ns": 468440.0,
+        "before_range_ns": [
+          622000.0,
+          746430.0
+        ],
+        "after_range_ns": [
+          424760.0,
+          562190.0
+        ],
+        "median_speedup": 1.5522158654256681,
+        "all_after_samples_beat_all_before": true
+      },
+      "fresh": {
+        "before_median_ns": 725434.0,
+        "after_median_ns": 470257.0,
+        "before_range_ns": [
+          677654.0,
+          746564.0
+        ],
+        "after_range_ns": [
+          438656.0,
+          485055.0
+        ],
+        "median_speedup": 1.5426330708527465,
+        "all_after_samples_beat_all_before": true
+      },
+      "prepared": {
+        "before_median_ns": 13227.9,
+        "after_median_ns": 13447.5,
+        "before_range_ns": [
+          12996.1,
+          13613.5
+        ],
+        "after_range_ns": [
+          13360.6,
+          15390.0
+        ],
+        "median_speedup": 0.98366982710541,
+        "all_after_samples_beat_all_before": false
+      },
+      "checksum_validation": {
+        "fresh": {
+          "root_count_sum": 100.0,
+          "iterations": 100,
+          "maximum_absolute_difference": 0.0
+        },
+        "prepared": {
+          "root_count_sum": 1000.0,
+          "iterations": 1000,
+          "maximum_absolute_difference": 0.0
+        }
+      }
+    },
+    {
+      "profile": [
+        "NIST_MEOS:N-H2",
+        0.95
+      ],
+      "setup": {
+        "before_median_ns": 847970.0,
+        "after_median_ns": 463280.0,
+        "before_range_ns": [
+          797900.0,
+          861880.0
+        ],
+        "after_range_ns": [
+          453310.0,
+          489250.0
+        ],
+        "median_speedup": 1.8303617682610949,
+        "all_after_samples_beat_all_before": true
+      },
+      "fresh": {
+        "before_median_ns": 850718.0,
+        "after_median_ns": 470798.0,
+        "before_range_ns": [
+          811531.0,
+          863228.0
+        ],
+        "after_range_ns": [
+          467087.0,
+          511468.0
+        ],
+        "median_speedup": 1.806970292991899,
+        "all_after_samples_beat_all_before": true
+      },
+      "prepared": {
+        "before_median_ns": 7438.9,
+        "after_median_ns": 7605.0,
+        "before_range_ns": [
+          7305.8,
+          7591.1
+        ],
+        "after_range_ns": [
+          7540.9,
+          9713.0
+        ],
+        "median_speedup": 0.9781591058514135,
+        "all_after_samples_beat_all_before": false
+      },
+      "checksum_validation": {
+        "fresh": {
+          "root_count_sum": 100.0,
+          "iterations": 100,
+          "maximum_absolute_difference": 0.0
+        },
+        "prepared": {
+          "root_count_sum": 1000.0,
+          "iterations": 1000,
+          "maximum_absolute_difference": 0.0
+        }
+      }
+    },
+    {
+      "profile": [
+        "LJ_MEOS:AR",
+        0.95
+      ],
+      "setup": {
+        "before_median_ns": 5526540.0,
+        "after_median_ns": 2818010.0,
+        "before_range_ns": [
+          5281250.0,
+          6141760.0
+        ],
+        "after_range_ns": [
+          2795690.0,
+          3350410.0
+        ],
+        "median_speedup": 1.9611498894610027,
+        "all_after_samples_beat_all_before": true
+      },
+      "fresh": {
+        "before_median_ns": 5524576.0,
+        "after_median_ns": 2878920.0,
+        "before_range_ns": [
+          5407264.0,
+          5769879.0
+        ],
+        "after_range_ns": [
+          2793596.0,
+          2935912.0
+        ],
+        "median_speedup": 1.9189751712447722,
+        "all_after_samples_beat_all_before": true
+      },
+      "prepared": {
+        "before_median_ns": 19474.9,
+        "after_median_ns": 19514.6,
+        "before_range_ns": [
+          17680.3,
+          19652.7
+        ],
+        "after_range_ns": [
+          19236.5,
+          23332.3
+        ],
+        "median_speedup": 0.9979656257366281,
+        "all_after_samples_beat_all_before": false
+      },
+      "checksum_validation": {
+        "fresh": {
+          "root_count_sum": 124.0,
+          "iterations": 100,
+          "maximum_absolute_difference": 0.0
+        },
+        "prepared": {
+          "root_count_sum": 1250.0,
+          "iterations": 1000,
+          "maximum_absolute_difference": 0.0
+        }
+      }
+    },
+    {
+      "profile": [
+        "LJTS_MEOS:KR",
+        0.95
+      ],
+      "setup": {
+        "before_median_ns": 2576280.0,
+        "after_median_ns": 1359750.0,
+        "before_range_ns": [
+          2362280.0,
+          2654220.0
+        ],
+        "after_range_ns": [
+          1329490.0,
+          1497710.0
+        ],
+        "median_speedup": 1.8946718146718147,
+        "all_after_samples_beat_all_before": true
+      },
+      "fresh": {
+        "before_median_ns": 2578429.0,
+        "after_median_ns": 1356741.0,
+        "before_range_ns": [
+          2377107.0,
+          2647592.0
+        ],
+        "after_range_ns": [
+          1347885.0,
+          1402907.0
+        ],
+        "median_speedup": 1.90045778818507,
+        "all_after_samples_beat_all_before": true
+      },
+      "prepared": {
+        "before_median_ns": 14325.5,
+        "after_median_ns": 14438.2,
+        "before_range_ns": [
+          13433.3,
+          17602.6
+        ],
+        "after_range_ns": [
+          14194.3,
+          14687.8
+        ],
+        "median_speedup": 0.9921943178512557,
+        "all_after_samples_beat_all_before": false
+      },
+      "checksum_validation": {
+        "fresh": {
+          "root_count_sum": 100.0,
+          "iterations": 100,
+          "maximum_absolute_difference": 0.0
+        },
+        "prepared": {
+          "root_count_sum": 1000.0,
+          "iterations": 1000,
+          "maximum_absolute_difference": 0.0
+        }
+      }
+    }
+  ]
+}

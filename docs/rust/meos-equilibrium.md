@@ -169,19 +169,47 @@ selection semantics, so this record makes no source-speedup claim.
 
 | Profile | Discovery ms | Fresh complete query ms | Reused complete query us |
 |---|---:|---:|---:|
-| NIST C3, 0.95 Tc | 2.769 | 2.827 | 12.50 |
-| NIST R134A, 1.05 Tc | 0.736 | 0.739 | 13.51 |
-| NIST N-H2, 0.95 Tc | 0.841 | 0.864 | 7.65 |
-| LJ argon, 0.95 Tc | 5.457 | 5.487 | 19.20 |
-| LJTS krypton, 0.95 Tc | 2.585 | 2.597 | 14.10 |
+| NIST C3, 0.95 Tc | 1.405 | 1.415 | 13.41 |
+| NIST R134A, 1.05 Tc | 0.468 | 0.470 | 13.45 |
+| NIST N-H2, 0.95 Tc | 0.463 | 0.471 | 7.61 |
+| LJ argon, 0.95 Tc | 2.818 | 2.879 | 19.51 |
+| LJTS krypton, 0.95 Tc | 1.360 | 1.357 | 14.44 |
 
 Each profile preflights all eight matching source-backed fixture pressures.
+All forty timing pressures have one stable root. The larger qualification
+also includes two- and three-root sets; those query costs are not measured here.
 A complete query requests all roots into caller storage and separately asks
 for minimum-Gibbs selection; both API calls are timed. Fresh samples cycle
 100 such queries, reused samples 1000, and discovery samples 10 preparations.
 Five measured samples follow one warm-up. Model construction and parsing are
 excluded. Reuse removes the dominant discovery cost; cold discovery remains
 an optimization target. These timings cover this host and workload.
+
+The [freshly measured uncached baseline](meos-branches-before-cache-benchmark.json)
+and [comparison audit](meos-bounds-cache-comparison.json) isolate the bounded
+discovery cache change. Each immutable-temperature discovery retains at most
+eight exact endpoint-bit keys, 32 exponential bounds per key and four lazy
+natural-derivative sums. Hits reuse the original-order results; FIFO eviction
+clears the sums. The pressure/stiffness/curvature bounds, exp guard, search
+budget and convergence rules are unchanged. The cache is discarded before
+the public equilibrium object is returned; reusable-query thread behavior
+and storage remain unchanged.
+
+Discovery medians improve by 1.55-2.14x, and fresh complete-query medians by
+1.54-2.09x. Every cached discovery/fresh sample is below every baseline sample
+in its profile. Prepared-query algorithms are unchanged; the recorded C3
+prepared median rises from 11.75 to 13.41 us, while the other four prepared
+medians vary by less than 3%. These results do not establish a prepared-query
+speedup, and further profiling remains open.
+
+The audit requires identical source references, numerical cases, benchmark
+code, Cargo inputs and toolchain, with only the native interval module
+changed. All five separate checksum fields remain identical in every profile.
+Requalification with hash-verified source references and live kernel checks
+leaves all five fixture/metadata pairs byte for byte unchanged, including
+the eight precision errors and eleven resolved
+extreme volumes. An independent test compares cached/uncached bounds bitwise
+through derivative switches, signed zeros and repeated eviction.
 
 ```text
 python tools/rust_port/build_probe.py --compiler /path/to/gfortran

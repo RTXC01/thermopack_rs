@@ -1,5 +1,9 @@
 //! Conservatively bounded pressure-branch discovery, without a fixed density grid.
 use super::*;
+use std::cell::RefCell;
+
+const MAX_TERMS: usize = 32;
+const NATURAL_CACHE_SIZE: usize = 8;
 
 #[derive(Debug, Clone, Copy)]
 struct Interval {
@@ -149,7 +153,7 @@ impl BoundTerm {
             coefficient: term.coefficient,
         }
     }
-    fn bound(&self, x: Interval, k: usize) -> Interval {
+    fn exponential(&self, x: Interval) -> Interval {
         let exponent = match self.exponent {
             DensityExponent::Plain => Interval::ZERO,
             DensityExponent::Power(l) => x.powi(l).negative(),
@@ -163,12 +167,19 @@ impl BoundTerm {
                 .multiply(Interval::point(-eta))
                 .add(Interval::point(-temperature)),
         };
+        exponent.exp()
+    }
+    fn bound_with_exponential(&self, x: Interval, k: usize, exponential: Interval) -> Interval {
         let poly = self.polynomial[k][..self.lengths[k]]
             .iter()
             .rev()
             .fold(Interval::ZERO, |v, &a| v.multiply(x).add(a));
-        poly.multiply(exponent.exp())
+        poly.multiply(exponential)
             .multiply(Interval::point(self.coefficient))
+    }
+    #[cfg(test)]
+    fn bound(&self, x: Interval, k: usize) -> Interval {
+        self.bound_with_exponential(x, k, self.exponential(x))
     }
 }
 
@@ -205,19 +216,75 @@ pub struct MultiparameterEquilibrium<'a> {
     intervals: Vec<StableInterval>,
 }
 
+#[derive(Clone, Copy)]
+struct NaturalEntry {
+    key: Option<[u64; 2]>,
+    exponentials: [Interval; MAX_TERMS],
+    values: [Option<Interval>; 4],
+}
+impl NaturalEntry {
+    const EMPTY: Self = Self {
+        key: None,
+        exponentials: [Interval::ZERO; MAX_TERMS],
+        values: [None; 4],
+    };
+}
+struct NaturalCache {
+    entries: [NaturalEntry; NATURAL_CACHE_SIZE],
+    next: usize,
+}
 struct Bounds {
     terms: Vec<BoundTerm>,
+    cache: RefCell<NaturalCache>,
 }
 impl Bounds {
+    fn new(terms: Vec<BoundTerm>) -> Result<Self> {
+        if terms.len() > MAX_TERMS {
+            return Err(Error::InvalidInput(
+                "multiparameter bound cache term capacity",
+            ));
+        }
+        Ok(Self {
+            terms,
+            cache: RefCell::new(NaturalCache {
+                entries: [NaturalEntry::EMPTY; NATURAL_CACHE_SIZE],
+                next: 0,
+            }),
+        })
+    }
     fn natural(&self, x: Interval, k: usize) -> Interval {
+        let key = [x.lo.to_bits(), x.hi.to_bits()];
+        let mut cache = self.cache.borrow_mut();
+        let slot = if let Some(i) = cache
+            .entries
+            .iter()
+            .position(|entry| entry.key == Some(key))
+        {
+            i
+        } else {
+            let i = cache.next;
+            cache.next = (i + 1) % NATURAL_CACHE_SIZE;
+            let entry = &mut cache.entries[i];
+            entry.key = Some(key);
+            entry.values = [None; 4];
+            for (out, term) in entry.exponentials.iter_mut().zip(&self.terms) {
+                *out = term.exponential(x);
+            }
+            i
+        };
+        let entry = &mut cache.entries[slot];
+        if let Some(value) = entry.values[k] {
+            return value;
+        }
         let mut sum = match k {
             0 => x,
             1 => Interval::point(1.),
             _ => Interval::ZERO,
         };
-        for term in &self.terms {
-            sum = sum.add(term.bound(x, k));
+        for (term, &exponential) in self.terms.iter().zip(&entry.exponentials) {
+            sum = sum.add(term.bound_with_exponential(x, k, exponential));
         }
+        entry.values[k] = Some(sum);
         sum
     }
     fn evaluate(&self, x: Interval, k: usize) -> Interval {
@@ -228,9 +295,12 @@ impl Bounds {
         let mid = x.lo + (x.hi - x.lo) * 0.5;
         let center = Interval::point(mid);
         let dx = x.add(center.negative());
-        let mut taylor = self
-            .natural(center, k)
-            .add(self.natural(center, k + 1).multiply(dx));
+        let slope = if k == 2 {
+            self.natural(x, k + 1)
+        } else {
+            self.natural(center, k + 1)
+        };
+        let mut taylor = self.natural(center, k).add(slope.multiply(dx));
         if k < 2 {
             taylor = taylor.add(
                 self.natural(x, k + 2)
@@ -242,11 +312,6 @@ impl Bounds {
         // and stiffness use second-order centered forms. Intersecting these
         // with Horner bounds removes density-dependency inflation near flat
         // critical regions without excluding any enclosed function value.
-        if k == 2 {
-            taylor = self
-                .natural(center, k)
-                .add(self.natural(x, k + 1).multiply(dx));
-        }
         let result = Interval {
             lo: natural.lo.max(taylor.lo),
             hi: natural.hi.min(taylor.hi),
@@ -348,7 +413,7 @@ impl<'a> PreparedMultiparameter<'a> {
             terms.push(BoundTerm::new(&t));
             Ok(())
         })?;
-        let bounds = Bounds { terms };
+        let bounds = Bounds::new(terms)?;
         let boxes = bounds.spinodals(maximum)?;
         let scale = self.eos.gas_constant() * self.temperature * self.eos.rc();
         let mut brackets = Vec::new();
@@ -568,15 +633,101 @@ impl MultiparameterEquilibrium<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn uncached_natural(bounds: &Bounds, x: Interval, k: usize) -> Interval {
+        let mut value = match k {
+            0 => x,
+            1 => Interval::point(1.),
+            _ => Interval::ZERO,
+        };
+        for term in &bounds.terms {
+            value = value.add(term.bound(x, k));
+        }
+        value
+    }
+    fn uncached_evaluate(bounds: &Bounds, x: Interval, k: usize) -> Interval {
+        let value = uncached_natural(bounds, x, k);
+        if x.lo == x.hi || k >= 3 {
+            return value;
+        }
+        let mid = x.lo + (x.hi - x.lo) * 0.5;
+        let center = Interval::point(mid);
+        let dx = x.add(center.negative());
+        let mut taylor = uncached_natural(bounds, center, k)
+            .add(uncached_natural(bounds, center, k + 1).multiply(dx));
+        if k < 2 {
+            taylor = taylor.add(
+                uncached_natural(bounds, x, k + 2)
+                    .multiply(dx.square())
+                    .multiply(Interval::point(0.5)),
+            );
+        }
+        if k == 2 {
+            taylor = uncached_natural(bounds, center, k)
+                .add(uncached_natural(bounds, x, k + 1).multiply(dx));
+        }
+        Interval {
+            lo: value.lo.max(taylor.lo),
+            hi: value.hi.min(taylor.hi),
+        }
+    }
+    #[test]
+    fn interval_cache_preserves_bounds_bitwise_across_derivatives_and_eviction() {
+        for model in [
+            Multiparameter::new("C3").unwrap(),
+            Multiparameter::new("R134A").unwrap(),
+            Multiparameter::new("O-H2").unwrap(),
+            Multiparameter::lennard_jones("AR", LennardJonesKind::Full).unwrap(),
+            Multiparameter::reduced_lennard_jones_truncated_shifted(),
+        ] {
+            for tr in [0.6, 0.999999, 1., 1.5] {
+                let prepared = model.prepare(tr * model.tc()).unwrap();
+                let mut terms = Vec::new();
+                prepared
+                    .visit_density_terms(|t| {
+                        terms.push(BoundTerm::new(&t));
+                        Ok(())
+                    })
+                    .unwrap();
+                let bounds = Bounds::new(terms).unwrap();
+                let mut intervals = vec![
+                    Interval::point(0.),
+                    Interval { lo: -0., hi: 0. },
+                    Interval { lo: 0., hi: 8. },
+                ];
+                for i in 1..=20 {
+                    let d = f64::from(i) / 5.;
+                    intervals.push(Interval::point(d));
+                    intervals.push(Interval {
+                        lo: d - 1e-5,
+                        hi: d + 1e-5,
+                    });
+                }
+                for x in intervals
+                    .iter()
+                    .copied()
+                    .chain(intervals.iter().rev().copied())
+                {
+                    for k in [2, 1, 3, 0, 1, 2] {
+                        let actual = bounds.evaluate(x, k);
+                        let expected = uncached_evaluate(&bounds, x, k);
+                        assert_eq!(
+                            [actual.lo.to_bits(), actual.hi.to_bits()],
+                            [expected.lo.to_bits(), expected.hi.to_bits()],
+                            "{} {tr} {x:?} derivative {k}",
+                            model.record.ident
+                        );
+                    }
+                }
+            }
+        }
+    }
     #[test]
     fn centered_bounds_resolve_narrow_pairs_and_report_unresolved_contact() {
         for epsilon in [1e-8, 1e-12, 0.] {
             let a = DensityTerm::new(1, DensityExponent::Plain, -1., 0., 0).unwrap();
             let c = (1. - epsilon) / 6.;
             let b = DensityTerm::new(2, DensityExponent::Plain, c, 0., 0).unwrap();
-            let bounds = Bounds {
-                terms: vec![BoundTerm::new(&a), BoundTerm::new(&b)],
-            };
+            let bounds = Bounds::new(vec![BoundTerm::new(&a), BoundTerm::new(&b)]).unwrap();
             let roots = bounds.spinodals(2.).unwrap();
             if epsilon > 0. {
                 assert_eq!(roots.len(), 2);
@@ -612,7 +763,7 @@ mod tests {
                     Ok(())
                 })
                 .unwrap();
-                let b = Bounds { terms };
+                let b = Bounds::new(terms).unwrap();
                 for (lo, hi) in [(0., 0.1), (0.9, 1.1), (1.999, 2.001), (3., 4.)] {
                     let intervals = [
                         b.evaluate(Interval { lo, hi }, 0),

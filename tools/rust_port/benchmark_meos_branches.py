@@ -8,7 +8,7 @@ from benchmark_solid_water import parse
 
 PROFILES=[('NIST_MEOS:C3',.95),('NIST_MEOS:R134A',1.05),('NIST_MEOS:N-H2',.95),('LJ_MEOS:AR',.95),('LJTS_MEOS:KR',.95)]
 
-def benchmark(repeats,preflight_only):
+def benchmark(repeats,preflight_only,output):
     if repeats<1:raise ValueError('Positive sample count required')
     fixture=ROOT/'tests/fixtures/meos_pressure_branches.csv';meta=json.loads(fixture.with_suffix('.metadata.json').read_text());assert hashlib.sha256(fixture.read_bytes()).hexdigest()==meta['fixture_sha256']
     metadata=list(csv.DictReader((ROOT/'tests/fixtures/meos_metadata.csv').open(),delimiter=';'))
@@ -53,7 +53,7 @@ def benchmark(repeats,preflight_only):
         native_sources_sha256=native,cargo_inputs_sha256=cargo,benchmark_sources_sha256=harness,profiles=PROFILES,numeric_cases=inputs,preflight_cases=len(expected),maximum_absolute_differences=maxima,
         iterations_per_sample=dict(fresh=100,prepared=1000,setup=10),samples_ns=samples,median_ns={k:statistics.median(v) for k,v in samples.items()},checksums=checksums,
         workload='Complete stable bounded root set plus minimum-Gibbs selection at fixed T/P, with caller-owned density buffers. Five profiles; every resolved source-backed fixture pressure at each chosen isotherm is preflighted. Outputs are root count, sum of all root densities, extreme densities and minimum-Gibbs density; five separate sums checked per sample. Fresh mode includes interval discovery and destruction; prepared mode reuses branches; setup is timed separately. Model construction and input parsing are excluded. Native-only measurements: no original bulk complete-root API is available here, and legacy phase-switch iteration has different selection semantics. No source speedup claim. Default five measured samples after a warm-up.')
-    (ROOT/'docs/rust/meos-branches-benchmark.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report['median_ns'],indent=2))
+    Path(output).write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report['median_ns'],indent=2))
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('--repeats',type=int,default=5);p.add_argument('--preflight-only',action='store_true');a=p.parse_args();benchmark(a.repeats,a.preflight_only)
+    p=argparse.ArgumentParser();p.add_argument('--repeats',type=int,default=5);p.add_argument('--preflight-only',action='store_true');p.add_argument('--output',default=ROOT/'docs/rust/meos-branches-benchmark.json');a=p.parse_args();benchmark(a.repeats,a.preflight_only,a.output)

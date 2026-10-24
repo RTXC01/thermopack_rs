@@ -844,3 +844,44 @@ audits. The native-only branch benchmark preflights 40 source-backed cases
 and compares five separate output sums per sample. Source qualification and
 benchmark preflight are added to CI. Original source/data and the exact-source
 library remain unchanged. Hosted CI results have not been observed here.
+
+The bounded-discovery cache follow-up retains every qualified result and all
+five numerical fixture/metadata pairs byte for byte. Reused source references
+are hash-verified; all 1110 native roots and their Gibbs choices receive live
+original-kernel checks again. The 804 resolved sets, eight density-precision
+errors, eleven resolved extreme volumes, 212 spinodals and 52 ordinary
+critical comparisons keep their prior classifications.
+
+One discovery retains eight exact endpoint-bit interval keys, exponential
+bounds for at most 32 terms per key and four lazy natural-derivative sums.
+FIFO replacement clears the sums. The cache is private to one immutable
+temperature preparation and is dropped before returning the reusable public
+equilibrium object. The original exp guard, operation order, root equations,
+search limits and convergence/precision criteria remain unchanged. An
+independent uncached test checks all bound bits across derivative changes,
+signed zeros and eviction. Read-only numerical review also checked capacity,
+lifetimes and the public query object's thread traits.
+
+Fresh paired measurements use the same 40 numerical cases, source identity,
+benchmark code, Cargo inputs and toolchain. Only the interval module changes.
+All five numerical checksum fields are identical. Discovery improves by
+1.55-2.14x and fresh complete-query timing by 1.54-2.09x, with every cached
+sample below every baseline sample in those modes. Prepared C3 increases
+from 11.75 to 13.41 us; the remaining prepared medians vary by less than 3%.
+Every timing input has one stable root; broader multi-root-query performance
+remains unmeasured. These are native comparisons, without a source-speedup
+claim. The auditor validates actual cyclic root-count sums, positive samples,
+stored medians, separate density checksums and complete normalized report
+file hashes; it does not equate root-count sums with iteration counts.
+
+The follow-up passes 364 standard development tests plus custom source
+harnesses/all-target executables, 60 selected release tests, 27 documentation
+examples, strict all-target Clippy/rustdoc, formatting and all 125 fixture
+audits. The historical comparison audit is included in native CI. Hosted
+CI results have not been observed here.
+
+Eight Python audit regressions also pass and run in native CI. They preserve
+the distinction between iteration counts and cyclic sums of multiple roots,
+check full-file CRLF normalization, and reject sample, median, input, checksum
+and extra-source-change corruption. The tests use checked generated scratch
+directories and require no reference library.

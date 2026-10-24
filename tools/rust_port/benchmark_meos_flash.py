@@ -11,6 +11,7 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from deadline_reference import DeadlineReferenceProcess
+from validate_meos_flash import key as flash_case_key
 
 ROOT = Path(__file__).resolve().parents[2]
 PROFILES = ['NIST_MEOS:C3', 'NIST_MEOS:R134A', 'LJ_MEOS:KR', 'LJ_MEOS:AR',
@@ -27,6 +28,11 @@ def digest(path):
 def hashes(paths):
     return {p.relative_to(ROOT).as_posix():hashlib.sha256(p.read_bytes().replace(b'\r\n', b'\n')).hexdigest()
             for p in paths}
+
+
+def endpoint_request(request):
+    quality = request.get('kernel_quality', request.get('quality'))
+    return request['kind'] in ('PH', 'PS') and quality in (0., 1.)
 
 
 def parse_rows(text, prefix, fields):
@@ -122,6 +128,19 @@ def main():
     def read_rows(path):
         with path.open(encoding='utf-8', newline='') as f:
             return list(csv.DictReader(f, delimiter=';'))
+    flash_rows = read_rows(fixture)
+    fixture_cases = {row['case'] for row in flash_rows}
+    request_by_case = {}
+    for e in meta['records']:
+        if not e['result'].get('values'):
+            continue  # failed seed calls have no target and are not fixture rows
+        case = flash_case_key(e['request'], e['result'])
+        if case not in fixture_cases:
+            continue
+        if case in request_by_case:
+            assert endpoint_request(request_by_case[case]) == endpoint_request(e['request'])
+        request_by_case[case] = e['request']
+    assert request_by_case.keys() == fixture_cases, 'all fixture rows require original request context'
     metadata = {r['case'].split('|')[1]:{k:float(v) for k,v in r.items() if k != 'case'}
                 for r in read_rows(metadata_fixture)}
     ne = metadata['LJTS_MEOS:NE']
@@ -134,9 +153,9 @@ def main():
     audit = dict(undefined_pure_coexistence_tp=sum(r['case'].split('|')[1] in PROFILES for r in read_rows(coexist)),
                  source_recovery_rows_outside_primary_fixture=sum(r['case'].split('|')[1] in PROFILES for r in read_rows(recovered)),
                  declared_coordinate_gap_cases=len(gap_keys), gap_grid_intersections=0,
-                 exact_caloric_endpoint_rows=0, nearcritical_caloric_rows=0)
-    rows = []
-    for row in read_rows(fixture):
+                 endpoint_seed_requests=0, ordinary_homogeneous_caloric_rows=0, nearcritical_caloric_rows=0)
+    rows = []; contexts = {}
+    for row in flash_rows:
         case = row['case'].split('|'); profile = case[1]; control = case[5].split(':')
         if profile not in PROFILES:
             continue
@@ -154,6 +173,8 @@ def main():
         if any(c[0:3] == (eos, component, mode) and abs(tr-float(c[3])) <= 2e-5
                and abs(pr-float(c[4])) <= 2e-5 for c in gap_cells):
             audit['gap_grid_intersections'] += 1
+        request = request_by_case[row['case']]
+        endpoint_seed = endpoint_request(request)
         kind = {'TP':0,'PH':1,'PS':2}[mode]
         has_guess = mode != 'TP' and control[3] != 'none'
         guess = float(control[3]) if has_guess else 0.
@@ -164,11 +185,16 @@ def main():
              float(case[2]) if mode == 'TP' else guess, float(case[3]),
              0. if mode == 'TP' else float(control[2]), guess, int(has_guess), tmin, tmax, *expected]
         rows.append(r)
+        context = dict(source_case=row['case'], endpoint_seed=endpoint_seed,
+                       seed_quality=request.get('kernel_quality',request.get('quality')))
+        contexts[id(r)] = context
         if mode != 'TP':
-            audit['exact_caloric_endpoint_rows'] += int(vals[3] == vals[4])
+            audit['endpoint_seed_requests'] += int(endpoint_seed)
+            audit['ordinary_homogeneous_caloric_rows'] += int(not endpoint_seed and vals[3] == vals[4])
             audit['nearcritical_caloric_rows'] += int(abs(tr-1.) < .002)
         prop = r.copy(); prop[1] = prop[2] = 5; prop[3:5] = vals[:2]
         rows.append(prop)
+        contexts[id(prop)] = context
     assert rows
     rows.sort(key=lambda r:(r[0],r[1],r[3],r[4],r[7]))
     out = ROOT/'.reference'; out.mkdir(exist_ok=True)
@@ -180,7 +206,7 @@ def main():
     sources = [source, bench, Path(__file__), ROOT/'tools/rust_port/reference_probe.f90', fixture,
         fixture.with_suffix('.metadata.json'), metadata_fixture, coexist, coexist.with_suffix('.metadata.json'),
         recovered, ROOT/'tests/fixtures/meos_saturation.csv', ROOT/'tests/fixtures/meos_saturation_recovered.csv', gaps_path,
-        ROOT/'tools/rust_port/oracle_worker.py', ROOT/'tools/rust_port/reference.py', ROOT/'tools/rust_port/deadline_reference.py']
+        ROOT/'tools/rust_port/oracle_worker.py', ROOT/'tools/rust_port/reference.py', ROOT/'tools/rust_port/deadline_reference.py', ROOT/'tools/rust_port/validate_meos_flash.py']
     sourcehash = hashes(sources); rustpaths = sorted((ROOT/'rust').rglob('*.rs'))
     rusthash = hashes(rustpaths)
     cargo_candidates = [ROOT/'Cargo.toml', ROOT/'Cargo.lock', ROOT/'.cargo/config', ROOT/'.cargo/config.toml',
@@ -226,10 +252,10 @@ def main():
     statuses = parse_rows(ref_text, 'status_', 1)
     assert ref.keys() == native.keys() and len(ref) == len(rows)
     assert {k.removeprefix('status_') for k in statuses} == {k.removeprefix('check_') for k in ref}
-    groups = {}; row_by_key = {}; maxima = [0.]*8; endpoint_pairs = []; warnings = []
+    groups = {}; row_by_key = {}; context_by_key = {}; maxima = [0.]*8; endpoint_pairs = []; warnings = []
     for r in rows:
         group = int(r[0]), int(r[1]); selected = groups.setdefault(group, [])
-        key = f'check_{group[0]}_{group[1]}_{len(selected)}'; selected.append(key); row_by_key[key] = r
+        key = f'check_{group[0]}_{group[1]}_{len(selected)}'; selected.append(key); row_by_key[key] = r; context_by_key[key] = contexts[id(r)]
         x, y = ref[key][:], native[key][:]; prop = group[1] == 5
         assert valid_result(x, prop) and valid_result(y, prop), (key, x, y)
         status = statuses[key.replace('check_', 'status_', 1)][0]
@@ -244,7 +270,7 @@ def main():
                 assert abs((x[6] if r[2] == 1 else x[7])-r[5]) <= 2e-7*scale, (key, 'source caloric specification')
                 native_scale = gas*y[0] if r[2] == 1 else gas
                 assert abs((y[6] if r[2] == 1 else y[7])-r[5]) <= 3e-10*native_scale, (key, 'native caloric specification')
-        endpoint = group[1] in (1,2,3,4) and r[14] == r[15]
+        endpoint = group[1] in (1,2,3,4) and contexts[id(r)]['endpoint_seed']
         if endpoint:
             endpoint_pairs.append(dict(case=key, source=x[:], native=y[:]))
             x, y = endpoint_coordinates(x), endpoint_coordinates(y)
@@ -320,7 +346,7 @@ def main():
                      source_warnings=warnings, audit=audit, independent_kernel_checks=kernel_checks,
                      original_kernel_states=[dict(model=k[0],temperature=k[1],volume=k[2],values=v) for k,v in kernel_cache.items()],
                      kernel_fields=['residual_alpha','P','P_V','U','S','H','Cv'],
-                     outputs=dict(source=ref,native=native,source_status=statuses))
+                     outputs=dict(source=ref,native=native,source_status=statuses), request_contexts=context_by_key)
     (out/'meos-flash-benchmark-preflight.json').write_text(json.dumps(preflight,indent=2)+'\n', encoding='utf-8')
     if not args.measure:
         print(json.dumps(dict(preflight_rows=len(rows), timed_eligible_rows=len(rows), audit=audit,

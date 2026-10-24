@@ -53,14 +53,16 @@ wrappers; statuses are retained. The reviewed cohort has no warning statuses.
 
 The reviewed preflight includes **1,484 rows**, all eligible for timing:
 742 flash requests and 742 scalar property requests. The flash cohort includes
-**396 exact caloric endpoints** and **180 near-critical caloric rows**.
+**220 endpoint-seeded caloric requests** and **180 near-critical caloric rows**.
 There are no per-input mismatch exclusions. All source/native outputs match
 within the explicit per-quantity tolerances, and **2,968 independent checks**
 verify their actual T/V outputs against the original TV kernels: H/S,
 mechanical/thermal stability, pressure and coexistence chemical potential.
 Original kernel states, complete raw preflight vectors and statuses are retained.
 
-At an exact caloric endpoint, a tiny source/native quality or phase-flag
+Endpoint membership is derived from original request metadata (specified
+quality 0 or 1), rather than equal volume slots: ordinary single-phase
+returns also have equal slots. At an endpoint, a tiny source/native quality or phase-flag
 difference must not compare the occupied phase against the other phase's
 volume slot. The preflight compares weighted bulk volume and canonical phase
 fields only for endpoint inputs, requires the raw split to be within 2e-6 of

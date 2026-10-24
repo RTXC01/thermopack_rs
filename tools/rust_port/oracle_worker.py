@@ -151,6 +151,123 @@ def main(compiler_directory):
             except Exception as error:
                 print('THERMOPACK_RESULT='+json.dumps(dict(calculation_error=str(error))),flush=True)
             continue
+        if request['mode']=='MEOS_FLASH':
+            from types import SimpleNamespace
+            if probe is None:probe=load_probe()
+            from thermopack.multiparameter import multiparam
+            reduced=request['eos']=='LJTS_REDUCED'
+            key=('MEOS_FLASH',request['eos'],request['component'])
+            if previous!=key:
+                model=multiparam('NE' if reduced else request['component'],
+                                 'LJTS_MEOS' if reduced else request['eos']);previous=key
+            model.activate();tscale=vscale=pscale=1.
+            if reduced:
+                output=(c_double*46)();metadata=(c_double*18)()
+                probe.query_meos(300.,1.,1.,0,output,metadata)
+                tscale=float(metadata[14])
+                vscale=6.02214076e23*float(metadata[13])**3
+                pscale=float(metadata[10])*tscale/vscale
+            hscale=pscale*vscale
+            sscale=hscale/tscale
+            stage='setup';input_pressure=float(request['pressure']);result_pressure=input_pressure
+            target_native=None;seed_info=None
+            def emit_meos_flash(payload):
+                nonfinite={}
+                def clean(value,path=''):
+                    if isinstance(value,float) and not math.isfinite(value):
+                        nonfinite[path or 'value']=repr(value);return None
+                    if isinstance(value,dict):return {str(k):clean(v,f'{path}.{k}' if path else str(k)) for k,v in value.items()}
+                    if isinstance(value,(list,tuple)):return [clean(v,f'{path}[{i}]') for i,v in enumerate(value)]
+                    return value
+                safe=clean(payload)
+                if nonfinite:safe['nonfinite_metadata']=nonfinite
+                print('THERMOPACK_RESULT='+json.dumps(safe,allow_nan=False),flush=True)
+            try:
+                model.set_tmin(float(request.get('minimum_temperature',80./tscale))*tscale)
+                model.set_tmax(float(request.get('maximum_temperature',999./tscale))*tscale)
+                kind=request['kind'].upper()
+                if kind not in ('TP','PH','PS'):raise ValueError('kind must be TP, PH, or PS')
+                t=float(request['temperature'])*tscale
+                p=float(request['pressure'])*pscale
+                z=[1.]
+                target=None
+                with warnings.catch_warnings(record=True) as messages:
+                    warnings.simplefilter('always')
+                    if kind=='TP':
+                        if 'quality' in request:
+                            stage='seed_saturation';beta=float(request['quality'])
+                            p=float(model.bubble_pressure(t,z)[0]);result_pressure=p/pscale
+                            seed_info=dict(type='saturation_pressure',temperature=t/tscale,pressure=result_pressure,
+                                           quality=beta)
+                        stage='flash';result=model.two_phase_tpflash(t,p,z)
+                    else:
+                        method='enthalpy' if kind=='PH' else 'entropy'
+                        if 'target' in request:
+                            target=float(request['target'])*(hscale if kind=='PH' else sscale)
+                            target_native=float(request['target'])
+                            seed_info=dict(type='direct_target')
+                        else:
+                            if 'quality' in request:
+                                stage='seed_saturation';beta=float(request['quality'])
+                                p=float(model.bubble_pressure(t,z)[0]);result_pressure=p/pscale
+                                seed=SimpleNamespace(T=t,p=p,z=z,x=z,y=z,betaV=beta,betaL=1.-beta,phase=model.TWOPH)
+                                seed_info=dict(type='saturation_quality',temperature=t/tscale,
+                                               pressure=result_pressure,quality=beta)
+                            else:
+                                stage='seed_tp';seed=model.two_phase_tpflash(t,p,z)
+                                seed_info=dict(type='tp',temperature=float(seed.T)/tscale,
+                                               pressure=float(seed.p)/pscale,phase=int(seed.phase),
+                                               betaV=float(seed.betaV),betaL=float(seed.betaL))
+                            stage='property_check';target=overall(model,seed,method)
+                            target_native=target/(hscale if kind=='PH' else sscale)
+                        guess=request.get('guess_factor')
+                        guess_t=t*float(guess) if guess is not None else None
+                        stage='flash'
+                        result=getattr(model,'two_phase_phflash' if kind=='PH' else 'two_phase_psflash')(
+                            p,z,target,temp=guess_t)
+                result_pressure=float(result.p)/pscale
+                raw=[float(result.T)/tscale,result_pressure,int(result.phase),
+                     float(result.betaV),float(result.betaL),*map(float,result.x),*map(float,result.y)]
+                stage='property_check'
+                two=result.phase==model.TWOPH
+                if two:
+                    vl=float(model.specific_volume(result.T,result.p,z,model.LIQPH)[0])
+                    vv=float(model.specific_volume(result.T,result.p,z,model.VAPPH)[0])
+                    phase_volumes=[vl,vv]
+                else:
+                    v=float(model.specific_volume(result.T,result.p,z,
+                        model.LIQPH if result.phase==model.SINGLEPH else result.phase)[0])
+                    vl=vv=v;phase_volumes=[v]
+                closure=[model.pressure_tv(result.T,v,z,dpdv=True) for v in phase_volumes]
+                h=overall(model,result,'enthalpy');s=overall(model,result,'entropy')
+                actual=h if kind=='PH' else s
+                scaled_error=0. if target is None else (actual-target)/(8.31446261815324*(result.T if kind=='PH' else 1.))
+                interior=two and 1e-8<result.betaV<1.-1e-8
+                overall_v=result.betaL*vl+result.betaV*vv if two else vl
+                values=[float(result.T)/tscale,float(result.p)/pscale,float(interior),
+                        float(result.betaV) if interior else 0.,
+                        float(vl if interior else overall_v)/vscale,
+                        float(vv if interior else overall_v)/vscale,h/hscale,s/sscale]
+                extra=dict(specification=target_native,
+                           raw_result=raw,scaled_specification_error=scaled_error,
+                           pressure_closure=[dict(pressure=float(a)/pscale,dv=float(b)*vscale/pscale) for a,b in closure],
+                           pressure_stable=all(math.isfinite(float(a)) and math.isfinite(float(b)) and float(b)<0. for a,b in closure),
+                           pressure_errors=[(float(a)-result.p)/pscale for a,_ in closure],
+                           material_balance_error=0. if not two else abs(result.betaL+result.betaV-1.),
+                           input_pressure=input_pressure,result_pressure=result_pressure,seed=seed_info,
+                           warnings=[str(m.message) for m in messages])
+                if not all(map(math.isfinite,values)) or not extra['pressure_stable'] or any(
+                        not math.isfinite(float(a)) or abs(float(a)-result.p)>1e8*sys.float_info.epsilon*result.p
+                        for a,_ in closure):
+                    emit_meos_flash(dict(calculation_error='source MEOS flash fails finite/stable pressure closure',
+                          stage=stage,values=values,**extra));continue
+                emit_meos_flash(dict(values=values,stage=stage,**extra));continue
+            except Exception as error:
+                if str(error) not in ('PH flash calculation failed','PS flash calculation failed',
+                                      'bubble_pressure calculation failed'):
+                    raise
+                emit_meos_flash(dict(calculation_error=str(error),stage=stage,input_pressure=input_pressure,
+                                     result_pressure=result_pressure,specification=target_native,seed=seed_info));continue
         if request['mode'] in ['MEOS','MEOS_DENSITY','MEOS_COEX_CHECK','MEOS_PRESSURE_GRID']:
             if probe is None:probe=load_probe()
             reduced=int(request['eos']=='LJTS_REDUCED')

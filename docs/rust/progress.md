@@ -30,6 +30,10 @@ be mistaken for closing these much larger gaps.
 
 After each commit the chat reports the rounded overall estimate and the
 concrete completed change. It may remain unchanged across several commits.
+The pure MEOS TP/PH/PS addition qualifies a bounded surface across fourteen
+models, with 1,890 independent source-kernel checks. Its 36 endpoint
+coordinate gaps, missing response/phase-diagram capabilities and unmeasured
+flash performance leave the overall estimate at about 35%.
 Reassess the workstream estimates when a material gap closes, and record why;
 do not increment the percentage merely because a commit or test was added.
 The final 100% requires an exhaustive completion audit against the full user

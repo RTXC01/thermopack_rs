@@ -2037,6 +2037,68 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     "LJTS_REDUCED" => Multiparameter::reduced_lennard_jones_truncated_shifted(),
                     _ => Multiparameter::new(config[1])?,
                 };
+                if fields[5].starts_with("FLASH:") {
+                    let control: Vec<_> = fields[5].split(':').collect();
+                    let p = fields[3].parse().unwrap();
+                    let options = thermopack_rs::CaloricFlashOptions {
+                        temperature_guess: if control[3] == "none" {
+                            None
+                        } else {
+                            Some(control[3].parse().unwrap())
+                        },
+                        minimum_temperature: control[4].parse().unwrap(),
+                        maximum_temperature: control[5].parse().unwrap(),
+                        ..Default::default()
+                    };
+                    let f = match control[1] {
+                        "TP" => model.tp_flash(t, p)?,
+                        "PH" => {
+                            model.ph_flash_with_options(p, control[2].parse().unwrap(), options)?
+                        }
+                        "PS" => {
+                            model.ps_flash_with_options(p, control[2].parse().unwrap(), options)?
+                        }
+                        _ => {
+                            return Err(thermopack_rs::Error::InvalidInput(
+                                "unknown MEOS flash mode",
+                            ));
+                        }
+                    };
+                    let q = model.equilibrium_properties(&f)?;
+                    let two = f.phase == thermopack_rs::FlashPhase::TwoPhase
+                        && f.vapor_fraction > 1e-8
+                        && f.vapor_fraction < 1. - 1e-8;
+                    return Ok(vec![
+                        f.temperature,
+                        f.pressure,
+                        f64::from(two),
+                        if two { f.vapor_fraction } else { 0. },
+                        if two {
+                            f.liquid_volume.unwrap()
+                        } else {
+                            q.volume
+                        },
+                        if two {
+                            f.vapor_volume.unwrap()
+                        } else {
+                            q.volume
+                        },
+                        q.enthalpy,
+                        q.entropy,
+                        f64::from(f.phase == thermopack_rs::FlashPhase::TwoPhase),
+                        f.vapor_fraction,
+                        if f.phase == thermopack_rs::FlashPhase::TwoPhase {
+                            f.liquid_volume.unwrap()
+                        } else {
+                            q.volume
+                        },
+                        if f.phase == thermopack_rs::FlashPhase::TwoPhase {
+                            f.vapor_volume.unwrap()
+                        } else {
+                            q.volume
+                        },
+                    ]);
+                }
                 if fields[5] == "PRESSURE_JET" {
                     let q = model
                         .prepare(t)?

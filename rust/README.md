@@ -3,6 +3,8 @@
 Experimental native port; see [coverage](../docs/rust/coverage.md) before use.
 The original Fortran/Python implementation is retained as the reference.
 
+[Pure multiparameter flashes](../docs/rust/meos-flash.md) add TP/PH/PS and
+specified-quality properties, with an explicit source parity/gap ledger.
 [Pure multiparameter saturation](../docs/rust/meos-saturation.md) provides
 pressure, temperature inversion, phase volumes and Clapeyron slopes for all
 14 native NIST/Lennard-Jones variants, with separate evidence for direct

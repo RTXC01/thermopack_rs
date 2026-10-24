@@ -27,6 +27,10 @@ mod flash;
 mod response;
 pub use crate::caloric::EquilibriumResponse;
 
+#[path = "multiparameter_isochoric.rs"]
+mod isochoric;
+pub use isochoric::MultiparameterEquilibriumTv;
+
 #[path = "multiparameter_equilibrium.rs"]
 mod equilibrium;
 pub use equilibrium::{

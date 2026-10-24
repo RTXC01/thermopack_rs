@@ -2122,6 +2122,75 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     "LJTS_REDUCED" => Multiparameter::reduced_lennard_jones_truncated_shifted(),
                     _ => Multiparameter::new(config[1])?,
                 };
+                if fields[5].starts_with("ISO:") {
+                    let control: Vec<_> = fields[5].split(':').collect();
+                    let mut options = model.volume_flash_options();
+                    options.temperature_guess = if control[3] == "none" {
+                        None
+                    } else {
+                        Some(control[3].parse().unwrap())
+                    };
+                    options.pressure_guess = if control[4] == "none" {
+                        None
+                    } else {
+                        Some(control[4].parse().unwrap())
+                    };
+                    options.minimum_temperature = control[5].parse().unwrap();
+                    options.maximum_temperature = control[6].parse().unwrap();
+                    options.minimum_pressure = control[7].parse().unwrap();
+                    options.maximum_pressure = control[8].parse().unwrap();
+                    let volume: f64 = fields[3].parse().unwrap();
+                    let flash = match control[1] {
+                        "UV" => model.uv_flash_with_options(
+                            control[2].parse().unwrap(),
+                            volume,
+                            options,
+                        )?,
+                        "SV" => model.sv_flash_with_options(
+                            control[2].parse().unwrap(),
+                            volume,
+                            options,
+                        )?,
+                        _ => {
+                            return Err(thermopack_rs::Error::InvalidInput(
+                                "unknown MEOS isochoric flash mode",
+                            ));
+                        }
+                    };
+                    let properties = model.equilibrium_properties(&flash)?;
+                    let two = flash.phase == thermopack_rs::FlashPhase::TwoPhase;
+                    let (vl, vv) = if two {
+                        let sat = model.saturation_pressure(flash.temperature)?;
+                        (sat.liquid_volume, sat.vapor_volume)
+                    } else {
+                        (properties.volume, properties.volume)
+                    };
+                    let cv = if two {
+                        model
+                            .equilibrium_tv(flash.temperature, properties.volume)?
+                            .heat_capacity_v
+                    } else {
+                        model
+                            .prepare(flash.temperature)?
+                            .heat_capacity_v(properties.volume)?
+                    };
+                    return Ok(vec![
+                        flash.temperature,
+                        flash.pressure,
+                        f64::from(two),
+                        if two { flash.vapor_fraction } else { 0. },
+                        if two { flash.liquid_fraction } else { 1. },
+                        properties.volume,
+                        properties.internal_energy,
+                        properties.entropy,
+                        flash.phase as i32 as f64,
+                        vl,
+                        vv,
+                        cv,
+                        flash.vapor_fraction,
+                        flash.liquid_fraction,
+                    ]);
+                }
                 if fields[5].starts_with("FLASH:") {
                     let control: Vec<_> = fields[5].split(':').collect();
                     let p = fields[3].parse().unwrap();

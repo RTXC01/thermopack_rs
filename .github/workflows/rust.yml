@@ -25,6 +25,7 @@ jobs:
       - run: python -m unittest discover -s tools/rust_port -p test_compare_meos_bounds_cache_benchmarks.py
       - run: python -m unittest discover -s tools/rust_port -p test_meos_flash_audit.py
       - run: python -m unittest discover -s tools/rust_port -p test_meos_response_audit.py
+      - run: python -m unittest discover -s tools/rust_port -p test_meos_isochoric_audit.py
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test --all-targets
       - run: cargo test --release --tests
@@ -143,6 +144,7 @@ jobs:
       - run: python tools/rust_port/validate_meos_equilibrium.py
       - run: python tools/rust_port/validate_meos_flash.py --allow-known-gaps
       - run: python tools/rust_port/qualify_multiparameter_response.py
+      - run: python tools/rust_port/validate_meos_isochoric.py --allow-known-gaps
       - run: python tools/rust_port/benchmark_meos_branches.py --preflight-only
       - run: python tools/rust_port/benchmark_meos_saturation.py --compiler /usr/bin/gfortran-13 --preflight-only
       - run: python tools/rust_port/benchmark_meos.py --compiler /usr/bin/gfortran-13 --preflight-only

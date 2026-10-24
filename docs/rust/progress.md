@@ -43,3 +43,9 @@ Pure MEOS response and sound add 854 strict source comparisons across fourteen
 variants. This closes a bounded response subset; broad singular cases, global
 stability, mixture integration and performance measurements remain pending.
 The overall estimate remains about 35%.
+
+Pure MEOS fixed-volume equilibrium and UV/SV add 560 original-kernel native
+closure checks, 240 qualified source returns and 320 source-failure recoveries.
+The 59 endpoint phase-flag differences and missing global-stability, broad
+derivative/integration and performance evidence keep the overall estimate
+at about 35%.

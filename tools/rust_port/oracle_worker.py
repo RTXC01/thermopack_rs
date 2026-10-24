@@ -118,6 +118,89 @@ def main(compiler_directory):
     probe=None
     for line in sys.stdin:
         request=json.loads(line)
+        if request['mode']=='MEOS_ISO':
+            # Targets are prepared by independent original TV kernels in the
+            # host, before entering a solver that can terminate the process.
+            from thermopack.multiparameter import multiparam
+            from types import SimpleNamespace
+            if probe is None:probe=load_probe()
+            reduced=request['eos']=='LJTS_REDUCED'
+            key=('MEOS_ISO',request['eos'],request['component'])
+            if previous!=key:
+                model=multiparam('NE' if reduced else request['component'],
+                                 'LJTS_MEOS' if reduced else request['eos']);previous=key
+            model.activate();tscale=vscale=pscale=uscale=sscale=1.
+            if reduced:
+                output=(c_double*46)();metadata=(c_double*18)()
+                probe.query_meos(300.,1.,1.,0,output,metadata)
+                tscale=float(metadata[14]);vscale=6.02214076e23*float(metadata[13])**3
+                sscale=float(metadata[10]);uscale=sscale*tscale;pscale=uscale/vscale
+            model.set_tmin(float(request['minimum_temperature'])*tscale)
+            model.set_tmax(float(request['maximum_temperature'])*tscale)
+            model.set_pmin(float(request['minimum_pressure'])*pscale)
+            model.set_pmax(float(request['maximum_pressure'])*pscale)
+            kind=request['kind'];assert kind in ('UV','SV')
+            target=float(request['target'])*(uscale if kind=='UV' else sscale)
+            volume=float(request['volume'])*vscale
+            guess_t=0. if request['temperature_guess'] is None else request['temperature_guess']*tscale
+            guess_p=0. if request['pressure_guess'] is None else request['pressure_guess']*pscale
+            stage='flash';context={}
+            print('THERMOPACK_STAGE=flash',flush=True)
+            def emit_iso(payload):
+                nonfinite={}
+                def clean(value,path=''):
+                    if isinstance(value,float) and not math.isfinite(value):
+                        nonfinite[path]=repr(value);return None
+                    if isinstance(value,dict):return {str(k):clean(v,f'{path}.{k}') for k,v in value.items()}
+                    if isinstance(value,(list,tuple)):return [clean(v,f'{path}[{i}]') for i,v in enumerate(value)]
+                    return value
+                result=clean(payload)
+                if nonfinite:result['nonfinite_metadata']=nonfinite
+                print('THERMOPACK_RESULT='+json.dumps(result,allow_nan=False),flush=True)
+            try:
+                with warnings.catch_warnings(record=True) as messages:
+                    warnings.simplefilter('always')
+                    if kind=='UV':
+                        result=model.two_phase_uvflash([1.],target,volume,
+                            temp=None if request['temperature_guess'] is None else guess_t,
+                            press=None if request['pressure_guess'] is None else guess_p)
+                        # The public UV entry point exposes no status argument.
+                        status=None
+                    else:
+                        n=model.nc;tv,pv=c_double(guess_t),c_double(guess_p)
+                        bv=c_double(request['seed_beta']);bl=c_double(1.-request['seed_beta'])
+                        zv=(c_double*n)(1.);xv=(c_double*n)(1.);yv=(c_double*n)(1.)
+                        sv,vv=c_double(target),c_double(volume)
+                        phase=c_int(request['seed_phase']);code=c_int()
+                        probe.query_sv(n,byref(tv),byref(pv),zv,byref(bv),byref(bl),xv,yv,
+                                       byref(sv),byref(vv),byref(phase),byref(code))
+                        status=code.value
+                        result=SimpleNamespace(T=tv.value,p=pv.value,x=list(xv),y=list(yv),
+                                               betaV=bv.value,betaL=bl.value,phase=phase.value)
+                    context=dict(raw_result=[float(result.T)/tscale,float(result.p)/pscale,
+                        int(result.phase),float(result.betaV),float(result.betaL),
+                        *map(float,result.x),*map(float,result.y)],status=status)
+                    stage='returned_phase_properties'
+                    print('THERMOPACK_STAGE=returned_phase_properties',flush=True)
+                    phases=(model.LIQPH,model.VAPPH) if result.phase==model.TWOPH else (
+                        model.LIQPH if result.phase==model.SINGLEPH else result.phase,)
+                    volumes=[float(model.specific_volume(result.T,result.p,[1.],ph)[0]) for ph in phases]
+                    weights=[float(result.betaL),float(result.betaV)] if len(volumes)==2 else [1.]
+                    u=sum(w*float(model.internal_energy_tv(result.T,v,[1.])[0]) for w,v in zip(weights,volumes))
+                    entropy=sum(w*float(model.entropy_tv(result.T,v,[1.])[0]) for w,v in zip(weights,volumes))
+                    actual_volume=sum(w*v for w,v in zip(weights,volumes))
+                    closure=[model.pressure_tv(result.T,v,[1.],dpdv=True) for v in volumes]
+                    two=result.phase==model.TWOPH
+                    context.update(values=[float(result.T)/tscale,float(result.p)/pscale,float(two),
+                        float(result.betaV) if two else 0.,float(result.betaL) if two else 1.,
+                        actual_volume/vscale,u/uscale,entropy/sscale],
+                        phase_volumes=[v/vscale for v in volumes],
+                        pressure_errors=[(float(p)-result.p)/pscale for p,pv in closure],
+                        pressure_dv=[float(pv)*vscale/pscale for p,pv in closure])
+                emit_iso(dict(context,stage=stage,warnings=[str(m.message) for m in messages]))
+            except (ValueError,ArithmeticError) as error:
+                emit_iso(dict(context,calculation_error=str(error),stage=stage))
+            continue
         if request['mode']=='MEOS_SAT':
             if probe is None:probe=load_probe()
             from thermopack.multiparameter import multiparam

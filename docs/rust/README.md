@@ -163,6 +163,8 @@ The [MEOS response notes](meos-response.md) cover pure homogeneous response,
 coexistence sound, source mass conventions and strict wrapper/kernel checks.
 The [MEOS flash notes](meos-flash.md) cover pure TP/PH/PS, explicit quality,
 near-critical continuation, original-kernel checks and remaining endpoint gaps.
+The [MEOS isochoric notes](multiparameter-isochoric.md) cover fixed-volume
+equilibrium, UV/SV, source seed bounds, original-kernel checks and phase gaps.
 The [Lee-Kesler notes](lee-kesler.md) cover the Lee-Kesler corresponding states equation of state,
 Plöcker critical mixing rules, analytical compositional derivatives, and BWR generalized fluids.
 The [ice Ih notes](solid-water.md) cover owned Gibbs reference shifts,

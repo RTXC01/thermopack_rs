@@ -1,16 +1,42 @@
 """Regression gates for qualified MEOS flash benchmark inputs and checksums."""
 import contextlib
+import csv
+import json
 import io
 import math
 import unittest
 
+from validate_meos_flash import key as flash_case_key
+
 from benchmark_meos_flash import (
-    endpoint_coordinates, expected_checksum, parse_args, parse_rows,
-    valid_result, verify_checksum,
+    endpoint_coordinates, endpoint_request, expected_checksum, parse_args, parse_rows,
+    valid_result, verify_checksum, PROFILES, ROOT,
 )
 
 
 class BenchmarkAuditTests(unittest.TestCase):
+    def test_endpoint_classification_uses_original_request_not_equal_volume_slots(self):
+        self.assertFalse(endpoint_request(dict(kind='PH')))
+        self.assertFalse(endpoint_request(dict(kind='PS', quality=.5)))
+        self.assertFalse(endpoint_request(dict(kind='TP', quality=0.)))
+        self.assertTrue(endpoint_request(dict(kind='PH', quality=0.)))
+        self.assertTrue(endpoint_request(dict(kind='PS', kernel_quality=1.)))
+
+    def test_committed_cohort_distinguishes_endpoint_seeds_from_ordinary_single_phase(self):
+        meta = json.loads((ROOT/'tests/fixtures/meos_flash.metadata.json').read_text(encoding='utf-8'))
+        requests = {flash_case_key(e['request'],e['result']):e['request'] for e in meta['records'] if e['result'].get('values')}
+        endpoints = ordinary = 0
+        with (ROOT/'tests/fixtures/meos_flash.csv').open(encoding='utf-8') as handle:
+            for row in csv.DictReader(handle,delimiter=';'):
+                case = row['case'].split('|')
+                if case[1] not in PROFILES or not case[5].startswith(('FLASH:PH:', 'FLASH:PS:')):
+                    continue
+                endpoint = endpoint_request(requests[row['case']])
+                endpoints += endpoint
+                ordinary += not endpoint and float(row['liquid_or_overall_volume']) == float(row['vapor_or_overall_volume'])
+        self.assertEqual(endpoints,220)
+        self.assertEqual(ordinary,192)
+
     def test_endpoint_projection_uses_bulk_volume_at_tiny_quality(self):
         source = [374.172579, 4053799.082591912, 1., 0., .0001823236455205708, 0., 39192.317466, 157.873038]
         native = [374.172579, 4053799.082591912, 0., 1.3224346108521192e-12,

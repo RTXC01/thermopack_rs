@@ -2026,6 +2026,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if fields[0] == "MEOS" {
             let outcome = (|| -> thermopack_rs::Result<Vec<f64>> {
                 use thermopack_rs::{LennardJonesKind, Multiparameter};
+                let t: f64 = fields[2].parse().unwrap();
                 let config: Vec<_> = fields[1].split(':').collect();
                 let model = match config[0] {
                     "LJ_MEOS" => Multiparameter::lennard_jones(config[1], LennardJonesKind::Full)?,
@@ -2036,6 +2037,71 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     "LJTS_REDUCED" => Multiparameter::reduced_lennard_jones_truncated_shifted(),
                     _ => Multiparameter::new(config[1])?,
                 };
+                if fields[5] == "PRESSURE_JET" {
+                    let q = model
+                        .prepare(t)?
+                        .pressure_density_jet(fields[3].parse().unwrap())?;
+                    return Ok(vec![
+                        q.value,
+                        q.drho,
+                        q.drhorho,
+                        q.drhorhorho,
+                        q.dt,
+                        q.dtrho,
+                        q.dtrhorho,
+                    ]);
+                }
+                if matches!(fields[5], "CRITICAL" | "CRITICAL_AUTO") {
+                    let q = if fields[5] == "CRITICAL_AUTO" {
+                        model.critical_point()?
+                    } else {
+                        model.critical_point_from(t, fields[3].parse().unwrap())?
+                    };
+                    return Ok(vec![
+                        q.temperature,
+                        q.pressure,
+                        1. / q.volume,
+                        q.compressibility,
+                    ]);
+                }
+                if fields[5] == "BRANCHES" {
+                    let eq = model.prepare_equilibrium(t, fields[3].parse().unwrap())?;
+                    let mut values = vec![eq.spinodal_brackets().len() as f64];
+                    for b in eq.spinodal_brackets() {
+                        values.extend([
+                            b.minimum_density,
+                            b.maximum_density,
+                            b.minimum_pressure,
+                            b.maximum_pressure,
+                            f64::from(b.isolated),
+                        ]);
+                    }
+                    for p in fields[4].split(',').map(|s| s.parse::<f64>().unwrap()) {
+                        match eq.densities(p) {
+                            Ok(roots) => {
+                                values.push(roots.len() as f64);
+                                values.extend(&roots);
+                                for rho in roots {
+                                    values.push(model.prepare(t)?.pressure_roundoff(rho)?);
+                                }
+                                for phase in [Phase::Vapor, Phase::Liquid, Phase::MinimumGibbs] {
+                                    values.push(eq.volume(p, phase).unwrap_or(f64::NAN));
+                                }
+                            }
+                            Err(error) => {
+                                values.push(if error.to_string().contains("density precision") {
+                                    -2.
+                                } else {
+                                    -1.
+                                });
+                                for phase in [Phase::Vapor, Phase::Liquid, Phase::MinimumGibbs] {
+                                    values.push(eq.volume(p, phase).unwrap_or(f64::NAN));
+                                }
+                            }
+                        }
+                    }
+                    return Ok(values);
+                }
                 if matches!(fields[5], "SAT_P" | "SAT_T") {
                     let value = fields[2].parse().unwrap();
                     let q = if fields[5] == "SAT_P" {

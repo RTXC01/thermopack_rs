@@ -409,3 +409,21 @@ Failed and coincident-phase source results remain in the qualification ledger
 and are explicitly outside these timings. Hydrogen, reduced LJTS, recovery
 states, other temperatures/models, global stability and full multiparameter
 flashes are not performance-qualified here. No whole-library speedup is claimed.
+
+## Multiparameter bounded pressure roots
+
+The [bounded root/critical qualification](meos-equilibrium.md) has a separate
+[native-only measurement record](meos-branches-benchmark.json). It preflights
+40 source-backed pressure states across five isotherms, then times complete
+stable root sets plus minimum-Gibbs selection, including five separate output
+sums. Caller-buffer queries with reused branch data take 7.65-19.20 us on
+these profiles. Fresh complete queries take 0.739-5.487 ms, dominated by
+0.736-5.457 ms of interval discovery. These setup costs remain an optimization
+target; batch pressure calculations should reuse the prepared branch object.
+
+The fresh and reused paths return the same requested outputs. The original
+phase-switch iterator returns a single root with different selection rules,
+so these measurements make no speedup claim against that source routine.
+Five measured samples follow a warm-up; model construction and parsing are
+excluded. Root-domain, conditioning and source-selection limits remain in the
+qualification document.

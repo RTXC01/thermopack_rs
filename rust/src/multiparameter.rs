@@ -20,6 +20,12 @@ pub use density::MultiparameterDensityIteration;
 #[path = "multiparameter_saturation.rs"]
 mod saturation;
 
+#[path = "multiparameter_equilibrium.rs"]
+mod equilibrium;
+pub use equilibrium::{
+    MultiparameterEquilibrium, MultiparameterPressureJet, MultiparameterSpinodalBracket,
+};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LennardJonesKind {
     Full,

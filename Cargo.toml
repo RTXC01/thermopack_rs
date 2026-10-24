@@ -167,6 +167,11 @@ name = "meos_saturation"
 path = "rust/benches/meos_saturation.rs"
 harness = false
 
+[[bench]]
+name = "meos_branches"
+path = "rust/benches/meos_branches.rs"
+harness = false
+
 [lints.rust]
 unsafe_code = "forbid"
 

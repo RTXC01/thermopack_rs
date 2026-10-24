@@ -799,3 +799,48 @@ audits. The selected release run includes the complete 5082-state/46-field
 MEOS process-main reference harness and existing density regressions. Source
 validation and benchmark preflight are added to source CI; the before/after
 measurement audit is added to native CI. Hosted CI has not been observed here.
+
+The [multiparameter bounded-root checkpoint](meos-equilibrium.md) adds analytic
+P/rho derivatives, local ordinary critical candidates, interval-based stable
+branch discovery, caller-buffer root queries and explicit extreme/Gibbs root
+selection for all fourteen variants. The independent source-pressure matrix
+has 672 seven-output jets, 52 ordinary local/default critical comparisons,
+212 spinodals and 112 isotherms. Source branch searches agree on doubled
+2048/4096 grids augmented by dilute and independently source-solved critical
+neighborhoods. Critical references solve original EOS equations with source
+differences; generic legacy critical-solver trajectory identity is pending.
+
+All 804 resolved pressure sets match. Each of their 1110 native roots is
+checked again against original pressure/stiffness and Helmholtz kernels;
+source Gibbs scores verify the minimum-Gibbs choices. All 1653 existing finite
+source density iterates in those requests belong to the root sets. Sixty-seven
+explicit extreme-selection/legacy phase-switch differences remain in metadata.
+The old density-iteration APIs and their 1694-attempt regression are unchanged.
+
+Eight R134A complete-set requests expose interior branches whose pressure
+cannot close at representable density precision. Raw source-bisection
+candidates, neighbor pressures, density quanta and any resolvable extreme
+phase volumes are retained in a separate unresolved fixture. Complete-set and
+minimum-Gibbs queries remain errors; valid requested outer branches can still
+be returned and are source-checked. Sixteen other finite legacy phase iterates
+belong to these requests and are kept outside the complete-set membership
+count. Four returned extrapolated roots use a capped cancellation allowance;
+an arbitrarily large term-cancellation estimate never licenses a badly
+unclosed pressure. Source pressure checks retain a bounded relative/roundoff
+criterion instead of widening tolerance around those failed candidates.
+
+Tests independently difference the analytic density/temperature derivatives,
+check ordinary critical curvature and the two full-LJ critical basins, compare
+all root sets and selection modes, preserve unresolved-request behavior and
+test caller buffers, search boundaries, invalid inputs and spinodal pressure
+windows. Centered interval bounds resolve a synthetic narrow pair and report
+an unresolved contact. The four-ulp exp guard is an explicit assumption;
+unconditional formal completeness across every math library is not claimed.
+
+The local checkpoint passes 363 standard development tests plus custom source
+harnesses/all-target executables, 59 selected release tests, 27 documentation
+examples, strict all-target Clippy/rustdoc, formatting and all 125 fixture
+audits. The native-only branch benchmark preflights 40 source-backed cases
+and compares five separate output sums per sample. Source qualification and
+benchmark preflight are added to CI. Original source/data and the exact-source
+library remain unchanged. Hosted CI results have not been observed here.

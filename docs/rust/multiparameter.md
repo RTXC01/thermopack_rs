@@ -11,6 +11,10 @@ temperature, both phase volumes and analytic Clapeyron slopes for all 14
 variants. Its direct public-source comparisons and independently checked
 recovery states have separate fixtures and explicit critical/branch limits.
 
+[Bounded pressure branches and local critical points](meos-equilibrium.md)
+provide all stable roots within an explicit density domain, caller-buffer
+queries, extreme/Gibbs selection and analytic higher density derivatives.
+
 ```rust
 use thermopack_rs::{Multiparameter, LennardJonesKind};
 let eos = Multiparameter::lennard_jones("AR", LennardJonesKind::Full)?;
@@ -153,11 +157,13 @@ finite-difference tests run in normal test threads. Bitwise identity across
 thread contexts, compilers or all extrapolations is not promised. Hosted CI
 has not been observed here.
 
-These data replace the previous broad documentation claims based on a small
-1e-4 smoke test. The legacy tests remain as smoke tests. Volume solving has
-only the earlier C3 closure checks; complete root selection, raw source
-iteration trajectories, mixture/ideal-mixture behavior, alternate reference
-states and multiparameter flashes/envelopes remain pending.
+The original per-fluid smoke tests remain supplementary. The density section
+above describes the 1694-attempt source-iteration qualification, while the
+[bounded branch qualification](meos-equilibrium.md) covers complete stable
+root sets within an explicit density domain and local ordinary critical
+equations. Unbounded root enumeration, generic critical-solver trajectories,
+mixture/ideal-mixture behavior, alternate reference states and complete
+multiparameter flashes/envelopes remain pending.
 
 ## Native state measurements
 

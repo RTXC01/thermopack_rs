@@ -8,6 +8,10 @@ pressure, temperature inversion, phase volumes and Clapeyron slopes for all
 14 native NIST/Lennard-Jones variants, with separate evidence for direct
 source matches and solutions recovered where the source solver fails.
 
+[Multiparameter pressure branches](../docs/rust/meos-equilibrium.md) add
+analytic density derivatives, local critical candidates and reusable bounded
+root sets with explicit Gibbs selection and numerical-resolution limits.
+
 [Pure-fluid saturation grids](../docs/rust/pure-curves.md) provide selected
 components, linear/logarithmic sampling and physical/source critical endpoints,
 with explicit critical-root conditioning. The

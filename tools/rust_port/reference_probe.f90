@@ -1,3 +1,37 @@
+! Batched calls to the original pressure routine, without changing its algebra.
+subroutine query_meos_pressure_grid(t,n,rhos,reduced,values) bind(C,name='query_meos_pressure_grid')
+  use, intrinsic :: iso_c_binding, only: c_int,c_double
+  use thermopack_var, only: get_active_eos,base_eos_param
+  use eos_parameters, only: single_eos
+  use multiparameter_base, only: meos
+  use multiparameter_lj, only: meos_lj,init_LJTS
+  implicit none
+  real(c_double),value :: t
+  integer(c_int),value :: n,reduced
+  real(c_double),intent(in) :: rhos(n)
+  real(c_double),intent(out) :: values(3,n)
+  class(base_eos_param),pointer :: active
+  class(meos),pointer :: fluid
+  type(meos_lj),target :: local
+  integer :: i
+  real :: p,pr,pt
+  if (reduced==1) then
+    call init_LJTS(local);fluid=>local
+  else
+    active=>get_active_eos()
+    select type(eos=>active)
+    class is(single_eos)
+      fluid=>eos%nist(1)%meos
+    class default
+      error stop 'Expected a multiparameter model'
+    end select
+  endif
+  do i=1,n
+    call fluid%mp_pressure(rhos(i),t,p,pr,pt)
+    values(:,i)=[p,pr,pt]
+  enddo
+end subroutine query_meos_pressure_grid
+
 subroutine query_meos_density(t,p,phase,reduced,values) bind(C,name='query_meos_density')
   use, intrinsic :: iso_c_binding, only: c_int,c_double
   use thermopack_var, only: get_active_eos,base_eos_param

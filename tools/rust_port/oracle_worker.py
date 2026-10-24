@@ -33,6 +33,8 @@ def load_probe():
     probe=CDLL(str(ROOT/'.reference'/('reference_probe.dll' if os.name=='nt' else 'libreference_probe.so')))
     probe.query_meos.argtypes=[c_double,c_double,c_double,c_int,POINTER(c_double),POINTER(c_double)]
     probe.query_meos.restype=None
+    probe.query_meos_pressure_grid.argtypes=[c_double,c_int,POINTER(c_double),c_int,POINTER(c_double)]
+    probe.query_meos_pressure_grid.restype=None
     probe.query_meos_density.argtypes=[c_double,c_double,c_int,c_int,POINTER(c_double)]
     probe.query_meos_density.restype=None
     probe.query_fmt.argtypes=[c_int,c_int,POINTER(c_double),c_int,POINTER(c_double)]
@@ -149,7 +151,7 @@ def main(compiler_directory):
             except Exception as error:
                 print('THERMOPACK_RESULT='+json.dumps(dict(calculation_error=str(error))),flush=True)
             continue
-        if request['mode'] in ['MEOS','MEOS_DENSITY','MEOS_COEX_CHECK']:
+        if request['mode'] in ['MEOS','MEOS_DENSITY','MEOS_COEX_CHECK','MEOS_PRESSURE_GRID']:
             if probe is None:probe=load_probe()
             reduced=int(request['eos']=='LJTS_REDUCED')
             key=('MEOS',request['eos'],request['component'])
@@ -158,6 +160,11 @@ def main(compiler_directory):
                     from thermopack.multiparameter import multiparam
                     model=multiparam(request['component'],request['eos']);previous=key
                 model.activate()
+            if request['mode']=='MEOS_PRESSURE_GRID':
+                densities=request['densities'];n=len(densities);inputs=(c_double*n)(*densities);output=(c_double*(3*n))()
+                probe.query_meos_pressure_grid(request['temperature'],n,inputs,reduced,output)
+                rows=[[float(output[3*i+j]) if math.isfinite(output[3*i+j]) else None for j in range(3)] for i in range(n)]
+                print('THERMOPACK_RESULT='+json.dumps(dict(rows=rows),allow_nan=False),flush=True);continue
             if request['mode']=='MEOS_COEX_CHECK':
                 t,p,vl,vv,dpdt=request['point'];left=(c_double*46)();right=(c_double*46)();metadata=(c_double*18)()
                 probe.query_meos(t,vl,1.,reduced,left,metadata);probe.query_meos(t,vv,1.,reduced,right,metadata)

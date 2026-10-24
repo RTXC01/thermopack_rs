@@ -50,6 +50,22 @@ method and Fortran source file; the coverage ledger distinguishes native,
 validated, and pending capabilities. A wrapper calling Fortran is a reference
 adapter, not a completed Rust port.
 
+Independent ports use `codex/` topic branches in separate managed worktrees.
+`codex/rust-port` remains the integration branch. Each worktree owns its source
+edits, Cargo target directory, reference outputs and generated fixtures; shared
+reference binaries may be copied with their provenance metadata. Agents report
+review-ready changes before committing. Review covers the numerical algorithm,
+source conventions, error outcomes and differential qualification, followed by
+integration checks and a recorded merge. A passing round-trip test alone does
+not qualify a port against ThermoPack.
+
+On the current Windows host, parallel Rust builds use one job per worktree,
+with at most two compiler jobs active. Benchmark preparation can proceed in
+parallel, but timing waits until competing builds and validation jobs finish.
+The timed source/native inputs are frozen and fingerprinted; code, harness or
+Cargo edits require a new measured build. Historical reports keep their original
+hashes and are not relabeled as measurements of later code.
+
 [Activity-based cubic derivative qualification](ge-derivatives.md) documents
 the full attraction Hessian and its use in TP fugacity mole derivatives.
 

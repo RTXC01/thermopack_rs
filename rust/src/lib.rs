@@ -1,6 +1,7 @@
 //! Native thermodynamic models ported from the checked-in ThermoPack fork.
 //!
-//! All quantities use SI molar units. See `docs/rust/coverage.md` for the
+//! Physical models use SI molar units; the explicit reduced LJTS model uses
+//! reduced units. See `docs/rust/coverage.md` for the
 //! explicit migration status; this crate is not yet a complete replacement.
 //!
 //! # The scope
@@ -21,8 +22,8 @@
 //!   correlation function, and the quantum corrections of the hydrogen, the
 //!   helium and the neon,
 //! * the pure fluid equations of state of the Lee-Kesler tables, the
-//!   multiparameter models, the MBWR model of the IAPWS, the PeTS model of
-//!   the liquid hydrogen and the solid phases of the carbon dioxide and of the
+//!   multiparameter models, the Bender/MBWR-19 and MBWR-32 models, the PeTS model
+//!   of argon and the solid phases of the carbon dioxide and of the
 //!   water,
 //! * the utilities of the original: the Gauss and the Gauss-Kronrod rules,
 //!   the hyperdual numbers, the chain rule and the ideal gas properties.
@@ -34,7 +35,8 @@
 //! calls the original routines and reports their results, the validators of
 //! `tools/rust_port` compare them with the native model and store the
 //! qualified values in `tests/fixtures`. The Rust tests read those fixtures,
-//! so the test suite fails without the reference library. The migration
+//! so the test suite runs without the reference library. Regenerating the
+//! fixtures requires an exact-source reference build. The migration
 //! status of every kernel, with the number of qualified cases and the largest
 //! observed difference, is in `docs/rust/coverage.md`.
 //!
@@ -43,8 +45,9 @@
 //! The models prepare their state once and evaluate the properties of the
 //! prepared state without an allocation. The preparation of a state is
 //! dominated by the alpha correlation of the components and by the mixing
-//! rule, and the property evaluation of the prepared state costs about
-//! 20 ns for the pressure. The measured comparison with the source, the
+//! rule. The documented cubic pressure workload measured about 20 ns per
+//! prepared state on its recorded host; this is not a bound for other models.
+//! The measured comparison with the source, the
 //! implemented optimizations and the open targets are in
 //! `docs/rust/performance.md`.
 //!

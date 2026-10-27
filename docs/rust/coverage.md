@@ -60,3 +60,7 @@ not qualify an entire family.
 
 The exhaustive machine-readable surface is in inventory.json. All rows must
 be qualified before describing this project as a complete replacement.
+
+### Residual TP MEOS ideal mixture
+
+Native Z, residual H/S/G, analytic T/P derivatives and linear composition coefficients are qualified against 734 original internal-kernel requests, with 1784 original TV checks. The original public constructor fails; a class-safe validation helper bypasses only that allocation defect. Total properties, complete mole derivatives, stability, mixture flashes, interfaces and performance remain pending. See [qualification notes](meos-ideal-mixture.md).

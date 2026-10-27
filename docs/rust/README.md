@@ -163,6 +163,8 @@ The [MEOS response notes](meos-response.md) cover pure homogeneous response,
 coexistence sound, source mass conventions and strict wrapper/kernel checks.
 The [MEOS flash notes](meos-flash.md) cover pure TP/PH/PS, explicit quality,
 near-critical continuation, original-kernel checks and remaining endpoint gaps.
+The [MEOS ideal-mixture notes](meos-ideal-mixture.md) cover residual TP kernels,
+analytic derivatives, explicit source conventions and the broken original constructor.
 The [MEOS isochoric notes](multiparameter-isochoric.md) cover fixed-volume
 equilibrium, UV/SV, source seed bounds, original-kernel checks and phase gaps.
 The [MEOS flash benchmark notes](meos-flash-benchmark.md) define separate cold/

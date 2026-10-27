@@ -55,3 +55,10 @@ The first integrated pure-MEOS flash timing record covers six profiles and
 medians, but guessed propane PH/PS regress substantially and broad model/
 interface/performance work remains. This bounded evidence does not raise the
 overall estimate above about 35%.
+
+Phase-aware MEOS caloric initial guesses reduce the near-critical propane
+regression from 73..77 outer steps to six. A separate timing record on the
+same 1,484-row workload has lower Rust medians in 35/36 groups, with substantial
+sample variation and no whole-library performance claim. Full-source flash
+qualification retains the same declared gaps. This optimization does not
+close a new capability area; the overall estimate remains about 35%.

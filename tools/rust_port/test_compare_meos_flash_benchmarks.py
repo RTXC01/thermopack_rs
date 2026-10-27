@@ -15,6 +15,14 @@ class StoredTimingTests(unittest.TestCase):
     def test_complete_recorded_evidence_passes(self):
         self.assertEqual(audit(self.report), dict(rows=1484,groups=36,measured_samples=5,faster_median_groups=30))
 
+    def test_seed_followup_keeps_the_entire_original_workload(self):
+        followup = json.loads((ROOT/'docs/rust/meos-flash-caloric-seed.json').read_text(encoding='utf-8'))
+        self.assertEqual(audit(followup), dict(rows=1484,groups=36,measured_samples=5,faster_median_groups=35))
+        for field in ('numeric_input_sha256','numeric_input_rows','profile_names','lane_names'):
+            self.assertEqual(followup[field],self.report[field])
+        for field in ('audit','group_counts','request_contexts'):
+            self.assertEqual(followup['preflight'][field],self.report['preflight'][field])
+
     def test_changed_median_or_sample_is_rejected(self):
         for field in ('median_ns','timed_samples_ns'):
             bad = copy.deepcopy(self.report)

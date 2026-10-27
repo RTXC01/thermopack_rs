@@ -128,7 +128,8 @@ Rust has lower observed medians in 30 of 36 groups. TP is 1.45..5.26 times
 faster here, and most caloric groups improve, but propane guessed PH/PS regress:
 216.08 versus 159.39 microseconds for PH, and 280.53 versus 162.98 microseconds
 for PS (about 36% and 72% longer). Those are optimization targets, not omitted
-results. The small cold-propane and R134A scalar differences lie within the
+results. The seed optimization described below addresses those guessed
+propane cases. The small cold-propane and R134A scalar differences lie within the
 observed run-to-run spread; they are not strong evidence of a repeatable win
 or loss. Some scalar runs have substantial variability, and all raw samples,
 including the warm-up, remain available. No whole-library speedup is inferred.
@@ -137,3 +138,46 @@ Within each lane, original and Rust workers use identical inputs. Different
 lanes can have different successful-case subsets, so cold/guessed medians are
 not a controlled experiment of guess quality by themselves. The record retains
 the exact per-group counts and original source request context.
+
+## Caloric seed follow-up
+
+The [separate follow-up record](meos-flash-caloric-seed.json) measures the
+integrated `b356aee` tree on 2026-10-27, after phase-aware initial-temperature
+repair. It uses the **identical 1,484 numeric rows and input hash** as the
+2026-10-24 baseline. No rows were removed. All 2,968 original-kernel checks,
+per-sample checksums and frozen-source/input fingerprints passed. One warm-up
+and five measured samples are retained for every group.
+
+Original median / Rust median in this follow-up:
+
+| Model | TP | PH cold | PH guessed | PS cold | PS guessed | Scalar TV H/S |
+|---|---:|---:|---:|---:|---:|---:|
+| C3 | 1.49 | 1.38 | 1.10 | 1.38 | 1.33 | 0.98 |
+| R134A | 3.52 | 1.96 | 2.20 | 1.91 | 1.75 | 1.13 |
+| Full LJ KR | 5.20 | 1.72 | 1.63 | 1.59 | 1.64 | 1.81 |
+| Full LJ AR | 5.78 | 1.59 | 1.66 | 1.64 | 1.64 | 1.62 |
+| LJTS KR | 5.65 | 3.03 | 2.81 | 2.97 | 3.16 | 2.34 |
+| Reduced LJTS | 6.63 | 2.90 | 2.90 | 2.91 | 2.92 | 1.67 |
+
+Rust has lower observed medians in 35 of 36 groups. Propane guessed PH is
+167.63 microseconds versus original 183.75, and guessed PS is 160.39 versus
+213.72. The earlier Rust medians were 216.08 and 280.53 respectively. The
+per-case regression separately demonstrates six outer steps instead of 77 PH
+and 73 PS steps for the hot near-critical liquid guess.
+
+The historical and follow-up timings were collected on different days, not
+as a controlled before/after experiment. Source medians also changed, and
+some samples vary substantially: the largest maximum-minus-minimum spread is
+88% of its group's median. Propane guessed PH alone spans 151.09..184.64
+microseconds in Rust and 168.29..313.78 in Fortran. The 1.10 median ratio is
+therefore not evidence of a repeatable 10% win. Propane scalar TV H/S, which
+this seed change does not modify, remains slightly slower at 4.55 versus
+4.45 microseconds, within the observed spread. These are retained observations
+for this cohort and host; neither the 35-group count nor the cross-day changes
+establish a whole-library speedup.
+
+Audit both immutable records without a compiler:
+
+```text
+python tools/rust_port/compare_meos_flash_benchmarks.py docs/rust/meos-flash-baseline.json docs/rust/meos-flash-caloric-seed.json
+```

@@ -53,6 +53,10 @@ path = "rust/examples/cubic.rs"
 name = "parity"
 path = "rust/examples/parity.rs"
 
+[[example]]
+name = "meos_caloric_profile"
+path = "rust/examples/meos_caloric_profile.rs"
+
 [[test]]
 name = "mbwr_source_properties"
 path = "tests/mbwr_source_properties.rs"

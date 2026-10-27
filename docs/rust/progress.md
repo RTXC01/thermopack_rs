@@ -67,3 +67,10 @@ Residual TP ideal-mixture MEOS kernels add 734 internal-source comparisons
 and 1,784 original TV checks. Public construction fails in the fork, and
 total properties, complete derivatives, phase solvers and integration remain
 pending. This bounded addition leaves the overall estimate at about 35%.
+
+The MBWR total caloric layer adds 5,994 source-backed TV states, complete
+Helmholtz Hessians and all first thermal gradients, including raw ideal
+references and explicit derivative conventions. Forty-eight fits have default
+ideal data; the other seventeen require caller-supplied metadata. Source
+critical failures, equilibrium/flash/CSP integration, interfaces and performance
+work remain. This addition leaves the rounded overall estimate at about 35%.

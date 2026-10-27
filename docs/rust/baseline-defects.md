@@ -247,6 +247,20 @@ that source value; normal sound and mass access use SI units. The source
 matrix checks the baseline and an independent thermodynamic identity checks
 physical sound. See [pure multiparameter qualification](multiparameter.md).
 
+## MBWR ideal references and Python TV packing
+
+`init_multiparameter` copies component data with zero H/S integration constants
+and does not call `set_reference_energies`. Its MBWR calorics therefore use raw
+Cp integrals rather than the formation/standard references applied by other
+constructors. Reference setters normalize both constants; Cp setters preserve
+them. The [total MBWR layer](mbwr-caloric.md) qualifies this ordering explicitly.
+
+The Python `internal_energy_tv` wrapper appends `np.array(dedv_c)` when the
+mole derivative is requested, instead of returning the `dedn_c` array. On the
+qualified NumPy runtime this raises a pointer-buffer-format error. The original
+Fortran routine supplies all three correct TVn derivatives; the caloric audit
+calls that routine directly and retains the complete derivative block.
+
 ## Multiparameter ideal mixture is unreachable and inconsistent
 
 `src/multiparameter_idealmix.f90` mixes the multiparameter equations of state

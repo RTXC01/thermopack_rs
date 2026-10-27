@@ -59,7 +59,8 @@ impl DensityHelmholtz {
     }
 }
 
-/// Reduced extensive residual Helmholtz energy F=Ares/(R T), in mol.
+/// Reduced extensive Helmholtz energy F=A/(R T), in mol. The returning
+/// method specifies the total, ideal, or residual contribution.
 /// Derivatives hold the remaining T (K), total V (m3), n (mol) fixed.
 #[derive(Debug, Clone, Copy)]
 pub struct PureHelmholtz {

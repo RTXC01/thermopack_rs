@@ -18,6 +18,12 @@ use crate::{
     PurePressure, R, Result, error::positive,
 };
 
+mod mbwr_total_tp;
+pub use mbwr_total_tp::{
+    MbwrSourceTpProperties, MbwrSourceTpState, MbwrTpProperties, PreparedMbwrFluidTp,
+    PreparedMbwrSourceTp,
+};
+
 /// A total TV property and its partial derivatives at fixed remaining T, V,
 /// and n. Energy, entropy, and chemical-potential units depend on the property.
 #[derive(Debug, Clone, Copy)]
@@ -198,6 +204,16 @@ impl PreparedMbwrFluid<'_> {
     }
 
     fn evaluate(&self, v: f64, n: f64, baseline: bool) -> Result<MbwrTvProperties> {
+        self.evaluate_with_residual(v, n, baseline)
+            .map(|(properties, _)| properties)
+    }
+
+    fn evaluate_with_residual(
+        &self,
+        v: f64,
+        n: f64,
+        baseline: bool,
+    ) -> Result<(MbwrTvProperties, PureHelmholtz)> {
         let (residual, f) = self.jets(v, n, baseline)?;
         let t = self.temperature;
         let rt = R * t;
@@ -315,7 +331,7 @@ impl PreparedMbwrFluid<'_> {
         if values.iter().any(|value| !value.is_finite()) {
             return Err(Error::InvalidInput("non-finite MBWR TV caloric state"));
         }
-        Ok(properties)
+        Ok((properties, residual))
     }
 
     fn jets(&self, v: f64, n: f64, baseline: bool) -> Result<(PureHelmholtz, PureHelmholtz)> {

@@ -74,3 +74,10 @@ references and explicit derivative conventions. Forty-eight fits have default
 ideal data; the other seventeen require caller-supplied metadata. Source
 critical failures, equilibrium/flash/CSP integration, interfaces and performance
 work remain. This addition leaves the rounded overall estimate at about 35%.
+
+Total MBWR TP derivatives and density integration add 9,752 retained requests,
+including 324 independently source-checked bounded TP states and 3,434 actual
+classical source dispatches. Original pressure closure/slope identifies 93
+unclosed-extremum states with unqualified derivative blocks; 9,659 requests
+are fully qualified. Broad equilibrium,
+interfaces and performance work remain. The overall estimate stays about 35%.

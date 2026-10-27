@@ -220,5 +220,9 @@ The [metastable isentrope notes](metastable.md) cover local homogeneous PS,
 physical pressure continuation and complete source-convention mappings,
 including their independently recorded equation residuals.
 
+The [total MBWR TP notes](mbwr-total-tp.md) cover physical TP derivatives,
+bounded and original density integration, classical source conventions and
+the retained unqualified derivative blocks at unclosed extrema.
+
 Regenerate inventory with
 `python tools/rust_port/inventory.py`.

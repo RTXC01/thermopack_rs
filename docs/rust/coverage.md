@@ -68,3 +68,7 @@ Native Z, residual H/S/G, analytic T/P derivatives and linear composition coeffi
 ### Total MBWR caloric TV layer
 
 Owned raw ideal references, complete total Helmholtz Hessians, U/H/S/A/G/mu and analytic first TVn derivatives are qualified on 5994 states (11988 native views), including all 65 coefficient fits, 48 default-capable fits, explicit metadata for 17 legacy fits, setter controls and type-10 semantics. Thirty public TV snapshots match; 16 known constructor failures remain explicit. Equilibrium, flash/CSP integration, interfaces and performance remain pending. See [MBWR caloric notes](mbwr-caloric.md).
+
+## Total MBWR TP and density integration
+
+Physical TP derivatives, bounded pressure roots and original density/TP dispatch are connected to total calorics. The 9,752-request matrix retains 93 unclosed-extremum states with unqualified H/Z/lnphi derivative blocks; 9,659 requests are fully qualified. See [total TP qualification](mbwr-total-tp.md). Coexistence/flashes, CSP/bindings and performance remain pending.

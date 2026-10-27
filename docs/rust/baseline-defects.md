@@ -425,3 +425,14 @@ one EOS volume root, before their density order changes. Baseline phase labels
 and volumes retain this convention. Physical tracing orders reported phases
 by molar volume and changes the fixed-phase label consistently. This reporting
 choice is separate from global stability. See [envelope notes](envelope.md).
+
+## MBWR classical total TP ideal derivatives
+
+`single_component.f90` adds ideal H/S values and temperature derivatives, but
+assigns the P/n derivative additions to local `_id` buffers instead of outputs.
+Total S_P lacks the ideal -nR/P term; H_n and S_n omit their ideal contributions.
+The [total TP layer](mbwr-total-tp.md) preserves this classical convention
+separately from TVP/physical derivatives. Its evidence also retains 93
+unclosed near-zero-slope returns whose H/Z/lnphi derivatives depend strongly
+on floating-point context. Those derivative blocks remain unqualified; all
+original vectors and actual numeric mismatches remain in the evidence.

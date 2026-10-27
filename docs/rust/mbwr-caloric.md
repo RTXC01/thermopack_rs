@@ -121,7 +121,8 @@ source-executable identity remains attached to a reused collection.
 The original Python internal-energy wrapper mispackages its mole derivative
 as a volume-derivative pointer; the probe calls the Fortran routine directly.
 
-Connecting this caloric layer to density selection, MBWR coexistence/flashes,
-broad CSP integration and existing language interfaces remains pending.
+The [total TP layer](mbwr-total-tp.md) now connects these calorics to local TP
+derivatives and bounded/original density selection. MBWR coexistence/flashes,
+broad CSP integration and existing language interfaces remain pending.
 Performance has not yet been measured for this layer. It evaluates total
 homogeneous caloric states and does not replace the complete MBWR equilibrium API.

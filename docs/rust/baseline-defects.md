@@ -259,27 +259,26 @@ multiparameter EoS." for `NIST_MEOS_MIX`. The label therefore always
 terminates the caller, and the mixture model is unreachable through the
 public API.
 
-The mixture routines have further defects that a port cannot reproduce.
-`calc_multiparameter_idealmix_enthalpy` and `..._entropy` never assign their
-component pressure derivative, and requesting it also clears the component
-temperature derivative, so the reported enthalpy and entropy pressure
-derivatives are undefined. `..._Gres` assigns the total residual Gibbs energy
-to its pressure derivative.
+The internal `..._Gres` routine assigns weighted residual Gibbs energy to
+its pressure derivative. The public non-residual `TP_CalcGibbs` mixture path
+also uses an uninitialized `sumne` while adding ideal contributions.
+`..._fugacity` returns coefficients `phi`, although its caller names the
+output `lnfug`. These conventions require explicit treatment in a port.
 
-The composition derivative arrays are written one slot beyond the component
-index. For a two-component mixture of C3 and N-H2 at 200 K and 0.1 MPa the
-compressibility factor array of the original holds a zero in the first slot
-and the value of the first component in the second slot, and the value of the
-second component lands past the end of the array. The enthalpy, entropy,
-fugacity and derivative arrays show the same offset, and the last value of
-one array appears in the first slot of the next. The same library built with
-that module compiled at -O0 reproduces the offset, so it is not an
-optimization artifact of the qualified compiler.
+A later class-safe probe of the unchanged routines does **not** reproduce
+the earlier reported shifted-array observations. Nor are H/S pressure
+derivatives undefined in that probe: the local derivatives are passed
+unconditionally to the pure component routines, which assign them before
+they are used. The previous observations are not treated as a source-kernel
+contract. The new 734-case audit retains complete vectors, root checks and
+the failed public construction call.
 
-A native ideal mixture is therefore not qualified and the model stays
-pending. The pure model kernels, their density iteration and their state
-functions are qualified separately.
-See [pure multiparameter qualification](multiparameter.md).
+The [native residual mixture kernel](meos-ideal-mixture.md) is qualified
+against those internal routines with a probe that constructs the correct
+dynamic type using supported pure labels. This bypasses the allocation
+defect only in the validation helper; it does not modify the original
+library or establish public mixture-wrapper parity. Total properties and
+mixture phase solvers remain pending.
 ## Iso-line grid of a single point is not a number
 
 src/isolines.f90:linspace divides by the number of intervals of the grid,

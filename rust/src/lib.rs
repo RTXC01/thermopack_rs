@@ -96,6 +96,7 @@ pub mod mixture_saturation;
 pub mod mixture_spinodal;
 pub mod multiparameter;
 pub mod multiparameter_data;
+pub mod multiparameter_ideal_mixture;
 pub mod mut_flash;
 pub mod numerics;
 pub mod pc_saft;
@@ -158,6 +159,9 @@ pub use multiparameter::{
 };
 pub use multiparameter_data::{
     AncillarySatDensity, IdealGasHelmholtz, MultiparameterRecord, lookup_multiparameter_record,
+};
+pub use multiparameter_ideal_mixture::{
+    MultiparameterIdealMixture, MultiparameterIdealMixtureState,
 };
 pub use pc_saft::{
     PcSaft, PcSaftComponent, PcSaftKind, PcSaftPressureJet, PcSaftSaturation, PcSaftState,

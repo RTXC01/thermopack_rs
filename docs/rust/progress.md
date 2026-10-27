@@ -62,3 +62,8 @@ same 1,484-row workload has lower Rust medians in 35/36 groups, with substantial
 sample variation and no whole-library performance claim. Full-source flash
 qualification retains the same declared gaps. This optimization does not
 close a new capability area; the overall estimate remains about 35%.
+
+Residual TP ideal-mixture MEOS kernels add 734 internal-source comparisons
+and 1,784 original TV checks. Public construction fails in the fork, and
+total properties, complete derivatives, phase solvers and integration remain
+pending. This bounded addition leaves the overall estimate at about 35%.

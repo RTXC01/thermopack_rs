@@ -133,6 +133,77 @@ fn latent_splits_bypass_homogeneous_temperature_bounds() {
 }
 
 #[test]
+fn nearcritical_liquid_caloric_guess_avoids_opposite_branch_iterations() {
+    // Independently source-qualified propane row from the shared benchmark.
+    // The old initial guess crossed coexistence and took 77 PH / 73 PS steps.
+    let model = Multiparameter::new("C3").unwrap();
+    let p = 4_248_295.065_700_727_5;
+    let t = 369.853_011_000_000_1;
+    let o = options(&model, 1.2 * t);
+    for (enthalpy, target) in [
+        (true, 24_104.323_413_515_776),
+        (false, 89.444_149_078_783_68),
+    ] {
+        let flash = if enthalpy {
+            model.ph_flash_with_options(p, target, o)
+        } else {
+            model.ps_flash_with_options(p, target, o)
+        }
+        .unwrap();
+        let q = model.equilibrium_properties(&flash).unwrap();
+        let actual = if enthalpy { q.enthalpy } else { q.entropy };
+        let scale = model.gas_constant() * if enthalpy { t } else { 1. };
+        assert!((actual - target).abs() <= 3e-10 * scale);
+        assert!((flash.temperature / t - 1.).abs() < 2e-8);
+        assert_eq!(flash.phase, FlashPhase::Liquid);
+        assert_eq!(flash.pressure, p);
+        assert!(flash.iterations <= 20, "{} steps", flash.iterations);
+    }
+}
+
+#[test]
+fn opposite_branch_guesses_keep_caller_bounds_and_caloric_closure() {
+    for model in models() {
+        let sat = model.saturation_pressure(0.7 * model.tc()).unwrap();
+        for (tr, phase, guess) in [
+            (0.65, thermopack_rs::Phase::Liquid, 1.2),
+            (0.8, thermopack_rs::Phase::Vapor, 0.5),
+        ] {
+            let t = tr * model.tc();
+            let prep = model.prepare(t).unwrap();
+            let v = prep.volume(sat.pressure, phase).unwrap();
+            let h = prep.enthalpy(v).unwrap();
+            let s = prep.entropy(v).unwrap();
+            // This interval excludes Tsat. Repairing a seed must not expand
+            // the caller's interval or restrict it to a saturation endpoint.
+            let o = CaloricFlashOptions {
+                temperature_guess: Some(guess * model.tc()),
+                minimum_temperature: 0.99 * t,
+                maximum_temperature: 1.01 * t,
+                ..Default::default()
+            };
+            for (enthalpy, target) in [(true, h), (false, s)] {
+                let f = if enthalpy {
+                    model.ph_flash_with_options(sat.pressure, target, o)
+                } else {
+                    model.ps_flash_with_options(sat.pressure, target, o)
+                }
+                .unwrap_or_else(|e| {
+                    panic!("{} at Tr={tr}, H={enthalpy}: {e}", model.record().ident)
+                });
+                assert!(f.temperature >= o.minimum_temperature);
+                assert!(f.temperature <= o.maximum_temperature);
+                assert!((f.temperature / t - 1.).abs() < 2e-8);
+                let q = model.equilibrium_properties(&f).unwrap();
+                let actual = if enthalpy { q.enthalpy } else { q.entropy };
+                let scale = model.gas_constant() * if enthalpy { t } else { 1. };
+                assert!((actual - target).abs() <= 3e-10 * scale);
+            }
+        }
+    }
+}
+
+#[test]
 fn reduced_default_bounds_include_normal_reduced_temperatures() {
     let model = Multiparameter::reduced_lennard_jones_truncated_shifted();
     let f = model.tp_flash(1.4, 0.2).unwrap();

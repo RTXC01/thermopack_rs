@@ -51,6 +51,17 @@ the corresponding coexistence endpoint avoids the source density iterator's
 branch switching near an endpoint. Failed local continuation falls back to
 the phase-seeded density iteration.
 
+Once the specification selects a homogeneous branch, an initial temperature
+on the opposite side of saturation is moved to the corresponding saturation
+endpoint, then clamped to the caller's bounds. This applies to explicit
+guesses and the default critical-temperature seed. It only repairs the
+starting point: subsequent trials retain the complete original interval.
+In particular, the root is allowed to cross the computed saturation
+temperature by roundoff. The near-critical propane regression takes six
+scalar/coupled steps instead of 77 PH or 73 PS steps with its hot guess.
+Iteration counts exclude the nested saturation and density work; timing
+evidence is recorded separately in [the benchmark notes](meos-flash-benchmark.md).
+
 When temperature-only iteration reaches its precision limit, a bounded
 coupled Newton correction solves pressure and H/S in log T/log rho. Its
 analytic Jacobian is checked by finite differences. Accepted states require

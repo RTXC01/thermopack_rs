@@ -7,6 +7,18 @@ TP, cold PH, guessed PH, cold PS, guessed PS, and prepared scalar TV H/S.
 These measurements do not cover all fourteen models or the whole library.
 UV/SV and response/sound are separate, currently unmeasured capabilities.
 
+For per-case native diagnostics, run the `meos_caloric_profile` example on
+the manifest produced by this driver:
+
+```text
+cargo run --release --example meos_caloric_profile -- .reference/meos-flash-benchmark.txt 0 100
+```
+
+The optional numeric profile (0..5, in the order above) and repetition count
+default to 0 and 50. Output includes each PH/PS case key, elapsed nanoseconds,
+outer iteration count, result and controls. These diagnostic times are not
+paired source/native measurements and do not replace the frozen benchmark.
+
 ## Run and measurement scope
 
 Build the exact reference library and probe as described in the migration

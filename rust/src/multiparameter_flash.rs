@@ -560,6 +560,19 @@ impl Multiparameter {
             .temperature_guess
             .unwrap_or(self.tc())
             .clamp(o.minimum_temperature, o.maximum_temperature);
+        if let Some(sat) = saturation_anchor {
+            // The caloric specification has already selected the liquid or
+            // vapor branch. A guess across coexistence can send the local
+            // density iterator through the wrong branch, especially near Tc.
+            // Repair only the starting point; the solve retains the caller's
+            // full temperature interval, including roundoff across Tsat.
+            t = match branch {
+                FlashPhase::Liquid => t.min(sat.temperature),
+                FlashPhase::Vapor => t.max(sat.temperature),
+                _ => t,
+            }
+            .clamp(o.minimum_temperature, o.maximum_temperature);
+        }
         let fallback = |temperature: f64, volume: f64, iterations: usize| {
             coupled_caloric(
                 self,

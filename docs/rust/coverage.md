@@ -64,3 +64,7 @@ be qualified before describing this project as a complete replacement.
 ### Residual TP MEOS ideal mixture
 
 Native Z, residual H/S/G, analytic T/P derivatives and linear composition coefficients are qualified against 734 original internal-kernel requests, with 1784 original TV checks. The original public constructor fails; a class-safe validation helper bypasses only that allocation defect. Total properties, complete mole derivatives, stability, mixture flashes, interfaces and performance remain pending. See [qualification notes](meos-ideal-mixture.md).
+
+### Total MBWR caloric TV layer
+
+Owned raw ideal references, complete total Helmholtz Hessians, U/H/S/A/G/mu and analytic first TVn derivatives are qualified on 5994 states (11988 native views), including all 65 coefficient fits, 48 default-capable fits, explicit metadata for 17 legacy fits, setter controls and type-10 semantics. Thirty public TV snapshots match; 16 known constructor failures remain explicit. Equilibrium, flash/CSP integration, interfaces and performance remain pending. See [MBWR caloric notes](mbwr-caloric.md).

@@ -87,8 +87,9 @@ Their local Newton helper is test-only. Bounded physical density roots and
 critical points have separate [equilibrium qualification](mbwr-equilibrium.md).
 The [source density API](mbwr-density.md) separately qualifies raw last iterates
 and phase choices with explicit initialization. Inner
-trajectory identity, ideal/full caloric properties and flash/CSP integration
-remain pending. No new speedup is claimed here.
+trajectory identity and flash/CSP integration remain pending. The separate
+[total caloric layer](mbwr-caloric.md) now adds owned raw ideal references,
+full TV gradients and complete Helmholtz Hessians. No new speedup is claimed here.
 
 ```
 python tools/rust_port/validate_mbwr_properties.py --compiler-directory /path/to/compiler/bin

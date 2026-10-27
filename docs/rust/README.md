@@ -128,6 +128,8 @@ The [MBWR kernel notes](mbwr.md) cover all stored Bender/MBWR32 fits, pressure,
 residual derivatives, source summation fidelity and the stable integral path.
 The [MBWR state-function notes](mbwr-properties.md) cover residual G/H/S/Z/lnphi,
 physical/source TP responses, entropy signs and raw-rounding test context.
+The [MBWR total caloric notes](mbwr-caloric.md) cover raw ideal references,
+full TV state functions/derivatives, Hessians and explicit source conventions.
 The [MBWR equilibrium notes](mbwr-equilibrium.md) cover bounded pressure branches,
 derivative-hierarchy spinodals, stored critical metadata and analytic critical points.
 The [MBWR source density notes](mbwr-density.md) cover SRK seeds, Newton phase

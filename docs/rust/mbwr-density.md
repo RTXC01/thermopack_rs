@@ -103,8 +103,10 @@ coefficients, ownership and prepared/convenience API equivalence.
 This closes the raw-output and phase-choice gap identified in the previous
 bounded-root qualification for the documented explicit initialization cases.
 Inner trajectory identity, `meta_extrem`,
-`MBWR_stableDensity`, full ideal/caloric properties, coexistence/flashes and CSP
-integration remain pending within the full migration.
+`MBWR_stableDensity`, coexistence/flashes and CSP integration remain pending
+within the full migration. The separate [total caloric layer](mbwr-caloric.md)
+now evaluates explicit TV states; connecting it to these density selections
+remains pending.
 
 ```
 python tools/rust_port/validate_mbwr_density.py --compiler-directory /path/to/compiler/bin

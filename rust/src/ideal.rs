@@ -59,6 +59,25 @@ impl IdealGas {
         })
     }
 
+    /// Build an ideal gas with explicit enthalpy and entropy integration
+    /// constants [J/mol] and [J/(mol K)]. This preserves raw source constants
+    /// when initialization copies a component without reference normalization.
+    pub fn with_integration_constants(
+        component: &Component,
+        enthalpy_offset: f64,
+        entropy_offset: f64,
+    ) -> Result<Self> {
+        if !enthalpy_offset.is_finite() || !entropy_offset.is_finite() {
+            return Err(Error::InvalidInput(
+                "finite ideal-gas integration constants required",
+            ));
+        }
+        Ok(Self {
+            data: *component,
+            offsets: (enthalpy_offset, entropy_offset),
+        })
+    }
+
     pub fn properties(&self, temperature: f64, pressure: f64) -> Result<IdealProperties> {
         self.data
             .ideal_with_offsets(temperature, pressure, self.offsets)

@@ -61,6 +61,10 @@ path = "rust/examples/meos_caloric_profile.rs"
 name = "meos_ideal_mixture_parity"
 path = "rust/examples/meos_ideal_mixture_parity.rs"
 
+[[example]]
+name = "mbwr_caloric_parity"
+path = "rust/examples/mbwr_caloric_parity.rs"
+
 [[test]]
 name = "mbwr_source_properties"
 path = "tests/mbwr_source_properties.rs"

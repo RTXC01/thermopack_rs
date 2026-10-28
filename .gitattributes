@@ -2,3 +2,14 @@
 tests/fixtures/*.csv text eol=lf
 # Unified diff context represents an otherwise empty line with one space.
 docs/rust/*.patch text eol=lf whitespace=-blank-at-eol
+
+# Preserve the exact source bytes used by the captured PC-SAFT oracle.
+tools/rust_port/pcsaft_mole_probe.f90 -text whitespace=cr-at-eol
+tools/rust_port/pcsaft_mole_oracle.py text eol=lf
+tests/fixtures/*.oracle.jsonl text eol=lf
+
+# Keep standalone measurement tools portable with explicit LF text.
+tools/rust_port/benchmark_pcsaft_mole_derivatives.py text eol=lf
+tools/rust_port/pcsaft_mole_bench.rs text eol=lf
+tools/rust_port/pcsaft_mole_bench.f90 text eol=lf
+tools/rust_port/pcsaft_mole_bench_worker.py text eol=lf

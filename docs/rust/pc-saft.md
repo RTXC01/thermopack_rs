@@ -64,12 +64,14 @@ Extracted from `src/pc_saft_datadb.f90` via `tools/rust_port/generate_pcsaft_dat
 
 ## Performance and State Properties
 
-`PreparedPcSaft` provides allocation-free, cache-friendly evaluations:
+`PreparedPcSaft` caches temperature and composition functions. Scalar pressure
+and residual-energy queries allocate no memory; state and fugacity results own
+output vectors. Construct prepared states with `prepare` or `new`:
 - `residual_helmholtz_energy(rho)`: $\alpha^{\text{res}}$
 - `pressure(rho)`: $P = \rho R T (1 + \rho \frac{\partial \alpha^{\text{res}}}{\partial \rho})$
 - `pressure_and_derivatives(rho)`: $P$, $Z$, $\frac{\partial P}{\partial \rho}$, $\frac{\partial P}{\partial V}$, $\frac{\partial P}{\partial T}$
 - `state(rho)`: complete state bundle ($P, Z, U^{\text{res}}, H^{\text{res}}, S^{\text{res}}, A^{\text{res}}, G^{\text{res}}, H^{\text{total}}, S^{\text{total}}, C_v, C_p, w, \ln \boldsymbol{\phi}$)
-- `volume(P, phase)`: single-phase bounded $(1-\zeta)$ Newton solver from `pc_saft_nonassoc_volume_solver`, guaranteed to converge within physical limits $[10^{-10}, 0.75]$.
+- `volume(P, phase)`: single-phase bounded $(1-\zeta)$ Newton solver from `pc_saft_nonassoc_volume_solver`, with packing-fraction bounds $[10^{-10}, 0.75]$.
 - `saturation_pressure(T)`: pure fluid vapor-liquid coexistence saturation pressure with Clapeyron initialization and damped Newton root finding.
 
 ## The radial distribution function
@@ -259,3 +261,7 @@ coefficient of the dispersion term with respect to the packing fraction. The
 derivative of the pressure with respect to the density follows from the
 compressibility factor, and the derivative with respect to the volume from
 the derivative with respect to the density.
+
+The [analytic first mole derivative qualification](pc-saft-mole-derivatives.md)
+covers mixture fugacity in both variants, source failures, missing ideal-data
+construction and the remaining derivative scope.

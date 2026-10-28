@@ -87,3 +87,16 @@ original-kernel certificates over 1,008 retained requests. Eight source branch
 selection differences and 88 native error observations remain explicit; raw
 source saturation behavior, flashes, interfaces and timing remain pending.
 The overall estimate remains about 35%.
+
+Analytic PC-SAFT mixture gradients replace repeated composition perturbations
+with first mole derivatives, qualified against 340 original nonassociation
+kernel results across all stored parameter records reachable by the native
+constructor. Four BUTANAL requests remain blocked by ideal data, two source
+constructor failures are retained, and full Hessians/association/interfaces
+remain pending. This bounded addition keeps the overall estimate at about 35%.
+
+A frozen PC-SAFT gradient timing record adds 32 profiles and 1,120 valid timed
+calls. Prepared gradients have lower medians than the former Rust and original
+Fortran kernel in this workload; fresh preparation is measured separately.
+The record does not qualify whole-library performance or complete PC-SAFT
+behavior, so the overall estimate remains about 35%.

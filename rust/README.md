@@ -219,3 +219,5 @@ and the reduced interaction potential. See
 [Lennard-Jones splined notes](../docs/rust/ljs.md).
 
 [Pure MBWR coexistence](../docs/rust/mbwr-coexistence.md) provides bounded vapor/liquid saturation and inverse temperature with original solver and kernel evidence.
+
+[PC-SAFT mixture fugacity](../docs/rust/pc-saft-mole-derivatives.md) uses analytic first mole derivatives in the nonassociation model.

@@ -228,3 +228,9 @@ Regenerate inventory with
 `python tools/rust_port/inventory.py`.
 
 The [pure MBWR coexistence notes](mbwr-coexistence.md) cover bounded vapor/liquid equilibrium, inverse temperature, original-kernel certificates and retained source branch differences.
+
+[Analytic PC-SAFT mixture derivatives](pc-saft-mole-derivatives.md) replace composition finite differences with source-qualified first mole gradients.
+
+The [PC-SAFT gradient measurements](pc-saft-mole-performance.md) compare
+prepared and fresh analytic gradients with the former Rust finite differences
+and the original internal Fortran kernel on a frozen 32-profile workload.

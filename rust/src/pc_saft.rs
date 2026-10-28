@@ -2,7 +2,7 @@
 //!
 //! Implements original PC-SAFT (Gross & Sadowski 2001, doi: 10.1021/ie0003887)
 //! and simplified sPC-SAFT (von Solms et al. 2003, doi: 10.1021/ie020753p)
-//! with allocation-free prepared states, exact analytical derivatives,
+//! with prepared temperature/composition functions, analytical derivatives,
 //! bounded Newton volume solves, and full thermodynamic state properties.
 
 use crate::error::positive;
@@ -374,12 +374,15 @@ pub fn pcsaft_chain_energy(
 }
 
 /// Precomputed state of a PC-SAFT fluid/mixture at temperature $T$ and composition $\mathbf{x}$.
+/// Construct with [`PcSaft::prepare`] or [`PreparedPcSaft::new`].
+/// Construct prepared states through [`PcSaft::prepare`] or [`PreparedPcSaft::new`].
 #[derive(Debug, Clone)]
 pub struct PreparedPcSaft<'a> {
     pub model: &'a PcSaft,
     pub temperature: f64,
     pub mole_fractions: Vec<f64>,
     pub m_bar: f64,
+    composition_sum: f64,
     pub m_bar_n: Vec<f64>,
     pub d: Vec<f64>,
     pub d_t: Vec<f64>,
@@ -540,6 +543,7 @@ impl<'a> PreparedPcSaft<'a> {
             temperature,
             mole_fractions: x,
             m_bar,
+            composition_sum: sumn,
             m_bar_n,
             d,
             d_t,
@@ -725,13 +729,11 @@ impl<'a> PreparedPcSaft<'a> {
         }
 
         // Mixture: ln(phi_i) = F_{n_i} - ln(Z)
-        // using full numerical or analytical F_{n_i}
-        let v = 1.0 / rho;
-        let f_n = self.helmholtz_fn_derivatives(v, &self.mole_fractions);
-        let mut ln_phi = Vec::with_capacity(nc);
+        // using analytic F_{n_i} at fixed temperature and volume.
+        let mut ln_phi = self.helmholtz_fn_derivatives(rho);
         let ln_z = z.ln();
-        for &val in &f_n {
-            ln_phi.push(val - ln_z);
+        for value in &mut ln_phi {
+            *value -= ln_z;
         }
         ln_phi
     }
@@ -1431,33 +1433,114 @@ impl<'a> PreparedPcSaft<'a> {
         -(std::f64::consts::PI * N_AVOGADRO * rho) * second
     }
 
-    fn helmholtz_fn_derivatives(&self, v: f64, n: &[f64]) -> Vec<f64> {
-        let nc = self.model.components.len();
-        let sumn: f64 = n.iter().sum();
-        let rho = sumn / v;
-        let a_res = self.residual_helmholtz_energy(rho);
-        let a_rho = self.d_alpha_hard_chain_drho(rho, self.packing_fraction(rho))
-            + self.d_alpha_dispersion_drho(rho, self.packing_fraction(rho));
-
-        let mut f_n = Vec::with_capacity(nc);
-        for i in 0..nc {
-            // F_{n_i} = a_res + rho * a_rho + sumn * d(a_res)/d(n_i)
-            let h = 1e-6 * sumn.max(1.0);
-            let mut n_p = n.to_vec();
-            let mut n_m = n.to_vec();
-            n_p[i] += h;
-            n_m[i] -= h;
-
-            let prep_p = PreparedPcSaft::new(self.model, self.temperature, &n_p).unwrap();
-            let prep_m = PreparedPcSaft::new(self.model, self.temperature, &n_m).unwrap();
-
-            let da_dni = (prep_p.residual_helmholtz_energy(rho)
-                - prep_m.residual_helmholtz_energy(rho))
-                / (2.0 * h);
-
-            f_n.push(a_res + rho * a_rho + sumn * da_dni);
+    /// First mole-number derivatives of the extensive residual Helmholtz energy.
+    fn helmholtz_fn_derivatives(&self, rho: f64) -> Vec<f64> {
+        // Use one mole of mixture, so extensive derivatives are evaluated
+        // at volume 1/rho with the prepared mole fractions as mole numbers.
+        let v = 1.0 / rho;
+        let n = &self.mole_fractions;
+        let eta = self.packing_fraction(rho);
+        let nc = n.len();
+        let (i1, i2) = self.dispersion_i1_i2(eta);
+        let c1 = self.dispersion_c1(eta);
+        let e2 = eta * eta;
+        let o1 = (8.0 * eta - 2.0 * e2) / (1.0 - eta).powi(4);
+        let o2 = (20.0 * eta - 27.0 * e2 + 12.0 * e2 * eta - 2.0 * e2 * e2)
+            / ((1.0 - eta) * (2.0 - eta)).powi(2);
+        let mut powers = [1.0; 7];
+        for k in 1..7 {
+            powers[k] = powers[k - 1] * eta;
         }
-        f_n
+        let mut i1_eta = 0.0;
+        let mut i2_eta = 0.0;
+        for k in 1..7 {
+            i1_eta += k as f64 * self.a_disp[k] * powers[k - 1];
+            i2_eta += k as f64 * self.b_disp[k] * powers[k - 1];
+        }
+        let c1_eta = self.dispersion_c1_eta(eta);
+        let (z0, z1, z2, z3) = self.bmcsl_zetas(rho);
+        let q = 1.0 - z3;
+        let hs = if self.model.kind == PcSaftKind::PcSaft {
+            Some(crate::bmcsl::boublik_helmholtz_energy([z0, z1, z2, z3]))
+        } else {
+            None
+        };
+        let moment_prefactor = std::f64::consts::PI * N_AVOGADRO / (6.0 * v);
+        let alpha_hs = (4.0 * eta - 3.0 * eta * eta) / (1.0 - eta).powi(2);
+        let g = (1.0 - 0.5 * eta) / (1.0 - eta).powi(3);
+        let ahc_eta = if self.model.kind == PcSaftKind::SPcSaft {
+            self.simplified_hard_chain_eta_derivatives(eta).0
+        } else {
+            0.0
+        };
+        // Each contact-value derivative depends on component i only through
+        // dz2_i and dz3_i, so sum its j-dependent coefficients once.
+        let mut chain_log = vec![0.0; nc];
+        let mut chain_z2 = 0.0;
+        let mut chain_z3 = 0.0;
+        if self.model.kind == PcSaftKind::PcSaft {
+            for j in 0..nc {
+                let weight = self.model.components[j].m - 1.0;
+                if weight <= 0.0 {
+                    continue;
+                }
+                let mu = 0.5 * self.d[j];
+                let gij =
+                    1.0 / q + 3.0 * z2 * mu / q.powi(2) + 2.0 * z2.powi(2) * mu.powi(2) / q.powi(3);
+                let dg2 = 3.0 * mu / q.powi(2) + 4.0 * z2 * mu.powi(2) / q.powi(3);
+                let dg3 = 1.0 / q.powi(2)
+                    + 6.0 * z2 * mu / q.powi(3)
+                    + 6.0 * z2.powi(2) * mu.powi(2) / q.powi(4);
+                chain_log[j] = weight * gij.ln();
+                chain_z2 += n[j] * weight * dg2 / gij;
+                chain_z3 += n[j] * weight * dg3 / gij;
+            }
+        }
+        let disp_value = self.alpha_dispersion(rho, eta);
+        // Contact logarithms are no longer needed after each component is
+        // evaluated, so reuse their storage for the returned gradient.
+        let mut out = chain_log;
+        for (i, value) in out.iter_mut().enumerate() {
+            let log_chain = *value;
+            let mi = self.model.components[i].m;
+            let eta_n = std::f64::consts::PI * N_AVOGADRO * mi * self.d[i].powi(3) / (6.0 * v);
+            let hard = if self.model.kind == PcSaftKind::SPcSaft {
+                mi * alpha_hs - (mi - 1.0) * g.ln() + ahc_eta * eta_n
+            } else {
+                let hs = hs.as_ref().expect("BMCSL derivatives for PC-SAFT");
+                let dz = [
+                    moment_prefactor * mi,
+                    moment_prefactor * mi * self.d[i],
+                    moment_prefactor * mi * self.d[i].powi(2),
+                    eta_n,
+                ];
+                mi * hs.value
+                    + self.m_bar * hs.dzeta.iter().zip(dz).map(|(a, b)| a * b).sum::<f64>()
+                    - log_chain
+                    - chain_z2 * dz[2]
+                    - chain_z3 * dz[3]
+            };
+            let dm = self.m_bar_n[i] * self.composition_sum;
+            let mut di1 = i1_eta * eta_n;
+            let mut di2 = i2_eta * eta_n;
+            for (k, &power) in powers.iter().enumerate() {
+                di1 += self.a_disp_n[i][k] * self.composition_sum * power;
+                di2 += self.b_disp_n[i][k] * self.composition_sum * power;
+            }
+            let dc1 = c1_eta * eta_n - c1 * c1 * (o1 - o2) * dm;
+            let de1 = self.m2e1s3_n[i] * self.composition_sum;
+            let de2 = self.m2e2s3_n[i] * self.composition_sum;
+            let disp = 2.0 * disp_value
+                - std::f64::consts::PI
+                    * N_AVOGADRO
+                    * rho
+                    * (2.0 * (di1 * self.m2e1s3_val + i1 * de1)
+                        + (dm * c1 * i2 + self.m_bar * dc1 * i2 + self.m_bar * c1 * di2)
+                            * self.m2e2s3_val
+                        + self.m_bar * c1 * i2 * de2);
+            *value = hard + disp;
+        }
+        out
     }
 }
 
@@ -1504,4 +1587,45 @@ pub struct PcSaftSaturation {
     pub vapor_volume: f64,
     pub enthalpy_vaporization: f64,
     pub entropy_vaporization: f64,
+}
+
+#[cfg(test)]
+mod mole_derivative_tests {
+    use super::*;
+
+    #[test]
+    fn chain_segment_threshold_matches_energy_derivative() {
+        for kind in [PcSaftKind::PcSaft, PcSaftKind::SPcSaft] {
+            let mut model =
+                PcSaft::new_with_options(kind, &["CO2", "C1", "C3"], "Default").unwrap();
+            model.components[0].m = 0.75;
+            model.components[1].m = 1.0;
+            let n = [0.2, 0.3, 0.5];
+            let rho = 3000.0;
+            let volume = 1.0 / rho;
+            let prepared = model.prepare(320.0, &n).unwrap();
+            let analytic = prepared.helmholtz_fn_derivatives(rho);
+            let energy = |amounts: [f64; 3]| {
+                let total: f64 = amounts.iter().sum();
+                total
+                    * model
+                        .prepare(320.0, &amounts)
+                        .unwrap()
+                        .residual_helmholtz_energy(total / volume)
+            };
+            for i in 0..3 {
+                let h = 1e-5;
+                let mut plus = n;
+                plus[i] += h;
+                let mut minus = n;
+                minus[i] -= h;
+                let numeric = (energy(plus) - energy(minus)) / (2.0 * h);
+                assert!(
+                    (analytic[i] - numeric).abs() < 2e-7 * (1.0 + numeric.abs()),
+                    "{kind:?} component {i}: {} {numeric}",
+                    analytic[i]
+                );
+            }
+        }
+    }
 }

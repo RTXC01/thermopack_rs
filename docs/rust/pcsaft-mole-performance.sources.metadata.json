@@ -1,0 +1,13 @@
+{
+  "record": "pcsaft-mole-performance.json",
+  "record_normalized_sha256": "cee02e8f84b32b91197fb3dbe1fd8aace5826023998681635f4ed3c305c730e3",
+  "archive": "pcsaft-mole-performance.sources.json.gz",
+  "archive_sha256": "72386fd73cdbb4e8d229f10231cf336965a5c82b0e2b15516610333b98ebf37b",
+  "files": {
+    "benchmark_pcsaft_mole_derivatives.py": "e0294d86ee38c728021cdf04ab675cd330782b71bca16b1d2af91350544ed400",
+    "pcsaft_mole_bench.rs": "364028983c9fd664151be20b4cd379f32c8a62a815010e3ab87ca7166f163336",
+    "pcsaft_mole_bench.f90": "44624ccebdc047bc15a93fb38b5aa6e78ba0323fbe238a4fa42da2175e35fe74",
+    "pcsaft_mole_bench_worker.py": "0f47f4a311057c3c507f6a2dc30ae74cf635202ab27d0891af2408f637434f68"
+  },
+  "encoding": "base64 of exact measured input bytes"
+}

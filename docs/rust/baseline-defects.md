@@ -436,3 +436,27 @@ separately from TVP/physical derivatives. Its evidence also retains 93
 unclosed near-zero-slope returns whose H/Z/lnphi derivatives depend strongly
 on floating-point context. Those derivative blocks remain unqualified; all
 original vectors and actual numeric mismatches remain in the evidence.
+
+## MBWR saturation metadata and branch selection
+
+The full initialization chain refines component and fallback-cubic critical
+metadata through `init_fallback_and_redefine_criticals` and
+`redefine_critical_parameters` (`eoslibinit.f90`). It recalculates the acentric
+factor using original saturation. Thus successful public MBWR initialization
+does not leave general-database critical constants unchanged. Internal source
+coexistence qualification uses those unmodified routines with independent
+critical seeds where available; failed public construction remains recorded.
+
+Eight original saturation results in the bounded qualification domain have a
+separate stable density root with lower original-kernel Gibbs energy. Fourteen
+other source returns collapse or swap phases, sometimes with successful status
+and finite T/P. These outcomes remain visible and are not solver parity matches.
+See [coexistence evidence](mbwr-coexistence.md) for counts and domain limits.
+
+`MBWR_stableDensity` appears unreferenced by the generic saturation call chain.
+It uses density in mol/L and passes `V=1/rho` to `MBWR_Gres`, whose actual
+Helmholtz/density conversion and SI pressure term require SI volume despite an
+inconsistent volume-unit comment. This apparent factor-1000 caller discrepancy
+is a source audit finding, not a change to the reference or a qualified native
+compatibility implementation. Generic saturation uses LIQ/VAP thermodynamic
+dispatch instead.

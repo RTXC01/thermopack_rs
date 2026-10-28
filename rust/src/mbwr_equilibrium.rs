@@ -14,6 +14,8 @@
 //! ```
 use super::*;
 use crate::{Phase, PureCriticalPoint};
+#[path = "mbwr_equilibrium/coexistence.rs"]
+mod coexistence;
 
 /// Prepared stable pressure branches in an explicitly bounded density domain.
 /// The upper limit is a search boundary, not a fitted EOS validity claim.
@@ -262,6 +264,32 @@ fn gaussian_roots(mut a: Vec<f64>, mut b: Vec<f64>, maximum: f64) -> Result<Vec<
 }
 
 impl<'a> PreparedMbwr<'a> {
+    // Bound cancellation error in the pressure sum. Evaluated only after a
+    // density solve reaches floating-point resolution.
+    fn pressure_roundoff_bound(&self, rho: f64) -> Option<f64> {
+        let r = rho * 1e-3;
+        let ideal = R * self.temperature * rho;
+        let polynomial =
+            self.pressure_polynomial
+                .iter()
+                .enumerate()
+                .try_fold(0.0, |sum, (i, c)| {
+                    let term = c[0].abs() * r.powi((i + 2) as i32);
+                    (term.is_finite() && (sum + term).is_finite()).then_some(sum + term)
+                })?;
+        let exponential =
+            self.pressure_exponential
+                .iter()
+                .enumerate()
+                .try_fold(0.0, |sum, (i, c)| {
+                    let term =
+                        c[0].abs() * r.powi((2 * i + 3) as i32) * (-self.model.gamma * r * r).exp();
+                    (term.is_finite() && (sum + term).is_finite()).then_some(sum + term)
+                })?;
+        let bound = 64. * f64::EPSILON * (ideal + polynomial + exponential);
+        bound.is_finite().then_some(bound)
+    }
+
     // P, P_r, P_rr, P_rrr, P_Tr, P_Trr in SI units.
     fn critical_jet(&self, rho: f64) -> Result<[f64; 6]> {
         positive(rho, "critical molar density")?;
@@ -379,10 +407,18 @@ impl MbwrEquilibrium<'_> {
             let error = q.value - p;
             let tolerance = 2e-10 * p + 64. * f64::EPSILON * R * self.prepared.temperature * rho;
             let step = error / q.drho;
-            if error.abs() <= tolerance
-                && (step.abs() <= 32. * f64::EPSILON * rho || hi - lo <= 64. * f64::EPSILON * rho)
-            {
-                return Ok(rho);
+            let density_resolved =
+                step.abs() <= 32. * f64::EPSILON * rho || hi - lo <= 64. * f64::EPSILON * rho;
+            if density_resolved {
+                // Preserve the common well-conditioned path without evaluating
+                // the more expensive absolute pressure-sum bound.
+                if error.abs() <= tolerance {
+                    return Ok(rho);
+                }
+                let cancellation = self.prepared.pressure_roundoff_bound(rho).unwrap_or(0.);
+                if error.abs() <= tolerance.max(2e-10 * p + cancellation) {
+                    return Ok(rho);
+                }
             }
             if error > 0. {
                 hi = rho;
@@ -396,8 +432,19 @@ impl MbwrEquilibrium<'_> {
                 lo + (hi - lo) * 0.5
             };
             if next == rho || next == lo || next == hi {
-                if error.abs() <= tolerance {
-                    return Ok(rho);
+                // Recheck the width after updating the bracket above. The
+                // pressure evaluation may have just reduced it to a handful
+                // of ulps even when the pre-update width was still large.
+                let stagnated_at_resolution =
+                    step.abs() <= 32. * f64::EPSILON * rho || hi - lo <= 64. * f64::EPSILON * rho;
+                if stagnated_at_resolution {
+                    if error.abs() <= tolerance {
+                        return Ok(rho);
+                    }
+                    let cancellation = self.prepared.pressure_roundoff_bound(rho).unwrap_or(0.);
+                    if error.abs() <= tolerance.max(2e-10 * p + cancellation) {
+                        return Ok(rho);
+                    }
                 }
                 break;
             }

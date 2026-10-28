@@ -69,6 +69,15 @@ path = "rust/examples/mbwr_caloric_parity.rs"
 name = "mbwr_total_tp_parity"
 path = "rust/examples/mbwr_total_tp_parity.rs"
 
+[[example]]
+name = "mbwr_coexistence_parity"
+path = "rust/examples/mbwr_coexistence_parity.rs"
+
+[[test]]
+name = "mbwr_coexistence_source"
+path = "tests/mbwr_coexistence_source.rs"
+harness = false
+
 [[test]]
 name = "mbwr_total_tp_source"
 path = "tests/mbwr_total_tp_source.rs"

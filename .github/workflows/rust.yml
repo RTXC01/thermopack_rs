@@ -34,6 +34,8 @@ jobs:
       - run: python -m unittest discover -s tools/rust_port -p test_mbwr_caloric_audit.py
       - run: python tools/rust_port/audit_mbwr_total_tp.py
       - run: python -m unittest discover -s tools/rust_port -p test_mbwr_total_tp_audit.py
+      - run: python tools/rust_port/audit_mbwr_coexistence.py
+      - run: python -m unittest discover -s tools/rust_port -p test_mbwr_coexistence_audit.py
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test --all-targets
       - run: cargo test --release --tests
@@ -104,6 +106,7 @@ jobs:
       - run: python tools/rust_port/validate_mbwr_properties.py
       - run: python tools/rust_port/qualify_mbwr_caloric.py --compiler /usr/bin/gfortran-13 --source-build-dir .reference
       - run: python tools/rust_port/qualify_mbwr_total_tp.py --compiler /usr/bin/gfortran-13 --source-build-dir .reference
+      - run: python tools/rust_port/qualify_mbwr_coexistence.py --compiler /usr/bin/gfortran-13 --source-build-dir .reference
       - run: python tools/rust_port/validate_mbwr_equilibrium.py
       - run: python tools/rust_port/validate_mbwr_density.py
       - run: python tools/rust_port/validate_mbwr_initialization.py

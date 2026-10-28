@@ -217,3 +217,5 @@ polynomials, the reduced residual Helmholtz energy and its derivatives, the
 pressure of a state, the reduced residual chemical potential, the caloric state
 and the reduced interaction potential. See
 [Lennard-Jones splined notes](../docs/rust/ljs.md).
+
+[Pure MBWR coexistence](../docs/rust/mbwr-coexistence.md) provides bounded vapor/liquid saturation and inverse temperature with original solver and kernel evidence.

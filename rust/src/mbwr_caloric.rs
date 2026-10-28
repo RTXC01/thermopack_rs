@@ -133,7 +133,7 @@ impl MbwrFluid {
         })
     }
 
-    /// Total Helmholtz energy and its TVn gradient [J].
+    /// Total Helmholtz energy and its TVn gradient in J.
     pub fn helmholtz(&self, t: f64, v: f64, n: f64) -> Result<MbwrTvQuantity> {
         self.prepare(t)?.helmholtz(v, n)
     }

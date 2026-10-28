@@ -81,3 +81,9 @@ classical source dispatches. Original pressure closure/slope identifies 93
 unclosed-extremum states with unqualified derivative blocks; 9,659 requests
 are fully qualified. Broad equilibrium,
 interfaces and performance work remain. The overall estimate stays about 35%.
+
+Pure MBWR coexistence adds 404 independent original solver matches and 920
+original-kernel certificates over 1,008 retained requests. Eight source branch
+selection differences and 88 native error observations remain explicit; raw
+source saturation behavior, flashes, interfaces and timing remain pending.
+The overall estimate remains about 35%.

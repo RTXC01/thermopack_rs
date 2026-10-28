@@ -226,3 +226,5 @@ the retained unqualified derivative blocks at unclosed extrema.
 
 Regenerate inventory with
 `python tools/rust_port/inventory.py`.
+
+The [pure MBWR coexistence notes](mbwr-coexistence.md) cover bounded vapor/liquid equilibrium, inverse temperature, original-kernel certificates and retained source branch differences.

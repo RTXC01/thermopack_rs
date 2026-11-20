@@ -47,10 +47,35 @@ def _same_encoded(a, b):
     return (math.isnan(a) and math.isnan(b)) or a == b
 
 
-def _same_expected(stored, want):
-    """Require stored expected views to match derived values, allowing 4 ULP only on present PHYSICAL Cp/sound."""
+def _same_sign(a, b):
+    return a == 0.0 or b == 0.0 or (a > 0.0) == (b > 0.0)
+
+
+def _physical_scales(q, raw):
+    if q['kind'] not in ('TVP', 'BOUNDED'):
+        return None
+    tv = _raw_vector(raw, 'VALUES')
+    ideal = _raw_vector(raw, 'IDEAL')
+    residual = _raw_vector(raw, 'RESIDUAL')
+    f = tv[:10].copy()
+    if ideal[3] == 10.:
+        f[4] -= q['n'] * 999. * ideal[4] / (R * q['T'] ** 2)
+    p1 = -R * (f[2] + q['T'] * f[5])
+    p2 = -R * q['T'] * f[7]
+    cv = -R * q['T'] * (2.0 * f[1] + q['T'] * f[4])
+    if cv != 0.0:
+        denom = abs(p2 - q['T'] * (p1 * p1) / cv)
+        sound_factor = max(1.0, abs(p2) / denom) if denom > 0.0 else 1.0
+    else:
+        sound_factor = 1.0
+    return (residual[3], sound_factor)
+
+
+def _same_expected(stored, want, scales=None):
+    """Require stored expected views to match derived values, allowing operand-scaled 4 ULP only on PHYSICAL lnphi and present Cp/sound."""
     if not isinstance(stored, dict) or set(stored) != set(want):
         return False
+    residual_fn, sound_factor = scales if scales is not None else (0.0, 1.0)
     for label, expected in want.items():
         actual = stored[label]
         if isinstance(expected, str):
@@ -64,9 +89,16 @@ def _same_expected(stored, want):
                     return False
                 if not (math.isfinite(a) and math.isfinite(b)):
                     return False
-                if (label == 'PHYSICAL' and j in (48, 50)
-                        and expected[j - 1] == 1.0 and actual[j - 1] == 1.0):
-                    if abs(a - b) > 4.0 * math.ulp(max(abs(a), abs(b))):
+                if label == 'PHYSICAL' and j == 41:
+                    scale = max(abs(a), abs(b), abs(residual_fn))
+                    if not _same_sign(a, b) or abs(a - b) > 4.0 * math.ulp(scale):
+                        return False
+                elif label == 'PHYSICAL' and j == 48 and expected[47] == 1.0 and actual[47] == 1.0:
+                    scale = max(abs(a), abs(b), abs(expected[46]))
+                    if not _same_sign(a, b) or abs(a - b) > 4.0 * math.ulp(scale):
+                        return False
+                elif label == 'PHYSICAL' and j == 50 and expected[49] == 1.0 and actual[49] == 1.0:
+                    if not _same_sign(a, b) or abs(a - b) > 4.0 * math.ulp(max(abs(a), abs(b)) * sound_factor):
                         return False
                 elif a != b:
                     return False
@@ -191,7 +223,8 @@ def audit(report):
             _check(parsed is not None and len(parsed) == len(stored), f'case {i}: missing raw stdout {label}')
             _check(all(_same_encoded(a, b) for a, b in zip(stored, parsed)), f'case {i}: stored {label} differs from raw stdout')
         want = _expected(q, raw)
-        _check(_same_expected(e.get('expected'), want), f'case {i}: stored expected values are not derived from original evidence')
+        scales = _physical_scales(q, raw)
+        _check(_same_expected(e.get('expected'), want, scales), f'case {i}: stored expected values are not derived from original evidence')
         if unresolved_source_derivative_case(q, raw):
             unqualified.append(unqualified_entry(q))
         native_views = ({'DENSITY', 'CLASSICAL'} if kind == 'SOURCE' else

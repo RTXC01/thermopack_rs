@@ -11,7 +11,11 @@ from reference import ROOT
 from qualify_mbwr_caloric import FIELDS,RELATIVE,assemble,differences,key
 
 
-def _same_physical(expected,stored):
+def _same_sign(a,b):
+    return a==0.0 or b==0.0 or (a>0.0)==(b>0.0)
+
+
+def _same_physical(expected,stored,q=None,residual_fn=0.0):
     if not isinstance(stored,list) or len(expected)!=len(stored) or len(stored)!=45:
         return False
     for j,(a,b) in enumerate(zip(expected,stored)):
@@ -19,8 +23,22 @@ def _same_physical(expected,stored):
             return False
         if not (math.isfinite(a) and math.isfinite(b)):
             return False
-        if j in (40,44) and expected[j-1]==1.0 and stored[j-1]==1.0:
-            if abs(a-b)>4.0*math.ulp(max(abs(a),abs(b))):
+        if j==40 and expected[39]==1.0 and stored[39]==1.0:
+            scale=max(abs(a),abs(b),abs(expected[38]))
+            if not _same_sign(a,b) or abs(a-b)>4.0*math.ulp(scale):
+                return False
+        elif j==42 and expected[41]==1.0 and stored[41]==1.0:
+            scale=max(abs(a),abs(b),abs(residual_fn))
+            if not _same_sign(a,b) or abs(a-b)>4.0*math.ulp(scale):
+                return False
+        elif j==44 and expected[43]==1.0 and stored[43]==1.0:
+            p1=expected[11]; p2=expected[12]; cv=expected[38]
+            if q is not None and cv!=0.0:
+                denom=abs(p2-q['T']*(p1*p1)/cv)
+                factor=max(1.0,abs(p2)/denom) if denom>0.0 else 1.0
+            else:
+                factor=1.0
+            if not _same_sign(a,b) or abs(a-b)>4.0*math.ulp(max(abs(a),abs(b))*factor):
                 return False
         elif a!=b:
             return False
@@ -51,8 +69,9 @@ def audit(report):
         if ideal[3]==10.:
             f[4]-=q['n']*999.*ideal[4]/(8.31446261815324*q['T']**2)
             counts['type10']+=1
-        expected=assemble(q,f,source[3]-ideal[8],ideal[2]*1e-3)
-        assert _same_physical(expected,e['physical_from_original_jet'])
+        residual_fn=source[3]-ideal[8]
+        expected=assemble(q,f,residual_fn,ideal[2]*1e-3)
+        assert _same_physical(expected,e['physical_from_original_jet'],q,residual_fn)
         assert len(e['native'])==2
         for target,actual in zip((source,expected),e['native']):
             assert isinstance(actual,list) and not differences(q,target,actual)

@@ -73,16 +73,16 @@ fn solid_co2_matches_the_source() {
 
 #[test]
 fn solid_co2_reference_shift_is_reproducible() {
-    // The shift must move the model onto the requested reference state: the
-    // Gibbs energy of the solid at the triple point is the liquid Gibbs energy
-    // reduced by the melting enthalpy.
+    // The shift must move the model onto the requested triple-point reference state:
+    // solid Gibbs energy matches the liquid Gibbs energy, and solid entropy is the
+    // liquid entropy reduced by dh_melt_tr / T_tr.
     let mut model = SolidCo2::new();
     model.initialize(205.147591034776, -18000.0, 216.592, 517950.0);
     let gibbs = model.gibbs(216.592, 517950.0);
     let entropy = model.entropy(216.592, 517950.0);
     let enthalpy = model.enthalpy(216.592, 517950.0);
-    assert!(gibbs < -18000.0);
-    assert!(entropy > 0.0);
+    assert!((gibbs - (-18000.0)).abs() < 1e-9);
+    assert!((entropy - (205.147591034776 - 8875.0 / 216.592)).abs() < 1e-9);
     assert!((enthalpy - gibbs - 216.592 * entropy).abs() < 1e-9);
     // The volume follows the pressure derivative of the Gibbs energy.
     let volume = model.specific_volume(216.592, 517950.0);

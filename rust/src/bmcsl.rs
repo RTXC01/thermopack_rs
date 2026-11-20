@@ -809,7 +809,7 @@ mod tests {
                     difference < 1.0e-6,
                     "the first derivative {index} differs by {difference}"
                 );
-                for second in 0..3 {
+                for (second, &expected) in value.d2zeta[index].iter().enumerate() {
                     let mut up = [zeta_2, zeta_3, mu];
                     let mut down = [zeta_2, zeta_3, mu];
                     up[index] += step;
@@ -817,7 +817,7 @@ mod tests {
                     let quotient = (boublik_pair_correlation(up[0], up[1], up[2]).dzeta[second]
                         - boublik_pair_correlation(down[0], down[1], down[2]).dzeta[second])
                         / (2.0 * step);
-                    let difference = (quotient - value.d2zeta[index][second]).abs();
+                    let difference = (quotient - expected).abs();
                     assert!(
                         difference < 1.0e-4,
                         "the second derivative {index},{second} differs by {difference}"

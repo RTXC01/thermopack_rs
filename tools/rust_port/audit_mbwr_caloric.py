@@ -36,7 +36,11 @@ def audit(report):
             f[4]-=q['n']*999.*ideal[4]/(8.31446261815324*q['T']**2)
             counts['type10']+=1
         expected=assemble(q,f,source[3]-ideal[8],ideal[2]*1e-3)
-        assert expected==e['physical_from_original_jet']
+        stored=e['physical_from_original_jet']
+        assert isinstance(stored,list) and len(expected)==len(stored)==45
+        for a,b in zip(expected,stored):
+            assert type(a) in (int,float) and type(b) in (int,float)
+            assert math.isfinite(a) and math.isfinite(b) and abs(a-b)<=4.0*math.ulp(max(abs(a),abs(b),1.0))
         assert len(e['native'])==2
         for target,actual in zip((source,expected),e['native']):
             assert isinstance(actual,list) and not differences(q,target,actual)

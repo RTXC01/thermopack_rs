@@ -136,14 +136,11 @@ fn the_isotherm_splits_at_the_saturation_pressure() {
     assert!(saturation.pressure > 1.0e5 && saturation.pressure < 1.0e7);
     // The grid of ten points splits into the vapor branch and the liquid
     // branch, and the saturation pressure is the end of the first one.
-    let mut first_liquid = None;
-    for index in 0..line.pressure.len() {
-        if line.pressure[index] > saturation.pressure {
-            first_liquid = Some(index);
-            break;
-        }
-    }
-    let first_liquid = first_liquid.expect("liquid branch");
+    let first_liquid = line
+        .pressure
+        .iter()
+        .position(|&pressure| pressure > saturation.pressure)
+        .expect("liquid branch");
     assert!(first_liquid > 0);
     assert!((line.pressure[first_liquid - 1] - saturation.pressure).abs() < 1.0e-6);
     // The liquid branch compresses with the pressure.
@@ -157,14 +154,11 @@ fn the_isobar_splits_at_the_saturation_temperature() {
     let line = thermopack_rs::isolines::isobar(&model, 1.0e6, 120.0, 190.0, &[1.0], 8).unwrap();
     let saturation = model.pseudo_saturation_temperature(1.0e6, &[1.0]).unwrap();
     assert!(saturation.temperature > 120.0 && saturation.temperature < 190.0);
-    let mut first_vapor = None;
-    for index in 0..line.temperature.len() {
-        if line.temperature[index] > saturation.temperature {
-            first_vapor = Some(index);
-            break;
-        }
-    }
-    let first_vapor = first_vapor.expect("vapor branch");
+    let first_vapor = line
+        .temperature
+        .iter()
+        .position(|&temperature| temperature > saturation.temperature)
+        .expect("vapor branch");
     assert!(first_vapor > 0);
     assert!((line.temperature[first_vapor - 1] - saturation.temperature).abs() < 1.0e-9);
     assert!(line.volume[first_vapor] > line.volume[0]);
@@ -187,8 +181,8 @@ fn the_isenthalp_holds_the_enthalpy() {
     )
     .unwrap();
     assert!(!line.pressure.is_empty());
-    for index in 0..line.pressure.len() {
-        assert!((line.enthalpy[index] + 78000.0).abs() < 1.0e-6);
+    for &enthalpy in &line.enthalpy[..line.pressure.len()] {
+        assert!((enthalpy + 78000.0).abs() < 1.0e-6);
     }
 }
 
@@ -209,7 +203,7 @@ fn the_isentrope_holds_the_entropy() {
     )
     .unwrap();
     assert!(!line.pressure.is_empty());
-    for index in 0..line.pressure.len() {
-        assert!((line.entropy[index] - 165.0).abs() < 1.0e-6);
+    for &entropy in &line.entropy[..line.pressure.len()] {
+        assert!((entropy - 165.0).abs() < 1.0e-6);
     }
 }

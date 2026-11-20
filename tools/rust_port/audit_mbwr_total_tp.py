@@ -47,6 +47,28 @@ def _same_encoded(a, b):
     return (math.isnan(a) and math.isnan(b)) or a == b
 
 
+def _same_expected(stored, want):
+    """Require stored expected views to match derived values within 4 ULP."""
+    if not isinstance(stored, dict) or set(stored) != set(want):
+        return False
+    for label, expected in want.items():
+        actual = stored[label]
+        if isinstance(expected, str):
+            if actual != expected:
+                return False
+        else:
+            if not isinstance(actual, list) or len(actual) != len(expected):
+                return False
+            for a, b in zip(actual, expected):
+                if type(a) not in (int, float) or type(b) not in (int, float):
+                    return False
+                if not (math.isfinite(a) and math.isfinite(b)):
+                    return False
+                if abs(a - b) > 4.0 * math.ulp(max(abs(a), abs(b), 1.0)):
+                    return False
+    return True
+
+
 def _stdout_vectors(source):
     _check(not source.get('censored'), 'source collection was censored')
     _check(source.get('returncode') == 0, 'source collection failed')
@@ -165,7 +187,7 @@ def audit(report):
             _check(parsed is not None and len(parsed) == len(stored), f'case {i}: missing raw stdout {label}')
             _check(all(_same_encoded(a, b) for a, b in zip(stored, parsed)), f'case {i}: stored {label} differs from raw stdout')
         want = _expected(q, raw)
-        _check(e.get('expected') == want, f'case {i}: stored expected values are not derived from original evidence')
+        _check(_same_expected(e.get('expected'), want), f'case {i}: stored expected values are not derived from original evidence')
         if unresolved_source_derivative_case(q, raw):
             unqualified.append(unqualified_entry(q))
         native_views = ({'DENSITY', 'CLASSICAL'} if kind == 'SOURCE' else

@@ -11,6 +11,22 @@ from reference import ROOT
 from qualify_mbwr_caloric import FIELDS,RELATIVE,assemble,differences,key
 
 
+def _same_physical(expected,stored):
+    if not isinstance(stored,list) or len(expected)!=len(stored) or len(stored)!=45:
+        return False
+    for j,(a,b) in enumerate(zip(expected,stored)):
+        if type(a) not in (int,float) or type(b) not in (int,float):
+            return False
+        if not (math.isfinite(a) and math.isfinite(b)):
+            return False
+        if j in (40,44) and expected[j-1]==1.0 and stored[j-1]==1.0:
+            if abs(a-b)>4.0*math.ulp(max(abs(a),abs(b))):
+                return False
+        elif a!=b:
+            return False
+    return True
+
+
 def audit(report):
     records=report['records']; schedule=report['signature']['schedule']
     assert len(records)==len(schedule)==report['attempts']==report['cases']==5994
@@ -36,11 +52,7 @@ def audit(report):
             f[4]-=q['n']*999.*ideal[4]/(8.31446261815324*q['T']**2)
             counts['type10']+=1
         expected=assemble(q,f,source[3]-ideal[8],ideal[2]*1e-3)
-        stored=e['physical_from_original_jet']
-        assert isinstance(stored,list) and len(expected)==len(stored)==45
-        for a,b in zip(expected,stored):
-            assert type(a) in (int,float) and type(b) in (int,float)
-            assert math.isfinite(a) and math.isfinite(b) and abs(a-b)<=4.0*math.ulp(max(abs(a),abs(b),1.0))
+        assert _same_physical(expected,e['physical_from_original_jet'])
         assert len(e['native'])==2
         for target,actual in zip((source,expected),e['native']):
             assert isinstance(actual,list) and not differences(q,target,actual)

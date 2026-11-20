@@ -166,9 +166,11 @@ def main(directory):
             failures.append(dict(case=case, reason="length", native=len(actual), reference=len(expected)))
             status_rows.append([case, 2])
             continue
+        nc = len(components)
+        atols = [ATOL[0], ATOL[1], ATOL[2]] + [ATOL[3]] * nc + [ATOL[4]] * nc + [ATOL[5]] * (nc * nc)
+        assert len(atols) == len(expected)
         bad = []
-        for position, (a, b) in enumerate(zip(expected, actual)):
-            atol = ATOL[position] if position < len(ATOL) else ATOL[-1]
+        for position, (a, b, atol) in enumerate(zip(expected, actual, atols)):
             scaled = b * SOURCE_UNIT_SCALE
             if not math.isfinite(scaled) or abs(a - scaled) > atol + RTOL * max(abs(a), abs(scaled)):
                 bad.append(position)

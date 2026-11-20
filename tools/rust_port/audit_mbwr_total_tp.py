@@ -48,7 +48,7 @@ def _same_encoded(a, b):
 
 
 def _same_expected(stored, want):
-    """Require stored expected views to match derived values within 4 ULP."""
+    """Require stored expected views to match derived values, allowing 4 ULP only on present PHYSICAL Cp/sound."""
     if not isinstance(stored, dict) or set(stored) != set(want):
         return False
     for label, expected in want.items():
@@ -59,12 +59,16 @@ def _same_expected(stored, want):
         else:
             if not isinstance(actual, list) or len(actual) != len(expected):
                 return False
-            for a, b in zip(actual, expected):
+            for j, (a, b) in enumerate(zip(actual, expected)):
                 if type(a) not in (int, float) or type(b) not in (int, float):
                     return False
                 if not (math.isfinite(a) and math.isfinite(b)):
                     return False
-                if abs(a - b) > 4.0 * math.ulp(max(abs(a), abs(b), 1.0)):
+                if (label == 'PHYSICAL' and j in (48, 50)
+                        and expected[j - 1] == 1.0 and actual[j - 1] == 1.0):
+                    if abs(a - b) > 4.0 * math.ulp(max(abs(a), abs(b))):
+                        return False
+                elif a != b:
                     return False
     return True
 

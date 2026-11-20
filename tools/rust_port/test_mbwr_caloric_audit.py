@@ -1,5 +1,6 @@
 """Mutated evidence must fail even when native and expected vectors agree."""
 import copy
+import math
 import unittest
 from audit_mbwr_caloric import audit,load_and_audit
 from qualify_mbwr_caloric import differences,floors
@@ -40,6 +41,30 @@ class CaloricAuditTests(unittest.TestCase):
         e=next(e for e in bad['public_constructor_calls'] if 'PUBLIC_RETURNED' not in e['stdout'])
         e['expected_initialization_status']=0
         with self.assertRaises(AssertionError):audit(bad)
+
+    def test_presence_flag_single_ulp_mutation_is_rejected(self):
+        bad=copy.deepcopy(self.report)
+        self.assertEqual(bad['records'][0]['physical_from_original_jet'][39],1.0)
+        bad['records'][0]['physical_from_original_jet'][39]=1.0+math.ulp(1.0)
+        with self.assertRaises(AssertionError):audit(bad)
+
+    def test_unaffected_field_single_ulp_mutation_is_rejected(self):
+        for idx in (10,38):
+            bad=copy.deepcopy(self.report)
+            v=bad['records'][0]['physical_from_original_jet'][idx]
+            bad['records'][0]['physical_from_original_jet'][idx]=v+math.ulp(abs(v) if v!=0.0 else 1.0)
+            with self.assertRaises(AssertionError):audit(bad)
+
+    def test_present_cp_and_sound_exceeding_4_ulp_is_rejected(self):
+        rec_idx=next(
+            i for i,e in enumerate(self.report['records'])
+            if e['physical_from_original_jet'][39]==1.0 and e['physical_from_original_jet'][43]==1.0
+        )
+        for idx in (40,44):
+            bad=copy.deepcopy(self.report)
+            v=bad['records'][rec_idx]['physical_from_original_jet'][idx]
+            bad['records'][rec_idx]['physical_from_original_jet'][idx]=v+8.0*math.ulp(abs(v))
+            with self.assertRaises(AssertionError):audit(bad)
 
 
 if __name__=='__main__': unittest.main()

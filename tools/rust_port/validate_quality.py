@@ -34,14 +34,24 @@ def label(q,r):
         ','.join(map(repr,q['feed'])),repr(q['beta']),f"{q['fixed']}:{q['value']!r}:{q.get('component',0)}",','.join(map(repr,g))])
 
 def known_baseline_difference(q,bad):
-    # Retain this near-coincident NRTL miss as pending fidelity, never as a
-    # successful strict comparison or an expanded general tolerance.
-    return (q['eos'] in ['PR','SRK'] and q['components']==['C1','H2O'] and q.get('configuration')=='nrtl'
-        and q['fixed']=='T' and q['value']==350. and q['beta'] in [.1,.4] and bad
-        and all(isinstance(v,list) and (
+    # Retain documented near-coincident NRTL misses as pending fidelity,
+    # never as a successful strict comparison or an expanded general tolerance.
+    if not (q['components']==['C1','H2O'] and q['feed']==[.8,.2]
+        and q.get('configuration')=='nrtl' and q['fixed']=='T' and q['value']==350. and bad):
+        return False
+    if q['eos']=='PR' and q['beta']==.4:
+        return all(isinstance(v,list) and v[0] in [6,8] and abs(v[1]-v[2])<1.2e-7 for v in bad)
+    if q['eos']=='PR' and q['beta']==.1:
+        return all(isinstance(v,list) and (
+            (v[0]==4 and abs(v[1]-v[2])<5e-7*max(abs(v[1]),abs(v[2]))) or
+            (v[0] in [7,8] and abs(v[1]-v[2])<5e-7)
+        ) for v in bad)
+    if q['eos']=='SRK' and q['beta']==.4:
+        return all(isinstance(v,list) and (
             (v[0] in [3,4] and abs(v[1]-v[2])<5e-7*max(abs(v[1]),abs(v[2]))) or
-            (v[0] in [5,6,7,8] and abs(v[1]-v[2])<5e-7)
-        ) for v in bad))
+            (v[0] in [6,7,8] and abs(v[1]-v[2])<5e-7)
+        ) for v in bad)
+    return False
 
 def known_cold_difference(q,bad):
     return (q['components']==['C1','H2O'] and q['fixed']=='T' and q['value']==350. and q['beta'] in [.1,.4]

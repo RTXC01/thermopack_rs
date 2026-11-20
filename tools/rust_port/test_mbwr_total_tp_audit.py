@@ -107,9 +107,50 @@ class EvidenceAuditNegativeTests(unittest.TestCase):
         self.assertEqual(native, expected2)  # the tampered native/expected pair agrees exactly
         independently_derived = audit._expected(q, raw)
         with self.assertRaisesRegex(AssertionError, 'expected values are not derived'):
-            audit._check(expected2 == independently_derived,
+            audit._check(audit._same_expected(expected2, independently_derived),
                          'stored expected values are not derived from original evidence')
         self.assertEqual(native, expected2)
+
+    def test_same_expected_ulp_scope_is_strictly_bounded(self):
+        q, raw = valid_tvp_case()
+        expected = audit._expected(q, raw)
+        # Ensure flags are present (1.0) on a synthetic case with non-zero Cp/sound.
+        want = copy.deepcopy(expected)
+        want['PHYSICAL'][47] = 1.0
+        want['PHYSICAL'][48] = 50.0
+        want['PHYSICAL'][49] = 1.0
+        want['PHYSICAL'][50] = 200.0
+
+        # Presence flag 1-ULP mutation must be rejected.
+        for flag_idx in (47, 49):
+            bad = copy.deepcopy(want)
+            bad['PHYSICAL'][flag_idx] = 1.0 + math.ulp(1.0)
+            self.assertFalse(audit._same_expected(bad, want))
+
+        # Unaffected slots 1-ULP mutation must be rejected.
+        for view in ('BASELINE', 'PHYSICAL'):
+            bad = copy.deepcopy(want)
+            v = bad[view][0]
+            bad[view][0] = v + math.ulp(abs(v) if v != 0.0 else 1.0)
+            self.assertFalse(audit._same_expected(bad, want))
+
+        # Absent Cp/sound placeholder mutation (0.0 -> 1e-300) when flag is 0.0 must be rejected.
+        for flag_idx, val_idx in ((47, 48), (49, 50)):
+            absent_want = copy.deepcopy(want)
+            absent_want['PHYSICAL'][flag_idx] = 0.0
+            absent_want['PHYSICAL'][val_idx] = 0.0
+            bad = copy.deepcopy(absent_want)
+            bad['PHYSICAL'][val_idx] = 1e-300
+            self.assertFalse(audit._same_expected(bad, absent_want))
+
+        # Present Cp/sound: 2 ULP passes, 8 ULP is rejected.
+        for val_idx in (48, 50):
+            ok = copy.deepcopy(want)
+            ok['PHYSICAL'][val_idx] = want['PHYSICAL'][val_idx] + 2.0 * math.ulp(abs(want['PHYSICAL'][val_idx]))
+            self.assertTrue(audit._same_expected(ok, want))
+            bad = copy.deepcopy(want)
+            bad['PHYSICAL'][val_idx] = want['PHYSICAL'][val_idx] + 8.0 * math.ulp(abs(want['PHYSICAL'][val_idx]))
+            self.assertFalse(audit._same_expected(bad, want))
 
     def test_truncated_original_vectors_fail_closed(self):
         with self.assertRaisesRegex(AssertionError, '45 values'):
@@ -178,6 +219,45 @@ class EvidenceCorpusNegativeTests(unittest.TestCase):
         row['native']['CLASSICAL'][7] += 100.
         with self.assertRaisesRegex(AssertionError, 'CLASSICAL mismatch'):
             audit.audit(report)
+
+    def test_sub_ulp_floor_classical_sign_flip_is_rejected(self):
+        report = copy.deepcopy(self.report)
+        row = report['records'][0]
+        val = row['expected']['CLASSICAL'][16]
+        self.assertNotEqual(val, 0.0)
+        row['expected']['CLASSICAL'][16] = -val
+        want = audit._expected(row['request'], row['original'])
+        self.assertFalse(audit._same_expected(row['expected'], want))
+        with self.assertRaisesRegex(AssertionError, 'not derived from original'):
+            audit.audit(report)
+
+    def test_corpus_physical_flag_and_value_ulp_mutations_are_rejected(self):
+        tvp_index = next(
+            i for i, r in enumerate(self.report['records'])
+            if r['request']['kind'] == 'TVP'
+            and r['expected']['PHYSICAL'][47] == 1.0
+            and r['expected']['PHYSICAL'][49] == 1.0
+        )
+        # Flag mutation by 1 ULP is rejected.
+        for flag_idx in (47, 49):
+            report = copy.deepcopy(self.report)
+            report['records'][tvp_index]['expected']['PHYSICAL'][flag_idx] = 1.0 + math.ulp(1.0)
+            with self.assertRaisesRegex(AssertionError, 'not derived from original'):
+                audit.audit(report)
+        # Unaffected slot 1-ULP mutation is rejected.
+        for view in ('BASELINE', 'PHYSICAL'):
+            report = copy.deepcopy(self.report)
+            v = report['records'][tvp_index]['expected'][view][0]
+            report['records'][tvp_index]['expected'][view][0] = v + math.ulp(abs(v) if v != 0.0 else 1.0)
+            with self.assertRaisesRegex(AssertionError, 'not derived from original'):
+                audit.audit(report)
+        # Present Cp/sound 8-ULP mutation is rejected.
+        for val_idx in (48, 50):
+            report = copy.deepcopy(self.report)
+            v = report['records'][tvp_index]['expected']['PHYSICAL'][val_idx]
+            report['records'][tvp_index]['expected']['PHYSICAL'][val_idx] = v + 8.0 * math.ulp(abs(v))
+            with self.assertRaisesRegex(AssertionError, 'not derived from original'):
+                audit.audit(report)
 
 
 if __name__ == '__main__':

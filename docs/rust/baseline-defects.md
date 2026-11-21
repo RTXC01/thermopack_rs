@@ -460,3 +460,53 @@ inconsistent volume-unit comment. This apparent factor-1000 caller discrepancy
 is a source audit finding, not a change to the reference or a qualified native
 compatibility implementation. Generic saturation uses LIQ/VAP thermodynamic
 dispatch instead.
+
+## Extended CSP upstream initialization, backend, and wrapper defects
+
+Six upstream defects affect `src/extcsp.f90` and `addon/pycThermopack/thermopack/extended_csp.py`:
+
+1. `src/extcsp.f90:127-131` (`csp_init`): when `refEos` is `"SRK"` or `"PR"`,
+   `eos%refEosType = c_u_b_i_c` is never assigned, so `extcsp_eos_allocate_and_init`
+   terminates with `"Wrong input to extcsp_eos_allocate_and_init"`.
+2. `src/extcsp.f90:764-769` (`calcRefEqDiff`) and `src/extcsp.f90:806`
+   (`solveRefEqZfac`): the `m_b_w_r` branch in `calcRefEqDiff` computes
+   `sdiff%M..Mv0v0` from `mbwrRefEos` and then immediately overwrites all six
+   values with uninitialized `alpr*` locals. In addition, `calcRefEqDiff`
+   receives `v0` in `L/mol` while the MBWR reduced residual Helmholtz kernel
+   expects SI molar density `rho_SI = 1000 / v0` (`mol/m^3`), with
+   `d(rho_SI)/dv0 = -1000 / v0^2` and `d^2(rho_SI)/dv0^2 = 2000 / v0^3`;
+   converting the second volume derivative requires both terms of the
+   second-order chain rule,
+   `(d^2 F / d(rho_SI)^2) * (-1000 / v0^2)^2 + (d F / d(rho_SI)) * (2000 / v0^3)`.
+   Separately, in `solveRefEqZfac`, `mbwr_volume(..., nMoles=1)` returns
+   `m^3/mol`, so the SI gas constant in the executable compressibility
+   expression is correct and the litre comment at `src/extcsp.f90:806` is stale.
+3. `src/extcsp.f90:1302` (`extcsp_eos_allocate_and_init`): tests
+   `str_eq(eos_label, 'MBWR19')` against the combined `"MBWR19:C3"` string instead
+   of the parsed prefix `eos_l`, silently selecting MBWR-32 for MBWR-19 requests.
+4. `src/extcsp.f90:244-256`, `291`, `442-464` (`temperatureShapeFactorF`,
+   `F_function_TWU`, `a0_diff`): for `cbAlphaTwuIdx`, `temperatureShapeFactorF`
+   uses an uninitialized local `F` to compute `t0` and as the `newton_1d` seed
+   `x0 = F`, `F_function_TWU` substitutes the Twu exponent `N` instead of `sumn`
+   in `B = -L*(N*T/tc0)**C`, and `a0_diff` hardcodes classic-alpha derivatives
+   rather than evaluating the active Twu alpha derivatives.
+5. `src/extcsp.f90:420` (`mixture`) and combined Helmholtz derivative assembly:
+   assigns `sdiff%BT = 0.0` (commenting out `cbeos%bt`), zeroes/omits `BTT` and
+   `BiT`, and omits the corresponding `v0_T`, `v0_TT`, and `v0_Ti` chain-rule
+   terms, dropping temperature derivatives of the covolume for
+   temperature-dependent mixing rules such as Wong-Sandler.
+6. `addon/pycThermopack/thermopack/extended_csp.py:118-121`: passes `sh_alpha_c`
+   and `sh_mixing_c` in reverse order relative to Fortran
+   `eoslibinit::init_extcsp(comps, sh_eos, sh_mixing, sh_alpha, ...)`. Passing
+   `sh_alpha="Classic", sh_mixing="vdW"` silently runs with `sh_mixing="Classic"`
+   and `sh_alpha="vdW"`, while activity mixing rules such as `"HV1"` terminate
+   in `nameToIdx::unknown alpha corr name`.
+
+The native `thermopack_rs::extcsp::ExtCsp` fixes all six issues in pure SI.
+Exact-source qualification (`tools/rust_port/validate_extcsp.py`) passes the
+intended `sh_mixing` and `sh_alpha` in Fortran argument order to test the
+exact-source NIST MEOS `C3` kernel across `SRK`/`PR` and `VdW`/`HV1`/`HV2`/`NRTL`/`UNIFAC`,
+while `tests/extcsp.rs` independently verifies all three reference backends
+(`Multiparameter`, `Cubic`, `Mbwr` 19/32), Twu alpha, and Wong-Sandler via
+central finite differences, thermodynamic identities, and pure-reference-fluid
+identities.

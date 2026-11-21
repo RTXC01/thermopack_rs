@@ -781,3 +781,191 @@ fn hv_nrtl_kernel(
         d2g_dn_dn: d2g_ex_dnid_nj,
     })
 }
+
+/// Value-only Huron-Vidal / NRTL / Wong-Sandler excess Gibbs energy `g^E` (`[J/mol]`)
+/// with zero matrix or derivative allocations.
+fn hv_nrtl_value(
+    ge_mix: &ExcessGibbsMixture,
+    lambda_ge: f64,
+    temperature: f64,
+    mole_fractions: &[f64],
+    b_pure: &[f64],
+    a_pure: &[f64],
+) -> Result<f64> {
+    let nc = ge_mix.nc;
+    let t = temperature;
+    let ws = if ge_mix.mrule == MixingRule::WongSandler {
+        Some(
+            ge_mix
+                .wong_sandler
+                .as_ref()
+                .ok_or(crate::Error::InvalidInput(
+                    "the Wong-Sandler mixing rule without binary parameters",
+                ))?,
+        )
+    } else {
+        None
+    };
+
+    let mut sum2i = 0.0;
+    for i in 0..nc {
+        let bi = b_pure[i];
+        let mut gamma1 = 0.0;
+        let mut gamma2 = 0.0;
+        for j in 0..nc {
+            let (tau_ji, c_ji) = if i == j {
+                (0.0, 1.0)
+            } else if let Some(ws) = ws {
+                let source = i * nc + j;
+                let exponent = ws.alphaij[source];
+                if exponent.abs() > 1.0e-20 {
+                    let (value, _, _) = ws.tauij[source].evaluate(t);
+                    (value, (-exponent * value).exp())
+                } else {
+                    (0.0, 1.0)
+                }
+            } else {
+                let idx_ji = j * nc + i;
+                let bj = b_pure[j];
+                let pair = &ge_mix.pairs[idx_ji];
+                if pair.has_record {
+                    let tau_val = match pair.correlation {
+                        GeCorrelation::Polynomial => {
+                            let p = pair.poly_ij;
+                            if ge_mix.mrule == MixingRule::HuronVidal1
+                                || ge_mix.mrule == MixingRule::Nrtl
+                            {
+                                p[0] / t + p[1]
+                            } else {
+                                p[0] / t + p[1] + p[2] * t
+                            }
+                        }
+                        GeCorrelation::MariboMogensen => {
+                            let p = pair.poly_ij;
+                            let tc = p[2];
+                            let t_ref = 298.15;
+                            let d1 = 1.0 - t / tc;
+                            let d2 = 1.0 - t_ref / tc;
+                            (p[0] + p[1] * (d1 * d1 - d2 * d2)) / t
+                        }
+                    };
+                    (tau_val, (-pair.alpha_ij * tau_val).exp())
+                } else {
+                    let kij = pair.kij;
+                    let t1 = -2.0 * (bi * bj).sqrt() / (bi + bj);
+                    let gii = -a_pure[i] * lambda_ge / bi;
+                    let t2 = lambda_ge / bi;
+                    let t3 = t2 * lambda_ge / bj;
+                    let t4 = (t3 * a_pure[i] * a_pure[j]).sqrt();
+                    let tau_val = (t1 * t4 * (1.0 - kij) - gii) / (RGAS * t);
+                    let c_val = if ge_mix.mrule == MixingRule::Nrtl {
+                        1000.0 * bj
+                    } else {
+                        1.0
+                    };
+                    (tau_val, c_val)
+                }
+            };
+            let weight_b = if matches!(ge_mix.mrule, MixingRule::Nrtl | MixingRule::WongSandler) {
+                1.0
+            } else {
+                b_pure[j]
+            };
+            let term_base = weight_b * mole_fractions[j] * c_ji;
+            gamma1 += tau_ji * term_base;
+            gamma2 += term_base;
+        }
+        if !gamma1.is_finite() || !gamma2.is_finite() {
+            return Err(Error::InvalidInput("temperature outside numerical range"));
+        }
+        if gamma2.abs() >= 1e-30 {
+            sum2i += mole_fractions[i] * gamma1 / gamma2;
+        }
+    }
+    let ge = RGAS * t * sum2i;
+    if !ge.is_finite() {
+        return Err(Error::InvalidInput("temperature outside numerical range"));
+    }
+    Ok(ge)
+}
+
+/// Value-only infinite-pressure excess Gibbs energy `g^E` (`[J/mol]`) for Wong-Sandler
+/// without computing first or second derivative matrices.
+pub(crate) fn excess_gibbs_value(
+    ge_mix: &ExcessGibbsMixture,
+    kind: crate::cubic::CubicKind,
+    temperature: f64,
+    mole_fractions: &[f64],
+    b_pure: &[f64],
+    a_pure: &[f64],
+) -> Result<f64> {
+    let nc = ge_mix.nc;
+    if nc == 0 || mole_fractions.len() != nc {
+        return Err(Error::InvalidInput(
+            "component count mismatch in ExcessGibbs",
+        ));
+    }
+    if ge_mix.mrule == MixingRule::Unifac {
+        return Err(Error::Unsupported(
+            "the UNIFAC model does not deliver the excess Gibbs energy of the limit",
+        ));
+    }
+    hv_nrtl_value(
+        ge_mix,
+        excess_gibbs_limit(kind, GeLimit::Infinite),
+        temperature,
+        mole_fractions,
+        b_pure,
+        a_pure,
+    )
+}
+
+/// Value-only cubic mixture attraction `a_mix` (`[Pa m^6 / mol^2]`) for excess-Gibbs
+/// mixing rules (`HV1`, `HV2`, `NRTL`, `UNIFAC`) without computing derivative Hessians.
+pub(crate) fn excess_gibbs_cubic_a_value(
+    ge_mix: &ExcessGibbsMixture,
+    kind: crate::cubic::CubicKind,
+    temperature: f64,
+    mole_fractions: &[f64],
+    b_pure: &[f64],
+    a_pure: &[f64],
+    b_mix: f64,
+) -> Result<f64> {
+    let nc = ge_mix.nc;
+    if nc == 0 || mole_fractions.len() != nc {
+        return Err(Error::InvalidInput(
+            "component count mismatch in ExcessGibbs",
+        ));
+    }
+    let (g_ex, lambda_ge) = if ge_mix.mrule == MixingRule::Unifac {
+        let database = ge_mix.unifac.as_ref().ok_or(Error::InvalidInput(
+            "UNIFAC mixing rule without a group database",
+        ))?;
+        (
+            database.excess_gibbs_value(temperature, mole_fractions)?,
+            excess_gibbs_limit(kind, GeLimit::Zero),
+        )
+    } else {
+        let lambda_ge = excess_gibbs_limit(kind, GeLimit::Infinite);
+        (
+            hv_nrtl_value(
+                ge_mix,
+                lambda_ge,
+                temperature,
+                mole_fractions,
+                b_pure,
+                a_pure,
+            )?,
+            lambda_ge,
+        )
+    };
+    let mut sum_aa_b = 0.0;
+    for i in 0..nc {
+        sum_aa_b += mole_fractions[i] * a_pure[i] / b_pure[i];
+    }
+    let a = b_mix * (sum_aa_b - g_ex / lambda_ge);
+    if !a.is_finite() {
+        return Err(Error::InvalidInput("temperature outside numerical range"));
+    }
+    Ok(a)
+}

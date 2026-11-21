@@ -109,6 +109,10 @@ def load_probe():
     probe.query_cpa_rdf.restype=None
     probe.query_wong_sandler.argtypes=[c_double,POINTER(c_double),POINTER(c_double),POINTER(c_double),POINTER(c_double),POINTER(c_double),POINTER(c_int)]
     probe.query_wong_sandler.restype=None
+    probe.query_extcsp_fres.argtypes=[c_double,c_double,POINTER(c_double),POINTER(c_double),POINTER(c_int)]
+    probe.query_extcsp_fres.restype=None
+    probe.query_lk_gdep.argtypes=[c_double,c_double,POINTER(c_double),c_int,POINTER(c_double),POINTER(c_int)]
+    probe.query_lk_gdep.restype=None
     return probe
 
 
@@ -118,6 +122,103 @@ def main(compiler_directory):
     probe=None
     for line in sys.stdin:
         request=json.loads(line)
+        if request['mode']=='LEE_KESLER':
+            if probe is None:probe=load_probe()
+            from thermopack.lee_kesler import lee_kesler
+            comps=request['components'];ref=request.get('parameter_reference','Default')
+            key=('LEE_KESLER',comps,ref)
+            if previous!=key:
+                model=lee_kesler(comps,parameter_reference=ref);previous=key
+            model.activate()
+            t=float(request['temperature']);p=float(request['pressure']);z=list(map(float,request['feed']))
+            nc=len(z)
+            phase=model.LIQPH if request['phase']=='L' else model.VAPPH
+            z_val,dzdt,dzdp,dzdn=model.zfac(t,p,z,phase,dzdt=True,dzdp=True,dzdn=True)
+            v_val,dvdt,dvdp,dvdn=model.specific_volume(t,p,z,phase,dvdt=True,dvdp=True,dvdn=True)
+            hr,dhrdt,dhrdp,dhrdn=model.enthalpy(t,p,z,phase,dhdt=True,dhdp=True,dhdn=True,residual=True)
+            ht,dhtdt,dhtdp,dhtdn=model.enthalpy(t,p,z,phase,dhdt=True,dhdp=True,dhdn=True,residual=False)
+            sr,dsrdt,dsrdp,dsrdn=model.entropy(t,p,z,phase,dsdt=True,dsdp=True,dsdn=True,residual=True)
+            st,dstdt,dstdp,dstdn=model.entropy(t,p,z,phase,dsdt=True,dsdp=True,dsdn=True,residual=False)
+            lnphi,dlnphidt,dlnphidp,dlnphidn=model.thermo(t,p,z,phase,dlnfugdt=True,dlnfugdp=True,dlnfugdn=True)
+            sos=model.speed_of_sound(t,p,z,z,z,0.0,1.0,phase)
+            amounts=(c_double*16)(*z,*([0.0]*(16-nc)))
+            gdep=(c_double*3)();gcnt=c_int()
+            probe.query_lk_gdep(t,p,amounts,int(phase),gdep,byref(gcnt))
+            values=[
+                float(z_val),float(dzdt),float(dzdp),*[float(x) for x in dzdn],
+                float(v_val),float(dvdt),float(dvdp),*[float(x) for x in dvdn],
+                float(hr),float(dhrdt),float(dhrdp),*[float(x) for x in dhrdn],
+                float(ht),float(dhtdt),float(dhtdp),*[float(x) for x in dhtdn],
+                float(sr),float(dsrdt),float(dsrdp),*[float(x) for x in dsrdn],
+                float(st),float(dstdt),float(dstdp),*[float(x) for x in dstdn],
+                float(gdep[0]),float(gdep[1]),float(gdep[2]),
+                *[float(x) for x in lnphi],
+                *[float(x) for x in dlnphidt],
+                *[float(x) for x in dlnphidp],
+                *[float(dlnphidn[i][j]) for i in range(nc) for j in range(nc)],
+                float(sos),
+            ]
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=values)),flush=True)
+            continue
+        if request['mode']=='EXTCSP':
+            if probe is None:probe=load_probe()
+            from thermopack.extended_csp import ext_csp
+            comps=request['components']
+            sh_eos=request['shape_eos'];sh_mix=request['shape_mixing'];sh_alpha=request['shape_alpha']
+            ref_eos=request['ref_eos'];ref_comp=request['ref_comp'];ref_alpha=request.get('ref_alpha','Classic')
+            param_ref=request.get('parameter_reference','DEFAULT')
+            key=('EXTCSP',comps,sh_eos,sh_mix,sh_alpha,ref_eos,ref_comp,ref_alpha,param_ref)
+            if previous!=key:
+                # Note: addon/pycThermopack/thermopack/extended_csp.py swaps
+                # sh_alpha and sh_mixing relative to Fortran init_extcsp(comps,
+                # sh_eos, sh_mixing, sh_alpha, ...). Pass them in Fortran order
+                # so the exact-source Fortran kernel receives the intended
+                # sh_mixing and sh_alpha.
+                model=ext_csp(comps,sh_eos=sh_eos,sh_alpha=sh_mix,sh_mixing=sh_alpha,
+                              ref_eos=ref_eos,ref_comp=ref_comp,ref_alpha=ref_alpha,
+                              parameter_reference=param_ref)
+                previous=key
+            model.activate()
+            t=float(request['temperature']);p=float(request['pressure'])
+            n_vec=list(map(float,request['moles']));sumn=sum(n_vec)
+            x_vec=[v/sumn for v in n_vec];nc=len(n_vec)
+            phase=model.LIQPH if request['phase']=='L' else model.VAPPH
+            v_tp,dvdt,dvdp,dvdn=model.specific_volume(t,p,x_vec,phase,dvdt=True,dvdp=True,dvdn=True)
+            v_tv=float(request.get('volume',v_tp*sumn))
+            amounts=(c_double*16)(*n_vec,*([0.0]*(16-nc)))
+            fres_out=(c_double*256)();fres_cnt=c_int()
+            probe.query_extcsp_fres(t,v_tv,amounts,fres_out,byref(fres_cnt))
+            fres_vals=[float(fres_out[i]) for i in range(fres_cnt.value)]
+            ptv,dptv_dt,dptv_dv,dptv_dn=model.pressure_tv(t,v_tv,n_vec,dpdt=True,dpdv=True,dpdn=True)
+            utv=model.internal_energy_tv(t,v_tv,n_vec)[0]
+            stv=model.entropy_tv(t,v_tv,n_vec)[0]
+            htv=model.enthalpy_tv(t,v_tv,n_vec)[0]
+            sostv=model.speed_of_sound_tv(t,v_tv,n_vec)
+            z_val,dzdt,dzdp,dzdn=model.zfac(t,p,x_vec,phase,dzdt=True,dzdp=True,dzdn=True)
+            hr,dhrdt,dhrdp,dhrdn=model.enthalpy(t,p,x_vec,phase,dhdt=True,dhdp=True,dhdn=True,residual=True)
+            ht,dhtdt,dhtdp,dhtdn=model.enthalpy(t,p,x_vec,phase,dhdt=True,dhdp=True,dhdn=True,residual=False)
+            sr,dsrdt,dsrdp,dsrdn=model.entropy(t,p,x_vec,phase,dsdt=True,dsdp=True,dsdn=True,residual=True)
+            st,dstdt,dstdp,dstdn=model.entropy(t,p,x_vec,phase,dsdt=True,dsdp=True,dsdn=True,residual=False)
+            lnphi,dlnphidt,dlnphidp,dlnphidn=model.thermo(t,p,x_vec,phase,dlnfugdt=True,dlnfugdp=True,dlnfugdn=True)
+            sostp=model.speed_of_sound(t,p,x_vec,x_vec,x_vec,0.0,1.0,phase)
+            values=[
+                *fres_vals,
+                float(ptv),float(dptv_dt),float(dptv_dv),*[float(x) for x in dptv_dn],
+                float(utv),float(stv),float(htv),float(sostv),
+                float(z_val),float(dzdt),float(dzdp),*[float(x) for x in dzdn],
+                float(v_tp),float(dvdt),float(dvdp),*[float(x) for x in dvdn],
+                float(hr),float(dhrdt),float(dhrdp),*[float(x) for x in dhrdn],
+                float(ht),float(dhtdt),float(dhtdp),*[float(x) for x in dhtdn],
+                float(sr),float(dsrdt),float(dsrdp),*[float(x) for x in dsrdn],
+                float(st),float(dstdt),float(dstdp),*[float(x) for x in dstdn],
+                *[float(x) for x in lnphi],
+                *[float(x) for x in dlnphidt],
+                *[float(x) for x in dlnphidp],
+                *[float(dlnphidn[i][j]) for i in range(nc) for j in range(nc)],
+                float(sostp),
+            ]
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=values,volume=v_tv)),flush=True)
+            continue
         if request['mode']=='MEOS_ISO':
             # Targets are prepared by independent original TV kernels in the
             # host, before entering a solver that can terminate the process.

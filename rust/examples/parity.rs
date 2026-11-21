@@ -87,6 +87,183 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for line in io::stdin().lock().lines() {
         let line = line?;
         let fields: Vec<_> = line.split('|').collect();
+        if fields[0] == "LEE_KESLER" {
+            let names: Vec<_> = fields[1].split(',').collect();
+            let reference = fields[2];
+            let t: f64 = fields[3].parse()?;
+            let p: f64 = fields[4].parse()?;
+            let z: Vec<f64> = fields[5].split(',').map(|v| v.parse().unwrap()).collect();
+            let phase = if fields[6] == "L" {
+                Phase::Liquid
+            } else {
+                Phase::Vapor
+            };
+            let model = thermopack_rs::LeeKesler::new_with_reference(&names, reference)?;
+            match model.state_tp(t, p, &z, phase) {
+                Ok(s) => {
+                    let mut values = Vec::new();
+                    values.extend([
+                        s.compressibility_factor.value,
+                        s.compressibility_factor.dt,
+                        s.compressibility_factor.dp,
+                    ]);
+                    values.extend(s.compressibility_factor.dn);
+                    values.extend([
+                        s.specific_volume.value,
+                        s.specific_volume.dt,
+                        s.specific_volume.dp,
+                    ]);
+                    values.extend(s.specific_volume.dn);
+                    values.extend([
+                        s.residual_enthalpy.value,
+                        s.residual_enthalpy.dt,
+                        s.residual_enthalpy.dp,
+                    ]);
+                    values.extend(s.residual_enthalpy.dn);
+                    values.extend([s.enthalpy.value, s.enthalpy.dt, s.enthalpy.dp]);
+                    values.extend(s.enthalpy.dn);
+                    values.extend([
+                        s.residual_entropy.value,
+                        s.residual_entropy.dt,
+                        s.residual_entropy.dp,
+                    ]);
+                    values.extend(s.residual_entropy.dn);
+                    values.extend([s.entropy.value, s.entropy.dt, s.entropy.dp]);
+                    values.extend(s.entropy.dn);
+                    values.extend([
+                        s.residual_gibbs.value,
+                        s.residual_gibbs.dt,
+                        s.residual_gibbs.dp,
+                    ]);
+                    values.extend(s.ln_fugacity.ln_phi);
+                    values.extend(s.ln_fugacity.dt);
+                    values.extend(s.ln_fugacity.dp);
+                    values.extend(s.ln_fugacity.dn);
+                    values.push(s.speed_of_sound.unwrap_or(f64::NAN));
+                    println!(
+                        "{}",
+                        values
+                            .iter()
+                            .map(|v| format!("{v:.17e}"))
+                            .collect::<Vec<_>>()
+                            .join(",")
+                    );
+                }
+                Err(e) => println!("ERROR:{e}"),
+            }
+            continue;
+        }
+        if fields[0] == "EXTCSP" {
+            let sh_eos = match fields[1] {
+                "SRK" => CubicKind::SoaveRedlichKwong,
+                _ => CubicKind::PengRobinson,
+            };
+            let sh_mix = match fields[2] {
+                "HV1" => thermopack_rs::MixingRule::HuronVidal1,
+                "HV2" => thermopack_rs::MixingRule::HuronVidal2,
+                "NRTL" => thermopack_rs::MixingRule::Nrtl,
+                "UNIFAC" => thermopack_rs::MixingRule::Unifac,
+                "WS" => thermopack_rs::MixingRule::WongSandler,
+                _ => thermopack_rs::MixingRule::VdW,
+            };
+            let sh_alpha = thermopack_rs::AlphaCorrelation::from_name(fields[3])?;
+            let ref_eos = match fields[4] {
+                "NIST_MEOS" => thermopack_rs::ExtCspReferenceKind::NistMeos,
+                "MBWR19" => {
+                    thermopack_rs::ExtCspReferenceKind::Mbwr(thermopack_rs::MbwrKind::Bender19)
+                }
+                "MBWR32" => {
+                    thermopack_rs::ExtCspReferenceKind::Mbwr(thermopack_rs::MbwrKind::Mbwr32)
+                }
+                "SRK" => thermopack_rs::ExtCspReferenceKind::Cubic {
+                    kind: CubicKind::SoaveRedlichKwong,
+                    alpha: thermopack_rs::AlphaCorrelation::Classic,
+                },
+                _ => thermopack_rs::ExtCspReferenceKind::Cubic {
+                    kind: CubicKind::PengRobinson,
+                    alpha: thermopack_rs::AlphaCorrelation::Classic,
+                },
+            };
+            let ref_comp = fields[5];
+            let param_ref = fields[6];
+            let names: Vec<_> = fields[7].split(',').collect();
+            let t: f64 = fields[8].parse()?;
+            let p: f64 = fields[9].parse()?;
+            let v_tv: f64 = fields[10].parse()?;
+            let moles: Vec<f64> = fields[11].split(',').map(|v| v.parse().unwrap()).collect();
+            let sumn: f64 = moles.iter().sum();
+            let x: Vec<f64> = moles.iter().map(|&v| v / sumn).collect();
+            let phase = if fields[12] == "L" {
+                Phase::Liquid
+            } else {
+                Phase::Vapor
+            };
+            let model = thermopack_rs::ExtCsp::with_options(
+                &names,
+                thermopack_rs::ExtCspOptions {
+                    shape_eos: sh_eos,
+                    shape_mixing: sh_mix,
+                    shape_alpha: sh_alpha,
+                    reference_component: ref_comp,
+                    reference_eos: ref_eos,
+                    parameter_reference: param_ref,
+                    wong_sandler: None,
+                },
+            )?;
+            let run = || -> thermopack_rs::Result<Vec<f64>> {
+                let mut values = Vec::new();
+                let f = model.residual_helmholtz_tv(t, v_tv, &moles)?;
+                values.extend([f.f, f.f_t, f.f_v]);
+                values.extend(f.f_n);
+                values.extend([f.f_tt, f.f_vv, f.f_tv]);
+                values.extend(f.f_tn);
+                values.extend(f.f_vn);
+                values.extend(f.f_nn);
+                let ptv = model.pressure_tv(t, v_tv, &moles)?;
+                values.extend([ptv.value, ptv.dt, ptv.dv]);
+                values.extend(ptv.dn);
+                let cal = model.caloric_tv(t, v_tv, &moles)?;
+                let sostv = model.speed_of_sound_tv(t, v_tv, &moles)?;
+                values.extend([cal.internal_energy, cal.entropy, cal.enthalpy, sostv]);
+                let z = model.compressibility_factor_derivatives(t, p, &x, phase)?;
+                values.extend([z.value, z.dt, z.dp]);
+                values.extend(z.dn);
+                let v = model.specific_volume_derivatives(t, p, &x, phase)?;
+                values.extend([v.value, v.dt, v.dp]);
+                values.extend(v.dn);
+                let hr = model.residual_enthalpy_derivatives(t, p, &x, phase)?;
+                values.extend([hr.value, hr.dt, hr.dp]);
+                values.extend(hr.dn);
+                let ht = model.enthalpy_derivatives(t, p, &x, phase)?;
+                values.extend([ht.value, ht.dt, ht.dp]);
+                values.extend(ht.dn);
+                let sr = model.residual_entropy_derivatives(t, p, &x, phase)?;
+                values.extend([sr.value, sr.dt, sr.dp]);
+                values.extend(sr.dn);
+                let st = model.entropy_derivatives(t, p, &x, phase)?;
+                values.extend([st.value, st.dt, st.dp]);
+                values.extend(st.dn);
+                let fug = model.ln_fugacity_derivatives_tp(t, p, &x, phase)?;
+                values.extend(fug.ln_phi);
+                values.extend(fug.dt);
+                values.extend(fug.dp);
+                values.extend(fug.dn);
+                values.push(model.speed_of_sound_tp(t, p, &x, phase)?);
+                Ok(values)
+            };
+            match run() {
+                Ok(values) => println!(
+                    "{}",
+                    values
+                        .iter()
+                        .map(|v| format!("{v:.17e}"))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                ),
+                Err(e) => println!("ERROR:{e}"),
+            }
+            continue;
+        }
         if fields[0] == "QENVELOPE" {
             use thermopack_rs::envelope::{EnvelopeConstraint, EnvelopeOptions};
             use thermopack_rs::quality::QualityState;

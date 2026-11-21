@@ -77,6 +77,7 @@ pub mod envelope;
 mod error;
 pub mod excess_gibbs;
 pub mod excess_gibbs_data;
+pub mod extcsp;
 pub mod flash;
 pub mod fmt;
 pub mod hardsphere_wca;
@@ -139,12 +140,19 @@ pub use cubic::{
 pub use error::{Error, Result};
 pub use excess_gibbs::{ExcessGibbsMixture, MixingRule};
 pub use excess_gibbs_data::{ExcessGibbsRecord, GeCorrelation};
+pub use extcsp::{
+    ExtCsp, ExtCspCaloricTv, ExtCspDerivatives, ExtCspFugacityDerivatives, ExtCspHelmholtz,
+    ExtCspOptions, ExtCspPressure, ExtCspReferenceKind,
+};
 pub use flash::{
     FlashOptions, FlashPhase, FlashResult, RachfordRiceIteration, Stability, StabilityTrial,
 };
 pub use helmholtz::{DensityHelmholtz, PureHelmholtz, PurePressure};
 pub use ideal::{EntropyReference, IdealGas, IdealProperties};
-pub use lee_kesler::{BwrCoeffs, BwrCoeffsDiff1, BwrCoeffsDiff2, LeeKesler, PreparedLeeKesler};
+pub use lee_kesler::{
+    BwrCoeffs, BwrCoeffsDiff1, BwrCoeffsDiff2, LeeKesler, LeeKeslerDerivatives,
+    LeeKeslerFugacityDerivatives, LeeKeslerState, PreparedLeeKesler,
+};
 pub use mbwr::{
     Mbwr, MbwrDensityIteration, MbwrDensityParameters, MbwrDensityPath, MbwrEquilibrium,
     MbwrHelmholtzTerm, MbwrInitialization, MbwrKind, MbwrPressure, MbwrRecord, PreparedMbwr,

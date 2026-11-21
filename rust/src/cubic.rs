@@ -1716,7 +1716,154 @@ impl Cubic {
     }
 }
 
+#[derive(Debug, Clone)]
+pub(crate) struct CubicMixtureJet {
+    pub(crate) b: f64,
+    pub(crate) b_t: f64,
+    pub(crate) b_tt: f64,
+    pub(crate) b_i: Vec<f64>,
+    pub(crate) b_it: Vec<f64>,
+    pub(crate) b_ij: Vec<f64>,
+    pub(crate) d: f64,
+    pub(crate) d_t: f64,
+    pub(crate) d_tt: f64,
+    pub(crate) d_i: Vec<f64>,
+    pub(crate) d_it: Vec<f64>,
+    pub(crate) d_ij: Vec<f64>,
+}
+
 impl PreparedState<'_> {
+    /// Extensive mixture parameters `B(T, n)` (`[m^3]`) and `D(T, n)` (`[Pa m^6]`)
+    /// with full first and second derivatives with respect to `(T, n)` for total
+    /// mole number `moles`, preserving the exact scaling of `cbmix::cbCalcMixtureParams`.
+    pub(crate) fn mixture_parameter_jet(&self, moles: f64) -> Result<CubicMixtureJet> {
+        positive(moles, "total moles")?;
+        let n = self.composition_slice().len();
+        let n2 = moles * moles;
+        let inv_n = 1.0 / moles;
+
+        let b = moles * self.b;
+        let b_t = moles * self.beta.as_ref().map_or(0.0, |beta| beta.dt);
+        let b_tt = moles * self.beta.as_ref().map_or(0.0, |beta| beta.dtt);
+        let b_i = self.b_partial_slice().to_vec();
+        let b_it = if let Some(beta) = &self.beta {
+            beta.partial_t.clone()
+        } else {
+            vec![0.0; n]
+        };
+
+        let mut b_ij = vec![0.0; n * n];
+        if let Some(ws) = &self.wong_sandler {
+            for (dst, &src) in b_ij.iter_mut().zip(ws.b_ij.iter()) {
+                *dst = src * inv_n;
+            }
+        } else if !self.model.lij.iter().all(|&l| l == 0.0) {
+            for i in 0..n {
+                let bii = self
+                    .beta
+                    .as_ref()
+                    .map_or(self.model.bi[i], |beta| beta.components[i].value);
+                for j in 0..n {
+                    let bjj = self
+                        .beta
+                        .as_ref()
+                        .map_or(self.model.bi[j], |beta| beta.components[j].value);
+                    let bij = (1.0 - self.model.lij[i * n + j]) * (bii + bjj) * 0.5;
+                    b_ij[i * n + j] = (2.0 * bij - b_i[i] - b_i[j]) * inv_n;
+                }
+            }
+        }
+
+        let d = n2 * self.a;
+        let d_t = n2 * self.at;
+        let d_tt = n2 * self.att;
+        let d_i: Vec<f64> = self
+            .a_partial_slice()
+            .iter()
+            .map(|&ai| 2.0 * moles * ai)
+            .collect();
+        let d_it: Vec<f64> = if let Some(ait) = &self.ai_t {
+            ait.iter().map(|&v| 2.0 * moles * v).collect()
+        } else {
+            let (f, ft, _) = self.factors();
+            let comp = self.composition_slice();
+            let mut out = vec![0.0; n];
+            for i in 0..n {
+                let mut sum = 0.0;
+                for j in 0..n {
+                    sum +=
+                        comp[j] * (1.0 - self.model.kij[i * n + j]) * (ft[i] * f[j] + f[i] * ft[j]);
+                }
+                out[i] = 2.0 * moles * sum;
+            }
+            out
+        };
+        let d_ij: Vec<f64> = if let Some(ws) = &self.wong_sandler {
+            ws.a_ij.clone()
+        } else if let Some(ge_nn) = &self.ge_a_nn {
+            ge_nn.clone()
+        } else {
+            let (f, _, _) = self.factors();
+            let mut out = vec![0.0; n * n];
+            for i in 0..n {
+                for j in 0..n {
+                    out[i * n + j] = 2.0 * (1.0 - self.model.kij[i * n + j]) * f[i] * f[j];
+                }
+            }
+            out
+        };
+
+        Ok(CubicMixtureJet {
+            b,
+            b_t,
+            b_tt,
+            b_i,
+            b_it,
+            b_ij,
+            d,
+            d_t,
+            d_tt,
+            d_i,
+            d_it,
+            d_ij,
+        })
+    }
+
+    /// Pure-fluid reduced residual Helmholtz energy `alpr = A_res / (R T)` and its
+    /// first and second derivatives `[alpr, alpr_T, alpr_v, alpr_TT, alpr_Tv, alpr_vv]`
+    /// at molar volume `volume` (`[m^3/mol]`) for an untranslated, constant-covolume
+    /// reference cubic EOS.
+    pub(crate) fn pure_residual_helmholtz_tv(&self, volume: f64) -> Result<[f64; 6]> {
+        self.volume_check(volume)?;
+        let t = self.temperature;
+        let rt = R * t;
+        let free = volume - self.b;
+        let (d1, d2) = self.model.kind.deltas();
+        let integral = self.attraction_integral(volume);
+        let denom = (volume + d1 * self.b) * (volume + d2 * self.b);
+        let integral_v = -1.0 / denom;
+        let integral_vv = (2.0 * volume + (d1 + d2) * self.b) / (denom * denom);
+
+        let u = self.a / rt;
+        let u_t = (self.at - self.a / t) / rt;
+        let u_tt = (self.att - 2.0 * self.at / t + 2.0 * self.a / (t * t)) / rt;
+
+        let alpr = -(-self.b / volume).ln_1p() - u * integral;
+        let alpr_t = -u_t * integral;
+        let alpr_tt = -u_tt * integral;
+        let alpr_v = -self.b / (volume * free) - u * integral_v;
+        let alpr_tv = -u_t * integral_v;
+        let alpr_vv =
+            self.b * (2.0 * volume - self.b) / (volume * volume * free * free) - u * integral_vv;
+        let out = [alpr, alpr_t, alpr_v, alpr_tt, alpr_tv, alpr_vv];
+        if out.iter().any(|v| !v.is_finite()) {
+            return Err(Error::InvalidInput(
+                "non-finite cubic reference Helmholtz jet",
+            ));
+        }
+        Ok(out)
+    }
+
     /// Analytic derivatives of log fugacity coefficients at constant T/P.
     /// `dt` is 1/K, `dp` is 1/Pa, and `dn` is a row-major n*n matrix
     /// of derivatives with respect to mole numbers at total amount 1 mol.
@@ -2307,6 +2454,10 @@ impl PreparedState<'_> {
 
 // Preserve the source iteration, including evaluating omega from the final
 // iteration's n/n1/n2 (cbCalcOmegaZc), rather than rounded textbook constants.
+pub(crate) fn omega_ab(kind: CubicKind) -> (f64, f64) {
+    omega(kind)
+}
+
 fn omega(kind: CubicKind) -> (f64, f64) {
     let (a, b, _) = omega_with_critical_ratio(kind);
     (a, b)

@@ -242,9 +242,9 @@ impl Component {
                 let mut h = -inv / ts;
                 let mut s = p[0] * ts.ln() - inv / (2.0 * ts * ts);
                 for (i, pi) in p.iter().enumerate() {
-                    h += pi * ts.powi((i + 1) as i32) / (i + 1) as f64;
+                    h += pi * crate::numerics::ipow(ts, (i + 1) as i32) / (i + 1) as f64;
                     if i > 0 {
-                        s += pi * ts.powi(i as i32) / i as f64;
+                        s += pi * crate::numerics::ipow(ts, i as i32) / i as f64;
                     }
                 }
                 let hscale = match self.cp_type {

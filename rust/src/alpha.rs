@@ -103,7 +103,8 @@ impl AlphaCorrelation {
                 ));
             }
         };
-        Ok(a + b * w + c * w * w + d * w.powi(3) + e * w.powi(4))
+        let w2 = w * w;
+        Ok(a + b * w + c * w2 + d * (w2 * w) + e * (w2 * w2))
     }
 }
 

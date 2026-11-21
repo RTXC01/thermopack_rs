@@ -435,7 +435,8 @@ impl Cubic {
             let mut accepted = false;
             for _ in 0..40 {
                 for (ii, &i) in active.iter().enumerate() {
-                    candidate[i] = (2.0 * w[i].sqrt() + length * step[ii]).powi(2) / 4.0;
+                    let u = 2.0 * w[i].sqrt() + length * step[ii];
+                    candidate[i] = (u * u) / 4.0;
                 }
                 if let Ok((value, _)) = stability_evaluate(
                     self,

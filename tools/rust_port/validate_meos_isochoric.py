@@ -10,6 +10,7 @@ import hashlib
 import json
 import math
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -141,8 +142,15 @@ def source_outcome(r):
     if 'reference_timeout' in r:
         return 'censored_timeout'
     if 'reference_error' in r:
-        stage = 'phase_properties' if 'THERMOPACK_STAGE=returned_phase_properties' in str(r) else 'flash'
-        text = str(r).lower()
+        err = r['reference_error']
+        if isinstance(err, dict) and isinstance(err.get('output'), list):
+            output = err['output']
+            stage = 'phase_properties' if any('THERMOPACK_STAGE=returned_phase_properties' in str(line) for line in output) else 'flash'
+            filtered = [str(line) for line in output if not re.match(r'^\s*(?:#\d+\s+|at\s+)', str(line))]
+            text = ('\n'.join(filtered) if filtered else str(r)).lower()
+        else:
+            stage = 'phase_properties' if 'THERMOPACK_STAGE=returned_phase_properties' in str(r) else 'flash'
+            text = str(r).lower()
         for name, token in [('above_critical_saturation', 't > tc'), ('density_iteration', 'densitysolver'),
                             ('sv_nonconvergence', 'svsinglecomp'), ('uv_nonconvergence', 'uvsinglecomp'),
                             ('saturation_nonconvergence', 'saturation')]:
@@ -206,8 +214,14 @@ def valid_native_point(a):
     return (bv, bl) == (0., 1.) and (raw_bv, raw_bl) == expected and vl == vv
 
 
+def outcome_allowed(value, expected):
+    if isinstance(expected, list):
+        return value in expected
+    return expected == value
+
+
 def allowed_outcomes(actual, declared):
-    return all(declared.get(key) == value for key, value in actual.items())
+    return all(outcome_allowed(value, declared.get(key)) for key, value in actual.items())
 
 
 def coordinate_bad(a, b, reduced):
@@ -360,7 +374,7 @@ def main(args):
             unexpected = {
                 k: {'actual': v, 'declared': allowed['outcomes'].get(k)}
                 for k, v in sorted(outcomes.items())
-                if allowed['outcomes'].get(k) != v
+                if not outcome_allowed(v, allowed['outcomes'].get(k))
             }
             print(json.dumps({'unexpected_outcomes_count': len(unexpected), 'unexpected_outcomes': unexpected}, indent=2), flush=True)
             raise AssertionError(f'new or changed source/phase outcomes require review ({len(unexpected)} unexpected)')

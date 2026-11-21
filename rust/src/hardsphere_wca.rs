@@ -86,10 +86,10 @@ pub fn cavity_distribution_function(
         let packing_fraction = value * slope;
         let packing_fraction_second =
             value * (slope * slope + a_ee + b_ee * r_star + c_ee * r_star * r_star * r_star);
-        let r_first = value * (b + 3.0 * c * r_star * r_star);
-        let r_second = value * ((b + 3.0 * c * r_star * r_star).powi(2) + 6.0 * c * r_star);
-        let r_mixed =
-            value * (slope * (b + 3.0 * c * r_star * r_star) + b_e + 3.0 * c_e * r_star * r_star);
+        let dr = b + 3.0 * c * r_star * r_star;
+        let r_first = value * dr;
+        let r_second = value * (dr * dr + 6.0 * c * r_star);
+        let r_mixed = value * (slope * dr + b_e + 3.0 * c_e * r_star * r_star);
         (
             value,
             packing_fraction,
@@ -105,14 +105,13 @@ pub fn cavity_distribution_function(
         let packing_fraction = value * slope;
         let packing_fraction_second =
             value * (slope * slope + a_ee + b_ee * r_star + c_ee * r_star * r_star * r_star);
-        let r_first = value * (b + 3.0 * c * r_star * r_star);
-        let r_second = value * ((b + 3.0 * c * r_star * r_star).powi(2) + 6.0 * c * r_star);
-        let r_mixed =
-            value * (slope * (b + 3.0 * c * r_star * r_star) + b_e + 3.0 * c_e * r_star * r_star);
-        let r_mixed_first = value
-            * (2.0 * (b + 3.0 * c * r_star * r_star) * (b_e + 3.0 * c_e * r_star * r_star)
-                + slope * (6.0 * c * r_star + (b + 3.0 * c * r_star * r_star).powi(2))
-                + 6.0 * c_e * r_star);
+        let dr = b + 3.0 * c * r_star * r_star;
+        let dre = b_e + 3.0 * c_e * r_star * r_star;
+        let r_first = value * dr;
+        let r_second = value * (dr * dr + 6.0 * c * r_star);
+        let r_mixed = value * (slope * dr + dre);
+        let r_mixed_first =
+            value * (2.0 * dr * dre + slope * (6.0 * c * r_star + dr * dr) + 6.0 * c_e * r_star);
         let r_mixed_second = packing_fraction_second * (b + 3.0 * c * r_star * r_star)
             + value
                 * (2.0 * slope * (b_e + 3.0 * c_e * r_star * r_star)
@@ -126,7 +125,7 @@ pub fn cavity_distribution_function(
                         * (b_e + 3.0 * c_e * r_star * r_star)
                     + 6.0 * c * r_star * (a_ee + b_ee * r_star + c_ee * r_star * r_star * r_star)
                     + (b + 3.0 * c * r_star * r_star) * (b_ee + 3.0 * c_ee * r_star * r_star)
-                    + 2.0 * (b_e + 3.0 * c_e * r_star * r_star).powi(2)
+                    + 2.0 * (dre * dre)
                     + 2.0 * slope * 6.0 * c_e * r_star
                     + 6.0 * c_ee * r_star);
         let difference = eta - ETA_C;
@@ -173,7 +172,7 @@ pub fn lj_boltzmann_factor(
         (0.0, 0.0, 0.0)
     } else {
         let inverse = 1.0 / r;
-        let inverse6 = inverse.powi(6);
+        let inverse6 = crate::numerics::ipow(inverse, 6);
         let inverse12 = inverse6 * inverse6;
         (
             4.0 * (inverse12 - inverse6) + 1.0,
@@ -182,11 +181,10 @@ pub fn lj_boltzmann_factor(
         )
     };
     let value = (-u * eps_divk / temperature).exp();
-    let value_t =
-        -value * (u_r * r_t * eps_divk / temperature - u * eps_divk / (temperature * temperature));
+    let du_dt = u_r * r_t * eps_divk / temperature - u * eps_divk / (temperature * temperature);
+    let value_t = -value * du_dt;
     let value_tt = value
-        * ((u_r * r_t * eps_divk / temperature - u * eps_divk / (temperature * temperature))
-            .powi(2)
+        * (du_dt * du_dt
             - (u_rr * r_t * r_t * eps_divk / temperature + u_r * r_tt * eps_divk / temperature
                 - 2.0 * u_r * r_t * eps_divk / (temperature * temperature)
                 + 2.0 * u * eps_divk / (temperature * temperature * temperature)));
@@ -195,7 +193,8 @@ pub fn lj_boltzmann_factor(
 
 /// The parameters of the cavity correlation function of the source.
 fn cavity_parameters(eta: f64) -> (f64, f64, f64, f64, f64, f64, f64, f64, f64) {
-    let denominator = (1.0 - eta).powi(3);
+    let om = 1.0 - eta;
+    let denominator = om * om * om;
     let a = (3.0 - eta) / denominator - 3.0;
     let b = -3.0 * eta * (2.0 - eta) / denominator;
     let c = ((2.0 - eta) / denominator / 2.0).ln()
@@ -208,9 +207,13 @@ fn cavity_parameters(eta: f64) -> (f64, f64, f64, f64, f64, f64, f64, f64, f64) 
     let denominator = (1.0 - eta) * denominator;
     let a_ee = -(6.0 * (eta - 5.0)) / denominator;
     let b_ee = (6.0 * (eta * eta - 2.0 * eta - 5.0)) / denominator;
-    let c_ee = -(2.0 * eta.powi(5) - 10.0 * eta.powi(4) + 5.0 * eta.powi(3) + 31.0 * eta * eta
+    let eta2 = eta * eta;
+    let eta3 = eta2 * eta;
+    let eta4 = eta2 * eta2;
+    let em2 = eta - 2.0;
+    let c_ee = -(2.0 * crate::numerics::ipow(eta, 5) - 10.0 * eta4 + 5.0 * eta3 + 31.0 * eta2
         - 29.0 * eta
         - 11.0)
-        / ((eta - 2.0).powi(2) * denominator);
+        / ((em2 * em2) * denominator);
     (a, b, c, a_e, b_e, c_e, a_ee, b_ee, c_ee)
 }

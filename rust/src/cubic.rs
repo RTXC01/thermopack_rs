@@ -191,7 +191,8 @@ impl PreparedState<'_> {
         let (_, ob, qc) = omega_with_critical_ratio(self.model.kind);
         let zc = ob * qc;
         let f3 = rr + zc * (qq + zc * (pp + zc));
-        let discriminant = (2.0 * pp).powi(2) - 12.0 * qq;
+        let p2 = 2.0 * pp;
+        let discriminant = p2 * p2 - 12.0 * qq;
         let mut liquid = f3 > 0.0;
         let mut extremum = None;
         if discriminant > 0.0 {
@@ -352,9 +353,9 @@ impl PreparedState<'_> {
         let denom_b = (d1 + d2) * v + 2.0 * d1 * d2 * self.b;
         let (integral, ib, ibb) = self.attraction_integral_derivatives(v);
         let pressure_n = |i: usize| {
-            rt / free + rt * self.b_partial_slice()[i] / free.powi(2)
+            rt / free + rt * self.b_partial_slice()[i] / (free * free)
                 - 2.0 * self.a_partial_slice()[i] / denom
-                + self.a * denom_b * self.b_partial_slice()[i] / denom.powi(2)
+                + self.a * denom_b * self.b_partial_slice()[i] / (denom * denom)
         };
         let shift = |i: usize| {
             self.translation
@@ -389,7 +390,7 @@ impl PreparedState<'_> {
                             * self.factors().0[j],
                     )
                 };
-                dn[i * n + j] = (bi + bj + bnn) / free + bi * bj / free.powi(2)
+                dn[i * n + j] = (bi + bj + bnn) / free + bi * bj / (free * free)
                     - (dnn * integral
                         + (di * bj + dj * bi) * ib
                         + self.a * ibb * bi * bj
@@ -620,7 +621,8 @@ impl Cubic {
         let c = &self.components[component];
         let (oa, ob, qc) = source_order_omega(self.kind);
         let kr = 1000. * R;
-        let a0 = oa * (kr * c.critical_temperature).powi(2) / c.critical_pressure;
+        let krt = kr * c.critical_temperature;
+        let a0 = oa * (krt * krt) / c.critical_pressure;
         let b0 = ob * kr * c.critical_temperature / c.critical_pressure;
         let coefficients = |t: f64| -> Result<(f64, f64, f64, f64, f64)> {
             let alpha = self.alpha[component].evaluate(t, c.critical_temperature)?;
@@ -1117,9 +1119,8 @@ impl Cubic {
         for c in &model.components {
             positive(c.critical_temperature, "critical temperature")?;
             positive(c.critical_pressure, "critical pressure")?;
-            model
-                .a0
-                .push(omega_a * (R * c.critical_temperature).powi(2) / c.critical_pressure);
+            let rt_c = R * c.critical_temperature;
+            model.a0.push(omega_a * (rt_c * rt_c) / c.critical_pressure);
             model
                 .bi
                 .push(omega_b * R * c.critical_temperature / c.critical_pressure);
@@ -1746,9 +1747,9 @@ impl PreparedState<'_> {
         let denom_b = (d1 + d2) * volume + 2.0 * d1 * d2 * self.b;
         let (integral, ib, ibb) = self.attraction_integral_derivatives(volume);
         let pressure_n = |i: usize| {
-            rt / free + rt * self.b_partial_slice()[i] / free.powi(2)
+            rt / free + rt * self.b_partial_slice()[i] / (free * free)
                 - 2.0 * self.a_partial_slice()[i] / denom
-                + self.a * denom_b * self.b_partial_slice()[i] / denom.powi(2)
+                + self.a * denom_b * self.b_partial_slice()[i] / (denom * denom)
         };
         for i in 0..n {
             let ai_t = if let Some(ait) = &self.ai_t {
@@ -1805,7 +1806,7 @@ impl PreparedState<'_> {
                         ),
                     )
                 };
-                let fnn = (bi + bj + bnn) / free + bi * bj / free.powi(2)
+                let fnn = (bi + bj + bnn) / free + bi * bj / (free * free)
                     - (dnn * integral
                         + (di * bj + dj * bi) * ib
                         + self.a * ibb * bi * bj
@@ -1831,23 +1832,29 @@ impl PreparedState<'_> {
         let ratio = self.b / volume;
         if ratio < 0.01 {
             let (mut i, mut ib, mut ibb) = (0.0, 0.0, 0.0);
+            let v2 = volume * volume;
+            let v3 = v2 * volume;
             for k in 0_i32..12 {
-                let coefficient = (-1.0_f64).powi(k) * (d1.powi(k + 1) - d2.powi(k + 1))
+                let sign = if k & 1 == 0 { 1.0 } else { -1.0 };
+                let coefficient = sign
+                    * (crate::numerics::ipow(d1, k + 1) - crate::numerics::ipow(d2, k + 1))
                     / ((d1 - d2) * (k + 1) as f64);
-                i += coefficient * ratio.powi(k) / volume;
+                i += coefficient * crate::numerics::ipow(ratio, k) / volume;
                 if k >= 1 {
-                    ib += coefficient * k as f64 * ratio.powi(k - 1) / volume.powi(2);
+                    ib += coefficient * k as f64 * crate::numerics::ipow(ratio, k - 1) / v2;
                 }
                 if k >= 2 {
-                    ibb += coefficient * (k * (k - 1)) as f64 * ratio.powi(k - 2) / volume.powi(3);
+                    ibb += coefficient * (k * (k - 1)) as f64 * crate::numerics::ipow(ratio, k - 2)
+                        / v3;
                 }
             }
             (i, ib, ibb)
         } else {
             let integral = self.attraction_integral(volume);
-            let log_b = d1 / (volume + d1 * self.b) - d2 / (volume + d2 * self.b);
-            let log_bb =
-                -(d1 / (volume + d1 * self.b)).powi(2) + (d2 / (volume + d2 * self.b)).powi(2);
+            let t1 = d1 / (volume + d1 * self.b);
+            let t2 = d2 / (volume + d2 * self.b);
+            let log_b = t1 - t2;
+            let log_bb = -(t1 * t1) + (t2 * t2);
             let ib = (log_b / (d1 - d2) - integral) / self.b;
             let ibb = (log_bb / (d1 - d2) - 2.0 * ib) / self.b;
             (integral, ib, ibb)
@@ -1954,7 +1961,8 @@ impl PreparedState<'_> {
             .sum();
         let pressure = self.pressure(volume)?;
         let squared =
-            -volume * volume * (pressure.dv - self.temperature * pressure.dt.powi(2) / cv) / mass;
+            -volume * volume * (pressure.dv - self.temperature * (pressure.dt * pressure.dt) / cv)
+                / mass;
         positive(squared, "sound speed squared")?;
         Ok(squared.sqrt())
     }
@@ -2130,9 +2138,10 @@ impl PreparedState<'_> {
         let second = (thermal * self.b * (2.0 * volume - self.b) / (volume * volume * free * free)
             - self.a * slope / (denom * denom))
             / thermal;
+        let lv2 = LARGE_VOLUME * LARGE_VOLUME;
         Ok((
-            -LARGE_VOLUME * LARGE_VOLUME * first,
-            LARGE_VOLUME.powi(4) * (second + 2.0 * first / LARGE_VOLUME),
+            -lv2 * first,
+            (lv2 * lv2) * (second + 2.0 * first / LARGE_VOLUME),
         ))
     }
 
@@ -2152,7 +2161,7 @@ impl PreparedState<'_> {
                 + (self.temperature * self.at - self.a) * integral,
             entropy: R * (z * (1.0 - self.b / volume)).ln() + self.at * integral,
             cv,
-            cp: cv - self.temperature * pressure.dt.powi(2) / pressure.dv - R,
+            cp: cv - self.temperature * (pressure.dt * pressure.dt) / pressure.dv - R,
         };
         if let Some(beta) = &self.beta {
             let t = self.temperature;

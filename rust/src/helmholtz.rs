@@ -46,7 +46,7 @@ impl DensityHelmholtz {
             dtt: moles * self.dtt,
             dtv: -rho * rho * self.dtrho,
             dtn: self.dt + rho * self.dtrho,
-            dvv: (2. * rho * rho * self.drho + rho.powi(3) * self.drhorho) / volume,
+            dvv: (2. * rho * rho * self.drho + rho * rho * rho * self.drhorho) / volume,
             dvn: -(2. * rho * self.drho + rho * rho * self.drhorho) / volume,
             dnn: (2. * self.drho + rho * self.drhorho) / volume,
         };

@@ -37,22 +37,7 @@ pub use equilibrium::{
     MultiparameterEquilibrium, MultiparameterPressureJet, MultiparameterSpinodalBracket,
 };
 
-#[inline]
-fn ipow(mut x: f64, exp: i32) -> f64 {
-    let mut n = exp.unsigned_abs();
-    let mut y = if n & 1 != 0 { x } else { 1.0 };
-    loop {
-        n >>= 1;
-        if n == 0 {
-            break;
-        }
-        x *= x;
-        if n & 1 != 0 {
-            y *= x;
-        }
-    }
-    if exp < 0 { 1.0 / y } else { y }
-}
+pub(super) use crate::numerics::ipow;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LennardJonesKind {

@@ -133,25 +133,30 @@ impl SolidCo2 {
     /// The first temperature derivative of the exponential term.
     #[inline]
     fn d_f_alpha_dv(v: f64) -> f64 {
+        let u1 = (v - G6A) / G7A;
+        let u2 = (v + G6A) / G7A;
         2.0 * G0A * v
             + G1A * (2.0 * v - G2A) / (v * v - G2A * v + G3A)
             + G4A * (2.0 * v + G2A) / (v * v + G2A * v + G3A)
-            + (G5A / G7A) / (1.0 + ((v - G6A) / G7A).powi(2))
-            + (G8A / G7A) / (1.0 + ((v + G6A) / G7A).powi(2))
+            + (G5A / G7A) / (1.0 + u1 * u1)
+            + (G8A / G7A) / (1.0 + u2 * u2)
     }
 
     /// The second temperature derivative of the exponential term.
     #[inline]
     fn d2_f_alpha_dv2(v: f64) -> f64 {
-        2.0 * G0A
-            + G1A * (2.0 * (v * v - G2A * v + G3A) - (2.0 * v - G2A).powi(2))
-                / (v * v - G2A * v + G3A).powi(2)
-            + G4A * (2.0 * (v * v + G2A * v + G3A) - (2.0 * v + G2A).powi(2))
-                / (v * v + G2A * v + G3A).powi(2)
-            - (G5A / G7A.powi(2)) / (1.0 + ((v - G6A) / G7A).powi(2)).powi(2) * 2.0 * (v - G6A)
-                / G7A
-            - (G8A / G7A.powi(2)) / (1.0 + ((v + G6A) / G7A).powi(2)).powi(2) * 2.0 * (v + G6A)
-                / G7A
+        let q1 = v * v - G2A * v + G3A;
+        let d1 = 2.0 * v - G2A;
+        let q2 = v * v + G2A * v + G3A;
+        let d2 = 2.0 * v + G2A;
+        let u1 = (v - G6A) / G7A;
+        let p1 = 1.0 + u1 * u1;
+        let u2 = (v + G6A) / G7A;
+        let p2 = 1.0 + u2 * u2;
+        let g7a2 = G7A * G7A;
+        2.0 * G0A + G1A * (2.0 * q1 - d1 * d1) / (q1 * q1) + G4A * (2.0 * q2 - d2 * d2) / (q2 * q2)
+            - (G5A / g7a2) / (p1 * p1) * 2.0 * (v - G6A) / G7A
+            - (G8A / g7a2) / (p2 * p2) * 2.0 * (v + G6A) / G7A
     }
 
     /// The Gibbs energy of solid carbon dioxide [J/mol].

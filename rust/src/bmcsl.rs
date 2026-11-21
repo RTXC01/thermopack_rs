@@ -196,16 +196,21 @@ pub fn packing_moments(
         let d_tt = diameters.d_tt[component];
         let n = moles[component];
         for l in 0..4 {
-            zet[l] += m * n * d.powi(l as i32);
+            zet[l] += m * n * crate::numerics::ipow(d, l as i32);
             if l > 0 {
                 let exponent = l as i32 - 1;
-                let d_previous = d.powi(exponent);
+                let d_previous = crate::numerics::ipow(d, exponent);
                 zet_t[l] += l as f64 * m * n * d_previous * d_t;
                 zet_tt[l] += l as f64 * m * n * d_previous * d_tt;
                 zet_tv[l] -= l as f64 * m * n * d_previous * d_t / volume;
                 if l > 1 {
-                    zet_tt[l] +=
-                        l as f64 * (l as f64 - 1.0) * m * n * d.powi(exponent - 1) * d_t * d_t;
+                    zet_tt[l] += l as f64
+                        * (l as f64 - 1.0)
+                        * m
+                        * n
+                        * crate::numerics::ipow(d, exponent - 1)
+                        * d_t
+                        * d_t;
                 }
             }
         }
@@ -256,11 +261,12 @@ pub fn packing_fractions(
         let d = diameters.d[component];
         let d_t = diameters.d_t[component];
         for l in 0..4 {
-            let power = d.powi(l as i32);
+            let power = crate::numerics::ipow(d, l as i32);
             zet_n[component][l] = prefactor * m * power;
             zet_vn[component][l] = -prefactor * m * power / volume;
             if l > 0 {
-                zet_tn[component][l] = prefactor * l as f64 * m * d.powi(l as i32 - 1) * d_t;
+                zet_tn[component][l] =
+                    prefactor * l as f64 * m * crate::numerics::ipow(d, l as i32 - 1) * d_t;
             }
         }
     }
@@ -471,12 +477,20 @@ pub fn boublik_helmholtz_energy(zeta: [f64; 4]) -> HardSphereEnergy {
 
     let prefactor = 1.0 / zeta_0;
     let en_m_zeta_3 = 1.0 - zeta_3;
+    let en_m_zeta_3_2 = en_m_zeta_3 * en_m_zeta_3;
+    let en_m_zeta_3_3 = en_m_zeta_3_2 * en_m_zeta_3;
+    let en_m_zeta_3_4 = en_m_zeta_3_2 * en_m_zeta_3_2;
+    let zeta_2_2 = zeta_2 * zeta_2;
+    let zeta_2_3 = zeta_2_2 * zeta_2;
+    let zeta_3_2 = zeta_3 * zeta_3;
+    let zeta_3_3 = zeta_3_2 * zeta_3;
+    let zeta_3_4 = zeta_3_2 * zeta_3_2;
     let ln_term = en_m_zeta_3.abs().ln();
 
     let value = prefactor
         * (3.0 * zeta_1 * zeta_2 / en_m_zeta_3
-            + zeta_2.powi(3) / (zeta_3 * en_m_zeta_3.powi(2))
-            + (zeta_2.powi(3) / zeta_3.powi(2) - zeta_0) * ln_term);
+            + zeta_2_3 / (zeta_3 * en_m_zeta_3_2)
+            + (zeta_2_3 / zeta_3_2 - zeta_0) * ln_term);
 
     // The first order derivatives with respect to the packing fractions.
     let dzeta = [
@@ -484,31 +498,30 @@ pub fn boublik_helmholtz_energy(zeta: [f64; 4]) -> HardSphereEnergy {
         prefactor * 3.0 * zeta_2 / en_m_zeta_3,
         prefactor
             * (3.0 * zeta_1 / en_m_zeta_3
-                + 3.0 * zeta_2.powi(2) / (zeta_3 * en_m_zeta_3.powi(2))
-                + 3.0 * zeta_2.powi(2) / zeta_3.powi(2) * ln_term),
+                + 3.0 * zeta_2_2 / (zeta_3 * en_m_zeta_3_2)
+                + 3.0 * zeta_2_2 / zeta_3_2 * ln_term),
         prefactor
-            * (3.0 * zeta_1 * zeta_2 / en_m_zeta_3.powi(2)
-                + zeta_2.powi(3) * (3.0 * zeta_3 - 1.0) / (zeta_3.powi(2) * en_m_zeta_3.powi(3))
-                - 2.0 * zeta_2.powi(3) / zeta_3.powi(3) * ln_term
-                - (zeta_2.powi(3) - zeta_0 * zeta_3.powi(2)) / (zeta_3.powi(2) * en_m_zeta_3)),
+            * (3.0 * zeta_1 * zeta_2 / en_m_zeta_3_2
+                + zeta_2_3 * (3.0 * zeta_3 - 1.0) / (zeta_3_2 * en_m_zeta_3_3)
+                - 2.0 * zeta_2_3 / zeta_3_3 * ln_term
+                - (zeta_2_3 - zeta_0 * zeta_3_2) / (zeta_3_2 * en_m_zeta_3)),
     ];
 
     // The second order derivatives with respect to the packing fractions.
     let mut d2zeta = [[0.0; 4]; 4];
     d2zeta[0][0] = prefactor * prefactor * (2.0 * value + 2.0 * ln_term);
     d2zeta[1][1] = 0.0;
-    d2zeta[2][2] =
-        (prefactor * 6.0 * zeta_2 / zeta_3) * (1.0 / en_m_zeta_3.powi(2) + ln_term / zeta_3);
+    d2zeta[2][2] = (prefactor * 6.0 * zeta_2 / zeta_3) * (1.0 / en_m_zeta_3_2 + ln_term / zeta_3);
     d2zeta[3][3] = prefactor
-        * (6.0 * zeta_1 * zeta_2 / en_m_zeta_3.powi(3)
-            + 3.0 * zeta_2.powi(3) / (zeta_3.powi(2) * en_m_zeta_3.powi(3))
-            + 3.0 * zeta_2.powi(3) * (3.0 * zeta_3 - 1.0) / (zeta_3.powi(2) * en_m_zeta_3.powi(4))
-            - 2.0 * zeta_2.powi(3) * (3.0 * zeta_3 - 1.0) / (zeta_3.powi(3) * en_m_zeta_3.powi(3))
-            + 2.0 * zeta_2.powi(3) / (zeta_3.powi(3) * en_m_zeta_3)
-            + 6.0 * zeta_2.powi(3) * ln_term / zeta_3.powi(4)
-            + 2.0 * zeta_0 * zeta_3 / (zeta_3.powi(2) * en_m_zeta_3)
-            + 2.0 * (zeta_2.powi(3) - zeta_0 * zeta_3.powi(2)) / (zeta_3.powi(3) * en_m_zeta_3)
-            - (zeta_2.powi(3) - zeta_0 * zeta_3.powi(2)) / (zeta_3.powi(2) * en_m_zeta_3.powi(2)));
+        * (6.0 * zeta_1 * zeta_2 / en_m_zeta_3_3
+            + 3.0 * zeta_2_3 / (zeta_3_2 * en_m_zeta_3_3)
+            + 3.0 * zeta_2_3 * (3.0 * zeta_3 - 1.0) / (zeta_3_2 * en_m_zeta_3_4)
+            - 2.0 * zeta_2_3 * (3.0 * zeta_3 - 1.0) / (zeta_3_3 * en_m_zeta_3_3)
+            + 2.0 * zeta_2_3 / (zeta_3_3 * en_m_zeta_3)
+            + 6.0 * zeta_2_3 * ln_term / zeta_3_4
+            + 2.0 * zeta_0 * zeta_3 / (zeta_3_2 * en_m_zeta_3)
+            + 2.0 * (zeta_2_3 - zeta_0 * zeta_3_2) / (zeta_3_3 * en_m_zeta_3)
+            - (zeta_2_3 - zeta_0 * zeta_3_2) / (zeta_3_2 * en_m_zeta_3_2));
     d2zeta[0][1] = -prefactor * dzeta[1];
     d2zeta[1][0] = d2zeta[0][1];
     d2zeta[0][2] = -prefactor * dzeta[2];
@@ -518,10 +531,10 @@ pub fn boublik_helmholtz_energy(zeta: [f64; 4]) -> HardSphereEnergy {
     d2zeta[1][2] = 3.0 * prefactor / en_m_zeta_3;
     d2zeta[2][1] = d2zeta[1][2];
     d2zeta[2][3] = prefactor
-        * (3.0 * zeta_1 / en_m_zeta_3.powi(2)
-            + 3.0 * zeta_2.powi(2) * (3.0 * zeta_3 - 1.0) / (zeta_3.powi(2) * en_m_zeta_3.powi(3))
-            - 6.0 * zeta_2.powi(2) / zeta_3.powi(3) * ln_term
-            - 3.0 * zeta_2.powi(2) / (zeta_3.powi(2) * en_m_zeta_3));
+        * (3.0 * zeta_1 / en_m_zeta_3_2
+            + 3.0 * zeta_2_2 * (3.0 * zeta_3 - 1.0) / (zeta_3_2 * en_m_zeta_3_3)
+            - 6.0 * zeta_2_2 / zeta_3_3 * ln_term
+            - 3.0 * zeta_2_2 / (zeta_3_2 * en_m_zeta_3));
     d2zeta[3][2] = d2zeta[2][3];
     d2zeta[1][3] = dzeta[1] / en_m_zeta_3;
     d2zeta[3][1] = d2zeta[1][3];
@@ -846,10 +859,8 @@ mod tests {
             let expo = sigma[component] * (-3.0 * eps[component] * tinv).exp();
             d.push(sigma[component] - 0.12 * expo);
             d_t.push(-0.36 * eps[component] * tinv * tinv * expo);
-            d_tt.push(
-                expo * (0.72 * eps[component] - tinv * 1.08 * eps[component].powi(2))
-                    * tinv.powi(3),
-            );
+            let e = eps[component];
+            d_tt.push(expo * (0.72 * e - tinv * 1.08 * (e * e)) * (tinv * tinv * tinv));
         }
         HsDiameters { d, d_t, d_tt }
     }

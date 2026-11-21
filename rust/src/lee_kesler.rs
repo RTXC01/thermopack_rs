@@ -658,7 +658,8 @@ impl LeeKesler {
             for k in 0..n {
                 let tck = self.components[k].critical_temperature;
                 let vck = vc[k];
-                let vc_jk = 0.125 * (vcj.cbrt() + vck.cbrt()).powi(3);
+                let s_jk = vcj.cbrt() + vck.cbrt();
+                let vc_jk = 0.125 * (s_jk * s_jk * s_jk);
                 let tc_jk = self.kij[j * n + k] * (tcj * tck).sqrt();
 
                 let n_prod = z[j] * z[k];
@@ -692,7 +693,8 @@ impl LeeKesler {
             for l in 0..n {
                 let tcl = self.components[l].critical_temperature;
                 let vcl = vc[l];
-                let vc_il = 0.125 * (vci.cbrt() + vcl.cbrt()).powi(3);
+                let s_il = vci.cbrt() + vcl.cbrt();
+                let vc_il = 0.125 * (s_il * s_il * s_il);
                 let tc_il = self.kij[i * n + l] * (tci * tcl).sqrt();
 
                 v1 += z[l] * vc_il;

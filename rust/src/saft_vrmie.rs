@@ -297,10 +297,12 @@ impl SaftVrMie {
                 self.sigma_ij[idx] = sig_ij;
 
                 // Dispersion well depth (Lafitte combining rule)
+                let si3 = c_i.sigma * c_i.sigma * c_i.sigma;
+                let sj3 = c_j.sigma * c_j.sigma * c_j.sigma;
                 let eps_ij = (1.0 - self.kij[idx])
-                    * (c_i.sigma.powi(3) * c_j.sigma.powi(3)).sqrt()
+                    * (si3 * sj3).sqrt()
                     * (c_i.eps_depth_divk * c_j.eps_depth_divk).sqrt()
-                    / sig_ij.powi(3);
+                    / (sig_ij * sig_ij * sig_ij);
                 self.eps_divk_ij[idx] = eps_ij;
 
                 // Mie prefactor C_ij
@@ -442,8 +444,10 @@ impl<'a> PreparedSaftVrMie<'a> {
         for i in 0..nc {
             for j in 0..nc {
                 let idx = i * nc + j;
-                sum_d3 += xs[i] * xs[j] * d[idx].powi(3);
-                sum_sig3 += xs[i] * xs[j] * model.sigma_ij[idx].powi(3);
+                let dij = d[idx];
+                let sij = model.sigma_ij[idx];
+                sum_d3 += xs[i] * xs[j] * (dij * dij * dij);
+                sum_sig3 += xs[i] * xs[j] * (sij * sij * sij);
             }
         }
 
@@ -507,7 +511,8 @@ impl<'a> PreparedSaftVrMie<'a> {
 
         // 1. Hard-sphere term (BMCSL for mixture, Carnahan-Starling for pure fluid)
         let a_hs = if nc == 1 {
-            (4.0 * eta - 3.0 * eta * eta) / (1.0 - eta).powi(2)
+            let om = 1.0 - eta;
+            (4.0 * eta - 3.0 * eta * eta) / (om * om)
         } else {
             let mut z0 = 0.0;
             let mut z1 = 0.0;
@@ -517,16 +522,18 @@ impl<'a> PreparedSaftVrMie<'a> {
                 let di = self.d[i * nc + i];
                 let factor =
                     (PI * N_A / 6.0) * rho * self.model.components[i].m * self.mole_fractions[i];
+                let di2 = di * di;
                 z0 += factor;
                 z1 += factor * di;
-                z2 += factor * di * di;
-                z3 += factor * di.powi(3);
+                z2 += factor * di2;
+                z3 += factor * (di2 * di);
             }
             let em3 = 1.0 - z3;
             let pref = 1.0 / z0;
+            let z2_3 = z2 * z2 * z2;
             pref * (3.0 * z1 * z2 / em3
-                + z2.powi(3) / (z3 * em3 * em3)
-                + (z2.powi(3) / z3.powi(2) - z0) * em3.ln())
+                + z2_3 / (z3 * em3 * em3)
+                + (z2_3 / (z3 * z3) - z0) * em3.ln())
         };
 
         // 2. Dispersion A1, A2, A3
@@ -535,8 +542,13 @@ impl<'a> PreparedSaftVrMie<'a> {
         let mut a3_mix = 0.0;
 
         // Carnahan-Starling isothermal compressibility Khs
-        let denum_khs = 1.0 + 4.0 * eta + 4.0 * eta.powi(2) - 4.0 * eta.powi(3) + eta.powi(4);
-        let khs = (1.0 - eta).powi(4) / denum_khs;
+        let eta2 = eta * eta;
+        let eta3 = eta2 * eta;
+        let eta4 = eta2 * eta2;
+        let om_eta = 1.0 - eta;
+        let om_eta2 = om_eta * om_eta;
+        let denum_khs = 1.0 + 4.0 * eta + 4.0 * eta2 - 4.0 * eta3 + eta4;
+        let khs = (om_eta2 * om_eta2) / denum_khs;
 
         for i in 0..nc {
             for j in 0..nc {
@@ -560,7 +572,8 @@ impl<'a> PreparedSaftVrMie<'a> {
                     (0.0, 0.0)
                 };
                 let a1_tilde = c_fac * (x0.powf(la) * (asa + ba) - x0.powf(lr) * (asr + br));
-                let eta_ij = (PI * N_A / 6.0) * self.m_bar * rho * self.d[idx].powi(3);
+                let dij = self.d[idx];
+                let eta_ij = (PI * N_A / 6.0) * self.m_bar * rho * (dij * dij * dij);
                 let a1_ij = eta_ij * a1_tilde;
 
                 // a2_ij
@@ -582,15 +595,18 @@ impl<'a> PreparedSaftVrMie<'a> {
                 let a22_tilde = x0.powf(lam_2a) * (as_2a + b_2a)
                     - 2.0 * x0.powf(lam_ar) * (as_ar + b_ar)
                     + x0.powf(lam_2r) * (as_2r + b_2r);
+                let zb2 = zeta_bar * zeta_bar;
                 let chi = zeta_bar
-                    * (f_alpha[0] + f_alpha[1] * zeta_bar.powi(4) + f_alpha[2] * zeta_bar.powi(7));
-                let a2_ij = 0.5 * eps * c_fac.powi(2) * khs * (1.0 + chi) * eta_ij * a22_tilde;
+                    * (f_alpha[0]
+                        + f_alpha[1] * (zb2 * zb2)
+                        + f_alpha[2] * crate::numerics::ipow(zeta_bar, 7));
+                let a2_ij = 0.5 * eps * (c_fac * c_fac) * khs * (1.0 + chi) * eta_ij * a22_tilde;
 
                 // a3_ij
-                let a3_ij = -eps.powi(3)
+                let a3_ij = -(eps * eps * eps)
                     * f_alpha[3]
                     * zeta_bar
-                    * (f_alpha[4] * zeta_bar + f_alpha[5] * zeta_bar.powi(2)).exp();
+                    * (f_alpha[4] * zeta_bar + f_alpha[5] * zb2).exp();
 
                 let weight = self.xs[i] * self.xs[j];
                 a1_mix += weight * a1_ij;
@@ -614,15 +630,15 @@ impl<'a> PreparedSaftVrMie<'a> {
 
                 // gd
                 let one_m_eta = 1.0 - eta;
-                let d2 = one_m_eta.powi(2);
-                let d3 = one_m_eta.powi(3);
+                let d2 = one_m_eta * one_m_eta;
+                let d3 = d2 * one_m_eta;
                 let k0 = -one_m_eta.ln()
-                    + (42.0 * eta - 39.0 * eta.powi(2) + 9.0 * eta.powi(3) - 2.0 * eta.powi(4))
-                        / (6.0 * d3);
-                let k1 = (eta.powi(4) + 6.0 * eta.powi(2) - 12.0 * eta) / (2.0 * d3);
-                let k2 = (-3.0 * eta.powi(2)) / (8.0 * d2);
-                let k3 = (-eta.powi(4) + 3.0 * eta.powi(2) + 3.0 * eta) / (6.0 * d3);
-                let exparg = k0 + k1 * x0 + k2 * x0.powi(2) + k3 * x0.powi(3);
+                    + (42.0 * eta - 39.0 * eta2 + 9.0 * eta3 - 2.0 * eta4) / (6.0 * d3);
+                let k1 = (eta4 + 6.0 * eta2 - 12.0 * eta) / (2.0 * d3);
+                let k2 = (-3.0 * eta2) / (8.0 * d2);
+                let k3 = (-eta4 + 3.0 * eta2 + 3.0 * eta) / (6.0 * d3);
+                let x0_2 = x0 * x0;
+                let exparg = k0 + k1 * x0 + k2 * x0_2 + k3 * (x0_2 * x0);
                 let gd = exparg.exp();
 
                 // g1
@@ -664,14 +680,15 @@ impl<'a> PreparedSaftVrMie<'a> {
                 let a22_tilde_e = x0.powf(lam_2a) * (as_2a_e + b_2a_e)
                     - 2.0 * x0.powf(lam_ar) * (as_ar_e + b_ar_e)
                     + x0.powf(lam_2r) * (as_2r_e + b_2r_e);
-                let num_khs = (1.0 - eta).powi(4);
-                let num_khs_d = -4.0 * (1.0 - eta).powi(3);
-                let den_khs_d = 4.0 + 8.0 * eta - 12.0 * eta.powi(2) + 4.0 * eta.powi(3);
+                let num_khs = d2 * d2;
+                let num_khs_d = -4.0 * d3;
+                let den_khs_d = 4.0 + 8.0 * eta - 12.0 * eta2 + 4.0 * eta3;
                 let khs_e = (num_khs_d * denum_khs - num_khs * den_khs_d) / (denum_khs * denum_khs);
-                let g21 = (c_fac.powi(2) / (8.0 * eps))
+                let c_fac2 = c_fac * c_fac;
+                let g21 = (c_fac2 / (8.0 * eps))
                     * (khs * (a22_tilde + eta * a22_tilde_e) + eta * khs_e * a22_tilde);
                 let g22 = khs
-                    * (c_fac.powi(2) / (12.0 * eps))
+                    * (c_fac2 / (12.0 * eps))
                     * (-la * x0.powf(lam_2a) * (as_2a + b_2a)
                         + lam_ar * x0.powf(lam_ar) * (as_ar + b_ar)
                         - lr * x0.powf(lam_2r) * (as_2r + b_2r));
@@ -681,7 +698,7 @@ impl<'a> PreparedSaftVrMie<'a> {
                     * 10.0
                     * (1.0 - (10.0 * (0.57 - alpha)).tanh())
                     * zeta_bar
-                    * (-6.7 * zeta_bar - 8.0 * zeta_bar.powi(2)).exp();
+                    * (-6.7 * zeta_bar - 8.0 * (zeta_bar * zeta_bar)).exp();
                 let g2 = (1.0 + gam_c) * (g21 + g22);
 
                 let beta_eps = eps / t;
@@ -692,7 +709,7 @@ impl<'a> PreparedSaftVrMie<'a> {
             }
         }
 
-        let am = a_hs + beta * a1_mix + beta * beta * a2_mix + beta.powi(3) * a3_mix;
+        let am = a_hs + beta * a1_mix + beta * beta * a2_mix + (beta * beta * beta) * a3_mix;
         let a_res = self.m_bar * am + a_chain;
 
         Ok(SaftVrMieHelmholtzTerms {
@@ -797,7 +814,7 @@ impl<'a> PreparedSaftVrMie<'a> {
         s_id -= RGAS * (rho * RGAS * t / p_ref).ln();
 
         let cv_total = cp_id - RGAS + cv_res;
-        let cp_total = cv_total - t * jet.dp_dt.powi(2) / jet.dp_dv;
+        let cp_total = cv_total - t * (jet.dp_dt * jet.dp_dt) / jet.dp_dv;
 
         let gamma = cp_total / cv_total;
         let mw_kg = self.molar_mass_mix * 1e-3;
@@ -1076,7 +1093,7 @@ fn calc_mie_potential_full(
         let tinv = 1.0 / temperature;
         let d = d_param * tinv;
         let d_t = -d_param * tinv * tinv;
-        let d_tt = 2.0 * d_param * tinv.powi(3);
+        let d_tt = 2.0 * d_param * (tinv * tinv * tinv);
 
         let q1_n = n * (n - 1.0);
         let q1_m = m * (m - 1.0);
@@ -1308,7 +1325,7 @@ pub(crate) fn calc_hardsphere_diameter_pure(
 }
 
 fn calc_eff_eta(eta: f64, lam: f64) -> f64 {
-    let inv_lam = [1.0, 1.0 / lam, 1.0 / (lam * lam), 1.0 / (lam.powi(3))];
+    let inv_lam = [1.0, 1.0 / lam, 1.0 / (lam * lam), 1.0 / (lam * lam * lam)];
     let mut c_vec = [0.0; 4];
     for j in 0..4 {
         for i in 0..4 {
@@ -1319,7 +1336,7 @@ fn calc_eff_eta(eta: f64, lam: f64) -> f64 {
 }
 
 fn calc_eff_eta_with_deriv(eta: f64, lam: f64) -> (f64, f64) {
-    let inv_lam = [1.0, 1.0 / lam, 1.0 / (lam * lam), 1.0 / (lam.powi(3))];
+    let inv_lam = [1.0, 1.0 / lam, 1.0 / (lam * lam), 1.0 / (lam * lam * lam)];
     let mut c_vec = [0.0; 4];
     for j in 0..4 {
         for i in 0..4 {
@@ -1334,14 +1351,16 @@ fn calc_eff_eta_with_deriv(eta: f64, lam: f64) -> (f64, f64) {
 fn calc_a1_sutherland(eta: f64, lam: f64, eps_val: f64) -> f64 {
     let ef = calc_eff_eta(eta, lam);
     let pref = 6.0 * eps_val / (lam - 3.0);
-    let denum = (1.0 - ef).powi(3);
+    let om = 1.0 - ef;
+    let denum = om * om * om;
     -2.0 * pref * (1.0 - 0.5 * ef) / denum
 }
 
 fn calc_a1_sutherland_with_deriv(eta: f64, lam: f64, eps_val: f64) -> (f64, f64) {
     let (ef, ef_e) = calc_eff_eta_with_deriv(eta, lam);
     let pref = 6.0 * eps_val / (lam - 3.0);
-    let denum = (1.0 - ef).powi(3);
+    let om = 1.0 - ef;
+    let denum = om * om * om;
     let as_val = -2.0 * pref * (1.0 - 0.5 * ef) / denum;
     let temp1 = -pref * (5.0 - 2.0 * ef) / denum / (1.0 - ef);
     let as_e = temp1 * ef_e;
@@ -1352,7 +1371,8 @@ fn calc_b_tilde(x0: f64, eta: f64, lam: f64, eps_val: f64) -> f64 {
     let i_term = -(x0.powf(3.0 - lam) - 1.0) / (lam - 3.0);
     let j_term = -((lam - 3.0) * x0.powf(4.0 - lam) - (lam - 4.0) * x0.powf(3.0 - lam) - 1.0)
         / ((lam - 3.0) * (lam - 4.0));
-    let d3 = (1.0 - eta).powi(3);
+    let om = 1.0 - eta;
+    let d3 = om * om * om;
     let keta10 = (2.0 - eta) / d3;
     let keta20 = -9.0 * eta * (1.0 + eta) / d3;
     6.0 * eps_val * (keta10 * i_term + keta20 * j_term)
@@ -1362,12 +1382,13 @@ fn calc_b_tilde_with_deriv(x0: f64, eta: f64, lam: f64, eps_val: f64) -> (f64, f
     let i_term = -(x0.powf(3.0 - lam) - 1.0) / (lam - 3.0);
     let j_term = -((lam - 3.0) * x0.powf(4.0 - lam) - (lam - 4.0) * x0.powf(3.0 - lam) - 1.0)
         / ((lam - 3.0) * (lam - 4.0));
-    let d3 = (1.0 - eta).powi(3);
+    let om = 1.0 - eta;
+    let d3 = om * om * om;
     let d4 = (1.0 - eta) * d3;
     let keta10 = (2.0 - eta) / d3;
     let keta11 = (5.0 - 2.0 * eta) / d4;
     let keta20 = -9.0 * eta * (1.0 + eta) / d3;
-    let keta21 = -9.0 * (eta.powi(2) + 4.0 * eta + 1.0) / d4;
+    let keta21 = -9.0 * (eta * eta + 4.0 * eta + 1.0) / d4;
     let b_val = 6.0 * eps_val * (keta10 * i_term + keta20 * j_term);
     let b_e = 6.0 * eps_val * (keta11 * i_term + keta21 * j_term);
     (b_val, b_e)

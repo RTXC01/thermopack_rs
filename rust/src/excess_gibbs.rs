@@ -540,7 +540,9 @@ fn hv_nrtl_kernel(
                             let p = pair.poly_ij;
                             let tc = p[2];
                             let t_ref = 298.15;
-                            let diff_term = (1.0 - t / tc).powi(2) - (1.0 - t_ref / tc).powi(2);
+                            let d1 = 1.0 - t / tc;
+                            let d2 = 1.0 - t_ref / tc;
+                            let diff_term = d1 * d1 - d2 * d2;
                             let tau_val = (p[0] + p[1] * diff_term) / t;
                             let dtau_val = -tau_val / t - 2.0 * p[1] * (1.0 - t / tc) / (tc * t);
                             let d2tau_val = -2.0 * (dtau_val - p[1] / (tc * tc)) / t;

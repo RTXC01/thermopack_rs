@@ -356,7 +356,14 @@ def main(args):
         if not args.allow_known_gaps:
             raise SystemExit('Partial source qualification; inspect complete report and exact declared outcomes')
         allowed = json.loads((ROOT/'tools/rust_port/meos_isochoric_known_gaps.json').read_text(encoding='utf-8'))
-        assert allowed_outcomes(outcomes, allowed['outcomes']), 'new or changed source/phase outcomes require review'
+        if not allowed_outcomes(outcomes, allowed['outcomes']):
+            unexpected = {
+                k: {'actual': v, 'declared': allowed['outcomes'].get(k)}
+                for k, v in sorted(outcomes.items())
+                if allowed['outcomes'].get(k) != v
+            }
+            print(json.dumps({'unexpected_outcomes_count': len(unexpected), 'unexpected_outcomes': unexpected}, indent=2), flush=True)
+            raise AssertionError(f'new or changed source/phase outcomes require review ({len(unexpected)} unexpected)')
 
 
 if __name__ == '__main__':

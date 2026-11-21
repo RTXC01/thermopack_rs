@@ -113,12 +113,15 @@ impl DensityTerm {
     fn evaluate(&self, delta: f64) -> [f64; 4] {
         let exponent = match self.exponent {
             DensityExponent::Plain => 0.,
-            DensityExponent::Power(l) => -delta.powi(l),
+            DensityExponent::Power(l) => -super::ipow(delta, l),
             DensityExponent::Gaussian {
                 eta,
                 epsilon,
                 temperature,
-            } => -eta * (delta - epsilon).powi(2) - temperature,
+            } => {
+                let diff = delta - epsilon;
+                -eta * (diff * diff) - temperature
+            }
         };
         let factor = self.coefficient * exponent.exp();
         std::array::from_fn(|k| {
@@ -143,19 +146,20 @@ impl PreparedMultiparameter<'_> {
         let delta = rho / self.eos.rc();
         let mut scale = 1.;
         for (i, p) in self.eos.record.pol_terms.iter().enumerate() {
-            scale += f64::from(p.d).abs() * self.tau_cache[i].abs() * delta.powi(p.d);
+            scale += f64::from(p.d).abs() * self.tau_cache[i].abs() * super::ipow(delta, p.d);
         }
         for (i, p) in self.eos.record.exp_terms.iter().enumerate() {
-            let dl = delta.powi(p.l);
+            let dl = super::ipow(delta, p.l);
             scale += (f64::from(p.d).abs() + f64::from(p.l) * dl)
                 * self.tau_exp_cache[i].abs()
-                * delta.powi(p.d)
+                * super::ipow(delta, p.d)
                 * (-dl).exp();
         }
         for (i, p) in self.eos.record.expexp_terms.iter().enumerate() {
+            let diff = delta - p.epsilon;
             let term = self.tau_ee_cache[i].abs()
-                * delta.powi(p.d)
-                * (-p.eta * (delta - p.epsilon).powi(2) - self.gaussian_temperature[i]).exp();
+                * super::ipow(delta, p.d)
+                * (-p.eta * (diff * diff) - self.gaussian_temperature[i]).exp();
             scale += (f64::from(p.d).abs() + 2. * p.eta.abs() * delta * (delta + p.epsilon.abs()))
                 * term;
         }
@@ -417,16 +421,17 @@ mod tests {
                         let h = (1e-5 * rho).max(1e-6 * m.rc());
                         let a = p.pressure_density_jet(rho + h).unwrap();
                         let b = p.pressure_density_jet(rho - h).unwrap();
+                        let rc = m.rc();
                         for (actual, finite, scale) in [
                             (
                                 q.drhorho,
                                 (a.drho - b.drho) / (2. * h),
-                                m.gas_constant() * t / m.rc(),
+                                m.gas_constant() * t / rc,
                             ),
                             (
                                 q.drhorhorho,
                                 (a.drhorho - b.drhorho) / (2. * h),
-                                m.gas_constant() * t / m.rc().powi(2),
+                                m.gas_constant() * t / (rc * rc),
                             ),
                         ] {
                             assert!(

@@ -875,11 +875,18 @@ fn hv_nrtl_value(
             gamma1 += tau_ji * term_base;
             gamma2 += term_base;
         }
+        if !gamma1.is_finite() || !gamma2.is_finite() {
+            return Err(Error::InvalidInput("temperature outside numerical range"));
+        }
         if gamma2.abs() >= 1e-30 {
             sum2i += mole_fractions[i] * gamma1 / gamma2;
         }
     }
-    Ok(RGAS * t * sum2i)
+    let ge = RGAS * t * sum2i;
+    if !ge.is_finite() {
+        return Err(Error::InvalidInput("temperature outside numerical range"));
+    }
+    Ok(ge)
 }
 
 /// Value-only infinite-pressure excess Gibbs energy `g^E` (`[J/mol]`) for Wong-Sandler
@@ -956,5 +963,9 @@ pub(crate) fn excess_gibbs_cubic_a_value(
     for i in 0..nc {
         sum_aa_b += mole_fractions[i] * a_pure[i] / b_pure[i];
     }
-    Ok(b_mix * (sum_aa_b - g_ex / lambda_ge))
+    let a = b_mix * (sum_aa_b - g_ex / lambda_ge);
+    if !a.is_finite() {
+        return Err(Error::InvalidInput("temperature outside numerical range"));
+    }
+    Ok(a)
 }

@@ -438,5 +438,8 @@ pub(crate) fn wong_sandler_ab_values(
     let denominator = total - d;
     let b = q / denominator;
     let a = q * d * gas_temperature / denominator;
+    if !q.is_finite() || !d.is_finite() || !a.is_finite() || !b.is_finite() {
+        return Err(Error::InvalidInput("temperature outside numerical range"));
+    }
     Ok((a, b))
 }

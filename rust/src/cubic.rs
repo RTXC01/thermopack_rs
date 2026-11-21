@@ -1455,7 +1455,11 @@ impl Cubic {
             for i in 0..n {
                 let tc = self.components[i].critical_temperature;
                 let alpha = self.alpha[i].evaluate(temperature, tc)?.value;
-                a_pure.push(self.a0[i] * alpha);
+                let ai = self.a0[i] * alpha;
+                if !ai.is_finite() {
+                    return Err(Error::InvalidInput("temperature outside numerical range"));
+                }
+                a_pure.push(ai);
             }
             let g_ex = crate::excess_gibbs::excess_gibbs_value(
                 mixture,
@@ -1520,7 +1524,11 @@ impl Cubic {
             for i in 0..n {
                 let tc = self.components[i].critical_temperature;
                 let alpha = self.alpha[i].evaluate(temperature, tc)?.value;
-                a_pure.push(self.a0[i] * alpha);
+                let ai = self.a0[i] * alpha;
+                if !ai.is_finite() {
+                    return Err(Error::InvalidInput("temperature outside numerical range"));
+                }
+                a_pure.push(ai);
             }
             let a = crate::excess_gibbs::excess_gibbs_cubic_a_value(
                 ge,
@@ -2743,6 +2751,27 @@ mod mixture_ab_value_tests {
             },
         )?;
         assert_ab_matches("WongSandler", &ws_model, 320.0, &[0.5, 0.5])?;
+
+        // 7. Overflowing Wong-Sandler activity sum with zero-mole component must
+        // propagate an error instead of silently skipping a NaN row.
+        let mut ws_overflow = WongSandlerData::new(2);
+        ws_overflow.set_tauij(0, 1, Fraction::constant(-1000.0))?;
+        ws_overflow.set_alphaij(0, 1, 1.0)?;
+        let ws_overflow_model = Cubic::with_options(
+            CubicKind::PengRobinson,
+            &["CO2", "C1"],
+            CubicOptions {
+                mixing_rule: MixingRule::WongSandler,
+                wong_sandler: Some(&ws_overflow),
+                ..Default::default()
+            },
+        )?;
+        assert!(ws_overflow_model.prepare(320.0, &[1.0, 0.0]).is_err());
+        assert!(
+            ws_overflow_model
+                .mixture_ab_values(320.0, &[1.0, 0.0])
+                .is_err()
+        );
 
         Ok(())
     }

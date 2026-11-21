@@ -544,7 +544,11 @@ impl Unifac {
         for j in 0..ng {
             for k in 0..ng {
                 let index = j * ng + k;
-                ejk[index] = (-(self.ajk[index] / t + self.bjk[index] + self.cjk[index] * t)).exp();
+                let value = (-(self.ajk[index] / t + self.bjk[index] + self.cjk[index] * t)).exp();
+                if !value.is_finite() {
+                    return Err(Error::NotConverged("non-finite UNIFAC excess Gibbs energy"));
+                }
+                ejk[index] = value;
             }
         }
 

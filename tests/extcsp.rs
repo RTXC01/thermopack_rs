@@ -909,47 +909,91 @@ fn test_extcsp_all_backends_wong_sandler_zero_components_and_minimum_gibbs() -> 
     )?;
     verify_helmholtz_and_tp_fd(&m_cb_pr, 250.0, 6.0e6, &[0.4, 0.6], Phase::Liquid)?;
 
-    // Truly independent mapped reference-state check for Cubic PR backend (H, F computed
-    // from standalone Cubic without calling ExtCsp::shape_factors):
-    {
-        let t = 250.0;
-        let p = 6.0e6;
-        let n = [0.8, 1.2];
-        let sumn = 2.0;
-        let ref_pr = Cubic::new(CubicKind::PengRobinson, &["C3"])?;
-        let c3 = ref_pr.components()[0];
-        let (h_exp, f_exp) = independent_shape_factors(
+    // Truly independent mapped reference-state checks for both Cubic SRK and PR backends
+    // (H, F recovered from standalone Cubic pressure without calling ExtCsp::shape_factors):
+    for (label, kind, comps, model, t, p, n, ph) in [
+        (
+            "Cubic SRK",
+            CubicKind::SoaveRedlichKwong,
+            &["C1", "C3"][..],
+            &m_cb_srk,
+            320.0,
+            3.0e6,
+            [1.2, 0.8],
+            Phase::Vapor,
+        ),
+        (
+            "Cubic PR",
             CubicKind::PengRobinson,
+            &["CO2", "C1"][..],
+            &m_cb_pr,
+            250.0,
+            6.0e6,
+            [0.8, 1.2],
+            Phase::Liquid,
+        ),
+    ] {
+        let sumn = n[0] + n[1];
+        let ref_cubic = Cubic::new(kind, &["C3"])?;
+        let c3 = ref_cubic.components()[0];
+        let (h_exp, f_exp) = independent_shape_factors(
+            kind,
             MixingRule::VdW,
             AlphaCorrelation::Classic,
             "DEFAULT",
             None,
-            &["CO2", "C1"],
+            comps,
             "C3",
             c3.critical_temperature,
             c3.critical_pressure,
             t,
             &n,
         )?;
-        let (h_act, f_act) = m_cb_pr.shape_factors(t, &n)?;
-        assert_phys_close("Cubic PR independent H", h_exp, h_act, h_exp, 1e-11, 1e-12);
-        assert_phys_close("Cubic PR independent F", f_exp, f_act, f_exp, 1e-11, 1e-12);
-        let t0 = sumn * t / f_exp;
-        let p0 = h_exp * p / f_exp;
-        let v0_ref = ref_pr.prepare(t0, &[1.0])?.volume(p0, Phase::Liquid)?;
-        let v_csp = m_cb_pr.volume_tp(t, p, &n, Phase::Liquid)?;
+        let (h_act, f_act) = model.shape_factors(t, &n)?;
         assert_phys_close(
-            "Cubic PR independent mapped V == H*v0",
-            v_csp,
-            h_exp * v0_ref,
-            v_csp,
+            &format!("{label} independent H"),
+            h_exp,
+            h_act,
+            h_exp,
             1e-11,
             1e-12,
         );
-        let p_ref = ref_pr.prepare(t0, &[1.0])?.pressure(v_csp / h_exp)?.value;
-        let p_csp = m_cb_pr.pressure_tv(t, v_csp, &n)?.value;
         assert_phys_close(
-            "Cubic PR independent mapped P == (F/H)*P0",
+            &format!("{label} independent F"),
+            f_exp,
+            f_act,
+            f_exp,
+            1e-11,
+            1e-12,
+        );
+        let t0 = sumn * t / f_exp;
+        let p0 = h_exp * p / f_exp;
+        let ref_state = ref_cubic.prepare(t0, &[1.0])?;
+        let v0_ref = ref_state.volume(p0, ph)?;
+        let v_exp = h_exp * v0_ref;
+        let v_csp = model.volume_tp(t, p, &n, ph)?;
+        assert_phys_close(
+            &format!("{label} independent mapped V == H*v0"),
+            v_csp,
+            v_exp,
+            v_exp,
+            1e-11,
+            1e-12,
+        );
+        let f_ref = ref_state.residual(v0_ref)?.helmholtz_tv / (R * t0);
+        let f_csp = model.residual_helmholtz_tv(t, v_exp, &n)?;
+        assert_phys_close(
+            &format!("{label} independent mapped F_res"),
+            f_csp.f,
+            sumn * f_ref,
+            sumn,
+            1e-11,
+            1e-12,
+        );
+        let p_ref = ref_state.pressure(v0_ref)?.value;
+        let p_csp = model.pressure_tv(t, v_exp, &n)?.value;
+        assert_phys_close(
+            &format!("{label} independent mapped P == (F/H)*P0"),
             p_csp,
             (f_exp / h_exp) * p_ref,
             p,
@@ -1576,5 +1620,49 @@ fn test_extcsp_pure_reference_fluid_identities() -> Result<()> {
             1e-12,
         );
     }
+    Ok(())
+}
+
+#[test]
+fn test_extcsp_non_finite_wong_sandler_activity_sum_propagates_error() -> Result<()> {
+    let mut ws = thermopack_rs::wong_sandler::WongSandlerData::new(2);
+    ws.set_tauij(
+        0,
+        1,
+        thermopack_rs::wong_sandler::Fraction::constant(-1000.0),
+    )?;
+    ws.set_alphaij(0, 1, 1.0)?;
+
+    let model = ExtCsp::with_options(
+        &["CO2", "C1"],
+        ExtCspOptions {
+            shape_eos: CubicKind::PengRobinson,
+            shape_mixing: MixingRule::WongSandler,
+            wong_sandler: Some(&ws),
+            ..Default::default()
+        },
+    )?;
+
+    let t = 320.0;
+    let p = 3.0e6;
+    let n = [1.0, 0.0];
+    let v = 7.75e-4;
+
+    assert!(
+        model.shape_factors(t, &n).is_err(),
+        "shape_factors must propagate error on non-finite activity sum"
+    );
+    assert!(
+        model.volume_tp(t, p, &n, Phase::Vapor).is_err(),
+        "volume_tp must propagate error on non-finite activity sum"
+    );
+    assert!(
+        model.volume_tp_derivatives(t, p, &n, Phase::Vapor).is_err(),
+        "volume_tp_derivatives must propagate error on non-finite activity sum"
+    );
+    assert!(
+        model.pressure_tv(t, v, &n).is_err(),
+        "pressure_tv must propagate error on non-finite activity sum"
+    );
     Ok(())
 }

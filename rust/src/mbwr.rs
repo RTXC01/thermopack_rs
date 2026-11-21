@@ -67,6 +67,11 @@ pub struct MbwrHelmholtzTerm {
     pub temperature_power: f64,
     pub exponential: bool,
 }
+// `data::source_helmholtz` uses `.powi(...)`, which MSVC debug lowers to UCRT
+// `pow()` with 1-2 ULP drift vs gfortran binary exponentiation; keep the
+// generated file untouched because `tools/rust_port/generate_mbwr_data.py` is
+// SHA-256 pinned in `mbwr_coexistence.audit.json.gz`.
+#[allow(dead_code)]
 #[path = "mbwr_data.rs"]
 mod data;
 #[path = "mbwr_equilibrium.rs"]
@@ -167,7 +172,7 @@ impl Mbwr {
         }
         let mut values = [0.; 32];
         values[..coefficients.len()].copy_from_slice(coefficients);
-        let (source_terms, source_count) = data::source_helmholtz(kind, coefficients, gamma);
+        let (source_terms, source_count) = source_helmholtz(kind, coefficients, gamma);
         Ok(Self {
             kind,
             coefficients: values,
@@ -590,4 +595,174 @@ impl PreparedMbwr<'_> {
         }
         Ok(result)
     }
+}
+
+/// Integrated MBWR Helmholtz terms matching `src/mbwr.f90` bit-for-bit across
+/// toolchains by using explicit IEEE-754 binary exponentiation chains instead
+/// of `f64::powi` (which diverges under MSVC debug via UCRT `pow()`).
+#[allow(unused_parens, clippy::neg_multiply)]
+fn source_helmholtz(
+    kind: MbwrKind,
+    coefficients: &[f64],
+    gamma: f64,
+) -> ([MbwrHelmholtzTerm; 40], usize) {
+    let mut z = [0.0; 32];
+    for (i, &n) in coefficients.iter().enumerate() {
+        z[i] = if kind == MbwrKind::Bender19 {
+            n * 1000.0 / (1000.0 * R)
+        } else {
+            n / (1000.0 * R)
+        };
+    }
+    if kind == MbwrKind::Bender19 {
+        for v in &mut z[1..5] {
+            *v = -*v;
+        }
+    }
+    let mut h = [MbwrHelmholtzTerm::default(); 40];
+    let polynomial = if kind == MbwrKind::Bender19 { 13 } else { 19 };
+    for (i, term) in kind.terms().iter().take(polynomial).enumerate() {
+        h[i] = MbwrHelmholtzTerm {
+            coefficient: z[i] / (term.density_power - 1) as f64,
+            density_power: (term.density_power - 1) as i32,
+            temperature_power: term.temperature_power - 1.0,
+            exponential: false,
+        };
+    }
+    let g2 = gamma * gamma;
+    let g3 = g2 * gamma;
+    let g4 = g2 * g2;
+    let g5 = g2 * g3;
+    let g6 = g3 * g3;
+    if kind == MbwrKind::Bender19 {
+        h[13].coefficient = ((z[13] / (2.0 * gamma)) + (z[16] / (2.0 * g2)));
+        h[13].density_power = 0;
+        h[13].temperature_power = -3.0;
+        h[13].exponential = false;
+        h[14].coefficient = ((z[14] / (2.0 * gamma)) + (z[17] / (2.0 * g2)));
+        h[14].density_power = 0;
+        h[14].temperature_power = -4.0;
+        h[14].exponential = false;
+        h[15].coefficient = ((z[15] / (2.0 * gamma)) + (z[18] / (2.0 * g2)));
+        h[15].density_power = 0;
+        h[15].temperature_power = -5.0;
+        h[15].exponential = false;
+        h[16].coefficient = -(h[13].coefficient);
+        h[16].density_power = 0;
+        h[16].temperature_power = -3.0;
+        h[16].exponential = true;
+        h[17].coefficient = -(h[14].coefficient);
+        h[17].density_power = 0;
+        h[17].temperature_power = -4.0;
+        h[17].exponential = true;
+        h[18].coefficient = -(h[15].coefficient);
+        h[18].density_power = 0;
+        h[18].temperature_power = -5.0;
+        h[18].exponential = true;
+        h[19].coefficient = (-(z[16]) / (2.0 * gamma));
+        h[19].density_power = 2;
+        h[19].temperature_power = -3.0;
+        h[19].exponential = true;
+        h[20].coefficient = (-(z[17]) / (2.0 * gamma));
+        h[20].density_power = 2;
+        h[20].temperature_power = -4.0;
+        h[20].exponential = true;
+        h[21].coefficient = (-(z[18]) / (2.0 * gamma));
+        h[21].density_power = 2;
+        h[21].temperature_power = -5.0;
+        h[21].exponential = true;
+    } else {
+        h[19].coefficient = ((((((z[19] / (2.0 * gamma)) + (z[21] / (2.0 * g2))) + (z[23] / g3))
+            + ((3.0 * z[25]) / g4))
+            + ((12.0 * z[27]) / g5))
+            + ((60.0 * z[29]) / g6));
+        h[19].density_power = 0;
+        h[19].temperature_power = -3.0;
+        h[19].exponential = false;
+        h[20].coefficient = ((((z[20] / (2.0 * gamma)) + (z[24] / g3)) + ((12.0 * z[28]) / g5))
+            + ((60.0 * z[30]) / g6));
+        h[20].density_power = 0;
+        h[20].temperature_power = -4.0;
+        h[20].exponential = false;
+        h[21].coefficient = (((z[22] / (2.0 * g2)) + ((3.0 * z[26]) / g4)) + ((60.0 * z[31]) / g6));
+        h[21].density_power = 0;
+        h[21].temperature_power = -5.0;
+        h[21].exponential = false;
+        h[22].coefficient = -(h[19].coefficient);
+        h[22].density_power = 0;
+        h[22].temperature_power = -3.0;
+        h[22].exponential = true;
+        h[23].coefficient = -(h[20].coefficient);
+        h[23].density_power = 0;
+        h[23].temperature_power = -4.0;
+        h[23].exponential = true;
+        h[24].coefficient = -(h[21].coefficient);
+        h[24].density_power = 0;
+        h[24].temperature_power = -5.0;
+        h[24].exponential = true;
+        h[25].coefficient = (-(gamma) * (h[19].coefficient - (z[19] / (2.0 * gamma))));
+        h[25].density_power = 2;
+        h[25].temperature_power = -3.0;
+        h[25].exponential = true;
+        h[26].coefficient = (-(gamma) * (h[20].coefficient - (z[20] / (2.0 * gamma))));
+        h[26].density_power = 2;
+        h[26].temperature_power = -4.0;
+        h[26].exponential = true;
+        h[27].coefficient = (-(gamma) * h[21].coefficient);
+        h[27].density_power = 2;
+        h[27].temperature_power = -5.0;
+        h[27].exponential = true;
+        h[28].coefficient = ((((-(z[23]) / (2.0 * gamma)) - ((3.0 * z[25]) / (2.0 * g2)))
+            - ((6.0 * z[27]) / g3))
+            - ((30.0 * z[29]) / g4));
+        h[28].density_power = 4;
+        h[28].temperature_power = -3.0;
+        h[28].exponential = true;
+        h[29].coefficient = ((h[26].coefficient * gamma) / 2.0);
+        h[29].density_power = 4;
+        h[29].temperature_power = -4.0;
+        h[29].exponential = true;
+        h[30].coefficient = (((-(3.0) * z[26]) / (2.0 * g2)) - ((30.0 * z[31]) / g4));
+        h[30].density_power = 4;
+        h[30].temperature_power = -5.0;
+        h[30].exponential = true;
+        h[31].coefficient =
+            (((-(z[25]) / (2.0 * gamma)) - ((2.0 * z[27]) / g2)) - ((10.0 * z[29]) / g3));
+        h[31].density_power = 6;
+        h[31].temperature_power = -3.0;
+        h[31].exponential = true;
+        h[32].coefficient = (((-(2.0) * z[28]) / g2) - ((10.0 * z[30]) / g3));
+        h[32].density_power = 6;
+        h[32].temperature_power = -4.0;
+        h[32].exponential = true;
+        h[33].coefficient = ((-(z[26]) / (2.0 * gamma)) - ((10.0 * z[31]) / g3));
+        h[33].density_power = 6;
+        h[33].temperature_power = -5.0;
+        h[33].exponential = true;
+        h[34].coefficient = ((-(z[27]) / (2.0 * gamma)) - ((5.0 * z[29]) / (2.0 * g2)));
+        h[34].density_power = 8;
+        h[34].temperature_power = -3.0;
+        h[34].exponential = true;
+        h[35].coefficient = ((-(z[28]) / (2.0 * gamma)) - ((5.0 * z[30]) / (2.0 * g2)));
+        h[35].density_power = 8;
+        h[35].temperature_power = -4.0;
+        h[35].exponential = true;
+        h[36].coefficient = ((-(5.0) * z[31]) / (2.0 * g2));
+        h[36].density_power = 8;
+        h[36].temperature_power = -5.0;
+        h[36].exponential = true;
+        h[37].coefficient = (-(z[29]) / (2.0 * gamma));
+        h[37].density_power = 10;
+        h[37].temperature_power = -3.0;
+        h[37].exponential = true;
+        h[38].coefficient = (-(z[30]) / (2.0 * gamma));
+        h[38].density_power = 10;
+        h[38].temperature_power = -4.0;
+        h[38].exponential = true;
+        h[39].coefficient = (-(z[31]) / (2.0 * gamma));
+        h[39].density_power = 10;
+        h[39].temperature_power = -5.0;
+        h[39].exponential = true;
+    }
+    (h, if kind == MbwrKind::Bender19 { 22 } else { 40 })
 }

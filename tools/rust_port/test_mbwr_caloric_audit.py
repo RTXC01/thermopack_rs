@@ -1,7 +1,8 @@
 """Mutated evidence must fail even when native and expected vectors agree."""
 import copy
+import math
 import unittest
-from audit_mbwr_caloric import audit,load_and_audit
+from audit_mbwr_caloric import _same_physical,audit,load_and_audit
 from qualify_mbwr_caloric import differences,floors
 
 
@@ -40,6 +41,87 @@ class CaloricAuditTests(unittest.TestCase):
         e=next(e for e in bad['public_constructor_calls'] if 'PUBLIC_RETURNED' not in e['stdout'])
         e['expected_initialization_status']=0
         with self.assertRaises(AssertionError):audit(bad)
+
+    def _clone_with_record(self,rec_idx):
+        bad=dict(self.report,records=list(self.report['records']))
+        bad['records'][rec_idx]=copy.deepcopy(self.report['records'][rec_idx])
+        return bad
+
+    def test_presence_flag_single_ulp_mutation_is_rejected(self):
+        rec_idx=next(
+            i for i,e in enumerate(self.report['records'])
+            if e['physical_from_original_jet'][39]==1.0
+            and e['physical_from_original_jet'][41]==1.0
+            and e['physical_from_original_jet'][43]==1.0
+        )
+        for flag_idx in (39,41,43):
+            bad=self._clone_with_record(rec_idx)
+            bad['records'][rec_idx]['physical_from_original_jet'][flag_idx]=1.0+math.ulp(1.0)
+            with self.assertRaises(AssertionError):audit(bad)
+
+    def test_unaffected_field_single_ulp_mutation_is_rejected(self):
+        for idx in (10,38):
+            bad=self._clone_with_record(0)
+            v=bad['records'][0]['physical_from_original_jet'][idx]
+            bad['records'][0]['physical_from_original_jet'][idx]=v+math.ulp(abs(v) if v!=0.0 else 1.0)
+            with self.assertRaises(AssertionError):audit(bad)
+
+    def test_present_cp_and_sound_exceeding_4_ulp_is_rejected(self):
+        rec_idx=next(
+            i for i,e in enumerate(self.report['records'])
+            if e['physical_from_original_jet'][39]==1.0 and e['physical_from_original_jet'][43]==1.0
+        )
+        rec=self.report['records'][rec_idx]
+        p=rec['physical_from_original_jet']
+        q=rec['request']
+        cp_scale=max(abs(p[40]),abs(p[38]))
+        denom=abs(p[12]-q['T']*(p[11]*p[11])/p[38])
+        factor=max(1.0,abs(p[12])/denom) if denom>0.0 else 1.0
+        for idx,scale in ((40,cp_scale),(44,abs(p[44])*factor)):
+            bad=self._clone_with_record(rec_idx)
+            bad['records'][rec_idx]['physical_from_original_jet'][idx]=p[idx]+8.0*math.ulp(scale)
+            with self.assertRaises(AssertionError):audit(bad)
+
+    def test_lnphi_drift_and_sign_flip_bounds(self):
+        rec_idx=next(
+            i for i,e in enumerate(self.report['records'])
+            if e['physical_from_original_jet'][41]==1.0 and abs(e['physical_from_original_jet'][42])>1e-6
+        )
+        rec=self.report['records'][rec_idx]
+        p=rec['physical_from_original_jet']
+        residual_fn=rec['source_baseline'][3]-rec['source_ideal'][8]
+        # 1-ULP lnphi drift passes.
+        ok=p[:]
+        ok[42]=p[42]+math.ulp(max(abs(p[42]),abs(residual_fn)))
+        self.assertTrue(_same_physical(p,ok,rec['request'],residual_fn))
+        # Large lnphi drift (1e-12) is rejected.
+        bad=self._clone_with_record(rec_idx)
+        bad['records'][rec_idx]['physical_from_original_jet'][42]=p[42]+1e-12
+        with self.assertRaises(AssertionError):audit(bad)
+        # Sign flip on lnphi is rejected.
+        bad=self._clone_with_record(rec_idx)
+        bad['records'][rec_idx]['physical_from_original_jet'][42]=-p[42]
+        with self.assertRaises(AssertionError):audit(bad)
+
+    def test_case_487_sound_speed_overflow_mutation_is_rejected(self):
+        rec_idx=486
+        p=self.report['records'][rec_idx]['physical_from_original_jet']
+        self.assertEqual(p[43],1.0)
+        self.assertLess(abs(p[44]-61.66642636762747),1e-9)
+        for idx in (44,40,42):
+            bad=self._clone_with_record(rec_idx)
+            bad['records'][rec_idx]['physical_from_original_jet'][idx]=1e308
+            with self.assertRaises(AssertionError):audit(bad)
+        # Overflowing factor * abs(expected[44]) must fail closed even for a 1-ULP difference.
+        expected=[0.0]*45
+        expected[11]=1.0
+        expected[12]=400.0
+        expected[38]=1.0
+        expected[43]=1.0
+        expected[44]=1e308
+        stored=expected[:]
+        stored[44]=expected[44]+math.ulp(expected[44])
+        self.assertFalse(_same_physical(expected,stored,{'T':300.0},0.0))
 
 
 if __name__=='__main__': unittest.main()

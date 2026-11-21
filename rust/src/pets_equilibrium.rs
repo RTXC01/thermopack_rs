@@ -145,7 +145,7 @@ fn pressure_series(tr: f64, eta: f64) -> [f64; 4] {
     let q = 1. / tr;
     let alpha = hs
         - (e * (polynomial(&A).scale(2. * q) + (c * polynomial(&B)).scale(q * q)))
-            .scale(6. / diameter_ratio.powi(3));
+            .scale(6. / (diameter_ratio * diameter_ratio * diameter_ratio));
     let ar = alpha.0[1];
     let arr = 2. * alpha.0[2];
     let arrr = 6. * alpha.0[3];
@@ -186,7 +186,8 @@ fn reduced_critical() -> Result<ReducedCritical> {
                 }
                 let step_t = (-f[1] * d + b * f[2]) / determinant;
                 let step_e = (-a * f[2] + f[1] * c) / determinant;
-                let norm = f[1] * f[1] + (e * f[2]).powi(2);
+                let ef2 = e * f[2];
+                let norm = f[1] * f[1] + ef2 * ef2;
                 let mut length = 1.;
                 let mut accepted = false;
                 for _ in 0..20 {
@@ -194,7 +195,8 @@ fn reduced_critical() -> Result<ReducedCritical> {
                     let ne = e + length * step_e;
                     if (0.2..4.).contains(&nt) && (0.001..0.7).contains(&ne) {
                         let nf = pressure_series(nt, ne);
-                        if nf[1] * nf[1] + (ne * nf[2]).powi(2) < norm {
+                        let nef2 = ne * nf[2];
+                        if nf[1] * nf[1] + nef2 * nef2 < norm {
                             t = nt;
                             e = ne;
                             accepted = true;

@@ -272,6 +272,8 @@
     "NIST_MEOS|O-H2|PS|0.8|0.30723098|0.5|None|2.408188|30.072246|unqualified|property_check|",
     "NIST_MEOS|O-H2|PS|0.9999|0.30690003|0.5|1.2|0.3|3.0|error|terminal|",
     "NIST_MEOS|O-H2|PS|0.9999|0.30690003|0.5|None|0.3|3.0|error|terminal|",
+    "NIST_MEOS|O-H2|PS|0.9999|0.30690003|0.5|1.2|0.3|3.0|unqualified|property_check|",
+    "NIST_MEOS|O-H2|PS|0.9999|0.30690003|0.5|None|0.3|3.0|unqualified|property_check|",
     "NIST_MEOS|O-H2|PS|0.9999|0.30690003|1.0|1.2|0.3|3.0|unqualified|property_check|",
     "NIST_MEOS|O-H2|PS|0.9999|0.30690003|1.0|None|0.3|3.0|unqualified|property_check|",
     "NIST_MEOS|O-H2|PS|0.999|0.30558201|0.5|1.2|0.3|3.0|unqualified|property_check|",

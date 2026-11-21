@@ -249,7 +249,7 @@ impl LjsBh {
     pub fn packing_fraction(&self, temperature: f64, density: f64) -> Result<f64> {
         crate::error::positive(density, "the LJS density")?;
         let (diameter, _, _) = self.diameter(temperature)?;
-        Ok(std::f64::consts::PI / 6.0 * crate::N_A * diameter.powi(3) * density)
+        Ok(std::f64::consts::PI / 6.0 * crate::N_A * (diameter * diameter * diameter) * density)
     }
 
     /// The reduced interaction potential of the model and the reduced force.
@@ -263,12 +263,12 @@ impl LjsBh {
         let xs = (26.0_f64 / 7.0).powf(1.0 / 6.0);
         let xc = 67.0 / 48.0 * xs;
         let a = -24192.0 / 3211.0 / (xs * xs);
-        let b = -387072.0 / 61009.0 / xs.powi(3);
+        let b = -387072.0 / 61009.0 / (xs * xs * xs);
         let mut potential = Vec::with_capacity(separations.len());
         let mut force = Vec::with_capacity(separations.len());
         for &separation in separations {
             if separation < xs {
-                let inverse = 1.0 / separation.powi(6);
+                let inverse = 1.0 / crate::numerics::ipow(separation, 6);
                 potential.push(4.0 * (inverse * inverse - inverse));
                 // The force is the negative derivative of the potential with
                 // respect to the separation.
@@ -392,14 +392,17 @@ impl LjsBh {
         let density = moles / volume;
         let (diameter, _, _) = self.diameter(temperature)?;
         let tau = 1.0 - diameter / self.sigma;
-        let reduced_density = crate::N_A * self.sigma.powi(3) * density;
-        let reduced_density_v = -crate::N_A * self.sigma.powi(3) * moles / (volume * volume);
-        let eta = std::f64::consts::PI / 6.0 * crate::N_A * diameter.powi(3) * density;
+        let sigma3 = self.sigma * self.sigma * self.sigma;
+        let diameter3 = diameter * diameter * diameter;
+        let reduced_density = crate::N_A * sigma3 * density;
+        let reduced_density_v = -crate::N_A * sigma3 * moles / (volume * volume);
+        let eta = std::f64::consts::PI / 6.0 * crate::N_A * diameter3 * density;
         let eta_v = -eta / volume;
         // The volume derivative of the molar reduced residual energy.
         let mut derivative = 0.0;
         if self.control.enable_hard_sphere {
-            derivative += (4.0 - 2.0 * eta) / (1.0 - eta).powi(3) * eta_v;
+            let om = 1.0 - eta;
+            derivative += (4.0 - 2.0 * eta) / (om * om * om) * eta_v;
         }
         if self.control.enable_a1 {
             let (_, value_r, ..) = polynomial_with_derivatives(0, tau, reduced_density, 1.0);
@@ -423,21 +426,23 @@ impl LjsBh {
                 / (temperature * temperature);
         }
         if self.control.enable_a3 {
+            let eps3 = self.eps * self.eps * self.eps;
+            let t3 = temperature * temperature * temperature;
             if self.control.use_lafitte_a3 {
                 // The Lafitte form of the third order term follows the
                 // dispersion packing fraction and the polynomials of the
                 // van der Waals attractive constant of the source.
-                let zeta = std::f64::consts::PI / 6.0 * crate::N_A * self.sigma.powi(3) * density;
+                let zeta = std::f64::consts::PI / 6.0 * crate::N_A * sigma3 * density;
                 let f_alpha = crate::saft_vrmie::alpha_coefficients(ALPHA_LJS);
                 let exponent = f_alpha[4] * zeta + f_alpha[5] * zeta * zeta;
                 let factor = exponent.exp();
-                let slope = -self.eps.powi(3)
+                let slope = -eps3
                     * (f_alpha[3] * factor
                         + zeta * (f_alpha[4] + 2.0 * f_alpha[5] * zeta) * factor);
-                derivative += slope * (-zeta / volume) / temperature.powi(3);
+                derivative += slope * (-zeta / volume) / t3;
             } else {
                 let (_, value_r, ..) = polynomial_with_derivatives(2, tau, reduced_density, 1.0);
-                derivative += self.eps.powi(3) * value_r * reduced_density_v / temperature.powi(3);
+                derivative += eps3 * value_r * reduced_density_v / t3;
             }
         }
         // The pressure of the ideal gas and the pressure of the residual
@@ -484,9 +489,11 @@ impl LjsBh {
         let (diameter, diameter_t, _) = self.diameter(temperature)?;
         let tau = 1.0 - diameter / self.sigma;
         let tau_t = -diameter_t / self.sigma;
-        let reduced_density = crate::N_A * self.sigma.powi(3) * density;
-        let reduced_density_n = crate::N_A * self.sigma.powi(3) / volume;
-        let eta = std::f64::consts::PI / 6.0 * crate::N_A * diameter.powi(3) * density;
+        let sigma3 = self.sigma * self.sigma * self.sigma;
+        let diameter3 = diameter * diameter * diameter;
+        let reduced_density = crate::N_A * sigma3 * density;
+        let reduced_density_n = crate::N_A * sigma3 / volume;
+        let eta = std::f64::consts::PI / 6.0 * crate::N_A * diameter3 * density;
         let eta_t = std::f64::consts::PI / 6.0
             * crate::N_A
             * 3.0
@@ -494,13 +501,15 @@ impl LjsBh {
             * diameter
             * diameter_t
             * density;
-        let eta_n = std::f64::consts::PI / 6.0 * crate::N_A * diameter.powi(3) / volume;
+        let eta_n = std::f64::consts::PI / 6.0 * crate::N_A * diameter3 / volume;
         let mut energy = 0.0;
         let mut derivative = 0.0;
         let mut mole_derivative = 0.0;
         if self.control.enable_hard_sphere {
-            let slope = (4.0 - 2.0 * eta) / (1.0 - eta).powi(3);
-            energy += (4.0 * eta - 3.0 * eta * eta) / (1.0 - eta).powi(2);
+            let om = 1.0 - eta;
+            let om2 = om * om;
+            let slope = (4.0 - 2.0 * eta) / (om2 * om);
+            energy += (4.0 * eta - 3.0 * eta * eta) / om2;
             derivative += slope * eta_t;
             mole_derivative += slope * eta_n;
         }
@@ -537,9 +546,9 @@ impl LjsBh {
             let unscaled = second;
             second *= compressibility;
             second_t = second_t * compressibility + unscaled * compressibility_t;
-            energy += second / (temperature * temperature);
-            derivative +=
-                second_t / (temperature * temperature) - 2.0 * second / temperature.powi(3);
+            let t2 = temperature * temperature;
+            energy += second / t2;
+            derivative += second_t / t2 - 2.0 * second / (t2 * temperature);
             // The compressibility factor follows the packing fraction, and the
             // packing fraction follows the number of moles.
             mole_derivative += second_r * reduced_density_n * compressibility
@@ -547,31 +556,34 @@ impl LjsBh {
                 + unscaled * khs_eta(eta) * eta_n / (temperature * temperature);
         }
         if self.control.enable_a3 {
+            let eps3 = self.eps * self.eps * self.eps;
             let (third, third_t, third_n) = if self.control.use_lafitte_a3 {
                 // The Lafitte form of the third order term follows the
                 // dispersion packing fraction and the polynomials of the
                 // van der Waals attractive constant of the source.
-                let zeta = std::f64::consts::PI / 6.0 * crate::N_A * self.sigma.powi(3) * density;
-                let zeta_n = std::f64::consts::PI / 6.0 * crate::N_A * self.sigma.powi(3) / volume;
+                let zeta = std::f64::consts::PI / 6.0 * crate::N_A * sigma3 * density;
+                let zeta_n = std::f64::consts::PI / 6.0 * crate::N_A * sigma3 / volume;
                 let f_alpha = crate::saft_vrmie::alpha_coefficients(ALPHA_LJS);
                 let exponent = f_alpha[4] * zeta + f_alpha[5] * zeta * zeta;
                 let factor = exponent.exp();
-                let value = -self.eps.powi(3) * f_alpha[3] * zeta * factor;
-                let slope = -self.eps.powi(3)
+                let value = -eps3 * f_alpha[3] * zeta * factor;
+                let slope = -eps3
                     * (f_alpha[3] * factor
                         + zeta * (f_alpha[4] + 2.0 * f_alpha[5] * zeta) * factor);
                 (value, 0.0, slope * zeta_n)
             } else {
                 let (value, value_r, value_x, ..) =
                     polynomial_with_derivatives(2, tau, reduced_density, 1.0);
-                let third = self.eps.powi(3) * value;
-                let third_t = self.eps.powi(3) * value_x * tau_t;
-                let third_n = self.eps.powi(3) * value_r * reduced_density_n;
+                let third = eps3 * value;
+                let third_t = eps3 * value_x * tau_t;
+                let third_n = eps3 * value_r * reduced_density_n;
                 (third, third_t, third_n)
             };
-            energy += third / temperature.powi(3);
-            derivative += third_t / temperature.powi(3) - 3.0 * third / temperature.powi(4);
-            mole_derivative += third_n / temperature.powi(3);
+            let t2 = temperature * temperature;
+            let t3 = t2 * temperature;
+            energy += third / t3;
+            derivative += third_t / t3 - 3.0 * third / (t2 * t2);
+            mole_derivative += third_n / t3;
         }
         Ok((energy, derivative, mole_derivative))
     }
@@ -726,7 +738,8 @@ fn khs(eta: f64) -> f64 {
     let denominator =
         1.0 + 4.0 * eta + 4.0 * eta * eta - 4.0 * eta * eta * eta + eta * eta * eta * eta;
     let one_minus = 1.0 - eta;
-    one_minus.powi(4) / denominator
+    let om2 = one_minus * one_minus;
+    (om2 * om2) / denominator
 }
 
 /// The derivative of the isothermal compressibility factor of the hard-sphere
@@ -734,7 +747,8 @@ fn khs(eta: f64) -> f64 {
 fn khs_eta(eta: f64) -> f64 {
     let eta2 = eta * eta;
     let denominator = 1.0 + 4.0 * eta + 4.0 * eta2 - 4.0 * eta2 * eta + eta2 * eta2;
-    4.0 * (eta2 - 5.0 * eta - 2.0) * (1.0 - eta).powi(3) / (denominator * denominator)
+    let om = 1.0 - eta;
+    4.0 * (eta2 - 5.0 * eta - 2.0) * (om * om * om) / (denominator * denominator)
 }
 /// The u-fraction of the UV theory and its partial derivatives.
 ///
@@ -753,7 +767,8 @@ pub fn uv_phi(_eps_divk: f64, _temperature: f64, rho: f64) -> (f64, f64, f64, f6
         + C[3] * C[4] * (C[4] - 1.0) * rho.powf(C[4] - 2.0);
     let e2x = (2.0 * x).exp();
     let tanh = (e2x - 1.0) / (e2x + 1.0);
-    let denominator = (e2x + 1.0).powi(2);
+    let e2x_p1 = e2x + 1.0;
+    let denominator = e2x_p1 * e2x_p1;
     let tanh_r = 4.0 * e2x * x_r / denominator;
     let tanh_rr = 2.0 * tanh_r * x_r + 4.0 * e2x * x_rr / denominator
         - 16.0 * e2x * e2x * x_r * x_r / (denominator * (e2x + 1.0));
@@ -771,7 +786,7 @@ pub fn uv_phi_temp(eps_divk: f64, temperature: f64, rho: f64) -> (f64, f64, f64,
     ];
     let beta = eps_divk / temperature;
     let beta_t = -eps_divk / (temperature * temperature);
-    let beta_tt = 2.0 * eps_divk / temperature.powi(3);
+    let beta_tt = 2.0 * eps_divk / (temperature * temperature * temperature);
     let sqrt_c7 = C[6].sqrt();
     let denominator_sq = 1.0 + C[6] * beta * beta;
     let denominator = denominator_sq.sqrt();
@@ -779,7 +794,7 @@ pub fn uv_phi_temp(eps_divk: f64, temperature: f64, rho: f64) -> (f64, f64, f64,
     let sigma_beta_b =
         sqrt_c7 / denominator - sqrt_c7 * C[6] * beta * beta / (denominator * denominator_sq);
     let sigma_beta_bb = -3.0 * sqrt_c7 * C[6] * beta / (denominator * denominator_sq)
-        + 3.0 * sqrt_c7 * C[6] * C[6] * beta.powi(3)
+        + 3.0 * sqrt_c7 * C[6] * C[6] * (beta * beta * beta)
             / (denominator * denominator_sq * denominator_sq);
     let prefactor = C[0] + sigma_beta * (C[1] - C[0]);
     let x = C[2] * rho.powf(C[3]) + C[4] * rho.powf(C[5]);
@@ -788,7 +803,8 @@ pub fn uv_phi_temp(eps_divk: f64, temperature: f64, rho: f64) -> (f64, f64, f64,
         + C[4] * C[5] * (C[5] - 1.0) * rho.powf(C[5] - 2.0);
     let e2x = (2.0 * x).exp();
     let tanh = (e2x - 1.0) / (e2x + 1.0);
-    let denominator = (e2x + 1.0).powi(2);
+    let e2x_p1 = e2x + 1.0;
+    let denominator = e2x_p1 * e2x_p1;
     let tanh_r = 4.0 * e2x * x_r / denominator;
     let tanh_rr = 2.0 * tanh_r * x_r + 4.0 * e2x * x_rr / denominator
         - 16.0 * e2x * e2x * x_r * x_r / (denominator * (e2x + 1.0));
@@ -833,7 +849,7 @@ pub fn uv_a1_u(
     let a1_rt = a1_rd * d_t / temperature - a1_r / (temperature * temperature);
     let a1_tt = a1_dd * d_t * d_t / temperature + a1_d * d_tt / temperature
         - 2.0 * a1_d * d_t / (temperature * temperature)
-        + 2.0 * a1 / temperature.powi(3);
+        + 2.0 * a1 / (temperature * temperature * temperature);
     (
         a1 / temperature,
         a1_r / temperature,
@@ -864,7 +880,7 @@ pub fn uv_a1_b2(
     let b2_t = a1_rd * d_t / temperature - a1_r / (temperature * temperature);
     let b2_tt = a1_rd * d_tt / temperature + a1_rdd * d_t * d_t / temperature
         - 2.0 * a1_rd * d_t / (temperature * temperature)
-        + 2.0 * a1_r / temperature.powi(3);
+        + 2.0 * a1_r / (temperature * temperature * temperature);
     (b2, b2_t, b2_tt)
 }
 
@@ -943,7 +959,8 @@ pub fn uv_q_of_temperature(eps_divk: f64, temperature: f64) -> (f64, f64, f64) {
         [0.0, 1.10319989659929e-02, 6.41039871789327e-03],
         [0.0, -7.97813995328348e-05, 1.85866741090323e-05],
     ];
-    let m_matrix = [1.0, (M - 7.0), (M - 7.0) * (M - 7.0), (M - 7.0).powi(3)];
+    let dm = M - 7.0;
+    let m_matrix = [1.0, dm, dm * dm, dm * dm * dm];
     let mut coefficients = [0.0; 4];
     coefficients[0] = (2.0 * std::f64::consts::PI * M / N).sqrt();
     for row in 0..3 {
@@ -998,23 +1015,25 @@ pub fn ljs_b2(eps_divk: f64, temperature: f64) -> (f64, f64, f64) {
     const BI: [f64; 5] = [1.345, -1.336, -3.85, 1.295, -0.416];
     let reduced = eps_divk / temperature;
     let reduced_t = -eps_divk / (temperature * temperature);
-    let reduced_tt = 2.0 * eps_divk / temperature.powi(3);
+    let reduced_tt = 2.0 * eps_divk / (temperature * temperature * temperature);
+    let reduced2 = reduced * reduced;
+    let reduced3 = reduced2 * reduced;
     let b2 = BI[0]
         + BI[1] * reduced
-        + BI[2] * reduced * reduced
-        + BI[3] * reduced.powi(3)
-        + BI[4] * reduced.powi(4);
+        + BI[2] * reduced2
+        + BI[3] * reduced3
+        + BI[4] * (reduced2 * reduced2);
     let b2_t = BI[1] * reduced_t
         + 2.0 * BI[2] * reduced * reduced_t
-        + 3.0 * BI[3] * reduced * reduced * reduced_t
-        + 4.0 * BI[4] * reduced.powi(3) * reduced_t;
+        + 3.0 * BI[3] * reduced2 * reduced_t
+        + 4.0 * BI[4] * reduced3 * reduced_t;
     let b2_tt = BI[1] * reduced_tt
         + 2.0 * BI[2] * reduced_t * reduced_t
         + 2.0 * BI[2] * reduced * reduced_tt
         + 6.0 * BI[3] * reduced * reduced_t * reduced_t
-        + 3.0 * BI[3] * reduced * reduced * reduced_tt
-        + 12.0 * BI[4] * reduced * reduced * reduced_t * reduced_t
-        + 4.0 * BI[4] * reduced.powi(3) * reduced_tt;
+        + 3.0 * BI[3] * reduced2 * reduced_tt
+        + 12.0 * BI[4] * reduced2 * reduced_t * reduced_t
+        + 4.0 * BI[4] * reduced3 * reduced_tt;
     (b2, b2_t, b2_tt)
 }
 

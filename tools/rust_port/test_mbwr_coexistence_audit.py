@@ -9,6 +9,8 @@ import unittest
 
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 import audit_mbwr_coexistence as audit
+import generate_data
+import inventory
 
 
 def raw_process(state=(300.,1e6,.001,.02,1e5), check=None):
@@ -53,6 +55,28 @@ class ParseNegativeTests(unittest.TestCase):
         proof['roots']=[10.,51.]
         with self.assertRaisesRegex(AssertionError,'raw root-query stdout'):
             audit._native_root_query(proof,q,state)
+
+    def test_cohort_inputs_rejects_modified_compiled_components_under_historical_hash(self):
+        current = dict(audit.source_input_hashes())
+        recorded = dict(current)
+        recorded['tools/rust_port/generate_data.py'] = audit.HISTORICAL_GENERATE_DATA_SHA256
+        current['tools/rust_port/generate_data.py'] = 'f' * 64
+        self.assertFalse(audit._cohort_inputs_match(recorded, current, compiled_sha='0' * 64))
+        self.assertTrue(
+            audit._cohort_inputs_match(
+                recorded,
+                current,
+                compiled_sha=audit.HISTORICAL_COMPILED_COMPONENTS_SHA256,
+            )
+        )
+
+    def test_generate_data_and_inventory_sorting_is_os_independent(self):
+        fluid_files = inventory.inventory()['fluid_files']
+        self.assertLess(fluid_files.index('n-Butane.json'), fluid_files.index('Neon.json'))
+        self.assertLess(fluid_files.index('pseudo.json'), fluid_files.index('R11.json'))
+        generated = generate_data.generate()
+        self.assertLess(generated.index('// fluids/n-Butane.json'), generated.index('// fluids/Neon.json'))
+        self.assertLess(generated.index('// fluids/pseudo.json'), generated.index('// fluids/R11.json'))
 
 class FullReportNegativeTests(unittest.TestCase):
     @classmethod
@@ -194,6 +218,18 @@ class FullReportNegativeTests(unittest.TestCase):
         rows[bad]['original_solver']='1,2,3,4,5'
         with self.assertRaisesRegex(AssertionError,'source gold'):
             audit._check_fixture_rows(rows,self.report)
+
+    def test_cohort_inputs_rejects_tampered_generate_data_hash(self):
+        def change(r):
+            r['signature']['cohort_inputs_sha256']['tools/rust_port/generate_data.py'] = '0' * 64
+        with self.assertRaisesRegex(AssertionError, 'cohort input hashes'):
+            audit.audit(self.mutated(change))
+
+    def test_cohort_inputs_rejects_tampered_other_cohort_hash(self):
+        def change(r):
+            r['signature']['cohort_inputs_sha256']['tools/rust_port/generate_mbwr_data.py'] = '0' * 64
+        with self.assertRaisesRegex(AssertionError, 'cohort input hashes'):
+            audit.audit(self.mutated(change))
 
 
 if __name__=='__main__': unittest.main()

@@ -37,6 +37,8 @@ pub use equilibrium::{
     MultiparameterEquilibrium, MultiparameterPressureJet, MultiparameterSpinodalBracket,
 };
 
+pub(super) use crate::numerics::ipow;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LennardJonesKind {
     Full,
@@ -182,7 +184,7 @@ impl Multiparameter {
             .ok_or_else(|| Error::UnknownComponent(component.ident.to_owned()))?;
         let mut eos = Self::lj_template(kind);
         eos.record.tc *= parameters.epsilon;
-        eos.record.rc /= 6.02214076e23 * parameters.sigma.powi(3);
+        eos.record.rc /= 6.02214076e23 * (parameters.sigma * parameters.sigma * parameters.sigma);
         eos.record.t_triple *= parameters.epsilon;
         eos.record.rgas_fit = R;
         eos.record.molar_mass = component.molar_mass * 1e-3;
@@ -198,7 +200,8 @@ impl Multiparameter {
             sigma: parameters.sigma,
             epsilon_over_k: parameters.epsilon,
             maximum_temperature: max_t * parameters.epsilon,
-            maximum_pressure: max_p * parameters.epsilon * 1.380649e-23 / parameters.sigma.powi(3),
+            maximum_pressure: max_p * parameters.epsilon * 1.380649e-23
+                / (parameters.sigma * parameters.sigma * parameters.sigma),
             baseline_molar_mass: component.molar_mass,
         });
         eos.record.pc = eos
@@ -296,7 +299,8 @@ impl Multiparameter {
         }
         for (i, p) in self.record.expexp_terms.iter().enumerate() {
             prep.tau_ee_cache[i] = p.n * tau.powf(p.t);
-            prep.gaussian_temperature[i] = p.beta * (tau - p.gamma).powi(2);
+            let dt = tau - p.gamma;
+            prep.gaussian_temperature[i] = p.beta * (dt * dt);
             prep.beta_tau_diff[i] = 2. * p.beta * tau * (tau - p.gamma);
         }
         prep.ideal_cache = prep.ideal_at_delta(1.)?;
@@ -419,7 +423,7 @@ impl<'a> PreparedMultiparameter<'a> {
 
         // 1. Polynomial terms
         for (i, p) in self.eos.record.pol_terms.iter().enumerate() {
-            let term = self.tau_cache[i] * delta.powi(p.d);
+            let term = self.tau_cache[i] * ipow(delta, p.d);
             jet.alpha += term;
             jet.d_delta += p.d as f64 * term;
             jet.d_deltadelta += (p.d * (p.d - 1)) as f64 * term;
@@ -432,8 +436,8 @@ impl<'a> PreparedMultiparameter<'a> {
         jet = HelmholtzJet::default();
         // 2. Exponential terms
         for (i, e) in self.eos.record.exp_terms.iter().enumerate() {
-            let delta_l = delta.powi(e.l);
-            let term = self.tau_exp_cache[i] * delta.powi(e.d) * (-delta_l).exp();
+            let delta_l = ipow(delta, e.l);
+            let term = self.tau_exp_cache[i] * ipow(delta, e.d) * (-delta_l).exp();
             let d_eff = e.d as f64 - (e.l as f64) * delta_l;
             jet.alpha += term;
             jet.d_delta += d_eff * term;
@@ -450,16 +454,16 @@ impl<'a> PreparedMultiparameter<'a> {
         // 3. Double-exponential (Gaussian bell) terms
         for (i, ee) in self.eos.record.expexp_terms.iter().enumerate() {
             let diff_d = delta - ee.epsilon;
-            let d_fac = (-ee.eta * diff_d.powi(2) - self.gaussian_temperature[i]).exp();
-            let term = self.tau_ee_cache[i] * delta.powi(ee.d) * d_fac;
+            let d_fac = (-ee.eta * (diff_d * diff_d) - self.gaussian_temperature[i]).exp();
+            let term = self.tau_ee_cache[i] * ipow(delta, ee.d) * d_fac;
             let th_delta = ee.d as f64 - 2.0 * ee.eta * delta * diff_d;
             let th_tau = ee.t - self.beta_tau_diff[i];
             jet.alpha += term;
             jet.d_delta += th_delta * term;
             jet.d_deltadelta +=
-                (th_delta.powi(2) - ee.d as f64 - 2.0 * ee.eta * delta.powi(2)) * term;
+                (th_delta * th_delta - ee.d as f64 - 2.0 * ee.eta * (delta * delta)) * term;
             jet.d_tau += th_tau * term;
-            jet.d_tautau += (th_tau.powi(2) - ee.t - 2.0 * ee.beta * self.tau.powi(2)) * term;
+            jet.d_tautau += (th_tau * th_tau - ee.t - 2.0 * ee.beta * (self.tau * self.tau)) * term;
             jet.d_deltatau += th_delta * th_tau * term;
         }
 
@@ -647,7 +651,8 @@ impl<'a> PreparedMultiparameter<'a> {
     pub fn heat_capacity_p(&self, v: f64) -> Result<f64> {
         let cv = self.heat_capacity_v(v)?;
         let res = self.residual_jet(v)?;
-        let num = (1.0 + res.d_delta - res.d_deltatau).powi(2);
+        let term = 1.0 + res.d_delta - res.d_deltatau;
+        let num = term * term;
         let den = 1.0 + 2.0 * res.d_delta + res.d_deltadelta;
         Ok(cv + self.eos.gas_constant * num / den)
     }
@@ -656,7 +661,8 @@ impl<'a> PreparedMultiparameter<'a> {
     pub fn speed_of_sound(&self, v: f64) -> Result<f64> {
         let ideal = self.ideal_jet(v)?;
         let res = self.residual_jet(v)?;
-        let num = (1.0 + res.d_delta - res.d_deltatau).powi(2);
+        let term = 1.0 + res.d_delta - res.d_deltatau;
+        let num = term * term;
         let den_caloric = ideal.d_tautau + res.d_tautau;
         let adim = 1.0 + 2.0 * res.d_delta + res.d_deltadelta - num / den_caloric;
         let w2 = adim * self.eos.gas_constant * self.temperature / self.eos.record.molar_mass;

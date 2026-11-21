@@ -108,6 +108,7 @@ impl Mbwr {
         let tc = critical.critical_temperature;
         let pc = critical.critical_pressure;
         let w = critical.acentric_factor;
+        let krt_c = KR * tc;
         let result = PreparedMbwrDensity {
             t,
             parameters: a,
@@ -115,8 +116,8 @@ impl Mbwr {
             exponential_count,
             critical,
             b_srk: 0.08664 * KR * tc / pc,
-            m_srk: 0.480 + 1.547 * w - 0.176 * w.powi(2),
-            a0_srk: 0.42747 * (KR * tc).powi(2) / pc,
+            m_srk: 0.480 + 1.547 * w - 0.176 * (w * w),
+            a0_srk: 0.42747 * (krt_c * krt_c) / pc,
         };
         if [result.b_srk, result.m_srk, result.a0_srk]
             .iter()
@@ -294,12 +295,17 @@ impl PreparedMbwrDensity {
         if tr > 0.95 && pr > 0.95 && tr < 1.01 && pr < 1.05 {
             return self.critical.critical_density * 1e-3 * 1.5;
         }
-        let a = self.a0_srk * (1. + self.m_srk * (1. - tr.sqrt())).powi(2);
-        let big_a = a * p / (KR * self.t).powi(2);
-        let big_b = self.b_srk * p / (KR * self.t);
-        let r = (big_a - big_b - big_b.powi(2)) - 1. / 3.;
-        let q = -2. / 27. + 1. / 3. * (big_a - big_b - big_b.powi(2)) - big_a * big_b;
-        let discr = (r / 3.).powi(3) + (q / 2.).powi(2);
+        let alpha_sqrt = 1. + self.m_srk * (1. - tr.sqrt());
+        let a = self.a0_srk * (alpha_sqrt * alpha_sqrt);
+        let krt = KR * self.t;
+        let big_a = a * p / (krt * krt);
+        let big_b = self.b_srk * p / krt;
+        let big_b2 = big_b * big_b;
+        let r = (big_a - big_b - big_b2) - 1. / 3.;
+        let q = -2. / 27. + 1. / 3. * (big_a - big_b - big_b2) - big_a * big_b;
+        let r3 = r / 3.;
+        let q2 = q / 2.;
+        let discr = r3 * r3 * r3 + q2 * q2;
         let cube = |v: f64| v.abs().powf(1. / 3.).copysign(v);
         let y = if discr >= 1e-11 {
             let u = cube(-q / 2. + discr.sqrt());
@@ -312,7 +318,7 @@ impl PreparedMbwrDensity {
             let u = (-q / 2.).min(cube(-q / 2. + discr.sqrt()));
             if -u < -1. / 3. { u - r / (3. * u) } else { -u }
         } else {
-            let theta = (-r.powi(3) / 27.).sqrt();
+            let theta = (-(r * r * r) / 27.).sqrt();
             let phi = (-q / (2. * theta)).acos();
             let pi = 4. * 1_f64.atan();
             let y1 = (phi / 3.).cos();
@@ -400,7 +406,8 @@ impl PreparedMbwrDensity {
             iteration += 1;
             let dps = dp;
             let ds = rho;
-            let mut sq = (q[1] / q[2]).powi(2) + 2. * dp / q[2];
+            let ratio = q[1] / q[2];
+            let mut sq = ratio * ratio + 2. * dp / q[2];
             let pdiv = -q[1] / q[2];
             let sign = if pdiv > 0. { -1. } else { 1. };
             if sq < 0. {

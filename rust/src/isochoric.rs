@@ -380,10 +380,8 @@ fn evaluate(
         vapor.ln_fugacity_tp_into(p, vv, &mut fv)?;
         for i in 0..n {
             if z[i] > 0. {
-                residual[i] = y[i].max(f64::EPSILON.powi(5)).ln()
-                    - x[i].max(f64::EPSILON.powi(5)).ln()
-                    + fv[i]
-                    - fl[i];
+                let floor = crate::numerics::ipow(f64::EPSILON, 5);
+                residual[i] = y[i].max(floor).ln() - x[i].max(floor).ln() + fv[i] - fl[i];
             }
         }
         if pl.dv == 0. || pv.dv == 0. {

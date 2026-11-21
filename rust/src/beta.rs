@@ -100,9 +100,10 @@ impl Beta {
         let delta = xi * inverse;
         let delta_t = -xi * inverse * inverse;
         let delta_tt = 2. * xi * inverse * inverse * inverse;
-        let factor = 1. / (1. + xi / (critical_temperature + adjusted)).powi(3);
+        let denom = 1. + xi / (critical_temperature + adjusted);
+        let factor = 1. / (denom * denom * denom);
         let one = 1. + delta;
-        let value = factor * one.powi(3);
+        let value = factor * (one * one * one);
         let dt = factor * 3. * one * one * delta_t;
         let dtt = factor * (6. * one * delta_t * delta_t + 3. * one * one * delta_tt);
         if !value.is_finite() || !dt.is_finite() || !dtt.is_finite() {

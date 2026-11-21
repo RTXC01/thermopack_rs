@@ -81,8 +81,8 @@ impl Pets {
                 // Cv_eq = weighted(Cv_i - T*(P_T_i-P_sat')^2/P_V_i).
                 // This avoids subtracting caloric reference offsets.
                 let response = |state: &PetsTvProperties| {
-                    state.heat_capacity_v
-                        - t * (state.pressure.dt - sat.dpdt).powi(2) / state.pressure.dv
+                    let dpt = state.pressure.dt - sat.dpdt;
+                    state.heat_capacity_v - t * (dpt * dpt) / state.pressure.dv
                 };
                 let cv = weight(response(&liquid), response(&vapor));
                 positive(cv, "positive finite PeTS equilibrium Cv")?;

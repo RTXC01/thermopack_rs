@@ -77,7 +77,7 @@ fn polynomial(coefficients: &[f64; DEGREE + 1], x: f64) -> (f64, f64, f64) {
     let mut derivative = 0.0;
     let mut second = 0.0;
     for (power, &coefficient) in coefficients.iter().enumerate() {
-        let term = x.powi(power as i32);
+        let term = crate::numerics::ipow(x, power as i32);
         let power = power as f64;
         value += coefficient * term;
         derivative += power * coefficient * term / x;

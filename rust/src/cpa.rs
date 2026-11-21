@@ -583,15 +583,19 @@ impl<'a> PreparedCpa<'a> {
             let den = 1.0 - 1.9 * eta;
             let d1 = 1.0 / den;
             let g = d1;
-            let dg_deta = 1.9 * d1 * d1;
-            let d2g_deta2 = 2.0 * 1.9 * 1.9 * d1.powi(3);
+            let d2 = d1 * d1;
+            let dg_deta = 1.9 * d2;
+            let d2g_deta2 = 2.0 * 1.9 * 1.9 * (d2 * d1);
             (g, dg_deta, d2g_deta2)
         } else {
             let om_eta = 1.0 - eta;
             let d1 = 1.0 / om_eta;
-            let g = (1.0 - 0.5 * eta) * d1.powi(3);
-            let dg_deta = (2.5 - eta) * d1.powi(4);
-            let d2g_deta2 = (9.0 - 3.0 * eta) * d1.powi(5);
+            let d2 = d1 * d1;
+            let d3 = d2 * d1;
+            let d4 = d2 * d2;
+            let g = (1.0 - 0.5 * eta) * d3;
+            let dg_deta = (2.5 - eta) * d4;
+            let d2g_deta2 = (9.0 - 3.0 * eta) * crate::numerics::ipow(d1, 5);
             (g, dg_deta, d2g_deta2)
         }
     }
@@ -859,7 +863,7 @@ impl<'a> PreparedCpa<'a> {
         s_id -= RGAS * (rho * RGAS * t / p_ref).ln();
 
         let cv_total = cp_id - RGAS + cv_res;
-        let cp_total = cv_total - t * jet.dp_dt.powi(2) / jet.dp_dv;
+        let cp_total = cv_total - t * (jet.dp_dt * jet.dp_dt) / jet.dp_dv;
         let gamma = cp_total / cv_total;
         let mw_kg = self.molar_mass_mix * 1e-3;
         let sound_speed = if jet.dp_drho > 0.0 && gamma > 0.0 && mw_kg > 0.0 {

@@ -5,6 +5,25 @@
 mod symmetric;
 pub use symmetric::solve_symmetric_in_place;
 
+/// Binary exponentiation matching gfortran's integer-power multiplication chain
+/// without lowering to MSVC debug UCRT `pow()`.
+#[inline]
+pub(crate) fn ipow(mut x: f64, exp: i32) -> f64 {
+    let mut n = exp.unsigned_abs();
+    let mut y = if n & 1 != 0 { x } else { 1.0 };
+    loop {
+        n >>= 1;
+        if n == 0 {
+            break;
+        }
+        x *= x;
+        if n & 1 != 0 {
+            y *= x;
+        }
+    }
+    if exp < 0 { 1.0 / y } else { y }
+}
+
 /// Real roots of x^3 + a*x^2 + b*x + c, sorted in ascending order.
 /// Unused entries are NaN. Returns the number of distinct roots.
 pub fn cubic_roots(a: f64, b: f64, c: f64) -> ([f64; 3], usize) {
@@ -431,5 +450,31 @@ mod tests {
         let step = super::modified_newton_direction(&hessian, &gradient);
         assert!((step[0] - 1.0).abs() < 1e-14);
         assert!((step[1] * 1e20 - 1.0).abs() < 1e-14);
+    }
+
+    #[test]
+    fn ipow_matches_integer_powers_and_exact_cube_bits() {
+        let base = 1.75_f64;
+        for exp in [0, 1, 2, 3, 4, 5, 9, 12, -1, -2, -3] {
+            let expected = if exp >= 0 {
+                (0..exp).fold(1.0_f64, |acc, _| acc * base)
+            } else {
+                1.0 / (0..(-exp)).fold(1.0_f64, |acc, _| acc * base)
+            };
+            let actual = super::ipow(base, exp);
+            assert!(
+                (actual - expected).abs() <= 4.0 * f64::EPSILON * expected.abs(),
+                "exp={exp}: actual={actual}, expected={expected}"
+            );
+        }
+        assert_eq!(super::ipow(0.0, 0), 1.0);
+        for k in [-3, -2, -1, 0, 1, 2, 3, 4] {
+            let expected = if k % 2 == 0 { 1.0 } else { -1.0 };
+            assert_eq!(super::ipow(-1.0, k), expected);
+        }
+        assert_eq!(
+            super::ipow(4.1e-10, 3).to_bits(),
+            (4.1e-10_f64 * 4.1e-10 * 4.1e-10).to_bits()
+        );
     }
 }

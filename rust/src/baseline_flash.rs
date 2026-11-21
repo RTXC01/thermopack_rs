@@ -391,7 +391,7 @@ fn source_newton(
         let wolfe = 0.001 * step.iter().zip(&gradient).map(|(s, g)| s * g).sum::<f64>();
         for i in 1..=2 {
             if g >= old_g + alpha * wolfe {
-                alpha *= 0.5_f64.powi(i);
+                alpha *= crate::numerics::ipow(0.5_f64, i);
                 update(alpha, &mut vapor, &mut liquid);
                 g = evaluate_amounts(&vapor, &liquid, false)?.0;
             } else {
@@ -455,9 +455,11 @@ fn source_modified_direction(a: &[f64], gradient: &[f64]) -> Result<Vec<f64>> {
             c[i * n + j] = a[i * n + j] - (0..j).map(|s| l[j * n + s] * c[i * n + s]).sum::<f64>();
             theta = theta.max(c[i * n + j].abs());
         }
-        d[j] = c[j * n + j].abs().max((theta / beta).powi(2)).max(delta);
+        let tb = theta / beta;
+        d[j] = c[j * n + j].abs().max(tb * tb).max(delta);
         for i in j + 1..n {
-            c[i * n + i] -= c[i * n + j].powi(2) / d[j];
+            let cij = c[i * n + j];
+            c[i * n + i] -= (cij * cij) / d[j];
         }
     }
     let mut step: Vec<_> = gradient.iter().map(|g| -g).collect();

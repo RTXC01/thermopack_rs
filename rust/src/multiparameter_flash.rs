@@ -70,9 +70,8 @@ pub(super) fn properties(
     let enthalpy = internal_energy + p * v;
     let entropy = r * (ideal.d_tau + res.d_tau - ideal.alpha - res.alpha);
     let cv = -r * (ideal.d_tautau + res.d_tautau);
-    let cp = cv
-        + r * (1. + res.d_delta - res.d_deltatau).powi(2)
-            / (1. + 2. * res.d_delta + res.d_deltadelta);
+    let term = 1. + res.d_delta - res.d_deltatau;
+    let cp = cv + r * (term * term) / (1. + 2. * res.d_delta + res.d_deltadelta);
     let heat_capacity = (cp.is_finite() && cp > 0.).then_some(cp);
     if ![p, enthalpy, entropy, internal_energy]
         .iter()

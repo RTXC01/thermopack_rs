@@ -82,7 +82,8 @@ impl Multiparameter {
                     // dP_sat/dT is Clapeyron-exact for the coexistence pair.
                     let pt = pressure.dt;
                     let cv = lcv(self, &prep, vol)?;
-                    Ok(cv - t * (pt - sat.dpdt).powi(2) / pv)
+                    let dpt = pt - sat.dpdt;
+                    Ok(cv - t * (dpt * dpt) / pv)
                 };
                 let cv =
                     (1. - beta) * response(sat.liquid_volume)? + beta * response(sat.vapor_volume)?;
@@ -107,7 +108,7 @@ impl Multiparameter {
         positive(pressure, "positive multiparameter pressure")?;
         let pressure_state = prep.pressure(volume)?;
         let stiffness_tol = 32. * f64::EPSILON * self.gas_constant() * t;
-        if pressure_state.dv >= -stiffness_tol / volume.powi(2) {
+        if pressure_state.dv >= -stiffness_tol / (volume * volume) {
             return Err(Error::NoPhysicalRoot);
         }
         // Outside the coexistence interval accept a mechanically stable pure

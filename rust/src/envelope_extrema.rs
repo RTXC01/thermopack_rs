@@ -207,7 +207,10 @@ impl Problem<'_> {
                 .liquid
                 .iter()
                 .zip(&state.vapor)
-                .map(|(x, y)| (x - y).powi(2))
+                .map(|(x, y)| {
+                    let d = x - y;
+                    d * d
+                })
                 .sum::<f64>();
             Ok(EnvelopeExtremumPoint {
                 kind,
@@ -242,7 +245,10 @@ impl Problem<'_> {
             .composition
             .iter()
             .zip(&self.z)
-            .map(|(x, z)| (x - z).powi(2))
+            .map(|(x, z)| {
+                let d = x - z;
+                d * d
+            })
             .sum::<f64>();
         if contrast < 1e-12 {
             return Err(Error::NotConverged("coincident envelope extremum phases"));
@@ -338,7 +344,10 @@ impl Cubic {
                             .liquid
                             .iter()
                             .zip(&state.vapor)
-                            .map(|(x, y)| (x - y).powi(2))
+                            .map(|(x, y)| {
+                                let d = x - y;
+                                d * d
+                            })
                             .sum::<f64>(),
                     state,
                 });

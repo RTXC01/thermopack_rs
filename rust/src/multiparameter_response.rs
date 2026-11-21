@@ -144,9 +144,9 @@ fn baseline_phase(prep: &PreparedMultiparameter<'_>, p: f64, v: f64) -> Result<B
     let rt = r * t;
     // Keep the source's dimensional derivative grouping. Near Tc it differs
     // numerically from simplifying these expressions with D=1+2a_d+a_dd.
-    let vv = (a.d_deltadelta + 2. * a.d_delta) / v.powi(2);
+    let vv = (a.d_deltadelta + 2. * a.d_delta) / (v * v);
     let tv = a.d_deltatau / (t * v);
-    let pv = -rt * (vv + 1. / v.powi(2));
+    let pv = -rt * (vv + 1. / (v * v));
     let pt = p / t - rt * tv;
     if !pv.is_finite() || pv >= 0. {
         return Err(Error::NoPhysicalRoot);
@@ -155,8 +155,7 @@ fn baseline_phase(prep: &PreparedMultiparameter<'_>, p: f64, v: f64) -> Result<B
     let phi_dt = (-a.d_tau / t - tv * v) + (1. - vn * pt / r) / t;
     let phi_dp = vn / rt - 1. / p;
     let at = -ideal.d_tau / t - a.d_tau / t;
-    let att =
-        (ideal.d_tautau + 2. * ideal.d_tau) / t.powi(2) + (a.d_tautau + 2. * a.d_tau) / t.powi(2);
+    let att = (ideal.d_tautau + 2. * ideal.d_tau) / (t * t) + (a.d_tautau + 2. * a.d_tau) / (t * t);
     let entropy_dt = (-pt / pv) * pt - r * (2. * at + t * att);
     let z = p / ((1. / v) * rt);
     let zt = -z * (1. / t - (-pt / pv) / v);
@@ -164,7 +163,7 @@ fn baseline_phase(prep: &PreparedMultiparameter<'_>, p: f64, v: f64) -> Result<B
     let result = BaselinePhase {
         volume: z * rt / p,
         volume_dt: zt * rt / p + z * r / p,
-        volume_dp: zp * rt / p - z * rt / p.powi(2),
+        volume_dp: zp * rt / p - z * rt / (p * p),
         entropy_dt,
         entropy_dp: pt / pv,
         phi_dt,
@@ -216,7 +215,7 @@ fn coexistence_sound(
     let volume = (1. - beta) * vl + beta * vv;
     // S_V|T = P_sat' and S_T|V = Cv_eq/T avoid cancellation of
     // divergent phase and quality derivatives near the critical point.
-    let c2 = volume * volume * prep.temperature() * slope.powi(2) / (mass * cv);
+    let c2 = volume * volume * prep.temperature() * (slope * slope) / (mass * cv);
     if c2.is_finite() && c2 > 0. {
         Ok(c2.sqrt())
     } else {
@@ -229,7 +228,8 @@ fn phase_equilibrium_cv(prep: &PreparedMultiparameter<'_>, slope: f64, volume: f
     if p.dv >= 0. || !p.dv.is_finite() {
         return Err(Error::NoPhysicalRoot);
     }
-    let cv = prep.heat_capacity_v(volume)? - prep.temperature() * (p.dt - slope).powi(2) / p.dv;
+    let dpt = p.dt - slope;
+    let cv = prep.heat_capacity_v(volume)? - prep.temperature() * (dpt * dpt) / p.dv;
     if cv.is_finite() && cv > 0. {
         Ok(cv)
     } else {

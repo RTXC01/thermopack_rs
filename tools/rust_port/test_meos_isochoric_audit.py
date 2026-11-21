@@ -6,7 +6,7 @@ import unittest
 from reference import ROOT
 from validate_meos_isochoric import (
     allowed_outcomes, bounded_endpoint_gap, coordinate_bad, model_data,
-    outcome_key, source_closed, valid_native_point,
+    outcome_key, source_closed, source_outcome, valid_native_point,
 )
 
 
@@ -79,6 +79,71 @@ class IsochoricAuditTests(unittest.TestCase):
         e = copy.deepcopy(self.source)
         e['result']['raw_result'][3:5] = [-123., 1.]
         self.assertFalse(source_closed(e['request'], e['result'], model_data()))
+
+    def test_source_outcome_ignores_symbolized_backtrace_frames(self):
+        sat_with_sv_trace = {
+            'reference_error': {
+                'output': [
+                    ' saturation::sat did not converge',
+                    '#5  0x00007f00 in __sv_solver_MOD_twophasesvsinglecomp',
+                    '\tat /src/sv_solver.f90:1267',
+                ]
+            }
+        }
+        self.assertEqual(source_outcome(sat_with_sv_trace), 'flash:saturation_nonconvergence')
+        sv_with_sat_trace = {
+            'reference_error': {
+                'output': [
+                    ' sv_solver::twoPhaseSVsingleComp: No convergence',
+                    '\tat /src/saturation.f90:99',
+                ]
+            }
+        }
+        self.assertEqual(source_outcome(sv_with_sat_trace), 'flash:sv_nonconvergence')
+
+    def test_outcome_ledger_supports_closed_multi_platform_sets(self):
+        declared = {
+            'k1': ['flash:uv_nonconvergence', 'endpoint_phase_difference'],
+            'k2': ['endpoint_phase_difference', 'flash:sv_nonconvergence'],
+        }
+        self.assertTrue(allowed_outcomes({'k1': 'flash:uv_nonconvergence'}, declared))
+        self.assertTrue(allowed_outcomes({'k1': 'endpoint_phase_difference'}, declared))
+        self.assertTrue(allowed_outcomes({'k2': 'endpoint_phase_difference'}, declared))
+        self.assertTrue(allowed_outcomes({'k2': 'flash:sv_nonconvergence'}, declared))
+        self.assertFalse(allowed_outcomes({'k1': 'censored_timeout'}, declared))
+        self.assertFalse(allowed_outcomes({'k1': 'flash:density_iteration'}, declared))
+        self.assertFalse(allowed_outcomes({'k2': 'censored_timeout'}, declared))
+        self.assertFalse(allowed_outcomes({'k2': 'flash:density_iteration'}, declared))
+
+    def test_source_outcome_trace_only_output_is_unclassified(self):
+        trace_only = {
+            'reference_error': {
+                'output': [
+                    '#5  0x1 in __sv_solver_MOD_twophasesvsinglecomp',
+                    '\tat /src/sv_solver.f90:1267',
+                ]
+            }
+        }
+        self.assertEqual(source_outcome(trace_only), 'flash:unclassified_termination')
+        self.assertEqual(source_outcome({'reference_error': {'output': []}}), 'flash:unclassified_termination')
+        stage_trace_only = {
+            'reference_error': {
+                'output': [
+                    'THERMOPACK_STAGE=returned_phase_properties',
+                    '#0  0x1 in __sv_solver_MOD_twophasesvsinglecomp',
+                    '\tat /src/sv_solver.f90:1267',
+                ]
+            }
+        }
+        self.assertEqual(source_outcome(stage_trace_only), 'phase_properties:unclassified_termination')
+        recorded = self.report['source_outcomes']
+        checked = 0
+        for e in self.report['records']:
+            key = outcome_key(e['request'])
+            if key in recorded and recorded[key] != 'endpoint_phase_difference':
+                self.assertEqual(source_outcome(e['result']), recorded[key])
+                checked += 1
+        self.assertGreater(checked, 0)
 
 
 if __name__ == '__main__':

@@ -164,7 +164,10 @@
     "LJ_MEOS|KR|UV|saturation:0.900:1.0|True|2.0|999.0|10.0|100000000.0": "endpoint_phase_difference",
     "LJ_MEOS|KR|SV|saturation:0.900:1.0|False|2.0|999.0|10.0|100000000.0": "flash:sv_nonconvergence",
     "LJ_MEOS|KR|SV|saturation:0.900:1.0|True|2.0|999.0|10.0|100000000.0": "flash:sv_nonconvergence",
-    "LJ_MEOS|KR|UV|saturation:0.999:0.0|False|2.0|999.0|10.0|100000000.0": "flash:uv_nonconvergence",
+    "LJ_MEOS|KR|UV|saturation:0.999:0.0|False|2.0|999.0|10.0|100000000.0": [
+      "flash:uv_nonconvergence",
+      "endpoint_phase_difference"
+    ],
     "LJ_MEOS|KR|UV|saturation:0.999:0.0|True|2.0|999.0|10.0|100000000.0": "endpoint_phase_difference",
     "LJ_MEOS|KR|SV|saturation:0.999:0.0|False|2.0|999.0|10.0|100000000.0": "flash:sv_nonconvergence",
     "LJ_MEOS|KR|SV|saturation:0.999:0.0|True|2.0|999.0|10.0|100000000.0": "flash:sv_nonconvergence",
@@ -178,7 +181,10 @@
     "LJ_MEOS|XE|UV|saturation:0.900:0.0|False|2.0|999.0|10.0|100000000.0": "endpoint_phase_difference",
     "LJ_MEOS|XE|UV|saturation:0.900:1.0|True|2.0|999.0|10.0|100000000.0": "endpoint_phase_difference",
     "LJ_MEOS|XE|SV|saturation:0.900:1.0|False|2.0|999.0|10.0|100000000.0": "flash:sv_nonconvergence",
-    "LJ_MEOS|XE|SV|saturation:0.900:1.0|True|2.0|999.0|10.0|100000000.0": "endpoint_phase_difference",
+    "LJ_MEOS|XE|SV|saturation:0.900:1.0|True|2.0|999.0|10.0|100000000.0": [
+      "endpoint_phase_difference",
+      "flash:sv_nonconvergence"
+    ],
     "LJ_MEOS|XE|UV|saturation:0.999:0.0|False|2.0|999.0|10.0|100000000.0": "endpoint_phase_difference",
     "LJ_MEOS|XE|UV|saturation:0.999:0.0|True|2.0|999.0|10.0|100000000.0": "endpoint_phase_difference",
     "LJ_MEOS|XE|SV|saturation:0.999:0.0|False|2.0|999.0|10.0|100000000.0": "flash:sv_nonconvergence",
@@ -382,6 +388,23 @@
     "LJTS_REDUCED|LJTS|UV|saturation:0.999:1.0|False|0.32580000000000003|3.258|1e-08|70.0": "flash:saturation_nonconvergence",
     "LJTS_REDUCED|LJTS|UV|saturation:0.999:1.0|True|0.32580000000000003|3.258|1e-08|70.0": "flash:saturation_nonconvergence",
     "LJTS_REDUCED|LJTS|SV|saturation:0.999:1.0|False|0.32580000000000003|3.258|1e-08|70.0": "flash:saturation_nonconvergence",
-    "LJTS_REDUCED|LJTS|SV|saturation:0.999:1.0|True|0.32580000000000003|3.258|1e-08|70.0": "flash:saturation_nonconvergence"
+    "LJTS_REDUCED|LJTS|SV|saturation:0.999:1.0|True|0.32580000000000003|3.258|1e-08|70.0": "flash:saturation_nonconvergence",
+    "LJTS_MEOS|AR|SV|saturation:0.900:0.0|True|2.0|999.0|10.0|100000000.0": "endpoint_phase_difference",
+    "LJTS_MEOS|AR|UV|saturation:0.500:0.0|False|2.0|999.0|10.0|100000000.0": "endpoint_phase_difference",
+    "LJTS_MEOS|KR|SV|saturation:0.500:0.0|True|2.0|999.0|10.0|100000000.0": "endpoint_phase_difference",
+    "LJTS_MEOS|KR|UV|saturation:0.500:0.0|False|2.0|999.0|10.0|100000000.0": "endpoint_phase_difference",
+    "LJTS_MEOS|KR|UV|saturation:0.900:1.0|False|2.0|999.0|10.0|100000000.0": "endpoint_phase_difference",
+    "LJTS_MEOS|XE|SV|saturation:0.500:0.0|True|2.0|999.0|10.0|100000000.0": "endpoint_phase_difference",
+    "LJTS_MEOS|XE|UV|saturation:0.900:0.0|True|2.0|999.0|10.0|100000000.0": "endpoint_phase_difference",
+    "LJ_MEOS|AR|UV|saturation:0.500:0.0|False|2.0|999.0|10.0|100000000.0": "endpoint_phase_difference",
+    "LJ_MEOS|AR|UV|saturation:0.500:0.0|True|2.0|999.0|10.0|100000000.0": "endpoint_phase_difference",
+    "LJ_MEOS|AR|UV|saturation:0.900:0.0|False|2.0|999.0|10.0|100000000.0": "endpoint_phase_difference",
+    "LJ_MEOS|KR|UV|saturation:0.900:1.0|False|2.0|999.0|10.0|100000000.0": "endpoint_phase_difference",
+    "LJ_MEOS|XE|SV|saturation:0.500:0.0|True|2.0|999.0|10.0|100000000.0": "endpoint_phase_difference",
+    "LJ_MEOS|XE|SV|saturation:0.500:1.0|True|2.0|999.0|10.0|100000000.0": "endpoint_phase_difference",
+    "LJ_MEOS|XE|SV|saturation:0.900:0.0|False|2.0|999.0|10.0|100000000.0": "endpoint_phase_difference",
+    "LJ_MEOS|XE|UV|saturation:0.500:0.0|True|2.0|999.0|10.0|100000000.0": "endpoint_phase_difference",
+    "NIST_MEOS|C3|UV|saturation:0.900:0.0|True|2.0|999.0|10.0|100000000.0": "endpoint_phase_difference",
+    "NIST_MEOS|O-H2|UV|saturation:0.900:0.0|True|2.0|999.0|10.0|100000000.0": "endpoint_phase_difference"
   }
 }

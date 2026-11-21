@@ -178,12 +178,8 @@ pub fn pcsaft_rdf(
         volume_moles: correlation.d_vn.clone(),
         moles_second: Vec::with_capacity(count * count),
     };
-    for component in 0..count {
-        for other in 0..count {
-            derivatives
-                .moles_second
-                .push(correlation.d_nn[component][other]);
-        }
+    for row in &correlation.d_nn[..count] {
+        derivatives.moles_second.extend_from_slice(&row[..count]);
     }
     Ok(derivatives)
 }

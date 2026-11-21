@@ -12,6 +12,77 @@ from reference import ROOT
 
 R_GAS = 8.31446261815324
 
+# Independently pinned qualification grid count and exact case identities so a
+# silent truncation of cases() or an unexpected reference drop cannot pass.
+EXPECTED_QUALIFIED_CASE_COUNT = 24
+EXPECTED_CASE_KEYS = frozenset(
+    [
+        ("C1", "Default", (1.0,), 150.0, 2.0e6, "L"),
+        ("C1", "Default", (1.0,), 250.0, 1.0e6, "V"),
+        ("C1", "Default", (1.0,), 300.0, 5.0e6, "V"),
+        ("C3", "Default", (1.0,), 280.0, 2.0e6, "L"),
+        ("C3", "Default", (1.0,), 350.0, 1.0e6, "V"),
+        ("C3", "Default", (1.0,), 420.0, 6.0e6, "V"),
+        ("CO2", "Default", (1.0,), 260.0, 4.0e6, "L"),
+        ("CO2", "Default", (1.0,), 320.0, 2.0e6, "V"),
+        ("CO2", "Default", (1.0,), 350.0, 1.0e7, "L"),
+        ("C1,C2", "Default", (0.6, 0.4), 180.0, 3.0e6, "L"),
+        ("C1,C2", "Default", (0.6, 0.4), 250.0, 2.0e6, "V"),
+        ("C1,C2", "Default", (0.6, 0.4), 350.0, 5.0e6, "V"),
+        ("C1,C2", "Plocker1982(+)", (0.6, 0.4), 200.0, 1.0e6, "L"),
+        ("C1,C2", "Plocker1982(+)", (0.6, 0.4), 260.0, 2.0e6, "V"),
+        ("C1,C2", "Plocker1982(+)", (0.6, 0.4), 350.0, 5.0e6, "V"),
+        ("C1,C3", "Default", (0.7, 0.3), 220.0, 4.0e6, "L"),
+        ("C1,C3", "Default", (0.7, 0.3), 320.0, 2.0e6, "V"),
+        ("C1,C3", "Default", (0.7, 0.3), 380.0, 8.0e6, "V"),
+        ("CO2,C1", "Default", (0.5, 0.5), 240.0, 5.0e6, "L"),
+        ("CO2,C1", "Default", (0.5, 0.5), 310.0, 4.0e6, "V"),
+        ("CO2,C1", "Default", (0.5, 0.5), 360.0, 1.0e7, "V"),
+        ("C1,C2,C3", "Default", (0.5, 0.3, 0.2), 200.0, 4.0e6, "L"),
+        ("C1,C2,C3", "Default", (0.5, 0.3, 0.2), 300.0, 2.0e6, "V"),
+        ("C1,C2,C3", "Default", (0.5, 0.3, 0.2), 380.0, 8.0e6, "V"),
+    ]
+)
+
+
+def case_key(request):
+    return (
+        request["components"],
+        request["parameter_reference"],
+        tuple(request["feed"]),
+        float(request["temperature"]),
+        float(request["pressure"]),
+        request["phase"],
+    )
+
+
+def verify_expected_coverage(good, failed, censored, unqualified):
+    actual_keys = frozenset(case_key(r["request"]) for r in good)
+    missing = sorted(EXPECTED_CASE_KEYS - actual_keys)
+    extra = sorted(actual_keys - EXPECTED_CASE_KEYS)
+    if (
+        failed
+        or censored
+        or unqualified
+        or len(good) != EXPECTED_QUALIFIED_CASE_COUNT
+        or missing
+        or extra
+    ):
+        raise ValueError(
+            json.dumps(
+                dict(
+                    expected=EXPECTED_QUALIFIED_CASE_COUNT,
+                    qualified=len(good),
+                    failed=len(failed),
+                    censored=len(censored),
+                    unqualified=len(unqualified),
+                    missing_cases=len(missing),
+                    extra_cases=len(extra),
+                ),
+                indent=2,
+            )
+        )
+
 
 def cases():
     grid = [
@@ -105,7 +176,6 @@ def physical_scales(nc, t, p, v):
 
 def validate(directory):
     case_list = list(cases())
-    expected_count = len(case_list)
     good = []
     failed = []
     censored = []
@@ -135,20 +205,11 @@ def validate(directory):
                 continue
             good.append(record)
 
-    if len(good) != expected_count or failed or censored or unqualified:
-        print(
-            json.dumps(
-                dict(
-                    expected=expected_count,
-                    qualified=len(good),
-                    failed=len(failed),
-                    censored=len(censored),
-                    unqualified=len(unqualified),
-                ),
-                indent=2,
-            )
-        )
-        raise SystemExit(1)
+    try:
+        verify_expected_coverage(good, failed, censored, unqualified)
+    except ValueError as err:
+        print(err)
+        raise SystemExit(1) from err
 
     subprocess.run(
         ["cargo", "build", "--release", "--example", "parity", "-j", "2"],

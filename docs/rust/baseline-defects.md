@@ -468,12 +468,19 @@ Six upstream defects affect `src/extcsp.f90` and `addon/pycThermopack/thermopack
 1. `src/extcsp.f90:127-131` (`csp_init`): when `refEos` is `"SRK"` or `"PR"`,
    `eos%refEosType = c_u_b_i_c` is never assigned, so `extcsp_eos_allocate_and_init`
    terminates with `"Wrong input to extcsp_eos_allocate_and_init"`.
-2. `src/extcsp.f90:764-769` (`calcRefEqDiff`) and `src/extcsp.f90:806`: the
-   `m_b_w_r` branch computes `sdiff%M..Mv0v0` from `mbwrRefEos` and then
-   immediately overwrites all six values with uninitialized `alpr*` locals.
-   The MBWR reference calls also mix `mol/m^3` and `mol/L` density/volume
-   conventions across the MBWR interface (leaving a stale litre comment at
-   `src/extcsp.f90:806`).
+2. `src/extcsp.f90:764-769` (`calcRefEqDiff`) and `src/extcsp.f90:806`
+   (`solveRefEqZfac`): the `m_b_w_r` branch in `calcRefEqDiff` computes
+   `sdiff%M..Mv0v0` from `mbwrRefEos` and then immediately overwrites all six
+   values with uninitialized `alpr*` locals. In addition, `calcRefEqDiff`
+   receives `v0` in `L/mol` while the MBWR reduced residual Helmholtz kernel
+   expects SI molar density `rho_SI = 1000 / v0` (`mol/m^3`), with
+   `d(rho_SI)/dv0 = -1000 / v0^2` and `d^2(rho_SI)/dv0^2 = 2000 / v0^3`;
+   converting the second volume derivative requires both terms of the
+   second-order chain rule,
+   `(d^2 F / d(rho_SI)^2) * (-1000 / v0^2)^2 + (d F / d(rho_SI)) * (2000 / v0^3)`.
+   Separately, in `solveRefEqZfac`, `mbwr_volume(..., nMoles=1)` returns
+   `m^3/mol`, so the SI gas constant in the executable compressibility
+   expression is correct and the litre comment at `src/extcsp.f90:806` is stale.
 3. `src/extcsp.f90:1302` (`extcsp_eos_allocate_and_init`): tests
    `str_eq(eos_label, 'MBWR19')` against the combined `"MBWR19:C3"` string instead
    of the parsed prefix `eos_l`, silently selecting MBWR-32 for MBWR-19 requests.

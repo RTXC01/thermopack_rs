@@ -12,6 +12,82 @@ from reference import ROOT
 
 R_GAS = 8.31446261815324
 
+# Independently pinned qualification grid count and exact case identities so a
+# silent truncation of cases() or an unexpected reference drop cannot pass.
+EXPECTED_QUALIFIED_CASE_COUNT = 24
+EXPECTED_CASE_KEYS = frozenset(
+    [
+        ("SRK", "vdW", "Classic", "NIST_MEOS", "C3", "DEFAULT", "C3", (1.0,), 280.0, 2.0e6, "L"),
+        ("SRK", "vdW", "Classic", "NIST_MEOS", "C3", "DEFAULT", "C3", (1.0,), 350.0, 1.0e6, "V"),
+        ("SRK", "vdW", "Classic", "NIST_MEOS", "C3", "DEFAULT", "C3", (1.0,), 420.0, 6.0e6, "V"),
+        ("SRK", "vdW", "Classic", "NIST_MEOS", "C3", "DEFAULT", "C1,C3", (0.6, 0.4), 240.0, 5.0e6, "L"),
+        ("SRK", "vdW", "Classic", "NIST_MEOS", "C3", "DEFAULT", "C1,C3", (0.6, 0.4), 320.0, 2.0e6, "V"),
+        ("SRK", "vdW", "Classic", "NIST_MEOS", "C3", "DEFAULT", "C1,C3", (0.6, 0.4), 380.0, 8.0e6, "V"),
+        ("PR", "vdW", "Classic", "NIST_MEOS", "C3", "DEFAULT", "C1,C3", (0.7, 0.3), 240.0, 5.0e6, "L"),
+        ("PR", "vdW", "Classic", "NIST_MEOS", "C3", "DEFAULT", "C1,C3", (0.7, 0.3), 320.0, 2.0e6, "V"),
+        ("PR", "vdW", "Classic", "NIST_MEOS", "C3", "DEFAULT", "C1,C3", (0.7, 0.3), 380.0, 8.0e6, "V"),
+        ("SRK", "vdW", "Classic", "NIST_MEOS", "C3", "DEFAULT", "CO2,C1", (0.45, 0.55), 240.0, 6.0e6, "L"),
+        ("SRK", "vdW", "Classic", "NIST_MEOS", "C3", "DEFAULT", "CO2,C1", (0.45, 0.55), 310.0, 3.0e6, "V"),
+        ("PR", "vdW", "Classic", "NIST_MEOS", "C3", "DEFAULT", "C1,C2,C3", (0.5, 0.3, 0.2), 230.0, 5.0e6, "L"),
+        ("PR", "vdW", "Classic", "NIST_MEOS", "C3", "DEFAULT", "C1,C2,C3", (0.5, 0.3, 0.2), 320.0, 2.0e6, "V"),
+        ("PR", "vdW", "Classic", "NIST_MEOS", "C3", "DEFAULT", "C1,C2,C3", (0.5, 0.3, 0.2), 380.0, 8.0e6, "V"),
+        ("SRK", "vdW", "Classic", "NIST_MEOS", "C3", "DEFAULT", "C1,C2,C3", (1.0, 0.6, 0.4), 300.0, 3.0e6, "V"),
+        ("SRK", "vdW", "Classic", "NIST_MEOS", "C3", "DEFAULT", "C1,C2,C3", (1.0, 0.6, 0.4), 240.0, 6.0e6, "L"),
+        ("SRK", "HV1", "Classic", "NIST_MEOS", "C3", "DEFAULT", "C1,H2O", (0.4, 0.6), 350.0, 1.0e6, "V"),
+        ("SRK", "HV1", "Classic", "NIST_MEOS", "C3", "DEFAULT", "C1,H2O", (0.4, 0.6), 450.0, 5.0e6, "V"),
+        ("PR", "HV2", "Classic", "NIST_MEOS", "C3", "DEFAULT", "C1,H2O", (0.4, 0.6), 350.0, 1.0e6, "V"),
+        ("PR", "HV2", "Classic", "NIST_MEOS", "C3", "DEFAULT", "C1,H2O", (0.4, 0.6), 450.0, 5.0e6, "V"),
+        ("PR", "NRTL", "Classic", "NIST_MEOS", "C3", "Dicko2012", "H2S,C3", (0.4, 0.6), 350.0, 2.0e6, "V"),
+        ("PR", "NRTL", "Classic", "NIST_MEOS", "C3", "Dicko2012", "H2S,C3", (0.4, 0.6), 400.0, 5.0e6, "V"),
+        ("SRK", "UNIFAC", "Classic", "NIST_MEOS", "C3", "DEFAULT", "C1,C3", (0.3, 0.7), 300.0, 1.0e6, "V"),
+        ("SRK", "UNIFAC", "Classic", "NIST_MEOS", "C3", "DEFAULT", "C1,C3", (0.3, 0.7), 380.0, 4.0e6, "V"),
+    ]
+)
+
+
+def case_key(request):
+    return (
+        request["shape_eos"],
+        request["shape_mixing"],
+        request["shape_alpha"],
+        request["ref_eos"],
+        request["ref_comp"],
+        request["parameter_reference"],
+        request["components"],
+        tuple(request["moles"]),
+        float(request["temperature"]),
+        float(request["pressure"]),
+        request["phase"],
+    )
+
+
+def verify_expected_coverage(good, failed, censored, unqualified):
+    actual_keys = frozenset(case_key(r["request"]) for r in good)
+    missing = sorted(EXPECTED_CASE_KEYS - actual_keys)
+    extra = sorted(actual_keys - EXPECTED_CASE_KEYS)
+    if (
+        failed
+        or censored
+        or unqualified
+        or len(good) != EXPECTED_QUALIFIED_CASE_COUNT
+        or missing
+        or extra
+    ):
+        raise ValueError(
+            json.dumps(
+                dict(
+                    expected=EXPECTED_QUALIFIED_CASE_COUNT,
+                    qualified=len(good),
+                    failed=len(failed),
+                    censored=len(censored),
+                    unqualified=len(unqualified),
+                    missing_cases=len(missing),
+                    extra_cases=len(extra),
+                ),
+                indent=2,
+            )
+        )
+
 
 def cases():
     # (shape_eos, shape_mixing, shape_alpha, ref_eos, ref_comp, param_ref, comps, moles, states)
@@ -204,7 +280,6 @@ def physical_scales(nc, sumn, t, p, v_tv):
 
 def validate(directory):
     case_list = list(cases())
-    expected_count = len(case_list)
     good = []
     failed = []
     censored = []
@@ -255,20 +330,11 @@ def validate(directory):
                 continue
             good.append(record)
 
-    if len(good) != expected_count or failed or censored or unqualified:
-        print(
-            json.dumps(
-                dict(
-                    expected=expected_count,
-                    qualified=len(good),
-                    failed=len(failed),
-                    censored=len(censored),
-                    unqualified=len(unqualified),
-                ),
-                indent=2,
-            )
-        )
-        raise SystemExit(1)
+    try:
+        verify_expected_coverage(good, failed, censored, unqualified)
+    except ValueError as err:
+        print(err)
+        raise SystemExit(1) from err
 
     subprocess.run(
         ["cargo", "build", "--release", "--example", "parity", "-j", "2"],

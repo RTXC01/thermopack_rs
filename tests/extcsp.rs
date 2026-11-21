@@ -731,6 +731,150 @@ fn test_extcsp_volume_vs_specific_volume_derivatives() -> Result<()> {
     Ok(())
 }
 
+/// Independently recover untranslated two-parameter cubic `(a_mix, b_mix)` from
+/// standalone `Cubic::pressure(v)` at two moderate molar volumes without calling
+/// any `ExtCsp` method.
+fn recover_cubic_ab_from_pressure(
+    cubic: &Cubic,
+    kind: CubicKind,
+    t: f64,
+    x: &[f64],
+) -> Result<(f64, f64)> {
+    let (d1, d2) = match kind {
+        CubicKind::SoaveRedlichKwong => (1.0, 0.0),
+        CubicKind::PengRobinson => (1.0 + 2.0_f64.sqrt(), 1.0 - 2.0_f64.sqrt()),
+        _ => unreachable!(),
+    };
+    let prep = cubic.prepare(t, x)?;
+    let v1 = 5.0e-3;
+    let v2 = 2.0e-2;
+    let p1 = prep.pressure(v1)?.value;
+    let p2 = prep.pressure(v2)?.value;
+    let rt = R * t;
+    let a_from_v = |v: f64, p: f64, b: f64| (rt / (v - b) - p) * (v + d1 * b) * (v + d2 * b);
+    let residual = |b: f64| a_from_v(v1, p1, b) - a_from_v(v2, p2, b);
+
+    // Bracket b inside (0, v1 * 0.5)
+    let mut lo = 1.0e-7;
+    let mut hi = 1.0e-3;
+    let r_lo = residual(lo);
+    while residual(hi) * r_lo > 0.0 && hi < v1 * 0.8 {
+        hi *= 1.5;
+    }
+    assert!(
+        residual(lo) * residual(hi) <= 0.0,
+        "failed to bracket cubic covolume b from two-point pressure"
+    );
+    for _ in 0..100 {
+        let mid = 0.5 * (lo + hi);
+        let rm = residual(mid);
+        if rm == 0.0 || (hi - lo) <= 1.0e-15 * mid {
+            lo = mid;
+            hi = mid;
+            break;
+        }
+        if rm * r_lo <= 0.0 {
+            hi = mid;
+        } else {
+            lo = mid;
+        }
+    }
+    let b_mix = 0.5 * (lo + hi);
+    let a_mix = a_from_v(v1, p1, b_mix);
+    Ok((a_mix, b_mix))
+}
+
+/// Independently compute ExtCSP shape factors `(H_expected, F_expected)` directly
+/// from standalone untranslated `Cubic` parameters and reference `(tc0, pc0)`,
+/// without calling any method on `ExtCsp`.
+#[allow(clippy::too_many_arguments)]
+fn independent_shape_factors(
+    shape_kind: CubicKind,
+    shape_mixing: MixingRule,
+    shape_alpha: AlphaCorrelation,
+    param_ref: &str,
+    ws_data: Option<&thermopack_rs::wong_sandler::WongSandlerData>,
+    comps: &[&str],
+    ref_comp: &str,
+    tc0: f64,
+    pc0: f64,
+    t: f64,
+    n: &[f64],
+) -> Result<(f64, f64)> {
+    let sumn: f64 = n.iter().sum();
+    let x: Vec<f64> = n.iter().map(|&ni| ni / sumn).collect();
+
+    let mut mix_cubic = Cubic::with_options(
+        shape_kind,
+        comps,
+        thermopack_rs::CubicOptions {
+            alpha: Some(shape_alpha),
+            mixing_rule: shape_mixing,
+            parameter_reference: param_ref,
+            volume_translation: false,
+            wong_sandler: ws_data,
+        },
+    )?;
+    mix_cubic.disable_volume_translation();
+    let (a_mix, b_mix) = recover_cubic_ab_from_pressure(&mix_cubic, shape_kind, t, &x)?;
+
+    let mut ref_cubic = Cubic::with_options(
+        shape_kind,
+        &[ref_comp],
+        thermopack_rs::CubicOptions {
+            alpha: Some(shape_alpha),
+            mixing_rule: MixingRule::VdW,
+            parameter_reference: param_ref,
+            volume_translation: false,
+            ..Default::default()
+        },
+    )?;
+    ref_cubic.disable_volume_translation();
+    let ref_c = ref_cubic.components()[0];
+    let (a_ref_tc, b_ref_tc) =
+        recover_cubic_ab_from_pressure(&ref_cubic, shape_kind, ref_c.critical_temperature, &[1.0])?;
+    let omega_b = b_ref_tc * ref_c.critical_pressure / (R * ref_c.critical_temperature);
+    let omega_a = a_ref_tc * ref_c.critical_pressure
+        / (R * ref_c.critical_temperature * R * ref_c.critical_temperature);
+
+    let bc0 = omega_b * R * tc0 / pc0;
+    let ac0 = omega_a * (R * tc0) * (R * tc0) / pc0;
+    let h_molar = b_mix / bc0;
+    let h_expected = sumn * h_molar;
+
+    // Solve a_mix / b_mix - a0(T0) / bc0 = 0, i.e., f * alpha0(T / f) = a_mix / (h_molar * ac0)
+    let ref_alpha = *ref_cubic.alpha(0)?;
+    let target = a_mix / (h_molar * ac0);
+    let g = |f_val: f64| -> Result<f64> {
+        let av = ref_alpha.evaluate(t / f_val, tc0)?;
+        Ok(f_val * av.value - target)
+    };
+    let mut lo = 1.0e-4;
+    let mut hi = 1.0e2;
+    while g(lo)? > 0.0 {
+        lo *= 0.5;
+    }
+    while g(hi)? < 0.0 {
+        hi *= 2.0;
+    }
+    for _ in 0..120 {
+        let mid = 0.5 * (lo + hi);
+        let gm = g(mid)?;
+        if gm.abs() <= 1.0e-15 * target || (hi - lo) <= 1.0e-15 * mid {
+            lo = mid;
+            hi = mid;
+            break;
+        }
+        if gm < 0.0 {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    let f_expected = sumn * 0.5 * (lo + hi);
+    Ok((h_expected, f_expected))
+}
+
 #[test]
 fn test_extcsp_all_backends_wong_sandler_zero_components_and_minimum_gibbs() -> Result<()> {
     // 1. NIST MEOS + VdW (classic)
@@ -738,7 +882,7 @@ fn test_extcsp_all_backends_wong_sandler_zero_components_and_minimum_gibbs() -> 
     verify_helmholtz_and_tp_fd(&m_nist, 310.0, 4.0e6, &[1.0, 0.6, 0.4], Phase::Vapor)?;
     verify_helmholtz_and_tp_fd(&m_nist, 230.0, 6.0e6, &[0.5, 0.3, 0.2], Phase::Liquid)?;
 
-    // 2. Cubic SRK & PR reference backends + independent non-circular mapped Helmholtz check
+    // 2. Cubic SRK & PR reference backends + truly independent (non-circular) mapped checks
     let m_cb_srk = ExtCsp::with_options(
         &["C1", "C3"],
         ExtCspOptions {
@@ -765,31 +909,56 @@ fn test_extcsp_all_backends_wong_sandler_zero_components_and_minimum_gibbs() -> 
     )?;
     verify_helmholtz_and_tp_fd(&m_cb_pr, 250.0, 6.0e6, &[0.4, 0.6], Phase::Liquid)?;
 
-    // Independent mapped reference-state verification for Cubic PR backend on binary mixture:
+    // Truly independent mapped reference-state check for Cubic PR backend (H, F computed
+    // from standalone Cubic without calling ExtCsp::shape_factors):
     {
         let t = 250.0;
         let p = 6.0e6;
-        let n = [0.4, 0.6];
-        let (h, f_shape) = m_cb_pr.shape_factors(t, &n)?;
-        let v = m_cb_pr.volume_tp(t, p, &n, Phase::Liquid)?;
-        let t0 = t / f_shape;
-        let p0 = h * p / f_shape;
+        let n = [0.8, 1.2];
+        let sumn = 2.0;
         let ref_pr = Cubic::new(CubicKind::PengRobinson, &["C3"])?;
+        let c3 = ref_pr.components()[0];
+        let (h_exp, f_exp) = independent_shape_factors(
+            CubicKind::PengRobinson,
+            MixingRule::VdW,
+            AlphaCorrelation::Classic,
+            "DEFAULT",
+            None,
+            &["CO2", "C1"],
+            "C3",
+            c3.critical_temperature,
+            c3.critical_pressure,
+            t,
+            &n,
+        )?;
+        let (h_act, f_act) = m_cb_pr.shape_factors(t, &n)?;
+        assert_phys_close("Cubic PR independent H", h_exp, h_act, h_exp, 1e-11, 1e-12);
+        assert_phys_close("Cubic PR independent F", f_exp, f_act, f_exp, 1e-11, 1e-12);
+        let t0 = sumn * t / f_exp;
+        let p0 = h_exp * p / f_exp;
         let v0_ref = ref_pr.prepare(t0, &[1.0])?.volume(p0, Phase::Liquid)?;
-        assert_phys_close("Cubic PR mapped v == H*v0", v, h * v0_ref, v, 1e-12, 1e-13);
-        let p_ref = ref_pr.prepare(t0, &[1.0])?.pressure(v / h)?.value;
-        let p_csp = m_cb_pr.pressure_tv(t, v, &n)?.value;
+        let v_csp = m_cb_pr.volume_tp(t, p, &n, Phase::Liquid)?;
         assert_phys_close(
-            "Cubic PR mapped P == (F/H)*P0",
+            "Cubic PR independent mapped V == H*v0",
+            v_csp,
+            h_exp * v0_ref,
+            v_csp,
+            1e-11,
+            1e-12,
+        );
+        let p_ref = ref_pr.prepare(t0, &[1.0])?.pressure(v_csp / h_exp)?.value;
+        let p_csp = m_cb_pr.pressure_tv(t, v_csp, &n)?.value;
+        assert_phys_close(
+            "Cubic PR independent mapped P == (F/H)*P0",
             p_csp,
-            (f_shape / h) * p_ref,
+            (f_exp / h_exp) * p_ref,
             p,
             1e-11,
             1e-12,
         );
     }
 
-    // 3. MBWR19 (Bender) & MBWR32 reference backends + independent non-circular mapped check
+    // 3. MBWR19 (Bender) & MBWR32 reference backends + truly independent mapped checks
     let m_mbwr19 = ExtCsp::with_options(
         &["C1", "C3"],
         ExtCspOptions {
@@ -812,23 +981,62 @@ fn test_extcsp_all_backends_wong_sandler_zero_components_and_minimum_gibbs() -> 
         (MbwrKind::Bender19, &m_mbwr19, 320.0, 2.5e6, Phase::Vapor),
         (MbwrKind::Mbwr32, &m_mbwr32, 240.0, 5.0e6, Phase::Liquid),
     ] {
-        let n = [0.5, 0.5];
-        let (h, f_shape) = model.shape_factors(t, &n)?;
-        let v = model.volume_tp(t, p, &n, ph)?;
-        let f_csp = model.residual_helmholtz_tv(t, v, &n)?;
+        let n = [0.75, 0.75];
+        let sumn = 1.5;
         let mbwr = Mbwr::new(kind, "C3")?;
-        let f_ref = mbwr.prepare(t / f_shape)?.residual_helmholtz(v / h, 1.0)?;
+        let dp_ref = mbwr.source_density_parameters()?;
+        let (h_exp, f_exp) = independent_shape_factors(
+            CubicKind::SoaveRedlichKwong,
+            MixingRule::VdW,
+            AlphaCorrelation::Classic,
+            "DEFAULT",
+            None,
+            &["C1", "C3"],
+            "C3",
+            dp_ref.critical_temperature,
+            dp_ref.critical_pressure,
+            t,
+            &n,
+        )?;
+        let (h_act, f_act) = model.shape_factors(t, &n)?;
+        assert_phys_close("MBWR independent H", h_exp, h_act, h_exp, 1e-11, 1e-12);
+        assert_phys_close("MBWR independent F", f_exp, f_act, f_exp, 1e-11, 1e-12);
+        let t0 = sumn * t / f_exp;
+        let p0 = h_exp * p / f_exp;
+        let iter = mbwr.prepare_baseline_density(t0, dp_ref)?.density(p0, ph)?;
+        let v_exp = h_exp / iter.density;
+        let v_csp = model.volume_tp(t, p, &n, ph)?;
         assert_phys_close(
-            "MBWR binary mapped F",
+            "MBWR independent mapped V",
+            v_csp,
+            v_exp,
+            v_exp,
+            1e-10,
+            1e-11,
+        );
+        let f_csp = model.residual_helmholtz_tv(t, v_exp, &n)?;
+        let f_ref = mbwr.prepare(t0)?.residual_helmholtz(v_exp / h_exp, 1.0)?;
+        assert_phys_close(
+            "MBWR independent mapped F_res",
             f_csp.f,
-            f_ref.value,
-            1.0,
+            sumn * f_ref.value,
+            sumn,
+            1e-11,
             1e-12,
-            1e-12,
+        );
+        let p_csp = model.pressure_tv(t, v_exp, &n)?.value;
+        let p_ref = mbwr.prepare(t0)?.pressure_tv(v_exp / h_exp, 1.0)?.value;
+        assert_phys_close(
+            "MBWR independent mapped P",
+            p_csp,
+            (f_exp / h_exp) * p_ref,
+            p,
+            1e-10,
+            1e-11,
         );
     }
 
-    // 4. Wong-Sandler mixing rule: verify non-zero H_T against Cubic::wong_sandler_coefficients!
+    // 4. Wong-Sandler mixing rule: verify non-zero H_T and independent mapped state!
     let mut ws = thermopack_rs::wong_sandler::WongSandlerData::new(2);
     ws.set_kij(0, 1, thermopack_rs::wong_sandler::Fraction::constant(0.1))?;
     ws.set_kij(1, 0, thermopack_rs::wong_sandler::Fraction::constant(0.1))?;
@@ -846,7 +1054,53 @@ fn test_extcsp_all_backends_wong_sandler_zero_components_and_minimum_gibbs() -> 
         },
     )?;
     let ws_t = 320.0;
+    let ws_p = 3.0e6;
     let ws_n = [0.5, 0.5];
+    let meos_c3 = Multiparameter::new("C3")?;
+    let (h_ws_exp, f_ws_exp) = independent_shape_factors(
+        CubicKind::PengRobinson,
+        MixingRule::WongSandler,
+        AlphaCorrelation::Classic,
+        "DEFAULT",
+        Some(&ws),
+        &["CO2", "C1"],
+        "C3",
+        meos_c3.tc(),
+        meos_c3.pc(),
+        ws_t,
+        &ws_n,
+    )?;
+    let (h_ws_act, f_ws_act) = m_ws.shape_factors(ws_t, &ws_n)?;
+    assert_phys_close(
+        "WS independent H",
+        h_ws_exp,
+        h_ws_act,
+        h_ws_exp,
+        1e-11,
+        1e-12,
+    );
+    assert_phys_close(
+        "WS independent F",
+        f_ws_exp,
+        f_ws_act,
+        f_ws_exp,
+        1e-11,
+        1e-12,
+    );
+    let ws_v = m_ws.volume_tp(ws_t, ws_p, &ws_n, Phase::Vapor)?;
+    let f_ws_csp = m_ws.residual_helmholtz_tv(ws_t, ws_v, &ws_n)?;
+    let f_ws_ref = meos_c3
+        .prepare(ws_t / f_ws_exp)?
+        .residual_helmholtz(ws_v / h_ws_exp, 1.0)?;
+    assert_phys_close(
+        "WS independent mapped F_res",
+        f_ws_csp.f,
+        f_ws_ref.value,
+        1.0,
+        1e-11,
+        1e-12,
+    );
+
     let ws_coeffs = m_ws.shape_eos().wong_sandler_coefficients(ws_t, &ws_n)?;
     let h_t_expected = ws_coeffs.b_t / m_ws.reference_bc0();
     assert!(
@@ -864,7 +1118,72 @@ fn test_extcsp_all_backends_wong_sandler_zero_components_and_minimum_gibbs() -> 
         1e-6,
         1e-8,
     );
-    verify_helmholtz_and_tp_fd(&m_ws, ws_t, 3.0e6, &ws_n, Phase::Vapor)?;
+    verify_helmholtz_and_tp_fd(&m_ws, ws_t, ws_p, &ws_n, Phase::Vapor)?;
+
+    // 4b. Independent fixed-V finite-difference Cv check across all backends & mixing rules:
+    //     Cv = (dU/dT)_{V,n} where U(T,V,n) = sum n_i (h_id_i(T) - R T) - R T^2 * F_T(T,V,n).
+    let internal_energy_from_helmholtz =
+        |model: &ExtCsp, t_eval: f64, v_fixed: f64, n_vec: &[f64]| -> Result<f64> {
+            let f = model.residual_helmholtz_tv(t_eval, v_fixed, n_vec)?;
+            let mut u_id = 0.0;
+            for (i, &ni) in n_vec.iter().enumerate() {
+                if ni > 0.0 {
+                    let h_id = model.ideal_gas(i)?.properties(t_eval, 1.0e5)?.enthalpy;
+                    u_id += ni * (h_id - R * t_eval);
+                }
+            }
+            Ok(u_id - R * t_eval * t_eval * f.f_t)
+        };
+    for (label, model, t_c, p_c, n_c, ph_c) in [
+        (
+            "NIST ternary",
+            &m_nist,
+            310.0,
+            4.0e6,
+            &[1.0, 0.6, 0.4][..],
+            Phase::Vapor,
+        ),
+        (
+            "Cubic PR liquid",
+            &m_cb_pr,
+            250.0,
+            6.0e6,
+            &[0.4, 0.6][..],
+            Phase::Liquid,
+        ),
+        (
+            "MBWR32 liquid",
+            &m_mbwr32,
+            240.0,
+            5.0e6,
+            &[0.5, 0.5][..],
+            Phase::Liquid,
+        ),
+        (
+            "Wong-Sandler vapor",
+            &m_ws,
+            320.0,
+            3.0e6,
+            &[0.5, 0.5][..],
+            Phase::Vapor,
+        ),
+    ] {
+        let sumn: f64 = n_c.iter().sum();
+        let v_fixed = model.volume_tp(t_c, p_c, n_c, ph_c)?;
+        let (_cp, cv_analytic) = model.heat_capacities_tp(t_c, p_c, n_c, ph_c)?;
+        let dt_cv = 1.0e-5 * t_c;
+        let u_plus = internal_energy_from_helmholtz(model, t_c + dt_cv, v_fixed, n_c)?;
+        let u_minus = internal_energy_from_helmholtz(model, t_c - dt_cv, v_fixed, n_c)?;
+        let cv_fd = (u_plus - u_minus) / (2.0 * dt_cv);
+        assert_phys_close(
+            &format!("{label} fixed-V FD Cv"),
+            cv_analytic,
+            cv_fd,
+            sumn * R,
+            1e-6,
+            1e-8,
+        );
+    }
 
     // 5. Phase::MinimumGibbs selects the lower-Gibbs phase across all three reference backends
     for model in [&m_nist, &m_cb_srk, &m_mbwr32] {
@@ -910,8 +1229,8 @@ fn test_extcsp_all_backends_wong_sandler_zero_components_and_minimum_gibbs() -> 
         }
     }
 
-    // 6. Zero-component mixtures: exact sub-mixture equivalence + finite residual/fugacity
-    //    derivatives + documented 1e-100 regularization on absent-component total S/G.
+    // 6. Zero-component and trace-component 1e-100 log cutoff numerical assertions across 3 regimes:
+    //    (a) absent (x_1 = 0.0), (b) below cutoff (x_1 = 1e-120), (c) above cutoff (x_1 = 1e-50)
     {
         let t = 320.0;
         let p = 3.0e6;
@@ -944,26 +1263,92 @@ fn test_extcsp_all_backends_wong_sandler_zero_components_and_minimum_gibbs() -> 
             1e-12,
         );
 
-        let s_res = m_nist.residual_entropy_derivatives(t, p, &n_tern, Phase::Vapor)?;
-        let s_tot = m_nist.entropy_derivatives(t, p, &n_tern, Phase::Vapor)?;
-        let g_tot = m_nist.gibbs_derivatives(t, p, &n_tern, Phase::Vapor)?;
-        assert!(s_res.dn.iter().all(|v| v.is_finite()));
-        assert!(s_tot.dn.iter().all(|v| v.is_finite()));
-        assert!(g_tot.dn.iter().all(|v| v.is_finite()));
+        let ideal1 = m_nist.ideal_gas(1)?.properties(t, p)?;
+        let exp_s_cap = ideal1.entropy - R * 1.0e-100_f64.ln();
+        let exp_g_cap = ideal1.enthalpy - t * exp_s_cap;
+        let exp_s_above = ideal1.entropy - R * 1.0e-50_f64.ln();
+        let exp_g_above = ideal1.enthalpy - t * exp_s_above;
+
+        let s_bin_tot = m_bin.entropy(t, p, &n_bin, Phase::Vapor)?;
+        let g_bin_tot = m_bin.gibbs(t, p, &n_bin, Phase::Vapor)?;
+        let s_abs = m_nist.entropy_derivatives(t, p, &n_tern, Phase::Vapor)?;
+        let g_abs = m_nist.gibbs_derivatives(t, p, &n_tern, Phase::Vapor)?;
         assert_phys_close(
-            "zero-comp total entropy == scalar",
-            s_tot.value,
-            m_nist.entropy(t, p, &n_tern, Phase::Vapor)?,
+            "zero-comp exact 0*ln(0) S",
+            s_abs.value,
+            s_bin_tot,
             R,
             1e-12,
             1e-12,
         );
-        let ideal1 = m_nist.ideal_gas(1)?.properties(t, p)?;
         assert_phys_close(
-            "zero-comp absent dS/dn regularized",
-            s_tot.dn[1],
-            s_res.dn[1] + ideal1.entropy - R * 1.0e-100_f64.ln(),
-            R * 250.0,
+            "zero-comp exact 0*ln(0) G",
+            g_abs.value,
+            g_bin_tot,
+            R * t,
+            1e-11,
+            1e-11,
+        );
+
+        let mut s_dn1_below = 0.0;
+        let mut g_dn1_below = 0.0;
+        let mut s_dn1_above = 0.0;
+        let mut g_dn1_above = 0.0;
+        for (label, n_vec, exp_s_id, exp_g_id) in [
+            ("absent x=0", [0.6, 0.0, 0.4], exp_s_cap, exp_g_cap),
+            (
+                "below cutoff x=1e-120",
+                [0.6, 1.0e-120, 0.4],
+                exp_s_cap,
+                exp_g_cap,
+            ),
+            (
+                "above cutoff x=1e-50",
+                [0.6, 1.0e-50, 0.4],
+                exp_s_above,
+                exp_g_above,
+            ),
+        ] {
+            let s_res = m_nist.residual_entropy_derivatives(t, p, &n_vec, Phase::Vapor)?;
+            let s_tot = m_nist.entropy_derivatives(t, p, &n_vec, Phase::Vapor)?;
+            let g_res = m_nist.residual_gibbs_derivatives(t, p, &n_vec, Phase::Vapor)?;
+            let g_tot = m_nist.gibbs_derivatives(t, p, &n_vec, Phase::Vapor)?;
+            assert!(s_res.dn.iter().all(|v| v.is_finite()));
+            assert!(s_tot.dn.iter().all(|v| v.is_finite()));
+            assert!(g_res.dn.iter().all(|v| v.is_finite()));
+            assert!(g_tot.dn.iter().all(|v| v.is_finite()));
+            assert_phys_close(
+                &format!("{label} entropy.dn[1] ideal mixing"),
+                s_tot.dn[1] - s_res.dn[1],
+                exp_s_id,
+                R * 250.0,
+                1e-12,
+                1e-12,
+            );
+            assert_phys_close(
+                &format!("{label} gibbs.dn[1] ideal mixing"),
+                g_tot.dn[1] - g_res.dn[1],
+                exp_g_id,
+                R * t * 250.0,
+                1e-12,
+                1e-12,
+            );
+            if label.contains("below") {
+                s_dn1_below = s_tot.dn[1];
+                g_dn1_below = g_tot.dn[1];
+            } else if label.contains("above") {
+                s_dn1_above = s_tot.dn[1];
+                g_dn1_above = g_tot.dn[1];
+            }
+        }
+        assert!((s_dn1_above - s_dn1_below).abs() > 100.0 * R);
+        assert!((g_dn1_above - g_dn1_below).abs() > 100.0 * R * t);
+
+        assert_phys_close(
+            "zero-comp total entropy == scalar",
+            s_abs.value,
+            m_nist.entropy(t, p, &n_tern, Phase::Vapor)?,
+            R,
             1e-12,
             1e-12,
         );

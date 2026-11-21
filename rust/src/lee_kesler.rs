@@ -872,7 +872,7 @@ impl LeeKesler {
         }
 
         let moles = total_moles;
-        let moles_inv = 1.0 / moles;
+        let x: Vec<f64> = z.iter().map(|&zi| zi / moles).collect();
 
         // Individual pure critical volumes: vci = R * zci * tci / pci
         let mut vc = Vec::with_capacity(n);
@@ -883,8 +883,9 @@ impl LeeKesler {
             );
         }
 
-        // Precompute pair critical volumes/temperatures and first/second
-        // compositional derivatives in O(n^2) time.
+        // Precompute pair critical volumes/temperatures and unit-mole (N = 1)
+        // first/second compositional derivatives entirely in mole-fraction space
+        // so tiny total mole amounts never overflow intermediate 1/N^2 or 1/N^3 factors.
         let mut vc_pair = vec![0.0; n * n];
         let mut vc_eta_tc_pair = vec![0.0; n * n];
 
@@ -906,66 +907,62 @@ impl LeeKesler {
                 vc_pair[idx] = vc_jk;
                 vc_eta_tc_pair[idx] = vc_eta_tc;
 
-                let n_prod = z[j] * z[k];
-                vc_m += n_prod * vc_jk;
-                tc_m_sum += n_prod * vc_eta_tc;
+                let x_prod = x[j] * x[k];
+                vc_m += x_prod * vc_jk;
+                tc_m_sum += x_prod * vc_eta_tc;
             }
-            omega_m += z[j] * self.components[j].acentric_factor;
+            omega_m += x[j] * self.components[j].acentric_factor;
         }
 
-        vc_m *= moles_inv * moles_inv;
         let vc_m_inv = 1.0 / vc_m;
         let vc_m_inv_eta = vc_m_inv.powf(ETA);
 
-        let tc_m = tc_m_sum * moles_inv * moles_inv * vc_m_inv_eta;
-        omega_m *= moles_inv;
+        let tc_m = tc_m_sum * vc_m_inv_eta;
         let zc_m = 0.2905 - 0.085 * omega_m;
         let pc_m = R * zc_m * tc_m * vc_m_inv;
 
-        // First compositional derivatives
-        let mut dvc_dni = Vec::with_capacity(n);
-        let mut dtc_dni = Vec::with_capacity(n);
-        let mut domega_dni = Vec::with_capacity(n);
-        let mut dzc_dni = Vec::with_capacity(n);
-        let mut dpc_dni = Vec::with_capacity(n);
-        let mut comp_sum = Vec::with_capacity(n);
+        // Unit-mole (N = 1) first compositional derivatives
+        let mut dvc_u = Vec::with_capacity(n);
+        let mut dtc_u = Vec::with_capacity(n);
+        let mut domega_u = Vec::with_capacity(n);
+        let mut dzc_u = Vec::with_capacity(n);
+        let mut dpc_u = Vec::with_capacity(n);
+        let mut comp_sum_u = Vec::with_capacity(n);
 
         for (i, comp) in self.components.iter().enumerate() {
             let mut v1 = 0.0;
             let mut csum = 0.0;
-            for (l, &zl) in z.iter().enumerate() {
+            for (l, &xl) in x.iter().enumerate() {
                 let idx = i * n + l;
-                v1 += zl * vc_pair[idx];
-                csum += zl * vc_eta_tc_pair[idx];
+                v1 += xl * vc_pair[idx];
+                csum += xl * vc_eta_tc_pair[idx];
             }
 
-            let dvc = 2.0 * moles_inv * (moles_inv * v1 - vc_m);
+            let dvc = 2.0 * (v1 - vc_m);
             let t1 = -ETA * tc_m * vc_m_inv * dvc;
-            let t2 = 2.0 * csum * vc_m_inv_eta * moles_inv * moles_inv;
-            let t3 = -2.0 * tc_m * moles_inv;
+            let t2 = 2.0 * csum * vc_m_inv_eta;
+            let t3 = -2.0 * tc_m;
             let dtc = t1 + t2 + t3;
 
-            let domega = moles_inv * (comp.acentric_factor - omega_m);
+            let domega = comp.acentric_factor - omega_m;
             let dzc = -0.085 * domega;
             let dpc = pc_m * ((1.0 / zc_m) * dzc + (1.0 / tc_m) * dtc - vc_m_inv * dvc);
 
-            dvc_dni.push(dvc);
-            dtc_dni.push(dtc);
-            domega_dni.push(domega);
-            dzc_dni.push(dzc);
-            dpc_dni.push(dpc);
-            comp_sum.push(csum);
+            dvc_u.push(dvc);
+            dtc_u.push(dtc);
+            domega_u.push(domega);
+            dzc_u.push(dzc);
+            dpc_u.push(dpc);
+            comp_sum_u.push(csum);
         }
 
-        // Second compositional derivatives (symmetric n*n row-major matrices)
-        let mut d2vc_dn = vec![0.0; n * n];
-        let mut d2tc_dn = vec![0.0; n * n];
-        let mut d2pc_dn = vec![0.0; n * n];
-        let mut d2omega_dn = vec![0.0; n * n];
-        let mut d2zc_dn = vec![0.0; n * n];
+        // Unit-mole (N = 1) second compositional derivatives (symmetric n*n row-major)
+        let mut d2vc_u = vec![0.0; n * n];
+        let mut d2tc_u = vec![0.0; n * n];
+        let mut d2pc_u = vec![0.0; n * n];
+        let mut d2omega_u = vec![0.0; n * n];
+        let mut d2zc_u = vec![0.0; n * n];
 
-        let moles_inv2 = moles_inv * moles_inv;
-        let moles_inv3 = moles_inv2 * moles_inv;
         let vc_m_inv2 = vc_m_inv * vc_m_inv;
 
         for i in 0..n {
@@ -973,52 +970,84 @@ impl LeeKesler {
                 let idx = i * n + j;
                 let rev = j * n + i;
 
-                let d2vc = 2.0 * moles_inv2 * (vc_pair[idx] - vc_m)
-                    - 2.0 * moles_inv * (dvc_dni[i] + dvc_dni[j]);
-                let d2w = -moles_inv * (domega_dni[i] + domega_dni[j]);
+                let d2vc = 2.0 * (vc_pair[idx] - vc_m) - 2.0 * (dvc_u[i] + dvc_u[j]);
+                let d2w = -(domega_u[i] + domega_u[j]);
                 let d2z = -0.085 * d2w;
 
-                let d2tc = 2.0 * moles_inv2 * tc_m
-                    - 2.0 * moles_inv * dtc_dni[j]
-                    - ETA * vc_m_inv * dvc_dni[i] * dtc_dni[j]
-                    + ETA * tc_m * vc_m_inv2 * dvc_dni[i] * dvc_dni[j]
+                let d2tc = 2.0 * tc_m - 2.0 * dtc_u[j] - ETA * vc_m_inv * dvc_u[i] * dtc_u[j]
+                    + ETA * tc_m * vc_m_inv2 * dvc_u[i] * dvc_u[j]
                     - ETA * tc_m * vc_m_inv * d2vc
-                    - (4.0 * moles_inv3 * vc_m_inv_eta
-                        + 2.0 * ETA * dvc_dni[j] * moles_inv2 * vc_m_inv_eta * vc_m_inv)
-                        * comp_sum[i]
-                    + 2.0 * moles_inv2 * vc_m_inv_eta * vc_eta_tc_pair[idx];
+                    - (4.0 * vc_m_inv_eta + 2.0 * ETA * dvc_u[j] * vc_m_inv_eta * vc_m_inv)
+                        * comp_sum_u[i]
+                    + 2.0 * vc_m_inv_eta * vc_eta_tc_pair[idx];
 
                 let d2pc = vc_m_inv
-                    * (R * (d2z * tc_m
-                        + dzc_dni[i] * dtc_dni[j]
-                        + dzc_dni[j] * dtc_dni[i]
-                        + zc_m * d2tc)
+                    * (R * (d2z * tc_m + dzc_u[i] * dtc_u[j] + dzc_u[j] * dtc_u[i] + zc_m * d2tc)
                         - d2vc * pc_m
-                        - dvc_dni[i] * dpc_dni[j]
-                        - dvc_dni[j] * dpc_dni[i]);
+                        - dvc_u[i] * dpc_u[j]
+                        - dvc_u[j] * dpc_u[i]);
 
-                d2vc_dn[idx] = d2vc;
-                d2vc_dn[rev] = d2vc;
-                d2omega_dn[idx] = d2w;
-                d2omega_dn[rev] = d2w;
-                d2zc_dn[idx] = d2z;
-                d2zc_dn[rev] = d2z;
-                d2tc_dn[idx] = d2tc;
-                d2tc_dn[rev] = d2tc;
-                d2pc_dn[idx] = d2pc;
-                d2pc_dn[rev] = d2pc;
+                d2vc_u[idx] = d2vc;
+                d2vc_u[rev] = d2vc;
+                d2omega_u[idx] = d2w;
+                d2omega_u[rev] = d2w;
+                d2zc_u[idx] = d2z;
+                d2zc_u[rev] = d2z;
+                d2tc_u[idx] = d2tc;
+                d2tc_u[rev] = d2tc;
+                d2pc_u[idx] = d2pc;
+                d2pc_u[rev] = d2pc;
             }
+        }
+
+        // Scale to actual total moles using sequential `/ moles` divisions so
+        // 1/N^2 and 1/N^3 intermediates are never formed.
+        let dvc_dni: Vec<f64> = dvc_u.iter().map(|&v| v / moles).collect();
+        let dtc_dni: Vec<f64> = dtc_u.iter().map(|&v| v / moles).collect();
+        let dpc_dni: Vec<f64> = dpc_u.iter().map(|&v| v / moles).collect();
+        let dzc_dni: Vec<f64> = dzc_u.iter().map(|&v| v / moles).collect();
+        let domega_dni: Vec<f64> = domega_u.iter().map(|&v| v / moles).collect();
+
+        let d2vc_dn: Vec<f64> = d2vc_u.iter().map(|&v| (v / moles) / moles).collect();
+        let d2tc_dn: Vec<f64> = d2tc_u.iter().map(|&v| (v / moles) / moles).collect();
+        let d2pc_dn: Vec<f64> = d2pc_u.iter().map(|&v| (v / moles) / moles).collect();
+        let d2omega_dn: Vec<f64> = d2omega_u.iter().map(|&v| (v / moles) / moles).collect();
+        let d2zc_dn: Vec<f64> = d2zc_u.iter().map(|&v| (v / moles) / moles).collect();
+
+        if ![tc_m, vc_m, pc_m, zc_m, omega_m]
+            .iter()
+            .all(|v| v.is_finite())
+            || !dvc_dni.iter().all(|v| v.is_finite())
+            || !dtc_dni.iter().all(|v| v.is_finite())
+            || !dpc_dni.iter().all(|v| v.is_finite())
+            || !dzc_dni.iter().all(|v| v.is_finite())
+            || !domega_dni.iter().all(|v| v.is_finite())
+            || !d2vc_dn.iter().all(|v| v.is_finite())
+            || !d2tc_dn.iter().all(|v| v.is_finite())
+            || !d2pc_dn.iter().all(|v| v.is_finite())
+            || !d2omega_dn.iter().all(|v| v.is_finite())
+            || !d2zc_dn.iter().all(|v| v.is_finite())
+        {
+            return Err(Error::InvalidInput(
+                "Lee-Kesler mixture critical derivatives outside finite numerical range",
+            ));
         }
 
         Ok(PreparedLeeKesler {
             model: self,
-            z: z.to_vec(),
+            x,
             moles,
             tc_m,
             vc_m,
             pc_m,
             zc_m,
             omega_m,
+            dtc_u,
+            dpc_u,
+            domega_u,
+            d2tc_u,
+            d2pc_u,
+            d2omega_u,
             dtc_dni,
             dvc_dni,
             dpc_dni,
@@ -1209,13 +1238,19 @@ impl LeeKesler {
 #[derive(Debug, Clone)]
 pub struct PreparedLeeKesler<'a> {
     model: &'a LeeKesler,
-    z: Vec<f64>,
+    x: Vec<f64>,
     moles: f64,
     tc_m: f64,
     vc_m: f64,
     pc_m: f64,
     zc_m: f64,
     omega_m: f64,
+    dtc_u: Vec<f64>,
+    dpc_u: Vec<f64>,
+    domega_u: Vec<f64>,
+    d2tc_u: Vec<f64>,
+    d2pc_u: Vec<f64>,
+    d2omega_u: Vec<f64>,
     dtc_dni: Vec<f64>,
     dvc_dni: Vec<f64>,
     dpc_dni: Vec<f64>,
@@ -1281,11 +1316,10 @@ impl<'a> PreparedLeeKesler<'a> {
         coeffs_simp: &BwrCoeffs,
         coeffs_ref: &BwrCoeffs,
     ) -> Result<f64> {
-        let (ln_phi_m_simp, _, _) = ln_phi_m(t, p, tr, pr, vr_simp, self.moles, coeffs_simp, 0);
-        let (ln_phi_m_ref, _, _) = ln_phi_m(t, p, tr, pr, vr_ref, self.moles, coeffs_ref, 1);
+        let (ln_phi_m_simp, _, _) = ln_phi_m(t, p, tr, pr, vr_simp, 1.0, coeffs_simp, 0);
+        let (ln_phi_m_ref, _, _) = ln_phi_m(t, p, tr, pr, vr_ref, 1.0, coeffs_ref, 1);
         let g_dep =
-            R * t * (ln_phi_m_simp + (self.omega_m / W_REF) * (ln_phi_m_ref - ln_phi_m_simp))
-                / self.moles;
+            R * t * (ln_phi_m_simp + (self.omega_m / W_REF) * (ln_phi_m_ref - ln_phi_m_simp));
         if !g_dep.is_finite() {
             return Err(Error::InvalidInput(
                 "non-finite Lee-Kesler Gibbs energy departure",
@@ -1392,12 +1426,10 @@ impl<'a> PreparedLeeKesler<'a> {
         let z_simp = pr * vr_simp / tr;
         let z_ref = pr * vr_ref / tr;
 
-        let h_simp =
-            R * t * (-tr * f_diff_tr(self.moles, tr, vr_simp, 0) + self.moles * (z_simp - 1.0));
-        let h_ref =
-            R * t * (-tr * f_diff_tr(self.moles, tr, vr_ref, 1) + self.moles * (z_ref - 1.0));
+        let h_simp = R * t * (-tr * f_diff_tr(1.0, tr, vr_simp, 0) + (z_simp - 1.0));
+        let h_ref = R * t * (-tr * f_diff_tr(1.0, tr, vr_ref, 1) + (z_ref - 1.0));
 
-        let h_res = (h_simp + (self.omega_m / W_REF) * (h_ref - h_simp)) / self.moles;
+        let h_res = h_simp + (self.omega_m / W_REF) * (h_ref - h_simp);
         if !h_res.is_finite() {
             return Err(Error::InvalidInput(
                 "non-finite Lee-Kesler residual enthalpy",
@@ -1413,7 +1445,7 @@ impl<'a> PreparedLeeKesler<'a> {
         let n = self.model.components.len();
         for i in 0..n {
             let props = self.model.ideals[i].properties(t, p)?;
-            h_ideal += (self.z[i] / self.moles) * props.enthalpy;
+            h_ideal += self.x[i] * props.enthalpy;
         }
         Ok(h_ideal + h_res)
     }
@@ -1427,7 +1459,7 @@ impl<'a> PreparedLeeKesler<'a> {
         let z_ref = pr * vr_ref / tr;
 
         let f_simp = f_solver(
-            self.moles,
+            1.0,
             vr_simp,
             coeffs_simp.b,
             coeffs_simp.c,
@@ -1435,11 +1467,11 @@ impl<'a> PreparedLeeKesler<'a> {
             coeffs_simp.e,
             0,
         );
-        let s_vdep_simp = -R * (f_simp + tr * f_diff_tr(self.moles, tr, vr_simp, 0));
-        let s_simp = s_vdep_simp + self.moles * R * z_simp.ln();
+        let s_vdep_simp = -R * (f_simp + tr * f_diff_tr(1.0, tr, vr_simp, 0));
+        let s_simp = s_vdep_simp + R * z_simp.ln();
 
         let f_ref = f_solver(
-            self.moles,
+            1.0,
             vr_ref,
             coeffs_ref.b,
             coeffs_ref.c,
@@ -1447,10 +1479,10 @@ impl<'a> PreparedLeeKesler<'a> {
             coeffs_ref.e,
             1,
         );
-        let s_vdep_ref = -R * (f_ref + tr * f_diff_tr(self.moles, tr, vr_ref, 1));
-        let s_ref = s_vdep_ref + self.moles * R * z_ref.ln();
+        let s_vdep_ref = -R * (f_ref + tr * f_diff_tr(1.0, tr, vr_ref, 1));
+        let s_ref = s_vdep_ref + R * z_ref.ln();
 
-        let s_res = (s_simp + (self.omega_m / W_REF) * (s_ref - s_simp)) / self.moles;
+        let s_res = s_simp + (self.omega_m / W_REF) * (s_ref - s_simp);
         if !s_res.is_finite() {
             return Err(Error::InvalidInput(
                 "non-finite Lee-Kesler residual entropy",
@@ -1465,11 +1497,11 @@ impl<'a> PreparedLeeKesler<'a> {
         let mut s_ideal = 0.0;
         let n = self.model.components.len();
         for i in 0..n {
-            let zi = self.z[i] / self.moles;
+            let xi = self.x[i];
             let props = self.model.ideals[i].properties(t, p)?;
-            s_ideal += zi * props.entropy;
-            if zi > 0.0 {
-                s_ideal -= R * zi * zi.ln();
+            s_ideal += xi * props.entropy;
+            if xi > 0.0 {
+                s_ideal -= R * xi * xi.ln();
             }
         }
         Ok(s_ideal + s_res)
@@ -1480,8 +1512,8 @@ impl<'a> PreparedLeeKesler<'a> {
         let (tr, pr, coeffs_simp, coeffs_ref, vr_simp, vr_ref) =
             self.solve_reduced_volumes(t, p, phase)?;
 
-        let (ln_phi_m_simp, _, _) = ln_phi_m(t, p, tr, pr, vr_simp, self.moles, &coeffs_simp, 0);
-        let (ln_phi_m_ref, _, _) = ln_phi_m(t, p, tr, pr, vr_ref, self.moles, &coeffs_ref, 1);
+        let (ln_phi_m_simp, _, _) = ln_phi_m(t, p, tr, pr, vr_simp, 1.0, &coeffs_simp, 0);
+        let (ln_phi_m_ref, _, _) = ln_phi_m(t, p, tr, pr, vr_ref, 1.0, &coeffs_ref, 1);
 
         let z_simp = pr * vr_simp / tr;
         let z_ref = pr * vr_ref / tr;
@@ -1491,26 +1523,23 @@ impl<'a> PreparedLeeKesler<'a> {
         let n = self.model.components.len();
         let mut ln_phi = Vec::with_capacity(n);
 
-        let moles_inv = 1.0 / self.moles;
         let tc_m_inv = 1.0 / self.tc_m;
         let pc_m_inv = 1.0 / self.pc_m;
 
         for i in 0..n {
-            let tr_i = -tr * tc_m_inv * self.dtc_dni[i];
+            let tr_i = -tr * tc_m_inv * self.dtc_u[i];
 
-            let vr_i_simp =
-                vr_simp * (pc_m_inv * self.dpc_dni[i] - tc_m_inv * self.dtc_dni[i] - moles_inv);
-            let f_diff_simp = f_diff_ni(self.moles, tr, vr_simp, &coeffs_simp, 0, tr_i, vr_i_simp);
+            let vr_i_simp = vr_simp * (pc_m_inv * self.dpc_u[i] - tc_m_inv * self.dtc_u[i] - 1.0);
+            let f_diff_simp = f_diff_ni(1.0, tr, vr_simp, &coeffs_simp, 0, tr_i, vr_i_simp);
             let ln_phi_simp_i = f_diff_simp - lg_z_simp;
 
-            let vr_i_ref =
-                vr_ref * (pc_m_inv * self.dpc_dni[i] - tc_m_inv * self.dtc_dni[i] - moles_inv);
-            let f_diff_ref = f_diff_ni(self.moles, tr, vr_ref, &coeffs_ref, 1, tr_i, vr_i_ref);
+            let vr_i_ref = vr_ref * (pc_m_inv * self.dpc_u[i] - tc_m_inv * self.dtc_u[i] - 1.0);
+            let f_diff_ref = f_diff_ni(1.0, tr, vr_ref, &coeffs_ref, 1, tr_i, vr_i_ref);
             let ln_phi_ref_i = f_diff_ref - lg_z_ref;
 
             let val = ln_phi_simp_i
                 + (self.omega_m / W_REF) * (ln_phi_ref_i - ln_phi_simp_i)
-                + (self.domega_dni[i] / W_REF) * (ln_phi_m_ref - ln_phi_m_simp);
+                + (self.domega_u[i] / W_REF) * (ln_phi_m_ref - ln_phi_m_simp);
             if !val.is_finite() {
                 return Err(Error::InvalidInput(
                     "non-finite Lee-Kesler fugacity coefficient",
@@ -1585,13 +1614,41 @@ impl<'a> PreparedLeeKesler<'a> {
     }
 
     #[inline]
+    fn check_derivatives_finite(d: &LeeKeslerDerivatives) -> Result<()> {
+        if !d.value.is_finite()
+            || !d.dt.is_finite()
+            || !d.dp.is_finite()
+            || !d.dn.iter().all(|v| v.is_finite())
+        {
+            return Err(Error::InvalidInput(
+                "non-finite Lee-Kesler property derivatives",
+            ));
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn check_fugacity_finite(f: &LeeKeslerFugacityDerivatives) -> Result<()> {
+        if !f.ln_phi.iter().all(|v| v.is_finite())
+            || !f.dt.iter().all(|v| v.is_finite())
+            || !f.dp.iter().all(|v| v.is_finite())
+            || !f.dn.iter().all(|v| v.is_finite())
+        {
+            return Err(Error::InvalidInput(
+                "non-finite Lee-Kesler fugacity derivatives",
+            ));
+        }
+        Ok(())
+    }
+
+    #[inline]
     fn z_derivatives_from_reduced(
         &self,
         tr: f64,
         pr: f64,
         f0: &FluidReducedState,
         fr: &FluidReducedState,
-    ) -> LeeKeslerDerivatives {
+    ) -> Result<LeeKeslerDerivatives> {
         let n = self.model.components.len();
         let tc_inv = 1.0 / self.tc_m;
         let pc_inv = 1.0 / self.pc_m;
@@ -1603,39 +1660,59 @@ impl<'a> PreparedLeeKesler<'a> {
         let dz_dp = dz_dpr * pc_inv;
         let mut dz_dn = Vec::with_capacity(n);
         for i in 0..n {
-            let dtr_i = -tr * tc_inv * self.dtc_dni[i];
-            let dpr_i = -pr * pc_inv * self.dpc_dni[i];
-            dz_dn.push(dz_dtr * dtr_i + dz_dpr * dpr_i + dz_dw * self.domega_dni[i]);
+            let dtr_u = -tr * tc_inv * self.dtc_u[i];
+            let dpr_u = -pr * pc_inv * self.dpc_u[i];
+            let dz_u = dz_dtr * dtr_u + dz_dpr * dpr_u + dz_dw * self.domega_u[i];
+            dz_dn.push(dz_u / self.moles);
         }
-        LeeKeslerDerivatives {
+        let out = LeeKeslerDerivatives {
             value: z_val,
             dt: dz_dt,
             dp: dz_dp,
             dn: dz_dn,
-        }
+        };
+        Self::check_derivatives_finite(&out)?;
+        Ok(out)
     }
 
     #[inline]
-    fn v_derivatives_from_z(
+    fn v_derivatives_from_reduced(
         &self,
         t: f64,
         p: f64,
-        z: &LeeKeslerDerivatives,
-    ) -> LeeKeslerDerivatives {
+        tr: f64,
+        pr: f64,
+        f0: &FluidReducedState,
+        fr: &FluidReducedState,
+    ) -> Result<LeeKeslerDerivatives> {
+        let n = self.model.components.len();
+        let tc_inv = 1.0 / self.tc_m;
+        let pc_inv = 1.0 / self.pc_m;
+        let z_val = self.interp(f0.z, fr.z);
+        let dz_dtr = self.interp(f0.dz_dtr, fr.dz_dtr);
+        let dz_dpr = self.interp(f0.dz_dpr, fr.dz_dpr);
+        let dz_dw = Self::d_omega(f0.z, fr.z);
+        let dz_dt = dz_dtr * tc_inv;
+        let dz_dp = dz_dpr * pc_inv;
         let rt_p = R * t / p;
-        let v_val = z.value * rt_p;
-        let dv_dt = (z.dt * t + z.value) * R / p;
-        let dv_dp = (z.dp - z.value / p) * rt_p;
-        let dv_dn =
-            z.dn.iter()
-                .map(|&dzi| (self.moles * dzi + z.value) * rt_p)
-                .collect();
-        LeeKeslerDerivatives {
+        let v_val = z_val * rt_p;
+        let dv_dt = (dz_dt * t + z_val) * R / p;
+        let dv_dp = (dz_dp - z_val / p) * rt_p;
+        let mut dv_dn = Vec::with_capacity(n);
+        for i in 0..n {
+            let dtr_u = -tr * tc_inv * self.dtc_u[i];
+            let dpr_u = -pr * pc_inv * self.dpc_u[i];
+            let dz_u = dz_dtr * dtr_u + dz_dpr * dpr_u + dz_dw * self.domega_u[i];
+            dv_dn.push((dz_u + z_val) * rt_p);
+        }
+        let out = LeeKeslerDerivatives {
             value: v_val,
             dt: dv_dt,
             dp: dv_dp,
             dn: dv_dn,
-        }
+        };
+        Self::check_derivatives_finite(&out)?;
+        Ok(out)
     }
 
     #[inline]
@@ -1645,7 +1722,7 @@ impl<'a> PreparedLeeKesler<'a> {
         pr: f64,
         f0: &FluidReducedState,
         fr: &FluidReducedState,
-    ) -> LeeKeslerDerivatives {
+    ) -> Result<LeeKeslerDerivatives> {
         let n = self.model.components.len();
         let tc_inv = 1.0 / self.tc_m;
         let pc_inv = 1.0 / self.pc_m;
@@ -1659,17 +1736,19 @@ impl<'a> PreparedLeeKesler<'a> {
         let dh_res_dp = R * self.tc_m * pc_inv * dhr_dpr;
         let mut dh_res_dn = Vec::with_capacity(n);
         for i in 0..n {
-            let dtr_i = -tr * tc_inv * self.dtc_dni[i];
-            let dpr_i = -pr * pc_inv * self.dpc_dni[i];
-            let dhr_i = dhr_dtr * dtr_i + dhr_dpr * dpr_i + dhr_dw * self.domega_dni[i];
-            dh_res_dn.push(h_res_val + self.moles * R * (self.dtc_dni[i] * hr + self.tc_m * dhr_i));
+            let dtr_u = -tr * tc_inv * self.dtc_u[i];
+            let dpr_u = -pr * pc_inv * self.dpc_u[i];
+            let dhr_u = dhr_dtr * dtr_u + dhr_dpr * dpr_u + dhr_dw * self.domega_u[i];
+            dh_res_dn.push(h_res_val + R * (self.dtc_u[i] * hr + self.tc_m * dhr_u));
         }
-        LeeKeslerDerivatives {
+        let out = LeeKeslerDerivatives {
             value: h_res_val,
             dt: dh_res_dt,
             dp: dh_res_dp,
             dn: dh_res_dn,
-        }
+        };
+        Self::check_derivatives_finite(&out)?;
+        Ok(out)
     }
 
     #[inline]
@@ -1679,7 +1758,7 @@ impl<'a> PreparedLeeKesler<'a> {
         pr: f64,
         f0: &FluidReducedState,
         fr: &FluidReducedState,
-    ) -> LeeKeslerDerivatives {
+    ) -> Result<LeeKeslerDerivatives> {
         let n = self.model.components.len();
         let tc_inv = 1.0 / self.tc_m;
         let pc_inv = 1.0 / self.pc_m;
@@ -1693,17 +1772,19 @@ impl<'a> PreparedLeeKesler<'a> {
         let ds_res_dp = R * dsr_dpr * pc_inv;
         let mut ds_res_dn = Vec::with_capacity(n);
         for i in 0..n {
-            let dtr_i = -tr * tc_inv * self.dtc_dni[i];
-            let dpr_i = -pr * pc_inv * self.dpc_dni[i];
-            let dsr_i = dsr_dtr * dtr_i + dsr_dpr * dpr_i + dsr_dw * self.domega_dni[i];
-            ds_res_dn.push(s_res_val + self.moles * R * dsr_i);
+            let dtr_u = -tr * tc_inv * self.dtc_u[i];
+            let dpr_u = -pr * pc_inv * self.dpc_u[i];
+            let dsr_u = dsr_dtr * dtr_u + dsr_dpr * dpr_u + dsr_dw * self.domega_u[i];
+            ds_res_dn.push(s_res_val + R * dsr_u);
         }
-        LeeKeslerDerivatives {
+        let out = LeeKeslerDerivatives {
             value: s_res_val,
             dt: ds_res_dt,
             dp: ds_res_dp,
             dn: ds_res_dn,
-        }
+        };
+        Self::check_derivatives_finite(&out)?;
+        Ok(out)
     }
 
     #[inline]
@@ -1715,7 +1796,7 @@ impl<'a> PreparedLeeKesler<'a> {
         pr: f64,
         f0: &FluidReducedState,
         fr: &FluidReducedState,
-    ) -> LeeKeslerDerivatives {
+    ) -> Result<LeeKeslerDerivatives> {
         let n = self.model.components.len();
         let tc_inv = 1.0 / self.tc_m;
         let pc_inv = 1.0 / self.pc_m;
@@ -1729,17 +1810,118 @@ impl<'a> PreparedLeeKesler<'a> {
         let g_w = Self::d_omega(f0.gr, fr.gr);
         let mut dg_res_dn = Vec::with_capacity(n);
         for i in 0..n {
-            let dtr_i = -tr * tc_inv * self.dtc_dni[i];
-            let dpr_i = -pr * pc_inv * self.dpc_dni[i];
-            let di_gr = g_t * dtr_i + g_p * dpr_i + g_w * self.domega_dni[i];
-            dg_res_dn.push(rt * (gr + self.moles * di_gr));
+            let dtr_u = -tr * tc_inv * self.dtc_u[i];
+            let dpr_u = -pr * pc_inv * self.dpc_u[i];
+            let di_gr_u = g_t * dtr_u + g_p * dpr_u + g_w * self.domega_u[i];
+            dg_res_dn.push(rt * (gr + di_gr_u));
         }
-        LeeKeslerDerivatives {
+        let out = LeeKeslerDerivatives {
             value: rt * gr,
             dt: -s_res_val,
             dp: z_val * rt_p - rt_p,
             dn: dg_res_dn,
+        };
+        Self::check_derivatives_finite(&out)?;
+        Ok(out)
+    }
+
+    #[inline]
+    fn fugacity_derivatives_from_reduced(
+        &self,
+        t: f64,
+        p: f64,
+        tr: f64,
+        pr: f64,
+        f0: &FluidReducedState,
+        fr: &FluidReducedState,
+    ) -> Result<LeeKeslerFugacityDerivatives> {
+        let n = self.model.components.len();
+        let tc_inv = 1.0 / self.tc_m;
+        let pc_inv = 1.0 / self.pc_m;
+
+        let z_val = self.interp(f0.z, fr.z);
+        let dz_dtr = self.interp(f0.dz_dtr, fr.dz_dtr);
+        let dz_dpr = self.interp(f0.dz_dpr, fr.dz_dpr);
+        let dz_dw = Self::d_omega(f0.z, fr.z);
+
+        let hr = self.interp(f0.hr, fr.hr);
+        let dhr_dtr = self.interp(f0.dhr_dtr, fr.dhr_dtr);
+        let dhr_dpr = self.interp(f0.dhr_dpr, fr.dhr_dpr);
+        let dhr_dw = Self::d_omega(f0.hr, fr.hr);
+        let h_res_val = R * self.tc_m * hr;
+
+        let gr = self.interp(f0.gr, fr.gr);
+        let g_t = self.interp(f0.dgr_dtr, fr.dgr_dtr);
+        let g_p = self.interp(f0.dgr_dpr, fr.dgr_dpr);
+        let g_w = Self::d_omega(f0.gr, fr.gr);
+        let g_tt = self.interp(f0.d2gr_dtr2, fr.d2gr_dtr2);
+        let g_tp = self.interp(f0.d2gr_dtr_dpr, fr.d2gr_dtr_dpr);
+        let g_pp = self.interp(f0.d2gr_dpr2, fr.d2gr_dpr2);
+        let g_tw = Self::d_omega(f0.dgr_dtr, fr.dgr_dtr);
+        let g_pw = Self::d_omega(f0.dgr_dpr, fr.dgr_dpr);
+
+        let rt2 = R * t * t;
+        let mut dtr_u = Vec::with_capacity(n);
+        let mut dpr_u = Vec::with_capacity(n);
+        let mut d_gr_u = Vec::with_capacity(n);
+        let mut ln_phi = Vec::with_capacity(n);
+        let mut dt = Vec::with_capacity(n);
+        let mut dp = Vec::with_capacity(n);
+
+        for i in 0..n {
+            let dtr_i = -tr * tc_inv * self.dtc_u[i];
+            let dpr_i = -pr * pc_inv * self.dpc_u[i];
+            dtr_u.push(dtr_i);
+            dpr_u.push(dpr_i);
+
+            let di_gr = g_t * dtr_i + g_p * dpr_i + g_w * self.domega_u[i];
+            d_gr_u.push(di_gr);
+            ln_phi.push(gr + di_gr);
+
+            let dhr_i = dhr_dtr * dtr_i + dhr_dpr * dpr_i + dhr_dw * self.domega_u[i];
+            let dh_res_dni = h_res_val + R * (self.dtc_u[i] * hr + self.tc_m * dhr_i);
+            dt.push(-dh_res_dni / rt2);
+
+            let dz_i = dz_dtr * dtr_i + dz_dpr * dpr_i + dz_dw * self.domega_u[i];
+            dp.push((dz_i + z_val - 1.0) / p);
         }
+
+        // Compute the unit-mole (N = 1) Hessian purely in mole-fraction space
+        // and scale by `1 / moles` once at the end so tiny mole counts cannot
+        // overflow intermediate 1/N^2 or 1/N^3 terms.
+        let mut dn = vec![0.0; n * n];
+        for i in 0..n {
+            for j in i..n {
+                let idx = i * n + j;
+                let d2tr_u = (2.0 * tr * self.dtc_u[i] * self.dtc_u[j] * tc_inv
+                    - tr * self.d2tc_u[idx])
+                    * tc_inv;
+                let d2pr_u = (2.0 * pr * self.dpc_u[i] * self.dpc_u[j] * pc_inv
+                    - pr * self.d2pc_u[idx])
+                    * pc_inv;
+                let d2w_u = self.d2omega_u[idx];
+
+                let dg_t_j = g_tt * dtr_u[j] + g_tp * dpr_u[j] + g_tw * self.domega_u[j];
+                let dg_p_j = g_tp * dtr_u[j] + g_pp * dpr_u[j] + g_pw * self.domega_u[j];
+                let dg_w_j = g_tw * dtr_u[j] + g_pw * dpr_u[j];
+
+                let val_u = d_gr_u[i]
+                    + d_gr_u[j]
+                    + (dg_t_j * dtr_u[i]
+                        + dg_p_j * dpr_u[i]
+                        + dg_w_j * self.domega_u[i]
+                        + g_t * d2tr_u
+                        + g_p * d2pr_u
+                        + g_w * d2w_u);
+                let val = val_u / self.moles;
+                dn[idx] = val;
+                dn[j * n + i] = val;
+            }
+        }
+
+        let out = LeeKeslerFugacityDerivatives { ln_phi, dt, dp, dn };
+        Self::check_fugacity_finite(&out)?;
+        Ok(out)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1785,24 +1967,15 @@ impl<'a> PreparedLeeKesler<'a> {
     pub fn state_tp(&self, t: f64, p: f64, phase: Phase) -> Result<LeeKeslerState> {
         let (tr, pr, f0, fr) = self.solve_reduced_states(t, p, phase)?;
         let n = self.model.components.len();
-        let tc_inv = 1.0 / self.tc_m;
-        let pc_inv = 1.0 / self.pc_m;
-        let moles = self.moles;
 
-        let mut dtr_dn = Vec::with_capacity(n);
-        let mut dpr_dn = Vec::with_capacity(n);
-        for i in 0..n {
-            dtr_dn.push(-tr * tc_inv * self.dtc_dni[i]);
-            dpr_dn.push(-pr * pc_inv * self.dpc_dni[i]);
-        }
+        // 1-6. Z, v, residual H, residual S, residual G, and ln(phi_i)
+        let compressibility_factor = self.z_derivatives_from_reduced(tr, pr, &f0, &fr)?;
+        let specific_volume = self.v_derivatives_from_reduced(t, p, tr, pr, &f0, &fr)?;
+        let residual_enthalpy = self.h_res_derivatives_from_reduced(tr, pr, &f0, &fr)?;
+        let residual_entropy = self.s_res_derivatives_from_reduced(tr, pr, &f0, &fr)?;
+        let residual_gibbs = self.g_res_derivatives_from_reduced(t, p, tr, pr, &f0, &fr)?;
+        let ln_fugacity = self.fugacity_derivatives_from_reduced(t, p, tr, pr, &f0, &fr)?;
 
-        // 1-4. Z, v, residual H, residual S
-        let compressibility_factor = self.z_derivatives_from_reduced(tr, pr, &f0, &fr);
-        let specific_volume = self.v_derivatives_from_z(t, p, &compressibility_factor);
-        let residual_enthalpy = self.h_res_derivatives_from_reduced(tr, pr, &f0, &fr);
-        let residual_entropy = self.s_res_derivatives_from_reduced(tr, pr, &f0, &fr);
-
-        let z_val = compressibility_factor.value;
         let v_val = specific_volume.value;
         let dv_dt = specific_volume.dt;
         let dv_dp = specific_volume.dp;
@@ -1813,79 +1986,7 @@ impl<'a> PreparedLeeKesler<'a> {
         let ds_res_dt = residual_entropy.dt;
         let ds_res_dp = residual_entropy.dp;
 
-        // 5. Residual Gibbs energy g_res [J/mol] and ln(phi_i) with all derivatives
-        let gr = self.interp(f0.gr, fr.gr);
-        let g_t = self.interp(f0.dgr_dtr, fr.dgr_dtr);
-        let g_p = self.interp(f0.dgr_dpr, fr.dgr_dpr);
-        let g_w = Self::d_omega(f0.gr, fr.gr);
-        let g_tt = self.interp(f0.d2gr_dtr2, fr.d2gr_dtr2);
-        let g_tp = self.interp(f0.d2gr_dtr_dpr, fr.d2gr_dtr_dpr);
-        let g_pp = self.interp(f0.d2gr_dpr2, fr.d2gr_dpr2);
-        let g_tw = Self::d_omega(f0.dgr_dtr, fr.dgr_dtr);
-        let g_pw = Self::d_omega(f0.dgr_dpr, fr.dgr_dpr);
-
-        let rt = R * t;
-        let rt_p = rt / p;
-        let mut d_gr = Vec::with_capacity(n);
-        let mut ln_phi = Vec::with_capacity(n);
-        let mut dlnphi_dt = Vec::with_capacity(n);
-        let mut dlnphi_dp = Vec::with_capacity(n);
-        let mut dg_res_dn = Vec::with_capacity(n);
-
-        for i in 0..n {
-            let di_gr = g_t * dtr_dn[i] + g_p * dpr_dn[i] + g_w * self.domega_dni[i];
-            d_gr.push(di_gr);
-            let lnp = gr + moles * di_gr;
-            ln_phi.push(lnp);
-            dg_res_dn.push(rt * lnp);
-            dlnphi_dt.push(-residual_enthalpy.dn[i] / (rt * t));
-            dlnphi_dp.push((moles * compressibility_factor.dn[i] + z_val - 1.0) / p);
-        }
-
-        let mut dlnphi_dn = vec![0.0; n * n];
-        for i in 0..n {
-            for j in i..n {
-                let idx = i * n + j;
-                let d2tr = (2.0 * tr * self.dtc_dni[i] * self.dtc_dni[j] * tc_inv
-                    - tr * self.d2tc_dn[idx])
-                    * tc_inv;
-                let d2pr = (2.0 * pr * self.dpc_dni[i] * self.dpc_dni[j] * pc_inv
-                    - pr * self.d2pc_dn[idx])
-                    * pc_inv;
-                let d2w = self.d2omega_dn[idx];
-
-                let dg_t_j = g_tt * dtr_dn[j] + g_tp * dpr_dn[j] + g_tw * self.domega_dni[j];
-                let dg_p_j = g_tp * dtr_dn[j] + g_pp * dpr_dn[j] + g_pw * self.domega_dni[j];
-                let dg_w_j = g_tw * dtr_dn[j] + g_pw * dpr_dn[j];
-
-                let val = d_gr[i]
-                    + d_gr[j]
-                    + moles
-                        * (dg_t_j * dtr_dn[i]
-                            + dg_p_j * dpr_dn[i]
-                            + dg_w_j * self.domega_dni[i]
-                            + g_t * d2tr
-                            + g_p * d2pr
-                            + g_w * d2w);
-                dlnphi_dn[idx] = val;
-                dlnphi_dn[j * n + i] = val;
-            }
-        }
-
-        let residual_gibbs = LeeKeslerDerivatives {
-            value: rt * gr,
-            dt: -s_res_val,
-            dp: v_val - rt_p,
-            dn: dg_res_dn,
-        };
-        let ln_fugacity = LeeKeslerFugacityDerivatives {
-            ln_phi,
-            dt: dlnphi_dt,
-            dp: dlnphi_dp,
-            dn: dlnphi_dn,
-        };
-
-        // 6. Ideal gas mixture contributions + total H, S, G, Cp, Cv, sound speed
+        // 7. Ideal gas mixture contributions + total H, S, G, Cp, Cv, sound speed
         let mut h_id = 0.0;
         let mut dh_id_dt = 0.0;
         let mut s_id = 0.0;
@@ -1895,7 +1996,7 @@ impl<'a> PreparedLeeKesler<'a> {
         let mut dg_tot_dn = residual_gibbs.dn.clone();
 
         for i in 0..n {
-            let xi = self.z[i] / moles;
+            let xi = self.x[i];
             let props = self.model.ideals[i].properties(t, p)?;
             let s_bar_id = props.entropy - R * xi.max(1.0e-100).ln();
 
@@ -1913,6 +2014,11 @@ impl<'a> PreparedLeeKesler<'a> {
 
         let cp = dh_id_dt + dh_res_dt;
         let cv = cp + t * (dv_dt * dv_dt) / dv_dp;
+        if !cp.is_finite() || !cv.is_finite() {
+            return Err(Error::InvalidInput(
+                "Lee-Kesler heat capacity overflowed to non-finite value",
+            ));
+        }
 
         let enthalpy = LeeKeslerDerivatives {
             value: h_id + h_res_val,
@@ -1934,6 +2040,9 @@ impl<'a> PreparedLeeKesler<'a> {
             dp: v_val,
             dn: dg_tot_dn,
         };
+        Self::check_derivatives_finite(&enthalpy)?;
+        Self::check_derivatives_finite(&entropy)?;
+        Self::check_derivatives_finite(&gibbs)?;
 
         let speed_of_sound =
             Self::stable_speed_of_sound(v_val, dv_dt, dv_dp, ds_tot_dt, ds_tot_dp, cp, cv, mw_kg);
@@ -1962,7 +2071,7 @@ impl<'a> PreparedLeeKesler<'a> {
         phase: Phase,
     ) -> Result<LeeKeslerDerivatives> {
         let (tr, pr, f0, fr) = self.solve_reduced_states(t, p, phase)?;
-        Ok(self.z_derivatives_from_reduced(tr, pr, &f0, &fr))
+        self.z_derivatives_from_reduced(tr, pr, &f0, &fr)
     }
 
     /// Molar specific volume `v` `[m^3/mol]` with analytical `(T, P, n)` derivatives.
@@ -1973,8 +2082,7 @@ impl<'a> PreparedLeeKesler<'a> {
         phase: Phase,
     ) -> Result<LeeKeslerDerivatives> {
         let (tr, pr, f0, fr) = self.solve_reduced_states(t, p, phase)?;
-        let z = self.z_derivatives_from_reduced(tr, pr, &f0, &fr);
-        Ok(self.v_derivatives_from_z(t, p, &z))
+        self.v_derivatives_from_reduced(t, p, tr, pr, &f0, &fr)
     }
 
     /// Molar residual enthalpy `h_res` `[J/mol]` with analytical `(T, P, n)` derivatives.
@@ -1985,7 +2093,7 @@ impl<'a> PreparedLeeKesler<'a> {
         phase: Phase,
     ) -> Result<LeeKeslerDerivatives> {
         let (tr, pr, f0, fr) = self.solve_reduced_states(t, p, phase)?;
-        Ok(self.h_res_derivatives_from_reduced(tr, pr, &f0, &fr))
+        self.h_res_derivatives_from_reduced(tr, pr, &f0, &fr)
     }
 
     /// Molar total enthalpy `h` `[J/mol]` with analytical `(T, P, n)` derivatives.
@@ -1996,14 +2104,19 @@ impl<'a> PreparedLeeKesler<'a> {
         phase: Phase,
     ) -> Result<LeeKeslerDerivatives> {
         let (tr, pr, f0, fr) = self.solve_reduced_states(t, p, phase)?;
-        let mut h = self.h_res_derivatives_from_reduced(tr, pr, &f0, &fr);
+        let mut h = self.h_res_derivatives_from_reduced(tr, pr, &f0, &fr)?;
+        let mut h_id = 0.0;
+        let mut dh_id_dt = 0.0;
         for i in 0..self.model.components.len() {
-            let xi = self.z[i] / self.moles;
+            let xi = self.x[i];
             let props = self.model.ideals[i].properties(t, p)?;
-            h.value += xi * props.enthalpy;
-            h.dt += xi * props.enthalpy_dt;
+            h_id += xi * props.enthalpy;
+            dh_id_dt += xi * props.enthalpy_dt;
             h.dn[i] += props.enthalpy;
         }
+        h.value += h_id;
+        h.dt += dh_id_dt;
+        Self::check_derivatives_finite(&h)?;
         Ok(h)
     }
 
@@ -2015,7 +2128,7 @@ impl<'a> PreparedLeeKesler<'a> {
         phase: Phase,
     ) -> Result<LeeKeslerDerivatives> {
         let (tr, pr, f0, fr) = self.solve_reduced_states(t, p, phase)?;
-        Ok(self.s_res_derivatives_from_reduced(tr, pr, &f0, &fr))
+        self.s_res_derivatives_from_reduced(tr, pr, &f0, &fr)
     }
 
     /// Molar total entropy `s` `[J/(mol K)]` with analytical `(T, P, n)` derivatives.
@@ -2031,17 +2144,22 @@ impl<'a> PreparedLeeKesler<'a> {
         phase: Phase,
     ) -> Result<LeeKeslerDerivatives> {
         let (tr, pr, f0, fr) = self.solve_reduced_states(t, p, phase)?;
-        let mut s = self.s_res_derivatives_from_reduced(tr, pr, &f0, &fr);
-        s.dp -= R / p;
+        let mut s = self.s_res_derivatives_from_reduced(tr, pr, &f0, &fr)?;
+        let mut s_id = 0.0;
+        let mut dh_id_dt = 0.0;
         for i in 0..self.model.components.len() {
-            let xi = self.z[i] / self.moles;
+            let xi = self.x[i];
             let props = self.model.ideals[i].properties(t, p)?;
             if xi > 0.0 {
-                s.value += xi * (props.entropy - R * xi.ln());
+                s_id += xi * (props.entropy - R * xi.ln());
             }
-            s.dt += xi * props.enthalpy_dt / t;
+            dh_id_dt += xi * props.enthalpy_dt;
             s.dn[i] += props.entropy - R * xi.max(1.0e-100).ln();
         }
+        s.value += s_id;
+        s.dt += dh_id_dt / t;
+        s.dp -= R / p;
+        Self::check_derivatives_finite(&s)?;
         Ok(s)
     }
 
@@ -2053,7 +2171,7 @@ impl<'a> PreparedLeeKesler<'a> {
         phase: Phase,
     ) -> Result<LeeKeslerDerivatives> {
         let (tr, pr, f0, fr) = self.solve_reduced_states(t, p, phase)?;
-        Ok(self.g_res_derivatives_from_reduced(t, p, tr, pr, &f0, &fr))
+        self.g_res_derivatives_from_reduced(t, p, tr, pr, &f0, &fr)
     }
 
     /// Molar total Gibbs energy `g` `[J/mol]` with analytical `(T, P, n)` derivatives.
@@ -2064,12 +2182,13 @@ impl<'a> PreparedLeeKesler<'a> {
     /// the exact `0 * ln(0) = 0` limit.
     pub fn gibbs_derivatives(&self, t: f64, p: f64, phase: Phase) -> Result<LeeKeslerDerivatives> {
         let (tr, pr, f0, fr) = self.solve_reduced_states(t, p, phase)?;
-        let mut g = self.g_res_derivatives_from_reduced(t, p, tr, pr, &f0, &fr);
-        g.dp += R * t / p;
+        let mut g = self.g_res_derivatives_from_reduced(t, p, tr, pr, &f0, &fr)?;
+        let s_res_val = -g.dt;
+        let v_val = self.interp(f0.z, fr.z) * (R * t / p);
         let mut h_id = 0.0;
         let mut s_id = 0.0;
         for i in 0..self.model.components.len() {
-            let xi = self.z[i] / self.moles;
+            let xi = self.x[i];
             let props = self.model.ideals[i].properties(t, p)?;
             let s_bar_id = props.entropy - R * xi.max(1.0e-100).ln();
             h_id += xi * props.enthalpy;
@@ -2079,7 +2198,9 @@ impl<'a> PreparedLeeKesler<'a> {
             g.dn[i] += props.enthalpy - t * s_bar_id;
         }
         g.value += h_id - t * s_id;
-        g.dt -= s_id;
+        g.dt = -(s_id + s_res_val);
+        g.dp = v_val;
+        Self::check_derivatives_finite(&g)?;
         Ok(g)
     }
 
@@ -2091,89 +2212,7 @@ impl<'a> PreparedLeeKesler<'a> {
         phase: Phase,
     ) -> Result<LeeKeslerFugacityDerivatives> {
         let (tr, pr, f0, fr) = self.solve_reduced_states(t, p, phase)?;
-        let n = self.model.components.len();
-        let tc_inv = 1.0 / self.tc_m;
-        let pc_inv = 1.0 / self.pc_m;
-        let moles = self.moles;
-
-        let z_val = self.interp(f0.z, fr.z);
-        let dz_dtr = self.interp(f0.dz_dtr, fr.dz_dtr);
-        let dz_dpr = self.interp(f0.dz_dpr, fr.dz_dpr);
-        let dz_dw = Self::d_omega(f0.z, fr.z);
-
-        let hr = self.interp(f0.hr, fr.hr);
-        let dhr_dtr = self.interp(f0.dhr_dtr, fr.dhr_dtr);
-        let dhr_dpr = self.interp(f0.dhr_dpr, fr.dhr_dpr);
-        let dhr_dw = Self::d_omega(f0.hr, fr.hr);
-        let h_res_val = R * self.tc_m * hr;
-
-        let gr = self.interp(f0.gr, fr.gr);
-        let g_t = self.interp(f0.dgr_dtr, fr.dgr_dtr);
-        let g_p = self.interp(f0.dgr_dpr, fr.dgr_dpr);
-        let g_w = Self::d_omega(f0.gr, fr.gr);
-        let g_tt = self.interp(f0.d2gr_dtr2, fr.d2gr_dtr2);
-        let g_tp = self.interp(f0.d2gr_dtr_dpr, fr.d2gr_dtr_dpr);
-        let g_pp = self.interp(f0.d2gr_dpr2, fr.d2gr_dpr2);
-        let g_tw = Self::d_omega(f0.dgr_dtr, fr.dgr_dtr);
-        let g_pw = Self::d_omega(f0.dgr_dpr, fr.dgr_dpr);
-
-        let rt2 = R * t * t;
-        let mut dtr_dn = Vec::with_capacity(n);
-        let mut dpr_dn = Vec::with_capacity(n);
-        let mut d_gr = Vec::with_capacity(n);
-        let mut ln_phi = Vec::with_capacity(n);
-        let mut dt = Vec::with_capacity(n);
-        let mut dp = Vec::with_capacity(n);
-
-        for i in 0..n {
-            let dtr_i = -tr * tc_inv * self.dtc_dni[i];
-            let dpr_i = -pr * pc_inv * self.dpc_dni[i];
-            dtr_dn.push(dtr_i);
-            dpr_dn.push(dpr_i);
-
-            let di_gr = g_t * dtr_i + g_p * dpr_i + g_w * self.domega_dni[i];
-            d_gr.push(di_gr);
-            ln_phi.push(gr + moles * di_gr);
-
-            let dhr_i = dhr_dtr * dtr_i + dhr_dpr * dpr_i + dhr_dw * self.domega_dni[i];
-            let dh_res_dni = h_res_val + moles * R * (self.dtc_dni[i] * hr + self.tc_m * dhr_i);
-            dt.push(-dh_res_dni / rt2);
-
-            let dz_i = dz_dtr * dtr_i + dz_dpr * dpr_i + dz_dw * self.domega_dni[i];
-            dp.push((moles * dz_i + z_val - 1.0) / p);
-        }
-
-        let mut dn = vec![0.0; n * n];
-        for i in 0..n {
-            for j in i..n {
-                let idx = i * n + j;
-                let d2tr = (2.0 * tr * self.dtc_dni[i] * self.dtc_dni[j] * tc_inv
-                    - tr * self.d2tc_dn[idx])
-                    * tc_inv;
-                let d2pr = (2.0 * pr * self.dpc_dni[i] * self.dpc_dni[j] * pc_inv
-                    - pr * self.d2pc_dn[idx])
-                    * pc_inv;
-                let d2w = self.d2omega_dn[idx];
-
-                let dg_t_j = g_tt * dtr_dn[j] + g_tp * dpr_dn[j] + g_tw * self.domega_dni[j];
-                let dg_p_j = g_tp * dtr_dn[j] + g_pp * dpr_dn[j] + g_pw * self.domega_dni[j];
-                let dg_w_j = g_tw * dtr_dn[j] + g_pw * dpr_dn[j];
-
-                let val = d_gr[i]
-                    + d_gr[j]
-                    + moles
-                        * (dg_t_j * dtr_dn[i]
-                            + dg_p_j * dpr_dn[i]
-                            + dg_w_j * self.domega_dni[i]
-                            + g_t * d2tr
-                            + g_p * d2pr
-                            + g_w * d2w);
-                dn[idx] = val;
-                dn[j * n + i] = val;
-            }
-        }
-
-        Ok(LeeKeslerFugacityDerivatives { ln_phi, dt, dp, dn })
+        self.fugacity_derivatives_from_reduced(t, p, tr, pr, &f0, &fr)
     }
 
     /// Molar isobaric heat capacity `Cp` `[J/(mol K)]`.
@@ -2182,10 +2221,15 @@ impl<'a> PreparedLeeKesler<'a> {
         let dh_res_dt = R * self.interp(f0.dhr_dtr, fr.dhr_dtr);
         let mut dh_id_dt = 0.0;
         for i in 0..self.model.components.len() {
-            dh_id_dt +=
-                (self.z[i] / self.moles) * self.model.ideals[i].properties(t, p)?.enthalpy_dt;
+            dh_id_dt += self.x[i] * self.model.ideals[i].properties(t, p)?.enthalpy_dt;
         }
-        Ok(dh_id_dt + dh_res_dt)
+        let cp = dh_id_dt + dh_res_dt;
+        if !cp.is_finite() {
+            return Err(Error::InvalidInput(
+                "Lee-Kesler heat capacity overflowed to non-finite value",
+            ));
+        }
+        Ok(cp)
     }
 
     /// Molar isochoric heat capacity `Cv` `[J/(mol K)]`.
@@ -2194,8 +2238,7 @@ impl<'a> PreparedLeeKesler<'a> {
         let dh_res_dt = R * self.interp(f0.dhr_dtr, fr.dhr_dtr);
         let mut dh_id_dt = 0.0;
         for i in 0..self.model.components.len() {
-            dh_id_dt +=
-                (self.z[i] / self.moles) * self.model.ideals[i].properties(t, p)?.enthalpy_dt;
+            dh_id_dt += self.x[i] * self.model.ideals[i].properties(t, p)?.enthalpy_dt;
         }
         let cp = dh_id_dt + dh_res_dt;
         let z_val = self.interp(f0.z, fr.z);
@@ -2204,7 +2247,13 @@ impl<'a> PreparedLeeKesler<'a> {
         let rt_p = R * t / p;
         let dv_dt = (dz_dt * t + z_val) * R / p;
         let dv_dp = (dz_dp - z_val / p) * rt_p;
-        Ok(cp + t * (dv_dt * dv_dt) / dv_dp)
+        let cv = cp + t * (dv_dt * dv_dt) / dv_dp;
+        if !cv.is_finite() {
+            return Err(Error::InvalidInput(
+                "Lee-Kesler heat capacity overflowed to non-finite value",
+            ));
+        }
+        Ok(cv)
     }
 
     /// Single-phase speed of sound `[m/s]` matching `src/speed_of_sound.f90`.
@@ -2231,7 +2280,7 @@ impl<'a> PreparedLeeKesler<'a> {
         let mut dh_id_dt = 0.0;
         let mut mw_kg = 0.0;
         for i in 0..self.model.components.len() {
-            let xi = self.z[i] / self.moles;
+            let xi = self.x[i];
             dh_id_dt += xi * self.model.ideals[i].properties(t, p)?.enthalpy_dt;
             mw_kg += xi * self.model.components[i].molar_mass * 1.0e-3;
         }

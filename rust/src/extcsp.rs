@@ -651,8 +651,11 @@ impl ExtCsp {
     pub fn shape_factors(&self, t: f64, moles: &[f64]) -> Result<(f64, f64)> {
         positive(t, "temperature")?;
         let (n_tot, x) = self.validate_moles(moles)?;
-        let prepared = self.shape_eos.prepare(t, &x)?;
-        self.shape_factors_from_prepared(&prepared, t, n_tot)
+        let (a_molar, b_molar) = self.shape_eos.mixture_ab_values(t, &x)?;
+        let h_molar = b_molar / self.bc0;
+        let h = n_tot * h_molar;
+        let f = self.solve_temperature_shape_factor(h_molar, a_molar, t, n_tot)?;
+        Ok((h, f))
     }
 
     fn residual_helmholtz_tv_prepared(
@@ -898,8 +901,10 @@ impl ExtCsp {
         positive(t, "temperature")?;
         positive(p, "pressure")?;
         let (n_tot, x) = self.validate_moles(moles)?;
-        let prepared = self.shape_eos.prepare(t, &x)?;
-        let (h, f_shape) = self.shape_factors_from_prepared(&prepared, t, n_tot)?;
+        let (a_molar, b_molar) = self.shape_eos.mixture_ab_values(t, &x)?;
+        let h_molar = b_molar / self.bc0;
+        let h = n_tot * h_molar;
+        let f_shape = self.solve_temperature_shape_factor(h_molar, a_molar, t, n_tot)?;
         let t0 = n_tot * t / f_shape;
         let p0 = h * p / f_shape;
         let v0 = self.reference_volume(t0, p0, phase)?;

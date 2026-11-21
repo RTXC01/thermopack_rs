@@ -1425,6 +1425,137 @@ impl Cubic {
         }
     }
 
+    /// Value-only molar mixture attraction `a(T, x)` (`[Pa m^6 / mol^2]`) and
+    /// covolume `b(T, x)` (`[m^3 / mol]`) without computing or allocating
+    /// derivative buffers or composition Hessians.
+    pub(crate) fn mixture_ab_values(
+        &self,
+        temperature: f64,
+        composition: &[f64],
+    ) -> Result<(f64, f64)> {
+        positive(temperature, "temperature")?;
+        if composition.len() != self.components.len()
+            || composition.iter().any(|x| !x.is_finite() || *x < 0.0)
+            || (composition.iter().sum::<f64>() - 1.0).abs() > 1e-10
+        {
+            return Err(Error::InvalidInput(
+                "normalized composition matching the model required",
+            ));
+        }
+        let n = self.components.len();
+        let wong_sandler = self.mixing_rule == crate::excess_gibbs::MixingRule::WongSandler;
+        if wong_sandler {
+            let data = self.wong_sandler.as_ref().ok_or(Error::Unsupported(
+                "the Wong-Sandler mixing rule needs the binary parameters",
+            ))?;
+            let mixture = self.excess_gibbs.as_ref().ok_or(Error::Unsupported(
+                "the Wong-Sandler mixing rule needs the excess Gibbs model",
+            ))?;
+            let mut a_pure = Vec::with_capacity(n);
+            for i in 0..n {
+                let tc = self.components[i].critical_temperature;
+                let alpha = self.alpha[i].evaluate(temperature, tc)?.value;
+                a_pure.push(self.a0[i] * alpha);
+            }
+            let g_ex = crate::excess_gibbs::excess_gibbs_value(
+                mixture,
+                self.kind,
+                temperature,
+                composition,
+                &self.bi,
+                &a_pure,
+            )?;
+            let limit_c = crate::excess_gibbs::excess_gibbs_limit(
+                self.kind,
+                crate::excess_gibbs::GeLimit::Infinite,
+            );
+            let (a, b) = crate::wong_sandler::wong_sandler_ab_values(
+                data,
+                temperature,
+                composition,
+                &a_pure,
+                &self.bi,
+                limit_c,
+                g_ex,
+            )?;
+            positive(b, "mixture covolume")?;
+            if !a.is_finite() {
+                return Err(Error::InvalidInput("temperature outside numerical range"));
+            }
+            return Ok((a, b));
+        }
+
+        // Evaluate scalar covolume b(T, x) without derivative vectors.
+        let mut b_pure = Vec::with_capacity(n);
+        if self.variable_beta {
+            for i in 0..n {
+                let tc = self.components[i].critical_temperature;
+                let bv = self.beta[i].evaluate(temperature, tc)?.value;
+                b_pure.push(self.bi[i] * bv);
+            }
+        } else {
+            b_pure.extend_from_slice(&self.bi);
+        }
+        let b = if self.lij.iter().all(|&l| l == 0.0) {
+            composition
+                .iter()
+                .zip(b_pure.iter())
+                .map(|(x, bi)| x * bi)
+                .sum()
+        } else {
+            let mut b_sum = 0.0;
+            for i in 0..n {
+                let mut b_i = 0.0;
+                for (j, &xj) in composition.iter().enumerate() {
+                    b_i += xj * (1.0 - self.lij[i * n + j]) * (b_pure[i] + b_pure[j]) * 0.5;
+                }
+                b_sum += composition[i] * b_i;
+            }
+            b_sum
+        };
+        positive(b, "mixture covolume")?;
+
+        if let Some(ge) = &self.excess_gibbs {
+            let mut a_pure = Vec::with_capacity(n);
+            for i in 0..n {
+                let tc = self.components[i].critical_temperature;
+                let alpha = self.alpha[i].evaluate(temperature, tc)?.value;
+                a_pure.push(self.a0[i] * alpha);
+            }
+            let a = crate::excess_gibbs::excess_gibbs_cubic_a_value(
+                ge,
+                self.kind,
+                temperature,
+                composition,
+                &self.bi,
+                &a_pure,
+                b,
+            )?;
+            if !a.is_finite() {
+                return Err(Error::InvalidInput("temperature outside numerical range"));
+            }
+            return Ok((a, b));
+        }
+
+        let mut f = Vec::with_capacity(n);
+        let mut sum = 0.0;
+        for (i, &x) in composition.iter().enumerate() {
+            let tc = self.components[i].critical_temperature;
+            let alpha = self.alpha[i].evaluate(temperature, tc)?.value;
+            let fi = (self.a0[i] * alpha.max(0.0)).sqrt();
+            f.push(fi);
+            sum += x * fi;
+        }
+        let mut a = sum * sum;
+        for &(i, j, k) in &self.nonzero_kij {
+            a -= 2.0 * composition[i] * composition[j] * k * f[i] * f[j];
+        }
+        if !a.is_finite() {
+            return Err(Error::InvalidInput("temperature outside numerical range"));
+        }
+        Ok((a, b))
+    }
+
     pub fn prepare(&self, temperature: f64, composition: &[f64]) -> Result<PreparedState<'_>> {
         positive(temperature, "temperature")?;
         if composition.len() != self.components.len()
@@ -2517,4 +2648,102 @@ fn source_order_omega(kind: CubicKind) -> (f64, f64, f64) {
     let arg = n1 * n2 / (n * n1 + n * n2);
     let b = (1. - arg) / (zcomb - 1.);
     (b * (1. / n - b) * n1 * n2, b, zcomb)
+}
+
+#[cfg(test)]
+mod mixture_ab_value_tests {
+    use super::*;
+    use crate::excess_gibbs::MixingRule;
+    use crate::wong_sandler::{Fraction, WongSandlerData};
+
+    fn assert_ab_matches(label: &str, model: &Cubic, t: f64, x: &[f64]) -> Result<()> {
+        let (a_val, b_val) = model.mixture_ab_values(t, x)?;
+        let (a_prep, b_prep) = model.prepare(t, x)?.mixture_ab();
+        let a_tol = 1e-13 * a_prep.abs().max(1.0);
+        let b_tol = 1e-13 * b_prep.abs().max(1e-12);
+        assert!(
+            (a_val - a_prep).abs() <= a_tol,
+            "{label} a mismatch: value={a_val:.16e}, prepare={a_prep:.16e}"
+        );
+        assert!(
+            (b_val - b_prep).abs() <= b_tol,
+            "{label} b mismatch: value={b_val:.16e}, prepare={b_prep:.16e}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn mixture_ab_values_matches_prepare_across_all_mixing_rules() -> Result<()> {
+        // 1. VdW (with nonzero kij and lij)
+        let mut vdw = Cubic::new(CubicKind::SoaveRedlichKwong, &["C1", "C3"])?;
+        vdw.set_kij(0, 1, 0.04)?;
+        vdw.set_lij(0, 1, 0.02)?;
+        assert_ab_matches("VdW+lij", &vdw, 310.0, &[0.4, 0.6])?;
+
+        // 2. HV1
+        let hv1 = Cubic::with_options(
+            CubicKind::SoaveRedlichKwong,
+            &["C1", "H2O"],
+            CubicOptions {
+                mixing_rule: MixingRule::HuronVidal1,
+                ..Default::default()
+            },
+        )?;
+        assert_ab_matches("HV1", &hv1, 350.0, &[0.4, 0.6])?;
+
+        // 3. HV2
+        let hv2 = Cubic::with_options(
+            CubicKind::PengRobinson,
+            &["C1", "H2O"],
+            CubicOptions {
+                mixing_rule: MixingRule::HuronVidal2,
+                ..Default::default()
+            },
+        )?;
+        assert_ab_matches("HV2", &hv2, 400.0, &[0.3, 0.7])?;
+
+        // 4. NRTL
+        let nrtl = Cubic::with_options(
+            CubicKind::PengRobinson,
+            &["H2S", "C3"],
+            CubicOptions {
+                mixing_rule: MixingRule::Nrtl,
+                parameter_reference: "Dicko2012",
+                ..Default::default()
+            },
+        )?;
+        assert_ab_matches("NRTL", &nrtl, 360.0, &[0.45, 0.55])?;
+
+        // 5. UNIFAC
+        let unifac = Cubic::with_options(
+            CubicKind::SoaveRedlichKwong,
+            &["C1", "C3"],
+            CubicOptions {
+                mixing_rule: MixingRule::Unifac,
+                ..Default::default()
+            },
+        )?;
+        assert_ab_matches("UNIFAC", &unifac, 320.0, &[0.3, 0.7])?;
+
+        // 6. Wong-Sandler
+        let mut ws = WongSandlerData::new(2);
+        ws.set_kij(0, 1, Fraction::constant(0.1))?;
+        ws.set_kij(1, 0, Fraction::constant(0.1))?;
+        ws.set_tauij(0, 1, Fraction::constant(0.25))?;
+        ws.set_tauij(1, 0, Fraction::constant(-0.15))?;
+        ws.set_alphaij(0, 1, 0.3)?;
+        ws.set_alphaij(1, 0, 0.3)?;
+        let ws_model = Cubic::with_options(
+            CubicKind::PengRobinson,
+            &["CO2", "C1"],
+            CubicOptions {
+                mixing_rule: MixingRule::WongSandler,
+                wong_sandler: Some(&ws),
+                ..Default::default()
+            },
+        )?;
+        assert_ab_matches("WongSandler", &ws_model, 320.0, &[0.5, 0.5])?;
+
+        Ok(())
+    }
 }

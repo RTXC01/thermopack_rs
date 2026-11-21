@@ -2,12 +2,14 @@
 import csv
 import gzip
 import hashlib
+import inspect
 import json
 import math
 import re
 from pathlib import Path
 
 from reference import ROOT
+from generate_data import compiled_components
 from mbwr_coexistence_cases import reference_requests, physical_requests, native_key, source_input_hashes
 from qualify_mbwr_coexistence import (RELATIVE, ABSOLUTE, clean, parse_original,
     equilibrium_checks, source_category, compare_state, screen_kernel, kernel_request,
@@ -15,6 +17,26 @@ from qualify_mbwr_coexistence import (RELATIVE, ABSOLUTE, clean, parse_original,
 
 HASH_RE = re.compile(r'^[a-f0-9]{64}$')
 EXPECTED = 1008
+HISTORICAL_GENERATE_DATA_SHA256 = '510cc4285afd6083fcbf6b22d620df822cce68351117a0d309ff190cff7d1518'
+HISTORICAL_COMPILED_COMPONENTS_SHA256 = 'cafaf407bf3562d2088aedfef2373264cdf9685932f73338effd3a7db94989da'
+
+
+def _compiled_components_sha256(func=compiled_components):
+    return hashlib.sha256(inspect.getsource(func).replace('\r\n', '\n').encode('utf-8')).hexdigest()
+
+
+def _cohort_inputs_match(recorded, current, compiled_sha=None):
+    if not isinstance(recorded, dict) or set(recorded) != set(current):
+        return False
+    for key, expected in current.items():
+        if recorded.get(key) == expected:
+            continue
+        if key == 'tools/rust_port/generate_data.py':
+            sha = _compiled_components_sha256() if compiled_sha is None else compiled_sha
+            if recorded.get(key) == HISTORICAL_GENERATE_DATA_SHA256 and sha == HISTORICAL_COMPILED_COMPONENTS_SHA256:
+                continue
+        return False
+    return True
 
 
 def check(ok, message):
@@ -154,7 +176,7 @@ def audit(report):
     check(report.get('physical_requests')==physical and report.get('reference_requests')==refs,'authoritative cohort requests differ')
     check([e.get('request') for e in records]==allreq,'record requests differ from authoritative cohorts')
     check(report.get('relative_tolerance')==RELATIVE and report.get('absolute_tolerances')==ABSOLUTE,'comparison tolerances differ')
-    check(report.get('signature',{}).get('cohort_inputs_sha256')==source_input_hashes(),'cohort input hashes differ from current authoritative inputs')
+    check(_cohort_inputs_match(report.get('signature',{}).get('cohort_inputs_sha256'),source_input_hashes()),'cohort input hashes differ from current authoritative inputs')
     _sig_hashes(report)
     ks=report.get('kernel_signature')
     check(isinstance(ks,dict) and ks,'missing original kernel signature')

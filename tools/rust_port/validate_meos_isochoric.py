@@ -147,7 +147,7 @@ def source_outcome(r):
             output = err['output']
             stage = 'phase_properties' if any('THERMOPACK_STAGE=returned_phase_properties' in str(line) for line in output) else 'flash'
             filtered = [str(line) for line in output if not re.match(r'^\s*(?:#\d+\s+|at\s+)', str(line))]
-            text = ('\n'.join(filtered) if filtered else str(r)).lower()
+            text = '\n'.join(filtered).lower()
         else:
             stage = 'phase_properties' if 'THERMOPACK_STAGE=returned_phase_properties' in str(r) else 'flash'
             text = str(r).lower()

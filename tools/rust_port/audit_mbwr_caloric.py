@@ -15,6 +15,13 @@ def _same_sign(a,b):
     return a==0.0 or b==0.0 or (a>0.0)==(b>0.0)
 
 
+def _within_4_ulp(expected,stored,scale):
+    if not (math.isfinite(scale) and scale>=0.0):
+        return False
+    bound=4.0*math.ulp(scale)
+    return math.isfinite(bound) and _same_sign(expected,stored) and abs(expected-stored)<=bound
+
+
 def _same_physical(expected,stored,q=None,residual_fn=0.0):
     if not isinstance(stored,list) or len(expected)!=len(stored) or len(stored)!=45:
         return False
@@ -23,13 +30,13 @@ def _same_physical(expected,stored,q=None,residual_fn=0.0):
             return False
         if not (math.isfinite(a) and math.isfinite(b)):
             return False
+        if a==b:
+            continue
         if j==40 and expected[39]==1.0 and stored[39]==1.0:
-            scale=max(abs(a),abs(b),abs(expected[38]))
-            if not _same_sign(a,b) or abs(a-b)>4.0*math.ulp(scale):
+            if not _within_4_ulp(a,b,max(abs(a),abs(expected[38]))):
                 return False
         elif j==42 and expected[41]==1.0 and stored[41]==1.0:
-            scale=max(abs(a),abs(b),abs(residual_fn))
-            if not _same_sign(a,b) or abs(a-b)>4.0*math.ulp(scale):
+            if not _within_4_ulp(a,b,max(abs(a),abs(residual_fn))):
                 return False
         elif j==44 and expected[43]==1.0 and stored[43]==1.0:
             p1=expected[11]; p2=expected[12]; cv=expected[38]
@@ -38,9 +45,9 @@ def _same_physical(expected,stored,q=None,residual_fn=0.0):
                 factor=max(1.0,abs(p2)/denom) if denom>0.0 else 1.0
             else:
                 factor=1.0
-            if not _same_sign(a,b) or abs(a-b)>4.0*math.ulp(max(abs(a),abs(b))*factor):
+            if not _within_4_ulp(a,b,abs(a)*factor):
                 return False
-        elif a!=b:
+        else:
             return False
     return True
 

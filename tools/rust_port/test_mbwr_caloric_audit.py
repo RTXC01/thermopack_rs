@@ -103,5 +103,25 @@ class CaloricAuditTests(unittest.TestCase):
         bad['records'][rec_idx]['physical_from_original_jet'][42]=-p[42]
         with self.assertRaises(AssertionError):audit(bad)
 
+    def test_case_487_sound_speed_overflow_mutation_is_rejected(self):
+        rec_idx=486
+        p=self.report['records'][rec_idx]['physical_from_original_jet']
+        self.assertEqual(p[43],1.0)
+        self.assertLess(abs(p[44]-61.66642636762747),1e-9)
+        for idx in (44,40,42):
+            bad=self._clone_with_record(rec_idx)
+            bad['records'][rec_idx]['physical_from_original_jet'][idx]=1e308
+            with self.assertRaises(AssertionError):audit(bad)
+        # Overflowing factor * abs(expected[44]) must fail closed even for a 1-ULP difference.
+        expected=[0.0]*45
+        expected[11]=1.0
+        expected[12]=400.0
+        expected[38]=1.0
+        expected[43]=1.0
+        expected[44]=1e308
+        stored=expected[:]
+        stored[44]=expected[44]+math.ulp(expected[44])
+        self.assertFalse(_same_physical(expected,stored,{'T':300.0},0.0))
+
 
 if __name__=='__main__': unittest.main()

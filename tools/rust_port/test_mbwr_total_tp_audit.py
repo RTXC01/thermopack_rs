@@ -164,6 +164,26 @@ class EvidenceAuditNegativeTests(unittest.TestCase):
             bad['PHYSICAL'][val_idx] = want['PHYSICAL'][val_idx] + 8.0 * math.ulp(abs(want['PHYSICAL'][val_idx]))
             self.assertFalse(audit._same_expected(bad, want))
 
+    def test_same_expected_rejects_large_overflow_stored_mutations_and_overflowing_scales(self):
+        q, raw = valid_tvp_case()
+        want = copy.deepcopy(audit._expected(q, raw))
+        want['PHYSICAL'][41] = -0.25
+        want['PHYSICAL'][42] = 1.0
+        want['PHYSICAL'][46] = 40.0
+        want['PHYSICAL'][47] = 1.0
+        want['PHYSICAL'][48] = 50.0
+        want['PHYSICAL'][49] = 1.0
+        want['PHYSICAL'][50] = 61.66642636762747
+        scales = (0.0, 2.388105336637237)
+        for val_idx in (41, 48, 50):
+            bad = copy.deepcopy(want)
+            bad['PHYSICAL'][val_idx] = 1e308
+            self.assertFalse(audit._same_expected(bad, want, scales))
+        # Overflowing sound_factor must fail closed even on a 1-ULP difference.
+        one_ulp = copy.deepcopy(want)
+        one_ulp['PHYSICAL'][50] = want['PHYSICAL'][50] + math.ulp(want['PHYSICAL'][50])
+        self.assertFalse(audit._same_expected(one_ulp, want, (0.0, 1e308)))
+
     def test_truncated_original_vectors_fail_closed(self):
         with self.assertRaisesRegex(AssertionError, '45 values'):
             audit._raw_vector({'VALUES': [0.] * 44}, 'VALUES')
@@ -289,6 +309,20 @@ class EvidenceCorpusNegativeTests(unittest.TestCase):
         for val_idx, scale in ((48, cp_scale), (50, sound_scale)):
             report = self._clone_with_record(tvp_index)
             report['records'][tvp_index]['expected']['PHYSICAL'][val_idx] = phys[val_idx] + 8.0 * math.ulp(scale)
+            with self.assertRaisesRegex(AssertionError, 'not derived from original'):
+                audit.audit(report)
+
+    def test_case_487_sound_speed_overflow_mutation_is_rejected(self):
+        rec_idx = 486
+        row = self.report['records'][rec_idx]
+        phys = row['expected']['PHYSICAL']
+        self.assertEqual(phys[49], 1.0)
+        self.assertLess(abs(phys[50] - 61.66642636762747), 1e-9)
+        _, sound_factor = audit._physical_scales(row['request'], row['original'])
+        self.assertGreater(sound_factor, 2.0)
+        for val_idx in (50, 48, 41):
+            report = self._clone_with_record(rec_idx)
+            report['records'][rec_idx]['expected']['PHYSICAL'][val_idx] = 1e308
             with self.assertRaisesRegex(AssertionError, 'not derived from original'):
                 audit.audit(report)
 

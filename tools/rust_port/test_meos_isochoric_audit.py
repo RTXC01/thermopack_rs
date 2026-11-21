@@ -115,6 +115,36 @@ class IsochoricAuditTests(unittest.TestCase):
         self.assertFalse(allowed_outcomes({'k2': 'censored_timeout'}, declared))
         self.assertFalse(allowed_outcomes({'k2': 'flash:density_iteration'}, declared))
 
+    def test_source_outcome_trace_only_output_is_unclassified(self):
+        trace_only = {
+            'reference_error': {
+                'output': [
+                    '#5  0x1 in __sv_solver_MOD_twophasesvsinglecomp',
+                    '\tat /src/sv_solver.f90:1267',
+                ]
+            }
+        }
+        self.assertEqual(source_outcome(trace_only), 'flash:unclassified_termination')
+        self.assertEqual(source_outcome({'reference_error': {'output': []}}), 'flash:unclassified_termination')
+        stage_trace_only = {
+            'reference_error': {
+                'output': [
+                    'THERMOPACK_STAGE=returned_phase_properties',
+                    '#0  0x1 in __sv_solver_MOD_twophasesvsinglecomp',
+                    '\tat /src/sv_solver.f90:1267',
+                ]
+            }
+        }
+        self.assertEqual(source_outcome(stage_trace_only), 'phase_properties:unclassified_termination')
+        recorded = self.report['source_outcomes']
+        checked = 0
+        for e in self.report['records']:
+            key = outcome_key(e['request'])
+            if key in recorded and recorded[key] != 'endpoint_phase_difference':
+                self.assertEqual(source_outcome(e['result']), recorded[key])
+                checked += 1
+        self.assertGreater(checked, 0)
+
 
 if __name__ == '__main__':
     unittest.main()

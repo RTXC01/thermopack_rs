@@ -51,6 +51,13 @@ def _same_sign(a, b):
     return a == 0.0 or b == 0.0 or (a > 0.0) == (b > 0.0)
 
 
+def _within_4_ulp(actual, expected, scale):
+    if not (math.isfinite(scale) and scale >= 0.0):
+        return False
+    bound = 4.0 * math.ulp(scale)
+    return math.isfinite(bound) and _same_sign(actual, expected) and abs(actual - expected) <= bound
+
+
 def _physical_scales(q, raw):
     if q['kind'] not in ('TVP', 'BOUNDED'):
         return None
@@ -89,18 +96,18 @@ def _same_expected(stored, want, scales=None):
                     return False
                 if not (math.isfinite(a) and math.isfinite(b)):
                     return False
+                if a == b:
+                    continue
                 if label == 'PHYSICAL' and j == 41:
-                    scale = max(abs(a), abs(b), abs(residual_fn))
-                    if not _same_sign(a, b) or abs(a - b) > 4.0 * math.ulp(scale):
+                    if not _within_4_ulp(a, b, max(abs(b), abs(residual_fn))):
                         return False
                 elif label == 'PHYSICAL' and j == 48 and expected[47] == 1.0 and actual[47] == 1.0:
-                    scale = max(abs(a), abs(b), abs(expected[46]))
-                    if not _same_sign(a, b) or abs(a - b) > 4.0 * math.ulp(scale):
+                    if not _within_4_ulp(a, b, max(abs(b), abs(expected[46]))):
                         return False
                 elif label == 'PHYSICAL' and j == 50 and expected[49] == 1.0 and actual[49] == 1.0:
-                    if not _same_sign(a, b) or abs(a - b) > 4.0 * math.ulp(max(abs(a), abs(b)) * sound_factor):
+                    if not _within_4_ulp(a, b, abs(b) * sound_factor):
                         return False
-                elif a != b:
+                else:
                     return False
     return True
 

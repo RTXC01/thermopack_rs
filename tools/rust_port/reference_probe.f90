@@ -2066,7 +2066,7 @@ end subroutine query_binary_third_virial_matrix
 
 ! Evaluate ExtCSP reduced residual Helmholtz energy F and all first/second
 ! derivatives (F, F_T, F_V, F_n, F_TT, F_VV, F_TV, F_Tn, F_Vn, F_nn) in SI.
-subroutine query_extcsp_fres(temperature,volume,moles,values,count) &
+subroutine query_extcsp_fres(temperature,volume,moles,out_cap,values,count) &
      bind(C,name='query_extcsp_fres')
   use, intrinsic :: iso_c_binding, only: c_int, c_double
   use thermopack_var, only: nc, get_active_eos, base_eos_param
@@ -2074,14 +2074,18 @@ subroutine query_extcsp_fres(temperature,volume,moles,values,count) &
   implicit none
   real(c_double), value :: temperature, volume
   real(c_double), intent(in) :: moles(16)
-  real(c_double), intent(out) :: values(256)
+  integer(c_int), value :: out_cap
+  real(c_double), intent(out) :: values(*)
   integer(c_int), intent(out) :: count
   ! Locals
   class(base_eos_param), pointer :: eos
   real :: F, F_T, F_V, F_TT, F_VV, F_TV
   real, dimension(nc) :: n, F_n, F_Tn, F_Vn
   real, dimension(nc,nc) :: F_nn
-  integer :: i, j, pos
+  integer :: i, j, pos, required
+  if (nc < 1 .or. nc > 16) error stop 'query_extcsp_fres: unsupported component count'
+  required = 6 + 3*nc + nc*nc
+  if (int(out_cap) < required) error stop 'query_extcsp_fres: output buffer too small'
   eos => get_active_eos()
   select type (p_eos => eos)
   class is (extcsp_eos)
@@ -2136,6 +2140,7 @@ subroutine query_lk_gdep(temperature,pressure,moles,phase,values,count) &
   real, dimension(nc) :: n
   real :: g, dgdt, dgdp
   integer :: i
+  if (nc < 1 .or. nc > 16) error stop 'query_lk_gdep: unsupported component count'
   eos => get_active_eos()
   comp => get_active_comps()
   select type (p_eos => eos)

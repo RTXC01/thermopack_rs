@@ -1,15 +1,98 @@
 use thermopack_rs::{
-    AlphaCorrelation, Cubic, CubicKind, ExtCsp, ExtCspOptions, ExtCspReferenceKind, Mbwr, MbwrKind,
-    MixingRule, Multiparameter, Phase, R, Result,
+    AlphaCorrelation, Cubic, CubicKind, Error, ExtCsp, ExtCspOptions, ExtCspReferenceKind, Mbwr,
+    MbwrKind, MixingRule, Multiparameter, Phase, R, Result,
 };
 
-fn assert_close(label: &str, a: f64, b: f64, rtol: f64, atol: f64) {
-    let err = (a - b).abs();
-    let tol = atol + rtol * a.abs().max(b.abs());
+fn within_physical_tol(
+    expected: f64,
+    actual: f64,
+    phys_scale: f64,
+    rtol: f64,
+    atol_scale: f64,
+) -> bool {
+    if !expected.is_finite() || !actual.is_finite() {
+        return false;
+    }
+    let tol = atol_scale * phys_scale + rtol * expected.abs().max(actual.abs());
+    (expected - actual).abs() <= tol
+}
+
+fn assert_phys_close(
+    label: &str,
+    expected: f64,
+    actual: f64,
+    phys_scale: f64,
+    rtol: f64,
+    atol_scale: f64,
+) {
+    let err = (expected - actual).abs();
+    let tol = atol_scale * phys_scale + rtol * expected.abs().max(actual.abs());
     assert!(
-        err <= tol,
-        "{label}: expected={a:.15e}, actual={b:.15e}, err={err:.3e}, tol={tol:.3e}"
+        within_physical_tol(expected, actual, phys_scale, rtol, atol_scale),
+        "{label}: expected={expected:.15e}, actual={actual:.15e}, err={err:.3e}, tol={tol:.3e} (phys_scale={phys_scale:.3e})"
     );
+}
+
+fn fixture_physical_scales(nc: usize, sumn: f64, t: f64, p: f64, v_tv: f64) -> Vec<f64> {
+    let v_tp = v_tv / sumn;
+    let rt = R * t;
+    let p_scale = p.abs().max(sumn * rt / v_tv);
+    let mut scales = Vec::new();
+    // F, F_T, F_V, F_n
+    scales.extend([sumn, sumn / t, sumn / v_tv]);
+    scales.extend(std::iter::repeat_n(1.0, nc));
+    // F_TT, F_VV, F_TV, F_Tn, F_Vn, F_nn
+    scales.extend([sumn / (t * t), sumn / (v_tv * v_tv), sumn / (t * v_tv)]);
+    scales.extend(std::iter::repeat_n(1.0 / t, nc));
+    scales.extend(std::iter::repeat_n(1.0 / v_tv, nc));
+    scales.extend(std::iter::repeat_n(1.0 / sumn, nc * nc));
+    // P_tv, dP/dT, dP/dV, dP/dn
+    scales.extend([p_scale, p_scale / t, p_scale / v_tv]);
+    scales.extend(std::iter::repeat_n(p_scale / sumn, nc));
+    // U_tv, S_tv, H_tv, sos_tv
+    scales.extend([sumn * rt, sumn * R, sumn * rt, 100.0]);
+    // Z, dZ/dT, dZ/dP, dZ/dn
+    scales.extend([1.0, 1.0 / t, 1.0 / p]);
+    scales.extend(std::iter::repeat_n(1.0, nc));
+    // v_tp, dv/dT, dv/dP, dV/dn
+    scales.extend([v_tp, v_tp / t, v_tp / p]);
+    scales.extend(std::iter::repeat_n(v_tp, nc));
+    // h_res, dh_res/dT, dh_res/dP, dH_res/dn
+    scales.extend([rt, R, v_tp]);
+    scales.extend(std::iter::repeat_n(rt, nc));
+    // h, dh/dT, dh/dP, dH/dn
+    scales.extend([rt, R, v_tp]);
+    scales.extend(std::iter::repeat_n(rt, nc));
+    // s_res, ds_res/dT, ds_res/dP, dS_res/dn
+    scales.extend([R, R / t, v_tp / t]);
+    scales.extend(std::iter::repeat_n(R, nc));
+    // s, ds/dT, ds/dP, dS/dn
+    scales.extend([R, R / t, v_tp / t]);
+    scales.extend(std::iter::repeat_n(R, nc));
+    // ln_phi, dlnphi/dT, dlnphi/dP, dlnphi/dn
+    scales.extend(std::iter::repeat_n(1.0, nc));
+    scales.extend(std::iter::repeat_n(1.0 / t, nc));
+    scales.extend(std::iter::repeat_n(1.0 / p, nc));
+    scales.extend(std::iter::repeat_n(1.0, nc * nc));
+    // sos_tp
+    scales.push(100.0);
+    scales
+}
+
+#[test]
+fn test_extcsp_unit_aware_tolerance_catches_zeroed_dv_dp() -> Result<()> {
+    let model = ExtCsp::new(&["C3"])?;
+    let t = 280.0;
+    let p = 2.0e6;
+    let vd = model.volume_tp_derivatives(t, p, &[1.0], Phase::Liquid)?;
+    // Liquid dv/dP is ~ -1e-12 m^3/(mol Pa); unit-aware tolerance must reject 0.0!
+    assert!(vd.dp < 0.0 && vd.dp.abs() < 1e-10);
+    let phys_dv_dp = vd.value / p;
+    assert!(
+        !within_physical_tol(vd.dp, 0.0, phys_dv_dp, 1e-7, 1e-11),
+        "unit-aware comparator must reject zeroed liquid dv/dP"
+    );
+    Ok(())
 }
 
 #[test]
@@ -97,7 +180,7 @@ fn test_extcsp_fixture_parity() -> Result<()> {
         let z = model.compressibility_factor_derivatives(t, p, &x, phase)?;
         actual.extend([z.value, z.dt, z.dp]);
         actual.extend(&z.dn);
-        let v = model.specific_volume_derivatives(t, p, &x, phase)?;
+        let v = model.volume_tp_derivatives(t, p, &x, phase)?;
         actual.extend([v.value, v.dt, v.dp]);
         actual.extend(&v.dn);
         let hr = model.residual_enthalpy_derivatives(t, p, &x, phase)?;
@@ -119,13 +202,20 @@ fn test_extcsp_fixture_parity() -> Result<()> {
         actual.extend(&fug.dn);
         actual.push(model.speed_of_sound_tp(t, p, &x, phase)?);
 
+        let scales = fixture_physical_scales(moles.len(), sumn, t, p, v_tv);
         assert_eq!(actual.len(), expected.len(), "length mismatch for {label}");
-        for (idx, (&a, &b)) in expected.iter().zip(actual.iter()).enumerate() {
-            assert_close(&format!("{label}[{idx}]"), a, b, 1e-7, 1e-9);
+        assert_eq!(
+            scales.len(),
+            expected.len(),
+            "scale length mismatch for {label}"
+        );
+        for (idx, ((&a, &b), &phys)) in expected.iter().zip(actual.iter()).zip(&scales).enumerate()
+        {
+            assert_phys_close(&format!("{label}[{idx}]"), a, b, phys, 1e-7, 1e-11);
         }
         rows += 1;
     }
-    assert!(rows >= 20, "expected at least 20 ExtCSP fixture rows");
+    assert_eq!(rows, 24, "expected exact 24 ExtCSP fixture rows");
     Ok(())
 }
 
@@ -137,10 +227,14 @@ fn verify_helmholtz_and_tp_fd(
     phase: Phase,
 ) -> Result<()> {
     let nc = n.len();
+    let sumn: f64 = n.iter().sum();
     let v = model.volume_tp(t, p, n, phase)?;
+    let ptv = model.pressure_tv(t, v, n)?;
+    assert_phys_close("TP/TV pressure closure", p, ptv.value, p, 1e-9, 1e-12);
+
     let f = model.residual_helmholtz_tv(t, v, n)?;
 
-    // 1. Central finite differences of all 10 Helmholtz blocks
+    // 1. Central finite differences of all 10 Helmholtz blocks with unit-aware scales
     let dt = 1e-5 * t;
     let dv = 1e-5 * v;
     let fp_t = model.residual_helmholtz_tv(t + dt, v, n)?;
@@ -148,31 +242,47 @@ fn verify_helmholtz_and_tp_fd(
     let fp_v = model.residual_helmholtz_tv(t, v + dv, n)?;
     let fm_v = model.residual_helmholtz_tv(t, v - dv, n)?;
 
-    assert_close("F_T", f.f_t, (fp_t.f - fm_t.f) / (2.0 * dt), 1e-5, 1e-7);
-    assert_close("F_V", f.f_v, (fp_v.f - fm_v.f) / (2.0 * dv), 1e-5, 1e-7);
-    assert_close(
+    assert_phys_close(
+        "F_T",
+        f.f_t,
+        (fp_t.f - fm_t.f) / (2.0 * dt),
+        sumn / t,
+        1e-5,
+        1e-7,
+    );
+    assert_phys_close(
+        "F_V",
+        f.f_v,
+        (fp_v.f - fm_v.f) / (2.0 * dv),
+        sumn / v,
+        1e-5,
+        1e-7,
+    );
+    assert_phys_close(
         "F_TT",
         f.f_tt,
         (fp_t.f_t - fm_t.f_t) / (2.0 * dt),
+        sumn / (t * t),
         1e-5,
         1e-7,
     );
-    assert_close(
+    assert_phys_close(
         "F_VV",
         f.f_vv,
         (fp_v.f_v - fm_v.f_v) / (2.0 * dv),
+        sumn / (v * v),
         1e-5,
         1e-7,
     );
-    assert_close(
+    assert_phys_close(
         "F_TV",
         f.f_tv,
         (fp_t.f_v - fm_t.f_v) / (2.0 * dt),
+        sumn / (t * v),
         1e-5,
         1e-7,
     );
 
-    let sumn: f64 = n.iter().sum();
     let dn = 1e-6 * sumn;
     for j in 0..nc {
         let mut np = n.to_vec();
@@ -181,33 +291,37 @@ fn verify_helmholtz_and_tp_fd(
         nm[j] -= dn;
         let fp = model.residual_helmholtz_tv(t, v, &np)?;
         let fm = model.residual_helmholtz_tv(t, v, &nm)?;
-        assert_close("F_n", f.f_n[j], (fp.f - fm.f) / (2.0 * dn), 1e-5, 1e-7);
-        assert_close(
+        assert_phys_close("F_n", f.f_n[j], (fp.f - fm.f) / (2.0 * dn), 1.0, 1e-5, 1e-7);
+        assert_phys_close(
             "F_Tn",
             f.f_tn[j],
             (fp.f_t - fm.f_t) / (2.0 * dn),
+            1.0 / t,
             1e-5,
             1e-7,
         );
-        assert_close(
+        assert_phys_close(
             "F_Vn",
             f.f_vn[j],
             (fp.f_v - fm.f_v) / (2.0 * dn),
+            1.0 / v,
             1e-5,
             1e-7,
         );
         for i in 0..nc {
-            assert_close(
+            assert_phys_close(
                 "F_nn",
                 f.f_nn[i * nc + j],
                 (fp.f_n[i] - fm.f_n[i]) / (2.0 * dn),
+                1.0 / sumn,
                 1e-5,
                 1e-7,
             );
-            assert_close(
+            assert_phys_close(
                 "F_nn symmetry",
                 f.f_nn[i * nc + j],
                 f.f_nn[j * nc + i],
+                1.0 / sumn,
                 1e-12,
                 1e-12,
             );
@@ -216,15 +330,16 @@ fn verify_helmholtz_and_tp_fd(
 
     // 2. Euler homogeneity of F(T, V, n): sum(n_i F_n[i]) + V F_V = F
     let euler_f: f64 = n.iter().zip(&f.f_n).map(|(ni, fni)| ni * fni).sum::<f64>() + v * f.f_v;
-    assert_close("Euler F", euler_f, f.f, 1e-10, 1e-10);
+    assert_phys_close("Euler F", euler_f, f.f, sumn, 1e-10, 1e-10);
     for i in 0..nc {
         let euler_fn: f64 = (0..nc).map(|j| n[j] * f.f_nn[i * nc + j]).sum::<f64>() + v * f.f_vn[i];
-        assert_close("Euler F_n", euler_fn, 0.0, 1e-10, 1e-10);
+        assert_phys_close("Euler F_n", euler_fn, 0.0, 1.0, 1e-10, 1e-10);
     }
 
     // 3. TP derivatives and thermodynamic identities
     let zd = model.compressibility_factor_derivatives(t, p, n, phase)?;
-    let vd = model.specific_volume_derivatives(t, p, n, phase)?;
+    let vd = model.volume_tp_derivatives(t, p, n, phase)?;
+    let svd = model.specific_volume_derivatives(t, p, n, phase)?;
     let hrd = model.residual_enthalpy_derivatives(t, p, n, phase)?;
     let hd = model.enthalpy_derivatives(t, p, n, phase)?;
     let srd = model.residual_entropy_derivatives(t, p, n, phase)?;
@@ -236,97 +351,159 @@ fn verify_helmholtz_and_tp_fd(
     let sos_tp = model.speed_of_sound_tp(t, p, n, phase)?;
     let sos_tv = model.speed_of_sound_tv(t, v, n)?;
 
-    assert_close("dS/dP = -dV/dT", sd.dp, -vd.dt, 1e-10, 1e-10);
-    assert_close(
+    assert_phys_close(
+        "specific_volume == svd.value",
+        model.specific_volume(t, p, n, phase)?,
+        svd.value,
+        v / sumn,
+        1e-13,
+        1e-13,
+    );
+    assert_phys_close("volume_tp == vd.value", v, vd.value, v, 1e-13, 1e-13);
+    assert_phys_close(
+        "gibbs == gd.value",
+        model.gibbs(t, p, n, phase)?,
+        gd.value,
+        sumn * R * t,
+        1e-12,
+        1e-12,
+    );
+    assert_phys_close(
+        "residual_gibbs == grd.value",
+        model.residual_gibbs(t, p, n, phase)?,
+        grd.value,
+        sumn * R * t,
+        1e-12,
+        1e-12,
+    );
+
+    assert_phys_close("dS/dP = -dV/dT", sd.dp, -vd.dt, v / t, 1e-10, 1e-10);
+    assert_phys_close(
         "dH/dP = V - T*dV/dT",
         hd.dp,
         vd.value - t * vd.dt,
+        v,
         1e-10,
         1e-10,
     );
-    assert_close("dH/dT = T*dS/dT", hd.dt, t * sd.dt, 1e-10, 1e-10);
-    assert_close("Cp = dH/dT", cp, hd.dt, 1e-10, 1e-10);
+    assert_phys_close("dH/dT = T*dS/dT", hd.dt, t * sd.dt, sumn * R, 1e-10, 1e-10);
+    assert_phys_close("Cp = dH/dT", cp, hd.dt, sumn * R, 1e-10, 1e-10);
     assert!(cp > cv && cv > 0.0);
-    assert_close("sos_tp == sos_tv", sos_tp, sos_tv, 1e-11, 1e-11);
-    assert_close(
+    assert_phys_close("sos_tp == sos_tv", sos_tp, sos_tv, 100.0, 1e-11, 1e-11);
+    assert_phys_close(
         "G = H - T*S",
         gd.value,
         hd.value - t * sd.value,
+        sumn * R * t,
         1e-10,
         1e-10,
     );
-    assert_close("dG/dT = -S", gd.dt, -sd.value, 1e-10, 1e-10);
-    assert_close("dG/dP = V", gd.dp, vd.value, 1e-10, 1e-10);
-    assert_close("dG_res/dT = -S_res", grd.dt, -srd.value, 1e-10, 1e-10);
+    assert_phys_close("dG/dT = -S", gd.dt, -sd.value, sumn * R, 1e-10, 1e-10);
+    assert_phys_close("dG/dP = V", gd.dp, vd.value, v, 1e-10, 1e-10);
+    assert_phys_close(
+        "dG_res/dT = -S_res",
+        grd.dt,
+        -srd.value,
+        sumn * R,
+        1e-10,
+        1e-10,
+    );
     for i in 0..nc {
-        assert_close(
+        assert_phys_close(
             "dG_res/dn = R*T*lnphi",
             grd.dn[i],
             R * t * fug.ln_phi[i],
+            R * t,
             1e-10,
             1e-10,
         );
-        assert_close(
+        assert_phys_close(
             "dlnphi/dT = -H_bar_res/(RT^2)",
             fug.dt[i],
             -hrd.dn[i] / (R * t * t),
+            1.0 / t,
             1e-10,
             1e-10,
         );
-        assert_close(
+        assert_phys_close(
             "dlnphi/dP = V_bar/(RT) - 1/P",
             fug.dp[i],
             vd.dn[i] / (R * t) - 1.0 / p,
+            1.0 / p,
             1e-10,
             1e-10,
         );
         let mut gd_sum = 0.0;
         for j in 0..nc {
             gd_sum += n[j] * fug.dn[i * nc + j];
-            assert_close(
+            assert_phys_close(
                 "dlnphi/dn symmetry",
                 fug.dn[i * nc + j],
                 fug.dn[j * nc + i],
+                1.0 / sumn,
                 1e-11,
                 1e-11,
             );
         }
-        assert_close("Gibbs-Duhem", gd_sum, 0.0, 1e-10, 1e-10);
+        assert_phys_close("Gibbs-Duhem", gd_sum, 0.0, 1.0, 1e-10, 1e-10);
     }
 
-    // Spot-check TP FD for Z, H, S, lnphi w.r.t. T, P, n
+    // 4. Unit-aware TP FD for Z, V, v, H, S, lnphi w.r.t. T, P, n
     let dp = 1e-5 * p;
-    assert_close(
+    assert_phys_close(
         "dZ/dT FD",
         zd.dt,
         (model.compressibility_factor(t + dt, p, n, phase)?
             - model.compressibility_factor(t - dt, p, n, phase)?)
             / (2.0 * dt),
+        1.0 / t,
         1e-5,
         1e-7,
     );
-    assert_close(
+    assert_phys_close(
         "dZ/dP FD",
         zd.dp,
         (model.compressibility_factor(t, p + dp, n, phase)?
             - model.compressibility_factor(t, p - dp, n, phase)?)
             / (2.0 * dp),
+        1.0 / p,
         1e-5,
         1e-7,
     );
-    assert_close(
+    assert_phys_close(
+        "dV/dP FD",
+        vd.dp,
+        (model.volume_tp(t, p + dp, n, phase)? - model.volume_tp(t, p - dp, n, phase)?)
+            / (2.0 * dp),
+        v / p,
+        1e-5,
+        1e-7,
+    );
+    assert_phys_close(
+        "dv/dP FD",
+        svd.dp,
+        (model.specific_volume(t, p + dp, n, phase)?
+            - model.specific_volume(t, p - dp, n, phase)?)
+            / (2.0 * dp),
+        (v / sumn) / p,
+        1e-5,
+        1e-7,
+    );
+    assert_phys_close(
         "dH/dT FD",
         hd.dt,
         (model.enthalpy(t + dt, p, n, phase)? - model.enthalpy(t - dt, p, n, phase)?) / (2.0 * dt),
+        sumn * R,
         1e-5,
-        1e-6,
+        1e-7,
     );
-    assert_close(
+    assert_phys_close(
         "dS/dP FD",
         sd.dp,
         (model.entropy(t, p + dp, n, phase)? - model.entropy(t, p - dp, n, phase)?) / (2.0 * dp),
+        v / t,
         1e-5,
-        1e-6,
+        1e-7,
     );
     for j in 0..nc {
         let mut np = n.to_vec();
@@ -336,10 +513,11 @@ fn verify_helmholtz_and_tp_fd(
         let lnp_p = model.ln_fugacity_tp(t, p, &np, phase)?;
         let lnp_m = model.ln_fugacity_tp(t, p, &nm, phase)?;
         for i in 0..nc {
-            assert_close(
+            assert_phys_close(
                 "dlnphi/dn FD",
                 fug.dn[i * nc + j],
                 (lnp_p[i] - lnp_m[i]) / (2.0 * dn),
+                1.0 / sumn,
                 1e-5,
                 1e-7,
             );
@@ -349,13 +527,218 @@ fn verify_helmholtz_and_tp_fd(
 }
 
 #[test]
-fn test_extcsp_all_backends_mixing_rules_and_twu_alpha() -> Result<()> {
+fn test_extcsp_tcpr_reference_untranslated_consistency() -> Result<()> {
+    // Regression test: "tcPR" auto-enables volume translation inside Cubic::with_options,
+    // so ExtCSP must explicitly disable translation on both shape and cubic reference EOS
+    // so volume_tp and pure_residual_helmholtz_tv stay 100% consistent!
+    let model = ExtCsp::with_options(
+        &["C3"],
+        ExtCspOptions {
+            shape_eos: CubicKind::PengRobinson,
+            shape_alpha: AlphaCorrelation::Twu,
+            reference_component: "C3",
+            reference_eos: ExtCspReferenceKind::Cubic {
+                kind: CubicKind::PengRobinson,
+                alpha: AlphaCorrelation::Twu,
+            },
+            parameter_reference: "tcPR",
+            ..Default::default()
+        },
+    )?;
+    assert!(!model.shape_eos().volume_translation_enabled());
+    verify_helmholtz_and_tp_fd(&model, 300.0, 2.5e6, &[1.0], Phase::Liquid)?;
+    verify_helmholtz_and_tp_fd(&model, 350.0, 2.0e6, &[2.5], Phase::Vapor)?;
+    Ok(())
+}
+
+#[test]
+fn test_extcsp_active_twu_alpha_and_amount_invariance() -> Result<()> {
+    // Verify genuine Twu alpha (no Classic fallback!) using "tcPR" database parameters.
+    let model = ExtCsp::with_options(
+        &["C1", "C3"],
+        ExtCspOptions {
+            shape_eos: CubicKind::PengRobinson,
+            shape_alpha: AlphaCorrelation::Twu,
+            parameter_reference: "tcPR",
+            ..Default::default()
+        },
+    )?;
+    for idx in 0..2 {
+        let a = model.shape_eos().alpha(idx)?;
+        assert_eq!(a.correlation, AlphaCorrelation::Twu);
+        assert!(
+            !a.used_fallback,
+            "component {idx} unexpectedly fell back from Twu"
+        );
+    }
+    let ref_alpha = model.reference_alpha();
+    assert_eq!(ref_alpha.correlation, AlphaCorrelation::Twu);
+    assert!(
+        !ref_alpha.used_fallback,
+        "reference C3 unexpectedly fell back from Twu"
+    );
+
+    // Independently check the implicit Twu equation: F * alpha_Twu(N*T/F; L,M,N_exp) == D / (H * ac0)
+    let t = 300.0;
+    let p = 2.5e6;
+    let base_n = [0.4, 0.6];
+    let (h_base, f_base) = model.shape_factors(t, &base_n)?;
+    let [l_param, m_param, n_exp] = ref_alpha.parameters;
+    let tc0 = model.reference_critical_temperature();
+    let tr0 = (1.0 * t / f_base) / tc0;
+    let alpha_twu_indep =
+        tr0.powf(n_exp * (m_param - 1.0)) * (l_param * (1.0 - tr0.powf(n_exp * m_param))).exp();
+    let prep = model.shape_eos().prepare(t, &base_n)?;
+    let b_molar = h_base * model.reference_bc0();
+    let v_probe = 1.0e-2;
+    let p_pr = prep.pressure(v_probe)?.value;
+    let a_molar = (R * t / (v_probe - b_molar) - p_pr)
+        * (v_probe * v_probe + 2.0 * b_molar * v_probe - b_molar * b_molar);
+    let rhs = a_molar / (h_base * model.reference_ac0());
+    assert_phys_close(
+        "independent Twu implicit equation",
+        f_base * alpha_twu_indep,
+        rhs,
+        rhs,
+        1e-13,
+        1e-14,
+    );
+
+    // Exact scale invariance of intensive shape factors (H/N, F/N) across 18 orders of magnitude
+    for scale in [1.0e-12_f64, 0.37, 2.5, 1.0e6] {
+        let scaled = [base_n[0] * scale, base_n[1] * scale];
+        let (h_s, f_s) = model.shape_factors(t, &scaled)?;
+        assert_phys_close(
+            &format!("H/N invariance at scale {scale:e}"),
+            h_s / scale,
+            h_base,
+            h_base,
+            1e-14,
+            1e-15,
+        );
+        assert_phys_close(
+            &format!("F/N invariance at scale {scale:e}"),
+            f_s / scale,
+            f_base,
+            f_base,
+            1e-14,
+            1e-15,
+        );
+    }
+
+    // Full Helmholtz + TP FD at non-unit moles
+    verify_helmholtz_and_tp_fd(&model, t, p, &[1.2, 1.8], Phase::Vapor)?;
+    verify_helmholtz_and_tp_fd(&model, 240.0, 5.0e6, &[0.8, 1.2], Phase::Liquid)?;
+    Ok(())
+}
+
+#[test]
+fn test_extcsp_volume_vs_specific_volume_derivatives() -> Result<()> {
+    let model = ExtCsp::new(&["C1", "C3"])?;
+    let t = 320.0;
+    let p = 2.0e6;
+    let n = [1.2, 0.8];
+    let sumn = 2.0;
+    let phase = Phase::Vapor;
+
+    let v_ext = model.volume_tp(t, p, &n, phase)?;
+    let v_mol = model.specific_volume(t, p, &n, phase)?;
+    let vd = model.volume_tp_derivatives(t, p, &n, phase)?;
+    let svd = model.specific_volume_derivatives(t, p, &n, phase)?;
+
+    assert_phys_close("v_ext == vd.value", v_ext, vd.value, v_ext, 1e-14, 1e-14);
+    assert_phys_close("v_mol == svd.value", v_mol, svd.value, v_mol, 1e-14, 1e-14);
+    assert_phys_close(
+        "vd.value == N * svd.value",
+        vd.value,
+        sumn * svd.value,
+        v_ext,
+        1e-14,
+        1e-14,
+    );
+
+    // Euler homogeneity: sum(n_i * dV/dn_i) = V (degree 1), sum(n_i * dv/dn_i) = 0 (degree 0)
+    let euler_ext = n[0] * vd.dn[0] + n[1] * vd.dn[1];
+    let euler_mol = n[0] * svd.dn[0] + n[1] * svd.dn[1];
+    assert_phys_close("Euler V", euler_ext, v_ext, v_ext, 1e-12, 1e-12);
+    assert_phys_close("Euler v", euler_mol, 0.0, v_mol, 1e-12, 1e-12);
+
+    // Central FD of both extensive volume_tp and molar specific_volume w.r.t. T, P, n
+    let dt = 1e-5 * t;
+    let dp = 1e-5 * p;
+    let dn = 1e-6 * sumn;
+    assert_phys_close(
+        "dV/dT FD",
+        vd.dt,
+        (model.volume_tp(t + dt, p, &n, phase)? - model.volume_tp(t - dt, p, &n, phase)?)
+            / (2.0 * dt),
+        v_ext / t,
+        1e-6,
+        1e-8,
+    );
+    assert_phys_close(
+        "dv/dT FD",
+        svd.dt,
+        (model.specific_volume(t + dt, p, &n, phase)?
+            - model.specific_volume(t - dt, p, &n, phase)?)
+            / (2.0 * dt),
+        v_mol / t,
+        1e-6,
+        1e-8,
+    );
+    assert_phys_close(
+        "dV/dP FD",
+        vd.dp,
+        (model.volume_tp(t, p + dp, &n, phase)? - model.volume_tp(t, p - dp, &n, phase)?)
+            / (2.0 * dp),
+        v_ext / p,
+        1e-6,
+        1e-8,
+    );
+    assert_phys_close(
+        "dv/dP FD",
+        svd.dp,
+        (model.specific_volume(t, p + dp, &n, phase)?
+            - model.specific_volume(t, p - dp, &n, phase)?)
+            / (2.0 * dp),
+        v_mol / p,
+        1e-6,
+        1e-8,
+    );
+    for j in 0..2 {
+        let mut np = n;
+        let mut nm = n;
+        np[j] += dn;
+        nm[j] -= dn;
+        assert_phys_close(
+            "dV/dn FD",
+            vd.dn[j],
+            (model.volume_tp(t, p, &np, phase)? - model.volume_tp(t, p, &nm, phase)?) / (2.0 * dn),
+            v_mol,
+            1e-6,
+            1e-8,
+        );
+        assert_phys_close(
+            "dv/dn FD",
+            svd.dn[j],
+            (model.specific_volume(t, p, &np, phase)? - model.specific_volume(t, p, &nm, phase)?)
+                / (2.0 * dn),
+            v_mol / sumn,
+            1e-6,
+            1e-8,
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn test_extcsp_all_backends_wong_sandler_zero_components_and_minimum_gibbs() -> Result<()> {
     // 1. NIST MEOS + VdW (classic)
     let m_nist = ExtCsp::new(&["C1", "C2", "C3"])?;
     verify_helmholtz_and_tp_fd(&m_nist, 310.0, 4.0e6, &[1.0, 0.6, 0.4], Phase::Vapor)?;
     verify_helmholtz_and_tp_fd(&m_nist, 230.0, 6.0e6, &[0.5, 0.3, 0.2], Phase::Liquid)?;
 
-    // 2. Cubic SRK & PR reference backends (upstream bug #1 fixed!)
+    // 2. Cubic SRK & PR reference backends + independent non-circular mapped Helmholtz check
     let m_cb_srk = ExtCsp::with_options(
         &["C1", "C3"],
         ExtCspOptions {
@@ -382,7 +765,31 @@ fn test_extcsp_all_backends_mixing_rules_and_twu_alpha() -> Result<()> {
     )?;
     verify_helmholtz_and_tp_fd(&m_cb_pr, 250.0, 6.0e6, &[0.4, 0.6], Phase::Liquid)?;
 
-    // 3. MBWR19 (Bender) & MBWR32 reference backends (upstream bugs #2 & #3 fixed!)
+    // Independent mapped reference-state verification for Cubic PR backend on binary mixture:
+    {
+        let t = 250.0;
+        let p = 6.0e6;
+        let n = [0.4, 0.6];
+        let (h, f_shape) = m_cb_pr.shape_factors(t, &n)?;
+        let v = m_cb_pr.volume_tp(t, p, &n, Phase::Liquid)?;
+        let t0 = t / f_shape;
+        let p0 = h * p / f_shape;
+        let ref_pr = Cubic::new(CubicKind::PengRobinson, &["C3"])?;
+        let v0_ref = ref_pr.prepare(t0, &[1.0])?.volume(p0, Phase::Liquid)?;
+        assert_phys_close("Cubic PR mapped v == H*v0", v, h * v0_ref, v, 1e-12, 1e-13);
+        let p_ref = ref_pr.prepare(t0, &[1.0])?.pressure(v / h)?.value;
+        let p_csp = m_cb_pr.pressure_tv(t, v, &n)?.value;
+        assert_phys_close(
+            "Cubic PR mapped P == (F/H)*P0",
+            p_csp,
+            (f_shape / h) * p_ref,
+            p,
+            1e-11,
+            1e-12,
+        );
+    }
+
+    // 3. MBWR19 (Bender) & MBWR32 reference backends + independent non-circular mapped check
     let m_mbwr19 = ExtCsp::with_options(
         &["C1", "C3"],
         ExtCspOptions {
@@ -401,18 +808,27 @@ fn test_extcsp_all_backends_mixing_rules_and_twu_alpha() -> Result<()> {
     )?;
     verify_helmholtz_and_tp_fd(&m_mbwr32, 240.0, 5.0e6, &[0.5, 0.5], Phase::Liquid)?;
 
-    // 4. Twu alpha correlation (upstream bug #4 fixed!)
-    let m_twu = ExtCsp::with_options(
-        &["C1", "C3"],
-        ExtCspOptions {
-            shape_eos: CubicKind::PengRobinson,
-            shape_alpha: AlphaCorrelation::Twu,
-            ..Default::default()
-        },
-    )?;
-    verify_helmholtz_and_tp_fd(&m_twu, 300.0, 2.5e6, &[0.4, 0.6], Phase::Vapor)?;
+    for (kind, model, t, p, ph) in [
+        (MbwrKind::Bender19, &m_mbwr19, 320.0, 2.5e6, Phase::Vapor),
+        (MbwrKind::Mbwr32, &m_mbwr32, 240.0, 5.0e6, Phase::Liquid),
+    ] {
+        let n = [0.5, 0.5];
+        let (h, f_shape) = model.shape_factors(t, &n)?;
+        let v = model.volume_tp(t, p, &n, ph)?;
+        let f_csp = model.residual_helmholtz_tv(t, v, &n)?;
+        let mbwr = Mbwr::new(kind, "C3")?;
+        let f_ref = mbwr.prepare(t / f_shape)?.residual_helmholtz(v / h, 1.0)?;
+        assert_phys_close(
+            "MBWR binary mapped F",
+            f_csp.f,
+            f_ref.value,
+            1.0,
+            1e-12,
+            1e-12,
+        );
+    }
 
-    // 5. Wong-Sandler mixing rule (exercises nonzero H_T, H_TT, H_iT!)
+    // 4. Wong-Sandler mixing rule: verify non-zero H_T against Cubic::wong_sandler_coefficients!
     let mut ws = thermopack_rs::wong_sandler::WongSandlerData::new(2);
     ws.set_kij(0, 1, thermopack_rs::wong_sandler::Fraction::constant(0.1))?;
     ws.set_kij(1, 0, thermopack_rs::wong_sandler::Fraction::constant(0.1))?;
@@ -429,7 +845,216 @@ fn test_extcsp_all_backends_mixing_rules_and_twu_alpha() -> Result<()> {
             ..Default::default()
         },
     )?;
-    verify_helmholtz_and_tp_fd(&m_ws, 320.0, 3.0e6, &[0.5, 0.5], Phase::Vapor)?;
+    let ws_t = 320.0;
+    let ws_n = [0.5, 0.5];
+    let ws_coeffs = m_ws.shape_eos().wong_sandler_coefficients(ws_t, &ws_n)?;
+    let h_t_expected = ws_coeffs.b_t / m_ws.reference_bc0();
+    assert!(
+        h_t_expected.abs() > 1e-7,
+        "Wong-Sandler H_T must be genuinely non-zero (got {h_t_expected:.3e})"
+    );
+    let dt = 1e-4 * ws_t;
+    let (h_p, _) = m_ws.shape_factors(ws_t + dt, &ws_n)?;
+    let (h_m, _) = m_ws.shape_factors(ws_t - dt, &ws_n)?;
+    assert_phys_close(
+        "Wong-Sandler H_T vs shape_factors FD",
+        h_t_expected,
+        (h_p - h_m) / (2.0 * dt),
+        h_t_expected.abs(),
+        1e-6,
+        1e-8,
+    );
+    verify_helmholtz_and_tp_fd(&m_ws, ws_t, 3.0e6, &ws_n, Phase::Vapor)?;
+
+    // 5. Phase::MinimumGibbs selects the lower-Gibbs phase across all three reference backends
+    for model in [&m_nist, &m_cb_srk, &m_mbwr32] {
+        let n_len = model.components().len();
+        let n_vec: Vec<f64> = if n_len == 3 {
+            vec![0.5, 0.3, 0.2]
+        } else {
+            vec![0.5, 0.5]
+        };
+        let t = 260.0;
+        let p = 3.0e6;
+        let g_min = model.gibbs(t, p, &n_vec, Phase::MinimumGibbs)?;
+        let g_liq = model.gibbs(t, p, &n_vec, Phase::Liquid);
+        let g_vap = model.gibbs(t, p, &n_vec, Phase::Vapor);
+        match (g_liq, g_vap) {
+            (Ok(gl), Ok(gv)) => {
+                assert_phys_close(
+                    "MinimumGibbs selects lower G",
+                    g_min,
+                    gl.min(gv),
+                    R * t,
+                    1e-11,
+                    1e-11,
+                );
+            }
+            (Ok(gl), Err(_)) => assert_phys_close(
+                "MinimumGibbs liquid fallback",
+                g_min,
+                gl,
+                R * t,
+                1e-11,
+                1e-11,
+            ),
+            (Err(_), Ok(gv)) => assert_phys_close(
+                "MinimumGibbs vapor fallback",
+                g_min,
+                gv,
+                R * t,
+                1e-11,
+                1e-11,
+            ),
+            (Err(e), Err(_)) => return Err(e),
+        }
+    }
+
+    // 6. Zero-component mixtures: exact sub-mixture equivalence + finite residual/fugacity
+    //    derivatives + documented 1e-100 regularization on absent-component total S/G.
+    {
+        let t = 320.0;
+        let p = 3.0e6;
+        let m_bin = ExtCsp::new(&["C1", "C3"])?;
+        let n_tern = [0.6, 0.0, 0.4];
+        let n_bin = [0.6, 0.4];
+
+        let v_tern = m_nist.volume_tp(t, p, &n_tern, Phase::Vapor)?;
+        let v_bin = m_bin.volume_tp(t, p, &n_bin, Phase::Vapor)?;
+        assert_phys_close("zero-comp volume", v_tern, v_bin, v_bin, 1e-12, 1e-12);
+
+        let fug_tern = m_nist.ln_fugacity_derivatives_tp(t, p, &n_tern, Phase::Vapor)?;
+        let fug_bin = m_bin.ln_fugacity_derivatives_tp(t, p, &n_bin, Phase::Vapor)?;
+        assert!(fug_tern.ln_phi.iter().all(|v| v.is_finite()));
+        assert!(fug_tern.dn.iter().all(|v| v.is_finite()));
+        assert_phys_close(
+            "zero-comp ln_phi[0]",
+            fug_tern.ln_phi[0],
+            fug_bin.ln_phi[0],
+            1.0,
+            1e-12,
+            1e-12,
+        );
+        assert_phys_close(
+            "zero-comp ln_phi[2]",
+            fug_tern.ln_phi[2],
+            fug_bin.ln_phi[1],
+            1.0,
+            1e-12,
+            1e-12,
+        );
+
+        let s_res = m_nist.residual_entropy_derivatives(t, p, &n_tern, Phase::Vapor)?;
+        let s_tot = m_nist.entropy_derivatives(t, p, &n_tern, Phase::Vapor)?;
+        let g_tot = m_nist.gibbs_derivatives(t, p, &n_tern, Phase::Vapor)?;
+        assert!(s_res.dn.iter().all(|v| v.is_finite()));
+        assert!(s_tot.dn.iter().all(|v| v.is_finite()));
+        assert!(g_tot.dn.iter().all(|v| v.is_finite()));
+        assert_phys_close(
+            "zero-comp total entropy == scalar",
+            s_tot.value,
+            m_nist.entropy(t, p, &n_tern, Phase::Vapor)?,
+            R,
+            1e-12,
+            1e-12,
+        );
+        let ideal1 = m_nist.ideal_gas(1)?.properties(t, p)?;
+        assert_phys_close(
+            "zero-comp absent dS/dn regularized",
+            s_tot.dn[1],
+            s_res.dn[1] + ideal1.entropy - R * 1.0e-100_f64.ln(),
+            R * 250.0,
+            1e-12,
+            1e-12,
+        );
+
+        // Pure component embedded in binary [0.0, 1.0]
+        let m_pure = ExtCsp::new(&["C3"])?;
+        assert_phys_close(
+            "embedded pure C3 volume",
+            m_bin.volume_tp(t, p, &[0.0, 1.0], Phase::Vapor)?,
+            m_pure.volume_tp(t, p, &[1.0], Phase::Vapor)?,
+            1e-3,
+            1e-12,
+            1e-12,
+        );
+    }
+
+    // 7. Coherent shape alpha setter (replaces unsafe &mut Cubic exposure)
+    {
+        let mut custom = ExtCsp::new(&["C1", "C3"])?;
+        custom.set_shape_alpha(0, AlphaCorrelation::Classic, &[0.52])?;
+        assert_phys_close(
+            "custom shape alpha",
+            custom.shape_eos().alpha(0)?.parameters[0],
+            0.52,
+            1.0,
+            1e-15,
+            1e-15,
+        );
+        verify_helmholtz_and_tp_fd(&custom, 320.0, 2.0e6, &[0.5, 0.5], Phase::Vapor)?;
+    }
+
+    Ok(())
+}
+
+#[test]
+fn test_extcsp_nist_c3_only_constraint() -> Result<()> {
+    // Propane aliases accepted for NIST_MEOS
+    assert!(
+        ExtCsp::with_options(
+            &["C1", "C3"],
+            ExtCspOptions {
+                reference_component: "C3",
+                reference_eos: ExtCspReferenceKind::NistMeos,
+                ..Default::default()
+            },
+        )
+        .is_ok()
+    );
+    assert!(
+        ExtCsp::with_options(
+            &["C1", "C3"],
+            ExtCspOptions {
+                reference_component: "Propane",
+                reference_eos: ExtCspReferenceKind::NistMeos,
+                ..Default::default()
+            },
+        )
+        .is_ok()
+    );
+
+    // Non-propane NIST fluids rejected
+    for bad_ref in ["R134A", "N-H2", "O-H2", "P-H2"] {
+        let err = ExtCsp::with_options(
+            &["C1", "C3"],
+            ExtCspOptions {
+                reference_component: bad_ref,
+                reference_eos: ExtCspReferenceKind::NistMeos,
+                ..Default::default()
+            },
+        )
+        .unwrap_err();
+        assert!(
+            matches!(err, Error::InvalidInput(_)),
+            "expected InvalidInput for NIST_MEOS reference {bad_ref}, got {err:?}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn test_extcsp_speed_of_sound_rejects_mechanically_unstable_state() -> Result<()> {
+    let model = ExtCsp::new(&["C3"])?;
+    // Inside the two-phase spinodal for C3: T = 330 K, V = 3.8e-4 m^3/mol has dP/dV > 0.
+    let p_tv = model.pressure_tv(330.0, 3.8e-4, &[1.0])?;
+    assert!(
+        p_tv.dv > 0.0,
+        "expected mechanically unstable state (dP/dV > 0), got {}",
+        p_tv.dv
+    );
+    let err = model.speed_of_sound_tv(330.0, 3.8e-4, &[1.0]).unwrap_err();
+    assert!(matches!(err, Error::NoPhysicalRoot));
     Ok(())
 }
 
@@ -445,17 +1070,15 @@ fn test_extcsp_pure_reference_fluid_identities() -> Result<()> {
     let csp_nist = ExtCsp::new(&["C3"])?;
     let meos = Multiparameter::new("C3")?;
     let (h, f) = csp_nist.shape_factors(t, &[n])?;
-    // Note: C3 tc/pc in compdb vs NIST_MEOS record differ by ~0.01 K, so shape factors
-    // are ~N (not exact 1.0 unless tc/pc match). Check reference EOS direct identity for Cubic & MBWR,
-    // and check NIST_MEOS consistency via exact t0, v0 mapping:
     let t0 = n * t / f;
     let v = csp_nist.volume_tp(t, p, &[n], Phase::Vapor)?;
     let f_csp = csp_nist.residual_helmholtz_tv(t, v, &[n])?;
     let f_meos = meos.prepare(t0)?.residual_helmholtz(v / h, 1.0)?;
-    assert_close(
+    assert_phys_close(
         "NIST C3 mapped F_res",
         f_csp.f,
         n * f_meos.value,
+        n,
         1e-12,
         1e-12,
     );
@@ -474,33 +1097,43 @@ fn test_extcsp_pure_reference_fluid_identities() -> Result<()> {
     )?;
     let srk = Cubic::new(CubicKind::SoaveRedlichKwong, &["C3"])?;
     let (h, f) = csp_srk.shape_factors(t, &[n])?;
-    assert_close("Pure SRK H == N", h, n, 1e-13, 1e-13);
-    assert_close("Pure SRK F == N", f, n, 1e-13, 1e-13);
+    assert_phys_close("Pure SRK H == N", h, n, n, 1e-13, 1e-13);
+    assert_phys_close("Pure SRK F == N", f, n, n, 1e-13, 1e-13);
     let v_csp = csp_srk.specific_volume(t, p, &[n], Phase::Vapor)?;
     let srk_state = srk.prepare(t, &[1.0])?;
     let v_srk = srk_state.volume(p, Phase::Vapor)?;
-    assert_close("Pure SRK volume identity", v_csp, v_srk, 1e-12, 1e-12);
-    assert_close(
+    assert_phys_close(
+        "Pure SRK volume identity",
+        v_csp,
+        v_srk,
+        v_srk,
+        1e-12,
+        1e-12,
+    );
+    assert_phys_close(
         "Pure SRK enthalpy identity",
         csp_srk.enthalpy(t, p, &[1.0], Phase::Vapor)?,
         srk_state.enthalpy(v_srk)?,
+        R * t,
         1e-11,
         1e-11,
     );
-    assert_close(
+    assert_phys_close(
         "Pure SRK entropy identity",
         csp_srk.entropy(t, p, &[1.0], Phase::Vapor)?,
         srk_state.entropy(v_srk)?,
+        R,
         1e-11,
         1e-11,
     );
 
-    // 3. Cubic PR C3 with Twu alpha: H == N and F == N IDENTICALLY!
+    // 3. Cubic PR C3 with genuine Twu alpha ("tcPR", untranslated): H == N and F == N IDENTICALLY!
     let csp_pr_twu = ExtCsp::with_options(
         &["C3"],
         ExtCspOptions {
             shape_eos: CubicKind::PengRobinson,
             shape_alpha: AlphaCorrelation::Twu,
+            parameter_reference: "tcPR",
             reference_eos: ExtCspReferenceKind::Cubic {
                 kind: CubicKind::PengRobinson,
                 alpha: AlphaCorrelation::Twu,
@@ -508,18 +1141,31 @@ fn test_extcsp_pure_reference_fluid_identities() -> Result<()> {
             ..Default::default()
         },
     )?;
-    let pr_twu = Cubic::with_alpha(
+    assert_eq!(
+        csp_pr_twu.reference_alpha().correlation,
+        AlphaCorrelation::Twu
+    );
+    assert!(!csp_pr_twu.reference_alpha().used_fallback);
+    let mut pr_twu = Cubic::with_alpha(
         CubicKind::PengRobinson,
         &["C3"],
         AlphaCorrelation::Twu,
-        "DEFAULT",
+        "tcPR",
     )?;
+    pr_twu.disable_volume_translation();
     let (h, f) = csp_pr_twu.shape_factors(t, &[n])?;
-    assert_close("Pure PR+Twu H == N", h, n, 1e-13, 1e-13);
-    assert_close("Pure PR+Twu F == N", f, n, 1e-13, 1e-13);
+    assert_phys_close("Pure PR+Twu H == N", h, n, n, 1e-13, 1e-13);
+    assert_phys_close("Pure PR+Twu F == N", f, n, n, 1e-13, 1e-13);
     let v_csp = csp_pr_twu.specific_volume(t, p, &[n], Phase::Vapor)?;
     let v_pr = pr_twu.prepare(t, &[1.0])?.volume(p, Phase::Vapor)?;
-    assert_close("Pure PR+Twu volume identity", v_csp, v_pr, 1e-12, 1e-12);
+    assert_phys_close(
+        "Pure PR+Twu volume identity",
+        v_csp,
+        v_pr,
+        v_pr,
+        1e-12,
+        1e-12,
+    );
 
     // 4. MBWR19 & MBWR32 C3 mapped residual Helmholtz identity
     for kind in [MbwrKind::Bender19, MbwrKind::Mbwr32] {
@@ -536,10 +1182,11 @@ fn test_extcsp_pure_reference_fluid_identities() -> Result<()> {
         let v = csp_mbwr.volume_tp(t, p, &[n], Phase::Vapor)?;
         let f_csp = csp_mbwr.residual_helmholtz_tv(t, v, &[n])?;
         let f_mbwr = mbwr.prepare(t0)?.residual_helmholtz(v / h, 1.0)?;
-        assert_close(
+        assert_phys_close(
             "MBWR C3 mapped F_res",
             f_csp.f,
             n * f_mbwr.value,
+            n,
             1e-12,
             1e-12,
         );

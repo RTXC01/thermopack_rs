@@ -109,7 +109,7 @@ def load_probe():
     probe.query_cpa_rdf.restype=None
     probe.query_wong_sandler.argtypes=[c_double,POINTER(c_double),POINTER(c_double),POINTER(c_double),POINTER(c_double),POINTER(c_double),POINTER(c_int)]
     probe.query_wong_sandler.restype=None
-    probe.query_extcsp_fres.argtypes=[c_double,c_double,POINTER(c_double),POINTER(c_double),POINTER(c_int)]
+    probe.query_extcsp_fres.argtypes=[c_double,c_double,POINTER(c_double),c_int,POINTER(c_double),POINTER(c_int)]
     probe.query_extcsp_fres.restype=None
     probe.query_lk_gdep.argtypes=[c_double,c_double,POINTER(c_double),c_int,POINTER(c_double),POINTER(c_int)]
     probe.query_lk_gdep.restype=None
@@ -186,8 +186,9 @@ def main(compiler_directory):
             v_tp,dvdt,dvdp,dvdn=model.specific_volume(t,p,x_vec,phase,dvdt=True,dvdp=True,dvdn=True)
             v_tv=float(request.get('volume',v_tp*sumn))
             amounts=(c_double*16)(*n_vec,*([0.0]*(16-nc)))
-            fres_out=(c_double*256)();fres_cnt=c_int()
-            probe.query_extcsp_fres(t,v_tv,amounts,fres_out,byref(fres_cnt))
+            fres_cap=max(256,6+3*nc+nc*nc)
+            fres_out=(c_double*fres_cap)();fres_cnt=c_int()
+            probe.query_extcsp_fres(t,v_tv,amounts,fres_cap,fres_out,byref(fres_cnt))
             fres_vals=[float(fres_out[i]) for i in range(fres_cnt.value)]
             ptv,dptv_dt,dptv_dv,dptv_dn=model.pressure_tv(t,v_tv,n_vec,dpdt=True,dpdv=True,dpdn=True)
             utv=model.internal_energy_tv(t,v_tv,n_vec)[0]

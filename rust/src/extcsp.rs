@@ -4,19 +4,22 @@
 //! combining a two-parameter cubic shape-factor EOS (`SRK` or `PR` with any supported
 //! cubic mixing rule: `VdW`, `HuronVidal1`, `HuronVidal2`, `Nrtl`, `Unifac`,
 //! `WongSandler`) with a pure-fluid reference EOS:
-//! - NIST multiparameter EOS (`Multiparameter`, e.g. `"C3"` propane)
+//! - NIST multiparameter EOS (`Multiparameter`, propane `"C3"`)
 //! - Pure-fluid cubic EOS (`SRK` or `PR`)
 //! - Pure-fluid MBWR-19 (Bender) or MBWR-32 EOS (`Mbwr`)
 //!
 //! Unlike the upstream Fortran `src/extcsp.f90`, this implementation operates
-//! exclusively in base SI units (`K`, `Pa`, `m^3`, `mol`, `J`) and fixes four
+//! exclusively in base SI units (`K`, `Pa`, `m^3`, `mol`, `J`) and fixes the
 //! upstream defects documented in `docs/rust/baseline-defects.md`:
 //! 1. Cubic reference EOS initialization (`refEosType` left unset in `csp_init`).
-//! 2. MBWR reference EOS derivative overwrite in `calcRefEqDiff`.
+//! 2. MBWR reference EOS derivative overwrite in `calcRefEqDiff` and unit conversion.
 //! 3. `MBWR19` selection prefix check in `extcsp_eos_allocate_and_init`.
 //! 4. Uninitialized `F` seed, wrong `N`/`sumn` symbol in `F_function_TWU`, and
 //!    hardcoded classic derivatives in `a0_diff` for Twu alpha correlations.
+//! 5. Omitted covolume temperature derivatives (`BT`, `BTT`, `BiT`) and `v0_T`
+//!    chain-rule terms for temperature-dependent mixing rules such as Wong-Sandler.
 
+use crate::cubic::PreparedState as CubicPreparedState;
 use crate::error::positive;
 use crate::{
     Alpha, AlphaCorrelation, Component, Cubic, CubicKind, CubicOptions, Error, IdealGas, Mbwr,
@@ -26,7 +29,7 @@ use crate::{
 /// Reference equation of state specification for [`ExtCspOptions`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExtCspReferenceKind {
-    /// NIST multiparameter reference equation (standard choice: `"C3"`).
+    /// NIST multiparameter reference equation (propane `"C3"` only).
     NistMeos,
     /// Pure-fluid two-parameter cubic reference equation (`SRK` or `PR`).
     Cubic {
@@ -122,10 +125,13 @@ pub struct ExtCspCaloricTv {
 
 /// Scalar TP property value with analytical `(T, P, n)` derivatives.
 ///
-/// For intensive quantities (`Z`), `dn[i] = dZ / dn_i`. For extensive
-/// properties (`V`, `H`, `S`, `G`), `value`, `dt`, `dp` are extensive for the
-/// supplied mole vector `n` (equal to molar when `sum(n) == 1.0`), and
-/// `dn[i]` is the partial molar derivative `d(value) / dn_i`.
+/// For intensive/molar quantities (`Z` via [`ExtCsp::compressibility_factor_derivatives`]
+/// and `v = V / N` via [`ExtCsp::specific_volume_derivatives`]), `value`, `dt`, `dp`,
+/// and `dn[i] = d(value) / dn_i` are derivatives of the intensive quantity itself.
+/// For extensive properties (`V` via [`ExtCsp::volume_tp_derivatives`], `H`, `S`, `G`),
+/// `value`, `dt`, and `dp` are extensive for the supplied mole vector `n` (equal to
+/// molar when `sum(n) == 1.0`), and `dn[i]` is the partial molar derivative
+/// `d(value) / dn_i`.
 #[derive(Debug, Clone)]
 pub struct ExtCspDerivatives {
     pub value: f64,
@@ -176,7 +182,7 @@ impl ExtCsp {
                 "ExtCSP shape EOS must be SoaveRedlichKwong or PengRobinson",
             ));
         }
-        let shape_eos = Cubic::with_options(
+        let mut shape_eos = Cubic::with_options(
             options.shape_eos,
             components,
             CubicOptions {
@@ -187,7 +193,12 @@ impl ExtCsp {
                 wong_sandler: options.wong_sandler,
             },
         )?;
-        let shape_eos_ref = Cubic::with_options(
+        // Reference-aware parameter sets such as "tcPR" auto-enable volume
+        // translation in Cubic::with_options; ExtCSP shape factors always use
+        // untranslated cubic covolumes.
+        shape_eos.disable_volume_translation();
+
+        let mut shape_eos_ref = Cubic::with_options(
             options.shape_eos,
             &[options.reference_component],
             CubicOptions {
@@ -198,6 +209,8 @@ impl ExtCsp {
                 ..Default::default()
             },
         )?;
+        shape_eos_ref.disable_volume_translation();
+
         let ref_component = shape_eos_ref.components()[0];
         let ref_alpha = *shape_eos_ref.alpha(0)?;
         let classic_corr = match options.shape_eos {
@@ -209,7 +222,12 @@ impl ExtCsp {
 
         let (reference, tc0, pc0) = match options.reference_eos {
             ExtCspReferenceKind::NistMeos => {
-                let meos = Multiparameter::new(options.reference_component)?;
+                if !ref_component.ident.eq_ignore_ascii_case("C3") {
+                    return Err(Error::InvalidInput(
+                        "ExtCSP NIST_MEOS reference requires propane (C3)",
+                    ));
+                }
+                let meos = Multiparameter::new(ref_component.ident)?;
                 let tc0 = meos.tc();
                 let pc0 = meos.pc();
                 (ReferenceBackend::Multiparameter(Box::new(meos)), tc0, pc0)
@@ -220,7 +238,7 @@ impl ExtCsp {
                         "ExtCSP cubic reference EOS must be SoaveRedlichKwong or PengRobinson",
                     ));
                 }
-                let cb = Cubic::with_options(
+                let mut cb = Cubic::with_options(
                     kind,
                     &[options.reference_component],
                     CubicOptions {
@@ -231,6 +249,9 @@ impl ExtCsp {
                         ..Default::default()
                     },
                 )?;
+                // Ensure volume_tp and pure_residual_helmholtz_tv share the
+                // exact same untranslated volume convention even for "tcPR".
+                cb.disable_volume_translation();
                 let tc0 = cb.components()[0].critical_temperature;
                 let pc0 = cb.components()[0].critical_pressure;
                 (ReferenceBackend::Cubic(Box::new(cb)), tc0, pc0)
@@ -281,6 +302,11 @@ impl ExtCsp {
         self.ref_component
     }
 
+    /// Active alpha correlation used by the reference shape fluid.
+    pub fn reference_alpha(&self) -> Alpha {
+        self.ref_alpha
+    }
+
     /// Reference EOS critical temperature `[K]`.
     pub fn reference_critical_temperature(&self) -> f64 {
         self.tc0
@@ -306,9 +332,14 @@ impl ExtCsp {
         &self.shape_eos
     }
 
-    /// Mutably borrow the underlying cubic shape-factor EOS.
-    pub fn shape_eos_mut(&mut self) -> &mut Cubic {
-        &mut self.shape_eos
+    /// Set one mixture component's shape-EOS alpha correlation and parameters.
+    pub fn set_shape_alpha(
+        &mut self,
+        index: usize,
+        correlation: AlphaCorrelation,
+        parameters: &[f64],
+    ) -> Result<()> {
+        self.shape_eos.set_alpha(index, correlation, parameters)
     }
 
     /// Get binary attraction interaction parameter `kij`.
@@ -336,7 +367,7 @@ impl ExtCsp {
         self.shape_eos.ideal_gas_mut(index)
     }
 
-    fn validate_moles(&self, moles: &[f64]) -> Result<(f64, Vec<f64>)> {
+    fn sum_moles(&self, moles: &[f64]) -> Result<f64> {
         if moles.len() != self.shape_eos.components().len() {
             return Err(Error::InvalidInput("composition length mismatch"));
         }
@@ -350,6 +381,11 @@ impl ExtCsp {
             sum += ni;
         }
         positive(sum, "total moles")?;
+        Ok(sum)
+    }
+
+    fn validate_moles(&self, moles: &[f64]) -> Result<(f64, Vec<f64>)> {
+        let sum = self.sum_moles(moles)?;
         let x: Vec<f64> = moles.iter().map(|&ni| ni / sum).collect();
         Ok((sum, x))
     }
@@ -367,57 +403,71 @@ impl ExtCsp {
     }
 
     /// Solve `F * alpha_ref(N * T / F) = D / (H * ac0)` for the temperature shape factor `F` `[mol]`.
-    fn solve_temperature_shape_factor(&self, h: f64, d: f64, t: f64, moles: f64) -> Result<f64> {
-        positive(h, "volume shape factor H")?;
-        positive(d, "mixture attraction parameter D")?;
-        let target = d / (h * self.ac0);
+    ///
+    /// Solved in the scale-invariant intensive variable `f = F / N` so that `F / N`
+    /// is invariant across arbitrary total mole scalings.
+    fn solve_temperature_shape_factor(
+        &self,
+        h_molar: f64,
+        a_molar: f64,
+        t: f64,
+        moles: f64,
+    ) -> Result<f64> {
+        positive(h_molar, "molar volume shape factor h")?;
+        positive(a_molar, "molar mixture attraction parameter a")?;
+        let target_molar = a_molar / (h_molar * self.ac0);
+        positive(target_molar, "molar temperature shape target")?;
+
         if self.is_classic_m0_alpha() {
             let m0 = self.ref_alpha.parameters[0];
-            let root = (m0 * (t * moles / self.tc0).sqrt() + target.sqrt()) / (1.0 + m0);
-            let f = root * root;
+            let root = (m0 * (t / self.tc0).sqrt() + target_molar.sqrt()) / (1.0 + m0);
+            let f_int = root * root;
+            positive(f_int, "intensive temperature shape factor f")?;
+            let f = moles * f_int;
             positive(f, "temperature shape factor F")?;
             return Ok(f);
         }
 
-        // General alpha (including Twu): solve g(F) = F * alpha0(N*T/F) - target = 0
-        // starting from the classic-alpha closed-form seed.
+        // General alpha (including Twu): solve g(f) = f * alpha0(T / f) - target_molar = 0
+        // in intensive f = F / N starting from the classic-alpha closed-form seed.
         let m0 = self.ref_classic_m0;
-        let root_guess = (m0 * (t * moles / self.tc0).sqrt() + target.sqrt()) / (1.0 + m0);
-        let mut f = (root_guess * root_guess).max(1.0e-12 * moles);
-        let tol = 1.0e-14 * target.max(1.0);
+        let root_guess = (m0 * (t / self.tc0).sqrt() + target_molar.sqrt()) / (1.0 + m0);
+        let mut f_int = (root_guess * root_guess).max(1.0e-12);
+        let tol = 1.0e-14 * target_molar;
         let eval_g = |f_val: f64| -> Result<(f64, f64)> {
-            let t0 = moles * t / f_val;
+            let t0 = t / f_val;
             let av = self.ref_alpha.evaluate(t0, self.tc0)?;
-            let g = f_val * av.value - target;
+            let g = f_val * av.value - target_molar;
             let dg = av.value - t0 * av.dt;
             Ok((g, dg))
         };
 
         for _ in 0..80 {
-            let (g, dg) = eval_g(f)?;
+            let (g, dg) = eval_g(f_int)?;
             if !g.is_finite() || !dg.is_finite() || dg == 0.0 {
                 break;
             }
             if g.abs() <= tol {
+                let f = moles * f_int;
+                positive(f, "temperature shape factor F")?;
                 return Ok(f);
             }
             let step = g / dg;
-            let mut next = f - step;
+            let mut next = f_int - step;
             let mut damping = 1.0;
             while (!next.is_finite() || next <= 0.0) && damping > 1.0e-8 {
                 damping *= 0.5;
-                next = f - damping * step;
+                next = f_int - damping * step;
             }
             if next <= 0.0 || !next.is_finite() {
                 break;
             }
             let (g_next, _) = eval_g(next)?;
             if g_next.abs() > g.abs() {
-                // Backtrack in log space to keep F positive.
                 let mut alpha = 0.5;
                 let mut accepted = false;
                 for _ in 0..24 {
-                    let cand = f - alpha * step;
+                    let cand = f_int - alpha * step;
                     if cand > 0.0
                         && cand.is_finite()
                         && let Ok((gc, _)) = eval_g(cand)
@@ -433,19 +483,21 @@ impl ExtCsp {
                     break;
                 }
             }
-            let rel = (next - f).abs() / next.max(1.0e-30);
-            f = next;
+            let rel = (next - f_int).abs() / next;
+            f_int = next;
             if rel <= 1.0e-14 {
-                let (gf, _) = eval_g(f)?;
-                if gf.abs() <= 1.0e-11 * target.max(1.0) {
+                let (gf, _) = eval_g(f_int)?;
+                if gf.abs() <= 1.0e-12 * target_molar {
+                    let f = moles * f_int;
+                    positive(f, "temperature shape factor F")?;
                     return Ok(f);
                 }
             }
         }
 
-        // Bracketed bisection fallback using monotonicity of F * alpha0(N*T/F).
-        let mut lo = f * 0.5;
-        let mut hi = f * 2.0;
+        // Bracketed bisection fallback using monotonicity of f * alpha0(T / f).
+        let mut lo = f_int * 0.5;
+        let mut hi = f_int * 2.0;
         for _ in 0..80 {
             if eval_g(lo).is_ok_and(|(g, _)| g <= 0.0) {
                 break;
@@ -469,7 +521,9 @@ impl ExtCsp {
             let mid = 0.5 * (lo + hi);
             let (gm, _) = eval_g(mid)?;
             if gm.abs() <= tol || (hi - lo) <= 1.0e-14 * mid {
-                return Ok(mid);
+                let f = moles * mid;
+                positive(f, "temperature shape factor F")?;
+                return Ok(f);
             }
             if gm < 0.0 {
                 lo = mid;
@@ -477,7 +531,22 @@ impl ExtCsp {
                 hi = mid;
             }
         }
-        Ok(0.5 * (lo + hi))
+        let f = moles * 0.5 * (lo + hi);
+        positive(f, "temperature shape factor F")?;
+        Ok(f)
+    }
+
+    fn shape_factors_from_prepared(
+        &self,
+        prepared: &CubicPreparedState<'_>,
+        t: f64,
+        n_tot: f64,
+    ) -> Result<(f64, f64)> {
+        let (a_molar, b_molar) = prepared.mixture_ab();
+        let h_molar = b_molar / self.bc0;
+        let h = n_tot * h_molar;
+        let f = self.solve_temperature_shape_factor(h_molar, a_molar, t, n_tot)?;
+        Ok((h, f))
     }
 
     /// Evaluate reference reduced residual Helmholtz `alpr(T0, v0)` and its
@@ -582,45 +651,38 @@ impl ExtCsp {
     pub fn shape_factors(&self, t: f64, moles: &[f64]) -> Result<(f64, f64)> {
         positive(t, "temperature")?;
         let (n_tot, x) = self.validate_moles(moles)?;
-        let jet = self
-            .shape_eos
-            .prepare(t, &x)?
-            .mixture_parameter_jet(n_tot)?;
-        let h = jet.b / self.bc0;
-        let f = self.solve_temperature_shape_factor(h, jet.d, t, n_tot)?;
-        Ok((h, f))
+        let prepared = self.shape_eos.prepare(t, &x)?;
+        self.shape_factors_from_prepared(&prepared, t, n_tot)
     }
 
-    /// Reduced residual Helmholtz energy `F = A_res / (R T)` and all 10 first
-    /// and second derivative blocks with respect to `(T, V, n)`.
-    ///
-    /// Inputs are temperature `t` `[K]`, total volume `volume` `[m^3]`, and
-    /// mole vector `moles` `[mol]`.
-    pub fn residual_helmholtz_tv(
+    fn residual_helmholtz_tv_prepared(
         &self,
+        prepared: &CubicPreparedState<'_>,
         t: f64,
         volume: f64,
-        moles: &[f64],
+        n_tot: f64,
+        nc: usize,
+        shape_opt: Option<(f64, f64)>,
     ) -> Result<ExtCspHelmholtz> {
-        positive(t, "temperature")?;
-        positive(volume, "volume")?;
-        let (n_tot, x) = self.validate_moles(moles)?;
-        let nc = moles.len();
-
-        let jet = self
-            .shape_eos
-            .prepare(t, &x)?
-            .mixture_parameter_jet(n_tot)?;
+        let jet = prepared.mixture_parameter_jet(n_tot)?;
         let inv_bc0 = 1.0 / self.bc0;
 
-        let h = jet.b * inv_bc0;
+        let (h, f_shape) = match shape_opt {
+            Some(pair) => pair,
+            None => {
+                let (a_molar, b_molar) = prepared.mixture_ab();
+                let h_molar = b_molar * inv_bc0;
+                let h_val = n_tot * h_molar;
+                let f_val = self.solve_temperature_shape_factor(h_molar, a_molar, t, n_tot)?;
+                (h_val, f_val)
+            }
+        };
         let h_t = jet.b_t * inv_bc0;
         let h_tt = jet.b_tt * inv_bc0;
         let h_i: Vec<f64> = jet.b_i.iter().map(|&v| v * inv_bc0).collect();
         let h_it: Vec<f64> = jet.b_it.iter().map(|&v| v * inv_bc0).collect();
         let h_ij: Vec<f64> = jet.b_ij.iter().map(|&v| v * inv_bc0).collect();
 
-        let f_shape = self.solve_temperature_shape_factor(h, jet.d, t, n_tot)?;
         let t0 = n_tot * t / f_shape;
         let v0 = volume / h;
 
@@ -767,9 +829,56 @@ impl ExtCsp {
         Ok(result)
     }
 
+    /// Single-prepare helper returning `(n_tot, v, ExtCspHelmholtz)` at `(T, P, moles, phase)`.
+    fn solve_tp_helmholtz(
+        &self,
+        t: f64,
+        p: f64,
+        moles: &[f64],
+        phase: Phase,
+    ) -> Result<(f64, f64, ExtCspHelmholtz)> {
+        positive(t, "temperature")?;
+        positive(p, "pressure")?;
+        let (n_tot, x) = self.validate_moles(moles)?;
+        let prepared = self.shape_eos.prepare(t, &x)?;
+        let (h, f_shape) = self.shape_factors_from_prepared(&prepared, t, n_tot)?;
+        let t0 = n_tot * t / f_shape;
+        let p0 = h * p / f_shape;
+        let v0 = self.reference_volume(t0, p0, phase)?;
+        let v = h * v0;
+        positive(v, "ExtCSP volume")?;
+        let f = self.residual_helmholtz_tv_prepared(
+            &prepared,
+            t,
+            v,
+            n_tot,
+            moles.len(),
+            Some((h, f_shape)),
+        )?;
+        Ok((n_tot, v, f))
+    }
+
+    /// Reduced residual Helmholtz energy `F = A_res / (R T)` and all 10 first
+    /// and second derivative blocks with respect to `(T, V, n)`.
+    ///
+    /// Inputs are temperature `t` `[K]`, total volume `volume` `[m^3]`, and
+    /// mole vector `moles` `[mol]`.
+    pub fn residual_helmholtz_tv(
+        &self,
+        t: f64,
+        volume: f64,
+        moles: &[f64],
+    ) -> Result<ExtCspHelmholtz> {
+        positive(t, "temperature")?;
+        positive(volume, "volume")?;
+        let (n_tot, x) = self.validate_moles(moles)?;
+        let prepared = self.shape_eos.prepare(t, &x)?;
+        self.residual_helmholtz_tv_prepared(&prepared, t, volume, n_tot, moles.len(), None)
+    }
+
     /// Pressure `[Pa]` and exact `(T, V, n)` derivatives at `(T, V, n)`.
     pub fn pressure_tv(&self, t: f64, volume: f64, moles: &[f64]) -> Result<ExtCspPressure> {
-        let (n_tot, _) = self.validate_moles(moles)?;
+        let n_tot = self.sum_moles(moles)?;
         let f = self.residual_helmholtz_tv(t, volume, moles)?;
         let rt = R * t;
         let value = rt * (n_tot / volume - f.f_v);
@@ -788,8 +897,9 @@ impl ExtCsp {
     pub fn volume_tp(&self, t: f64, p: f64, moles: &[f64], phase: Phase) -> Result<f64> {
         positive(t, "temperature")?;
         positive(p, "pressure")?;
-        let (n_tot, _) = self.validate_moles(moles)?;
-        let (h, f_shape) = self.shape_factors(t, moles)?;
+        let (n_tot, x) = self.validate_moles(moles)?;
+        let prepared = self.shape_eos.prepare(t, &x)?;
+        let (h, f_shape) = self.shape_factors_from_prepared(&prepared, t, n_tot)?;
         let t0 = n_tot * t / f_shape;
         let p0 = h * p / f_shape;
         let v0 = self.reference_volume(t0, p0, phase)?;
@@ -800,23 +910,24 @@ impl ExtCsp {
 
     /// Molar specific volume `[m^3/mol]` at `(T, P, n, phase)`.
     pub fn specific_volume(&self, t: f64, p: f64, moles: &[f64], phase: Phase) -> Result<f64> {
-        let (n_tot, _) = self.validate_moles(moles)?;
+        let n_tot = self.sum_moles(moles)?;
         Ok(self.volume_tp(t, p, moles, phase)? / n_tot)
     }
 
     /// Extensive total volume `V` `[m^3]` with exact `(T, P, n)` derivatives.
-    /// When `sum(n) == 1.0`, `value`, `dt`, `dp` are molar and `dn` are partial
-    /// molar volumes.
-    pub fn specific_volume_derivatives(
+    ///
+    /// `value`, `dt`, `dp` are extensive `(V, dV/dT, dV/dP)` for the supplied mole
+    /// vector `moles`, and `dn[i]` are the partial molar volumes `dV / dn_i`.
+    /// When `sum(n) == 1.0`, `value`, `dt`, `dp` coincide with molar volume
+    /// derivatives and match ThermoPack's `specific_volume(..., dvdt, dvdp, dvdn)`.
+    pub fn volume_tp_derivatives(
         &self,
         t: f64,
         p: f64,
         moles: &[f64],
         phase: Phase,
     ) -> Result<ExtCspDerivatives> {
-        let (n_tot, _) = self.validate_moles(moles)?;
-        let v = self.volume_tp(t, p, moles, phase)?;
-        let f = self.residual_helmholtz_tv(t, v, moles)?;
+        let (n_tot, v, f) = self.solve_tp_helmholtz(t, p, moles, phase)?;
         let rt = R * t;
         let dp_dv = -rt * (f.f_vv + n_tot / (v * v));
         let dp_dt = p / t - rt * f.f_tv;
@@ -835,6 +946,36 @@ impl ExtCsp {
         })
     }
 
+    /// Molar specific volume `v = V / N` `[m^3/mol]` with exact `(T, P, n)` derivatives.
+    ///
+    /// `value` matches [`ExtCsp::specific_volume`] for any total mole count `N`,
+    /// `dt = dv / dT`, `dp = dv / dP`, and `dn[i] = dv / dn_i = (V_bar_i - v) / N`.
+    /// For extensive volume and partial molar volumes `V_bar_i = dV / dn_i`, use
+    /// [`ExtCsp::volume_tp_derivatives`].
+    pub fn specific_volume_derivatives(
+        &self,
+        t: f64,
+        p: f64,
+        moles: &[f64],
+        phase: Phase,
+    ) -> Result<ExtCspDerivatives> {
+        let n_tot = self.sum_moles(moles)?;
+        let vd = self.volume_tp_derivatives(t, p, moles, phase)?;
+        let inv_n = 1.0 / n_tot;
+        let v_molar = vd.value * inv_n;
+        let dv_dn = vd
+            .dn
+            .into_iter()
+            .map(|v_bar_i| (v_bar_i - v_molar) * inv_n)
+            .collect();
+        Ok(ExtCspDerivatives {
+            value: v_molar,
+            dt: vd.dt * inv_n,
+            dp: vd.dp * inv_n,
+            dn: dv_dn,
+        })
+    }
+
     /// Compressibility factor `Z = P V / (N R T)` at `(T, P, n, phase)`.
     pub fn compressibility_factor(
         &self,
@@ -843,7 +984,7 @@ impl ExtCsp {
         moles: &[f64],
         phase: Phase,
     ) -> Result<f64> {
-        let (n_tot, _) = self.validate_moles(moles)?;
+        let n_tot = self.sum_moles(moles)?;
         let v = self.volume_tp(t, p, moles, phase)?;
         Ok(p * v / (n_tot * R * t))
     }
@@ -856,8 +997,8 @@ impl ExtCsp {
         moles: &[f64],
         phase: Phase,
     ) -> Result<ExtCspDerivatives> {
-        let (n_tot, _) = self.validate_moles(moles)?;
-        let vd = self.specific_volume_derivatives(t, p, moles, phase)?;
+        let n_tot = self.sum_moles(moles)?;
+        let vd = self.volume_tp_derivatives(t, p, moles, phase)?;
         let v = vd.value;
         let z = p * v / (n_tot * R * t);
         let dz_dt = -z * (1.0 / t - vd.dt / v);
@@ -877,9 +1018,7 @@ impl ExtCsp {
 
     /// Natural logarithm of component fugacity coefficients `ln(phi_i)` at `(T, P, n, phase)`.
     pub fn ln_fugacity_tp(&self, t: f64, p: f64, moles: &[f64], phase: Phase) -> Result<Vec<f64>> {
-        let (n_tot, _) = self.validate_moles(moles)?;
-        let v = self.volume_tp(t, p, moles, phase)?;
-        let f = self.residual_helmholtz_tv(t, v, moles)?;
+        let (n_tot, v, f) = self.solve_tp_helmholtz(t, p, moles, phase)?;
         let z = p * v / (n_tot * R * t);
         positive(z, "compressibility factor for fugacity")?;
         let ln_z = z.ln();
@@ -894,10 +1033,8 @@ impl ExtCsp {
         moles: &[f64],
         phase: Phase,
     ) -> Result<ExtCspFugacityDerivatives> {
-        let (n_tot, _) = self.validate_moles(moles)?;
         let nc = moles.len();
-        let v = self.volume_tp(t, p, moles, phase)?;
-        let f = self.residual_helmholtz_tv(t, v, moles)?;
+        let (n_tot, v, f) = self.solve_tp_helmholtz(t, p, moles, phase)?;
         let rt = R * t;
         let z = p * v / (n_tot * rt);
         positive(z, "compressibility factor for fugacity")?;
@@ -925,9 +1062,7 @@ impl ExtCsp {
 
     /// Extensive residual enthalpy `H_res` `[J]` at `(T, P, n, phase)`.
     pub fn residual_enthalpy(&self, t: f64, p: f64, moles: &[f64], phase: Phase) -> Result<f64> {
-        let (n_tot, _) = self.validate_moles(moles)?;
-        let v = self.volume_tp(t, p, moles, phase)?;
-        let f = self.residual_helmholtz_tv(t, v, moles)?;
+        let (n_tot, v, f) = self.solve_tp_helmholtz(t, p, moles, phase)?;
         Ok(-R * t * t * f.f_t + p * v - n_tot * R * t)
     }
 
@@ -939,9 +1074,7 @@ impl ExtCsp {
         moles: &[f64],
         phase: Phase,
     ) -> Result<ExtCspDerivatives> {
-        let (n_tot, _) = self.validate_moles(moles)?;
-        let v = self.volume_tp(t, p, moles, phase)?;
-        let f = self.residual_helmholtz_tv(t, v, moles)?;
+        let (n_tot, v, f) = self.solve_tp_helmholtz(t, p, moles, phase)?;
         let rt = R * t;
         let dp_dv = -rt * (f.f_vv + n_tot / (v * v));
         let dp_dt = p / t - rt * f.f_tv;
@@ -994,9 +1127,7 @@ impl ExtCsp {
 
     /// Extensive residual entropy `S_res` `[J/K]` at `(T, P, n, phase)`.
     pub fn residual_entropy(&self, t: f64, p: f64, moles: &[f64], phase: Phase) -> Result<f64> {
-        let (n_tot, _) = self.validate_moles(moles)?;
-        let v = self.volume_tp(t, p, moles, phase)?;
-        let f = self.residual_helmholtz_tv(t, v, moles)?;
+        let (n_tot, v, f) = self.solve_tp_helmholtz(t, p, moles, phase)?;
         let z = p * v / (n_tot * R * t);
         positive(z, "compressibility factor for entropy")?;
         Ok(R * (-f.f - t * f.f_t + n_tot * z.ln()))
@@ -1010,9 +1141,7 @@ impl ExtCsp {
         moles: &[f64],
         phase: Phase,
     ) -> Result<ExtCspDerivatives> {
-        let (n_tot, _) = self.validate_moles(moles)?;
-        let v = self.volume_tp(t, p, moles, phase)?;
-        let f = self.residual_helmholtz_tv(t, v, moles)?;
+        let (n_tot, v, f) = self.solve_tp_helmholtz(t, p, moles, phase)?;
         let rt = R * t;
         let z = p * v / (n_tot * rt);
         positive(z, "compressibility factor for entropy")?;
@@ -1035,7 +1164,7 @@ impl ExtCsp {
 
     /// Extensive total entropy `S` `[J/K]` at `(T, P, n, phase)`.
     pub fn entropy(&self, t: f64, p: f64, moles: &[f64], phase: Phase) -> Result<f64> {
-        let (n_tot, _) = self.validate_moles(moles)?;
+        let n_tot = self.sum_moles(moles)?;
         let s_res = self.residual_entropy(t, p, moles, phase)?;
         let mut s_id = 0.0;
         for (i, &ni) in moles.iter().enumerate() {
@@ -1050,6 +1179,11 @@ impl ExtCsp {
     }
 
     /// Extensive total entropy `S` `[J/K]` with exact `(T, P, n)` derivatives.
+    ///
+    /// For absent or trace components (`x_i < 1e-100`), the ideal-gas mixing term
+    /// in the partial molar entropy `dn[i]` uses ThermoPack's `max(x_i, 1e-100)`
+    /// log regularization so `dn[i]` remains finite while the mixture value uses
+    /// the exact `0 * ln(0) = 0` limit.
     pub fn entropy_derivatives(
         &self,
         t: f64,
@@ -1057,7 +1191,7 @@ impl ExtCsp {
         moles: &[f64],
         phase: Phase,
     ) -> Result<ExtCspDerivatives> {
-        let (n_tot, _) = self.validate_moles(moles)?;
+        let n_tot = self.sum_moles(moles)?;
         let mut res = self.residual_entropy_derivatives(t, p, moles, phase)?;
         res.dp -= n_tot * R / p;
         for (i, &ni) in moles.iter().enumerate() {
@@ -1074,9 +1208,7 @@ impl ExtCsp {
 
     /// Extensive residual Gibbs energy `G_res` `[J]` at `(T, P, n, phase)`.
     pub fn residual_gibbs(&self, t: f64, p: f64, moles: &[f64], phase: Phase) -> Result<f64> {
-        let (n_tot, _) = self.validate_moles(moles)?;
-        let v = self.volume_tp(t, p, moles, phase)?;
-        let f = self.residual_helmholtz_tv(t, v, moles)?;
+        let (n_tot, v, f) = self.solve_tp_helmholtz(t, p, moles, phase)?;
         let z = p * v / (n_tot * R * t);
         positive(z, "compressibility factor for Gibbs energy")?;
         Ok(R * t * (f.f + n_tot * (z - 1.0 - z.ln())))
@@ -1090,9 +1222,7 @@ impl ExtCsp {
         moles: &[f64],
         phase: Phase,
     ) -> Result<ExtCspDerivatives> {
-        let (n_tot, _) = self.validate_moles(moles)?;
-        let v = self.volume_tp(t, p, moles, phase)?;
-        let f = self.residual_helmholtz_tv(t, v, moles)?;
+        let (n_tot, v, f) = self.solve_tp_helmholtz(t, p, moles, phase)?;
         let rt = R * t;
         let z = p * v / (n_tot * rt);
         positive(z, "compressibility factor for Gibbs energy")?;
@@ -1106,12 +1236,29 @@ impl ExtCsp {
 
     /// Extensive total Gibbs energy `G` `[J]` at `(T, P, n, phase)`.
     pub fn gibbs(&self, t: f64, p: f64, moles: &[f64], phase: Phase) -> Result<f64> {
-        let h = self.enthalpy(t, p, moles, phase)?;
-        let s = self.entropy(t, p, moles, phase)?;
-        Ok(h - t * s)
+        let (n_tot, v, f) = self.solve_tp_helmholtz(t, p, moles, phase)?;
+        let rt = R * t;
+        let z = p * v / (n_tot * rt);
+        positive(z, "compressibility factor for Gibbs energy")?;
+        let g_res = rt * (f.f + n_tot * (z - 1.0 - z.ln()));
+        let mut g_id = 0.0;
+        for (i, &ni) in moles.iter().enumerate() {
+            if ni == 0.0 {
+                continue;
+            }
+            let xi = ni / n_tot;
+            let ideal = self.shape_eos.ideal_gas(i)?.properties(t, p)?;
+            g_id += ni * (ideal.enthalpy - t * (ideal.entropy - R * xi.ln()));
+        }
+        Ok(g_id + g_res)
     }
 
     /// Extensive total Gibbs energy `G` `[J]` with exact `(T, P, n)` derivatives.
+    ///
+    /// For absent or trace components (`x_i < 1e-100`), the ideal-gas mixing term
+    /// in the chemical potential `dn[i]` uses ThermoPack's `max(x_i, 1e-100)` log
+    /// regularization so `dn[i]` remains finite while the mixture value uses the
+    /// exact `0 * ln(0) = 0` limit.
     pub fn gibbs_derivatives(
         &self,
         t: f64,
@@ -1119,7 +1266,7 @@ impl ExtCsp {
         moles: &[f64],
         phase: Phase,
     ) -> Result<ExtCspDerivatives> {
-        let (n_tot, _) = self.validate_moles(moles)?;
+        let n_tot = self.sum_moles(moles)?;
         let mut res = self.residual_gibbs_derivatives(t, p, moles, phase)?;
         let mut s_id = 0.0;
         let mut h_id = 0.0;
@@ -1139,10 +1286,14 @@ impl ExtCsp {
         Ok(res)
     }
 
-    /// Extensive caloric state `(P, U, H, S, A, G, Cv, Cp)` at fixed `(T, V, n)`.
-    pub fn caloric_tv(&self, t: f64, volume: f64, moles: &[f64]) -> Result<ExtCspCaloricTv> {
-        let (n_tot, _) = self.validate_moles(moles)?;
-        let f = self.residual_helmholtz_tv(t, volume, moles)?;
+    fn caloric_tv_from_helmholtz(
+        &self,
+        t: f64,
+        volume: f64,
+        moles: &[f64],
+        n_tot: f64,
+        f: &ExtCspHelmholtz,
+    ) -> Result<ExtCspCaloricTv> {
         let rt = R * t;
         let pressure = rt * (n_tot / volume - f.f_v);
         let dp_dv = -rt * (f.f_vv + n_tot / (volume * volume));
@@ -1188,6 +1339,13 @@ impl ExtCsp {
         })
     }
 
+    /// Extensive caloric state `(P, U, H, S, A, G, Cv, Cp)` at fixed `(T, V, n)`.
+    pub fn caloric_tv(&self, t: f64, volume: f64, moles: &[f64]) -> Result<ExtCspCaloricTv> {
+        let n_tot = self.sum_moles(moles)?;
+        let f = self.residual_helmholtz_tv(t, volume, moles)?;
+        self.caloric_tv_from_helmholtz(t, volume, moles, n_tot, &f)
+    }
+
     /// Extensive heat capacities `(Cp, Cv)` `[J/K]` at `(T, P, n, phase)`.
     pub fn heat_capacities_tp(
         &self,
@@ -1196,15 +1354,19 @@ impl ExtCsp {
         moles: &[f64],
         phase: Phase,
     ) -> Result<(f64, f64)> {
-        let v = self.volume_tp(t, p, moles, phase)?;
-        let cal = self.caloric_tv(t, v, moles)?;
+        let (n_tot, v, f) = self.solve_tp_helmholtz(t, p, moles, phase)?;
+        let cal = self.caloric_tv_from_helmholtz(t, v, moles, n_tot, &f)?;
         Ok((cal.heat_capacity_p, cal.heat_capacity_v))
     }
 
-    /// Single-phase speed of sound `[m/s]` at `(T, V, n)`.
-    pub fn speed_of_sound_tv(&self, t: f64, volume: f64, moles: &[f64]) -> Result<f64> {
-        let (n_tot, _) = self.validate_moles(moles)?;
-        let f = self.residual_helmholtz_tv(t, volume, moles)?;
+    fn speed_of_sound_from_helmholtz(
+        &self,
+        t: f64,
+        volume: f64,
+        moles: &[f64],
+        n_tot: f64,
+        f: &ExtCspHelmholtz,
+    ) -> Result<f64> {
         let rt = R * t;
         let pressure = rt * (n_tot / volume - f.f_v);
         let dp_dv = -rt * (f.f_vv + n_tot / (volume * volume));
@@ -1222,7 +1384,13 @@ impl ExtCsp {
             mass += ni * self.shape_eos.components()[i].molar_mass * 1.0e-3;
         }
         let cv = cv_id + cv_res;
+        if !dp_dv.is_finite() || dp_dv >= 0.0 || !cv.is_finite() || cv <= 0.0 || mass <= 0.0 {
+            return Err(Error::NoPhysicalRoot);
+        }
         let dp_dv_s = dp_dv - t * (dp_dt * dp_dt) / cv;
+        if !dp_dv_s.is_finite() || dp_dv_s >= 0.0 {
+            return Err(Error::NoPhysicalRoot);
+        }
         let w2 = -volume * volume * dp_dv_s / mass;
         if !w2.is_finite() || w2 <= 0.0 {
             return Err(Error::NoPhysicalRoot);
@@ -1230,9 +1398,24 @@ impl ExtCsp {
         Ok(w2.sqrt())
     }
 
+    /// Single-phase speed of sound `[m/s]` at `(T, V, n)`.
+    ///
+    /// Requires a mechanically and thermally stable single-phase state
+    /// (`(dP/dV)_T < 0` and `Cv > 0`); returns [`Error::NoPhysicalRoot`] on
+    /// unstable or singular states.
+    pub fn speed_of_sound_tv(&self, t: f64, volume: f64, moles: &[f64]) -> Result<f64> {
+        let n_tot = self.sum_moles(moles)?;
+        let f = self.residual_helmholtz_tv(t, volume, moles)?;
+        self.speed_of_sound_from_helmholtz(t, volume, moles, n_tot, &f)
+    }
+
     /// Single-phase speed of sound `[m/s]` at `(T, P, n, phase)`.
+    ///
+    /// Requires a mechanically and thermally stable single-phase state
+    /// (`(dP/dV)_T < 0` and `Cv > 0`); returns [`Error::NoPhysicalRoot`] on
+    /// unstable or singular states.
     pub fn speed_of_sound_tp(&self, t: f64, p: f64, moles: &[f64], phase: Phase) -> Result<f64> {
-        let v = self.volume_tp(t, p, moles, phase)?;
-        self.speed_of_sound_tv(t, v, moles)
+        let (n_tot, v, f) = self.solve_tp_helmholtz(t, p, moles, phase)?;
+        self.speed_of_sound_from_helmholtz(t, v, moles, n_tot, &f)
     }
 }

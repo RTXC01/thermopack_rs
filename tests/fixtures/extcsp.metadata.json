@@ -133,9 +133,10 @@
   "generator": "tools/rust_port/validate_extcsp.py",
   "fixture_sha256": "f3a88eb0e4dcb111798d72aae978a1528a68d719d03cc15a526d81e1f068c95b",
   "relative_tolerance": 1e-07,
-  "absolute_tolerance": 1e-09,
+  "absolute_tolerance_scale": 1e-11,
+  "tolerance_policy": "unit-aware per-quantity physical scales (atol_i = absolute_tolerance_scale * phys_scale_i)",
   "reference_errors": [],
   "censored_calls": [],
   "unqualified_returns": [],
-  "worst_scaled_error": 7.97005366696195e-14
+  "worst_scaled_error": 1.7763568394002505e-11
 }

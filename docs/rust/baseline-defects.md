@@ -468,9 +468,12 @@ Six upstream defects affect `src/extcsp.f90` and `addon/pycThermopack/thermopack
 1. `src/extcsp.f90:127-131` (`csp_init`): when `refEos` is `"SRK"` or `"PR"`,
    `eos%refEosType = c_u_b_i_c` is never assigned, so `extcsp_eos_allocate_and_init`
    terminates with `"Wrong input to extcsp_eos_allocate_and_init"`.
-2. `src/extcsp.f90:764-769` (`calcRefEqDiff`): the `m_b_w_r` branch computes
-   `sdiff%M..Mv0v0` from `mbwrRefEos` and then immediately overwrites all six
-   values with uninitialized `alpr*` locals.
+2. `src/extcsp.f90:764-769` (`calcRefEqDiff`) and `src/extcsp.f90:806`: the
+   `m_b_w_r` branch computes `sdiff%M..Mv0v0` from `mbwrRefEos` and then
+   immediately overwrites all six values with uninitialized `alpr*` locals.
+   The MBWR reference calls also mix `mol/m^3` and `mol/L` density/volume
+   conventions across the MBWR interface (leaving a stale litre comment at
+   `src/extcsp.f90:806`).
 3. `src/extcsp.f90:1302` (`extcsp_eos_allocate_and_init`): tests
    `str_eq(eos_label, 'MBWR19')` against the combined `"MBWR19:C3"` string instead
    of the parsed prefix `eos_l`, silently selecting MBWR-32 for MBWR-19 requests.
@@ -480,9 +483,11 @@ Six upstream defects affect `src/extcsp.f90` and `addon/pycThermopack/thermopack
    `x0 = F`, `F_function_TWU` substitutes the Twu exponent `N` instead of `sumn`
    in `B = -L*(N*T/tc0)**C`, and `a0_diff` hardcodes classic-alpha derivatives
    rather than evaluating the active Twu alpha derivatives.
-5. `src/extcsp.f90:420` (`mixture`): assigns `sdiff%BT = 0.0` (commenting out
-   `cbeos%bt`) and omits `BTT`/`BiT`, dropping temperature derivatives of the
-   covolume for temperature-dependent mixing rules such as Wong-Sandler.
+5. `src/extcsp.f90:420` (`mixture`) and combined Helmholtz derivative assembly:
+   assigns `sdiff%BT = 0.0` (commenting out `cbeos%bt`), zeroes/omits `BTT` and
+   `BiT`, and omits the corresponding `v0_T`, `v0_TT`, and `v0_Ti` chain-rule
+   terms, dropping temperature derivatives of the covolume for
+   temperature-dependent mixing rules such as Wong-Sandler.
 6. `addon/pycThermopack/thermopack/extended_csp.py:118-121`: passes `sh_alpha_c`
    and `sh_mixing_c` in reverse order relative to Fortran
    `eoslibinit::init_extcsp(comps, sh_eos, sh_mixing, sh_alpha, ...)`. Passing

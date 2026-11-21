@@ -1718,7 +1718,6 @@ impl Cubic {
 
 #[derive(Debug, Clone)]
 pub(crate) struct CubicMixtureJet {
-    pub(crate) b: f64,
     pub(crate) b_t: f64,
     pub(crate) b_tt: f64,
     pub(crate) b_i: Vec<f64>,
@@ -1733,6 +1732,13 @@ pub(crate) struct CubicMixtureJet {
 }
 
 impl PreparedState<'_> {
+    /// Molar mixture attraction `a(T, x)` (`[Pa m^6 / mol^2]`) and covolume
+    /// `b(T, x)` (`[m^3 / mol]`) without computing derivative Hessians.
+    #[inline]
+    pub(crate) fn mixture_ab(&self) -> (f64, f64) {
+        (self.a, self.b)
+    }
+
     /// Extensive mixture parameters `B(T, n)` (`[m^3]`) and `D(T, n)` (`[Pa m^6]`)
     /// with full first and second derivatives with respect to `(T, n)` for total
     /// mole number `moles`, preserving the exact scaling of `cbmix::cbCalcMixtureParams`.
@@ -1742,7 +1748,6 @@ impl PreparedState<'_> {
         let n2 = moles * moles;
         let inv_n = 1.0 / moles;
 
-        let b = moles * self.b;
         let b_t = moles * self.beta.as_ref().map_or(0.0, |beta| beta.dt);
         let b_tt = moles * self.beta.as_ref().map_or(0.0, |beta| beta.dtt);
         let b_i = self.b_partial_slice().to_vec();
@@ -1814,7 +1819,6 @@ impl PreparedState<'_> {
         };
 
         Ok(CubicMixtureJet {
-            b,
             b_t,
             b_tt,
             b_i,

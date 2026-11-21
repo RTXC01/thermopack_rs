@@ -10,6 +10,8 @@ import subprocess
 from deadline_reference import DeadlineReferenceProcess
 from reference import ROOT
 
+R_GAS = 8.31446261815324
+
 
 def cases():
     grid = [
@@ -53,13 +55,63 @@ def cases():
             yield comps, ref, z, t, p, phase
 
 
+def physical_scales(nc, t, p, v):
+    """Per-column unit-aware physical scales so tiny pressure derivatives are strictly checked."""
+    rt = R_GAS * t
+    return [
+        # Z, dZ/dT, dZ/dP, dZ/dn
+        1.0,
+        1.0 / t,
+        1.0 / p,
+        *([1.0] * nc),
+        # v, dv/dT, dv/dP, dV/dn
+        v,
+        v / t,
+        v / p,
+        *([v] * nc),
+        # h_res, dh_res/dT, dh_res/dP, dH_res/dn
+        rt,
+        R_GAS,
+        v,
+        *([rt] * nc),
+        # h, dh/dT, dh/dP, dH/dn
+        rt,
+        R_GAS,
+        v,
+        *([rt] * nc),
+        # s_res, ds_res/dT, ds_res/dP, dS_res/dn
+        R_GAS,
+        R_GAS / t,
+        v / t,
+        *([R_GAS] * nc),
+        # s, ds/dT, ds/dP, dS/dn
+        R_GAS,
+        R_GAS / t,
+        v / t,
+        *([R_GAS] * nc),
+        # g_dep, dg_dep/dT, dg_dep/dP
+        rt,
+        R_GAS,
+        v,
+        # ln_phi, dlnphi/dT, dlnphi/dP, dlnphi/dn
+        *([1.0] * nc),
+        *([1.0 / t] * nc),
+        *([1.0 / p] * nc),
+        *([1.0] * (nc * nc)),
+        # speed_of_sound
+        100.0,
+    ]
+
+
 def validate(directory):
+    case_list = list(cases())
+    expected_count = len(case_list)
     good = []
     failed = []
     censored = []
     unqualified = []
     with DeadlineReferenceProcess(directory) as oracle:
-        for comps, ref, z, t, p, phase in cases():
+        for comps, ref, z, t, p, phase in case_list:
             label = f"LEE_KESLER|{comps}|{ref}|{t}|{p}|{','.join(map(repr, z))}|{phase}"
             request = dict(
                 mode="LEE_KESLER",
@@ -83,6 +135,21 @@ def validate(directory):
                 continue
             good.append(record)
 
+    if len(good) != expected_count or failed or censored or unqualified:
+        print(
+            json.dumps(
+                dict(
+                    expected=expected_count,
+                    qualified=len(good),
+                    failed=len(failed),
+                    censored=len(censored),
+                    unqualified=len(unqualified),
+                ),
+                indent=2,
+            )
+        )
+        raise SystemExit(1)
+
     subprocess.run(
         ["cargo", "build", "--release", "--example", "parity", "-j", "2"],
         cwd=ROOT,
@@ -102,7 +169,7 @@ def validate(directory):
     differences = []
     worst_rel = 0.0
     rtol = 1e-8
-    atol = 1e-10
+    atol_scale = 1e-12
     for r, out in zip(good, output):
         expected = r["result"]["values"]
         rows.append([r["case"], *[f"{v:.17e}" for v in expected]])
@@ -111,13 +178,19 @@ def validate(directory):
             continue
         native = list(map(float, out.split(",")))
         assert len(native) == len(expected)
+        req = r["request"]
+        nc = len(req["feed"])
+        v_val = abs(expected[3 + nc])
+        scales = physical_scales(nc, req["temperature"], req["pressure"], v_val)
+        assert len(scales) == len(expected)
         bad = []
-        for idx, (a, b) in enumerate(zip(expected, native)):
-            scale = max(abs(a), abs(b), 1.0)
+        for idx, (a, b, phys) in enumerate(zip(expected, native, scales)):
+            atol_i = atol_scale * phys
+            denom = max(abs(a), abs(b), 1e-4 * phys)
             err = abs(a - b)
-            worst_rel = max(worst_rel, err / scale)
-            if not math.isfinite(b) or err > atol + rtol * max(abs(a), abs(b)):
-                bad.append([idx, a, b])
+            worst_rel = max(worst_rel, err / denom)
+            if not math.isfinite(b) or err > atol_i + rtol * max(abs(a), abs(b)):
+                bad.append([idx, a, b, phys])
         if bad:
             differences.append(dict(case=r["case"], quantities=bad))
 
@@ -133,7 +206,8 @@ def validate(directory):
         generator="tools/rust_port/validate_lee_kesler.py",
         fixture_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
         relative_tolerance=rtol,
-        absolute_tolerance=atol,
+        absolute_tolerance_scale=atol_scale,
+        tolerance_policy="unit-aware per-quantity physical scales (atol_i = absolute_tolerance_scale * phys_scale_i)",
         reference_errors=failed,
         censored_calls=censored,
         unqualified_returns=unqualified,

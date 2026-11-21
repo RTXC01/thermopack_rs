@@ -728,6 +728,68 @@ fn test_lee_kesler_binary_co2_c1() -> thermopack_rs::Result<()> {
     Ok(())
 }
 
+fn within_physical_tol(
+    expected: f64,
+    actual: f64,
+    phys_scale: f64,
+    rtol: f64,
+    atol_scale: f64,
+) -> bool {
+    if !expected.is_finite() || !actual.is_finite() {
+        return false;
+    }
+    let tol = atol_scale * phys_scale + rtol * expected.abs().max(actual.abs());
+    (expected - actual).abs() <= tol
+}
+
+fn lk_fixture_physical_scales(nc: usize, t: f64, p: f64, v: f64) -> Vec<f64> {
+    let r = thermopack_rs::R;
+    let rt = r * t;
+    let mut scales = Vec::new();
+    // Z, dZ/dT, dZ/dP, dZ/dn
+    scales.extend([1.0, 1.0 / t, 1.0 / p]);
+    scales.extend(std::iter::repeat_n(1.0, nc));
+    // v, dv/dT, dv/dP, dV/dn
+    scales.extend([v, v / t, v / p]);
+    scales.extend(std::iter::repeat_n(v, nc));
+    // h_res, dh_res/dT, dh_res/dP, dH_res/dn
+    scales.extend([rt, r, v]);
+    scales.extend(std::iter::repeat_n(rt, nc));
+    // h, dh/dT, dh/dP, dH/dn
+    scales.extend([rt, r, v]);
+    scales.extend(std::iter::repeat_n(rt, nc));
+    // s_res, ds_res/dT, ds_res/dP, dS_res/dn
+    scales.extend([r, r / t, v / t]);
+    scales.extend(std::iter::repeat_n(r, nc));
+    // s, ds/dT, ds/dP, dS/dn
+    scales.extend([r, r / t, v / t]);
+    scales.extend(std::iter::repeat_n(r, nc));
+    // g_dep, dg_dep/dT, dg_dep/dP
+    scales.extend([rt, r, v]);
+    // ln_phi, dlnphi/dT, dlnphi/dP, dlnphi/dn
+    scales.extend(std::iter::repeat_n(1.0, nc));
+    scales.extend(std::iter::repeat_n(1.0 / t, nc));
+    scales.extend(std::iter::repeat_n(1.0 / p, nc));
+    scales.extend(std::iter::repeat_n(1.0, nc * nc));
+    // speed_of_sound
+    scales.push(100.0);
+    scales
+}
+
+#[test]
+fn test_lee_kesler_unit_aware_tolerance_catches_zeroed_dv_dp() -> thermopack_rs::Result<()> {
+    let model = LeeKesler::new(&["C3"])?;
+    let t = 280.0;
+    let p = 2.0e6;
+    let vd = model.specific_volume_derivatives(t, p, &[1.0], Phase::Liquid)?;
+    assert!(vd.dp < 0.0 && vd.dp.abs() < 1e-10);
+    assert!(
+        !within_physical_tol(vd.dp, 0.0, vd.value / p, 1e-8, 1e-12),
+        "unit-aware comparator must reject zeroed liquid dv/dP"
+    );
+    Ok(())
+}
+
 #[test]
 fn test_lee_kesler_fixture_parity() -> thermopack_rs::Result<()> {
     let fixture = include_str!("fixtures/lee_kesler.csv");
@@ -796,17 +858,24 @@ fn test_lee_kesler_fixture_parity() -> thermopack_rs::Result<()> {
         actual.extend(&s.ln_fugacity.dn);
         actual.push(s.speed_of_sound.unwrap());
 
+        let v_ref = expected[3 + z.len()].abs();
+        let scales = lk_fixture_physical_scales(z.len(), t, p, v_ref);
         assert_eq!(actual.len(), expected.len(), "length mismatch for {label}");
-        for (idx, (&a, &b)) in expected.iter().zip(actual.iter()).enumerate() {
-            let tol = 1e-10 + 1e-8 * a.abs().max(b.abs());
+        assert_eq!(
+            scales.len(),
+            expected.len(),
+            "scale length mismatch for {label}"
+        );
+        for (idx, ((&a, &b), &phys)) in expected.iter().zip(actual.iter()).zip(&scales).enumerate()
+        {
             assert!(
-                (a - b).abs() <= tol,
-                "fixture mismatch for {label} col {idx}: expected={a:.17e}, actual={b:.17e}"
+                within_physical_tol(a, b, phys, 1e-8, 1e-12),
+                "fixture mismatch for {label} col {idx}: expected={a:.17e}, actual={b:.17e}, phys_scale={phys:.3e}"
             );
         }
         rows += 1;
     }
-    assert!(rows >= 20, "expected at least 20 Lee-Kesler fixture rows");
+    assert_eq!(rows, 24, "expected exact 24 Lee-Kesler fixture rows");
     Ok(())
 }
 
@@ -819,6 +888,7 @@ fn test_lee_kesler_derivatives_finite_difference_and_identities() -> thermopack_
         // Non-unit total moles
         (310.0, 4.0e6, [1.2, 0.5, 0.3], Phase::Vapor),
     ];
+    let r = thermopack_rs::R;
 
     for (t, p, n, phase) in cases {
         let moles: f64 = n.iter().sum();
@@ -826,13 +896,15 @@ fn test_lee_kesler_derivatives_finite_difference_and_identities() -> thermopack_
         let prep = model.prepare(&n)?;
         let s = prep.state_tp(t, p, phase)?;
         let nc = n.len();
+        let v_val = s.specific_volume.value;
+        let rt = r * t;
 
-        let assert_close = |name: &str, analytic: f64, numeric: f64, rtol: f64| {
-            let scale = analytic.abs().max(numeric.abs()).max(1.0);
+        let assert_phys = |name: &str, analytic: f64, numeric: f64, phys: f64, rtol: f64| {
+            let tol = 1e-8 * phys + rtol * analytic.abs().max(numeric.abs());
             let err = (analytic - numeric).abs();
             assert!(
-                err <= rtol * scale + 1e-8,
-                "{name} mismatch at T={t}, P={p}: analytic={analytic:.12e}, numeric={numeric:.12e}, err={err:.3e}"
+                analytic.is_finite() && numeric.is_finite() && err <= tol,
+                "{name} mismatch at T={t}, P={p}: analytic={analytic:.12e}, numeric={numeric:.12e}, err={err:.3e}, tol={tol:.3e}"
             );
         };
 
@@ -840,125 +912,143 @@ fn test_lee_kesler_derivatives_finite_difference_and_identities() -> thermopack_
         let dt = 1e-5 * t;
         let sp = prep.state_tp(t + dt, p, phase)?;
         let sm = prep.state_tp(t - dt, p, phase)?;
-        assert_close(
+        assert_phys(
             "dZ/dT",
             s.compressibility_factor.dt,
             (sp.compressibility_factor.value - sm.compressibility_factor.value) / (2.0 * dt),
+            1.0 / t,
             1e-6,
         );
-        assert_close(
+        assert_phys(
             "dv/dT",
             s.specific_volume.dt,
             (sp.specific_volume.value - sm.specific_volume.value) / (2.0 * dt),
+            v_val / t,
             1e-6,
         );
-        assert_close(
+        assert_phys(
             "dh_res/dT",
             s.residual_enthalpy.dt,
             (sp.residual_enthalpy.value - sm.residual_enthalpy.value) / (2.0 * dt),
+            r,
             1e-6,
         );
-        assert_close(
+        assert_phys(
             "dh/dT",
             s.enthalpy.dt,
             (sp.enthalpy.value - sm.enthalpy.value) / (2.0 * dt),
+            r,
             1e-6,
         );
-        assert_close(
+        assert_phys(
             "ds_res/dT",
             s.residual_entropy.dt,
             (sp.residual_entropy.value - sm.residual_entropy.value) / (2.0 * dt),
+            r / t,
             1e-6,
         );
-        assert_close(
+        assert_phys(
             "ds/dT",
             s.entropy.dt,
             (sp.entropy.value - sm.entropy.value) / (2.0 * dt),
+            r / t,
             1e-6,
         );
-        assert_close(
+        assert_phys(
             "dg_res/dT",
             s.residual_gibbs.dt,
             (sp.residual_gibbs.value - sm.residual_gibbs.value) / (2.0 * dt),
+            r,
             1e-6,
         );
-        assert_close(
+        assert_phys(
             "dg/dT",
             s.gibbs.dt,
             (sp.gibbs.value - sm.gibbs.value) / (2.0 * dt),
+            r,
             1e-6,
         );
         for i in 0..nc {
-            assert_close(
+            assert_phys(
                 "dlnphi/dT",
                 s.ln_fugacity.dt[i],
                 (sp.ln_fugacity.ln_phi[i] - sm.ln_fugacity.ln_phi[i]) / (2.0 * dt),
+                1.0 / t,
                 1e-6,
             );
         }
 
-        // 2. Pressure finite differences
+        // 2. Pressure finite differences (unit-aware: catches tiny liquid dv/dP!)
         let dp = 1e-5 * p;
         let sp = prep.state_tp(t, p + dp, phase)?;
         let sm = prep.state_tp(t, p - dp, phase)?;
-        assert_close(
+        assert_phys(
             "dZ/dP",
             s.compressibility_factor.dp,
             (sp.compressibility_factor.value - sm.compressibility_factor.value) / (2.0 * dp),
+            1.0 / p,
             1e-6,
         );
-        assert_close(
+        assert_phys(
             "dv/dP",
             s.specific_volume.dp,
             (sp.specific_volume.value - sm.specific_volume.value) / (2.0 * dp),
+            v_val / p,
             1e-6,
         );
-        assert_close(
+        assert_phys(
             "dh_res/dP",
             s.residual_enthalpy.dp,
             (sp.residual_enthalpy.value - sm.residual_enthalpy.value) / (2.0 * dp),
+            v_val,
             1e-6,
         );
-        assert_close(
+        assert_phys(
             "dh/dP",
             s.enthalpy.dp,
             (sp.enthalpy.value - sm.enthalpy.value) / (2.0 * dp),
+            v_val,
             1e-6,
         );
-        assert_close(
+        assert_phys(
             "ds_res/dP",
             s.residual_entropy.dp,
             (sp.residual_entropy.value - sm.residual_entropy.value) / (2.0 * dp),
+            v_val / t,
             1e-6,
         );
-        assert_close(
+        assert_phys(
             "ds/dP",
             s.entropy.dp,
             (sp.entropy.value - sm.entropy.value) / (2.0 * dp),
+            v_val / t,
             1e-6,
         );
-        assert_close(
+        assert_phys(
             "dg_res/dP",
             s.residual_gibbs.dp,
             (sp.residual_gibbs.value - sm.residual_gibbs.value) / (2.0 * dp),
+            v_val,
             1e-6,
         );
-        assert_close(
+        assert_phys(
             "dg/dP",
             s.gibbs.dp,
             (sp.gibbs.value - sm.gibbs.value) / (2.0 * dp),
+            v_val,
             1e-6,
         );
         for i in 0..nc {
-            assert_close(
+            assert_phys(
                 "dlnphi/dP",
                 s.ln_fugacity.dp[i],
                 (sp.ln_fugacity.ln_phi[i] - sm.ln_fugacity.ln_phi[i]) / (2.0 * dp),
+                1.0 / p,
                 1e-6,
             );
         }
 
-        // 3. Composition finite differences (including critical Hessians!)
+        // 3. Composition finite differences (including ALL FIVE critical Hessians!)
         let dn = 1e-6 * moles;
         for j in 0..nc {
             let mut np = n;
@@ -972,71 +1062,104 @@ fn test_lee_kesler_derivatives_finite_difference_and_identities() -> thermopack_
             let sp = pp.state_tp(t, p, phase)?;
             let sm = pm.state_tp(t, p, phase)?;
 
-            assert_close(
+            assert_phys(
                 "dZ/dn",
                 s.compressibility_factor.dn[j],
                 (sp.compressibility_factor.value - sm.compressibility_factor.value) / (2.0 * dn),
+                1.0 / moles,
                 1e-6,
             );
-            assert_close(
+            assert_phys(
                 "dV/dn",
                 s.specific_volume.dn[j],
                 (mp * sp.specific_volume.value - mm * sm.specific_volume.value) / (2.0 * dn),
+                v_val,
                 1e-6,
             );
-            assert_close(
+            assert_phys(
                 "dH_res/dn",
                 s.residual_enthalpy.dn[j],
                 (mp * sp.residual_enthalpy.value - mm * sm.residual_enthalpy.value) / (2.0 * dn),
+                rt,
                 1e-6,
             );
-            assert_close(
+            assert_phys(
                 "dH/dn",
                 s.enthalpy.dn[j],
                 (mp * sp.enthalpy.value - mm * sm.enthalpy.value) / (2.0 * dn),
+                rt,
                 1e-6,
             );
-            assert_close(
+            assert_phys(
                 "dS_res/dn",
                 s.residual_entropy.dn[j],
                 (mp * sp.residual_entropy.value - mm * sm.residual_entropy.value) / (2.0 * dn),
+                r,
                 1e-6,
             );
-            assert_close(
+            assert_phys(
                 "dS/dn",
                 s.entropy.dn[j],
                 (mp * sp.entropy.value - mm * sm.entropy.value) / (2.0 * dn),
+                r,
                 1e-6,
             );
-            assert_close(
+            assert_phys(
                 "dG_res/dn",
                 s.residual_gibbs.dn[j],
                 (mp * sp.residual_gibbs.value - mm * sm.residual_gibbs.value) / (2.0 * dn),
+                rt,
                 1e-6,
             );
-            assert_close(
+            assert_phys(
                 "dG/dn",
                 s.gibbs.dn[j],
                 (mp * sp.gibbs.value - mm * sm.gibbs.value) / (2.0 * dn),
+                rt,
                 1e-6,
             );
             for i in 0..nc {
-                assert_close(
+                let idx = i * nc + j;
+                assert_phys(
                     "dlnphi_i/dn_j",
-                    s.ln_fugacity.dn[i * nc + j],
+                    s.ln_fugacity.dn[idx],
                     (sp.ln_fugacity.ln_phi[i] - sm.ln_fugacity.ln_phi[i]) / (2.0 * dn),
+                    1.0 / moles,
                     1e-6,
                 );
-                assert_close(
+                assert_phys(
+                    "d2vc_dn",
+                    prep.d2vc_dn()[idx],
+                    (pp.dvc_dni()[i] - pm.dvc_dni()[i]) / (2.0 * dn),
+                    prep.vc_m() / (moles * moles),
+                    1e-6,
+                );
+                assert_phys(
                     "d2tc_dn",
-                    prep.d2tc_dn()[i * nc + j],
+                    prep.d2tc_dn()[idx],
                     (pp.dtc_dni()[i] - pm.dtc_dni()[i]) / (2.0 * dn),
+                    prep.tc_m() / (moles * moles),
                     1e-6,
                 );
-                assert_close(
+                assert_phys(
                     "d2pc_dn",
-                    prep.d2pc_dn()[i * nc + j],
+                    prep.d2pc_dn()[idx],
                     (pp.dpc_dni()[i] - pm.dpc_dni()[i]) / (2.0 * dn),
+                    prep.pc_m() / (moles * moles),
+                    1e-6,
+                );
+                assert_phys(
+                    "d2omega_dn",
+                    prep.d2omega_dn()[idx],
+                    (pp.domega_dni()[i] - pm.domega_dni()[i]) / (2.0 * dn),
+                    1.0 / (moles * moles),
+                    1e-6,
+                );
+                assert_phys(
+                    "d2zc_dn",
+                    prep.d2zc_dn()[idx],
+                    (pp.dzc_dni()[i] - pm.dzc_dni()[i]) / (2.0 * dn),
+                    1.0 / (moles * moles),
                     1e-6,
                 );
             }
@@ -1044,44 +1167,145 @@ fn test_lee_kesler_derivatives_finite_difference_and_identities() -> thermopack_
 
         // 4. Exact thermodynamic identities
         let dot = |a: &[f64], b: &[f64]| a.iter().zip(b).map(|(u, v)| u * v).sum::<f64>();
-        assert_close("Euler Z", dot(&n, &s.compressibility_factor.dn), 0.0, 1e-11);
-        assert_close(
-            "Euler V",
-            dot(&x, &s.specific_volume.dn),
-            s.specific_volume.value,
+        assert_phys(
+            "Euler Z",
+            dot(&n, &s.compressibility_factor.dn),
+            0.0,
+            1.0,
             1e-11,
         );
-        assert_close("Euler H", dot(&x, &s.enthalpy.dn), s.enthalpy.value, 1e-11);
-        assert_close("Euler S", dot(&x, &s.entropy.dn), s.entropy.value, 1e-11);
-        assert_close("Euler G", dot(&x, &s.gibbs.dn), s.gibbs.value, 1e-11);
-        assert_close(
+        assert_phys(
+            "Euler V",
+            dot(&x, &s.specific_volume.dn),
+            v_val,
+            v_val,
+            1e-11,
+        );
+        assert_phys(
+            "Euler H",
+            dot(&x, &s.enthalpy.dn),
+            s.enthalpy.value,
+            rt,
+            1e-11,
+        );
+        assert_phys("Euler S", dot(&x, &s.entropy.dn), s.entropy.value, r, 1e-11);
+        assert_phys("Euler G", dot(&x, &s.gibbs.dn), s.gibbs.value, rt, 1e-11);
+        assert_phys(
             "Maxwell dS/dP = -dV/dT",
             s.entropy.dp,
             -s.specific_volume.dt,
+            v_val / t,
             1e-11,
         );
-        assert_close(
+        assert_phys(
             "dH/dP = V - T*dV/dT",
             s.enthalpy.dp,
-            s.specific_volume.value - t * s.specific_volume.dt,
+            v_val - t * s.specific_volume.dt,
+            v_val,
             1e-11,
         );
-        assert_close("dH/dT = T*dS/dT", s.enthalpy.dt, t * s.entropy.dt, 1e-11);
+        assert_phys("dH/dT = T*dS/dT", s.enthalpy.dt, t * s.entropy.dt, r, 1e-11);
         assert!(s.heat_capacity_p > s.heat_capacity_v && s.heat_capacity_v > 0.0);
         assert!(s.speed_of_sound.unwrap() > 100.0);
         for i in 0..nc {
             let mut gd = 0.0;
             for j in 0..nc {
                 gd += n[j] * s.ln_fugacity.dn[i * nc + j];
-                assert_close(
+                assert_phys(
                     "Maxwell symmetry dlnphi/dn",
                     s.ln_fugacity.dn[i * nc + j],
                     s.ln_fugacity.dn[j * nc + i],
+                    1.0 / moles,
                     1e-12,
                 );
             }
-            assert_close("Gibbs-Duhem", gd, 0.0, 1e-11);
+            assert_phys("Gibbs-Duhem", gd, 0.0, 1.0, 1e-11);
         }
     }
+    Ok(())
+}
+
+#[test]
+fn test_lee_kesler_extreme_low_pressure_returns_error() -> thermopack_rs::Result<()> {
+    // Regression test: extreme reduced-pressure underflow must return Err, never Ok(NaN).
+    let model = LeeKesler::new(&["C1", "C3"])?;
+    let prep = model.prepare(&[0.6, 0.4])?;
+    let t = 300.0;
+    let p = 1.0e-200;
+    for phase in [Phase::Vapor, Phase::Liquid, Phase::MinimumGibbs] {
+        assert!(prep.state_tp(t, p, phase).is_err());
+        assert!(prep.compressibility_factor(t, p, phase).is_err());
+        assert!(prep.specific_volume(t, p, phase).is_err());
+        assert!(prep.enthalpy(t, p, phase).is_err());
+        assert!(prep.entropy(t, p, phase).is_err());
+        assert!(prep.ln_fugacity_coefficients(t, p, phase).is_err());
+        assert!(prep.speed_of_sound(t, p, phase).is_err());
+    }
+    Ok(())
+}
+
+#[test]
+fn test_lee_kesler_targeted_methods_minimum_gibbs_and_zero_component() -> thermopack_rs::Result<()>
+{
+    let model = LeeKesler::new(&["C1", "C2", "C3"])?;
+    let t = 250.0;
+    let p = 3.0e6;
+    let n = [0.5, 0.3, 0.2];
+    let prep = model.prepare(&n)?;
+
+    // 1. Targeted derivative/scalar methods match state_tp exactly across all phases
+    for phase in [Phase::Liquid, Phase::Vapor, Phase::MinimumGibbs] {
+        let s = prep.state_tp(t, p, phase)?;
+        let z = prep.compressibility_factor_derivatives(t, p, phase)?;
+        let v = prep.specific_volume_derivatives(t, p, phase)?;
+        let hr = prep.residual_enthalpy_derivatives(t, p, phase)?;
+        let ht = prep.enthalpy_derivatives(t, p, phase)?;
+        let sr = prep.residual_entropy_derivatives(t, p, phase)?;
+        let st = prep.entropy_derivatives(t, p, phase)?;
+        let gr = prep.residual_gibbs_derivatives(t, p, phase)?;
+        let gt = prep.gibbs_derivatives(t, p, phase)?;
+        let fug = prep.ln_fugacity_derivatives(t, p, phase)?;
+        assert_eq!(z.value, s.compressibility_factor.value);
+        assert_eq!(z.dn, s.compressibility_factor.dn);
+        assert_eq!(v.value, s.specific_volume.value);
+        assert_eq!(v.dp, s.specific_volume.dp);
+        assert_eq!(hr.value, s.residual_enthalpy.value);
+        assert_eq!(ht.value, s.enthalpy.value);
+        assert_eq!(ht.dt, s.enthalpy.dt);
+        assert_eq!(sr.value, s.residual_entropy.value);
+        assert_eq!(st.value, s.entropy.value);
+        assert_eq!(st.dp, s.entropy.dp);
+        assert_eq!(gr.value, s.residual_gibbs.value);
+        assert_eq!(gt.value, s.gibbs.value);
+        assert_eq!(fug.ln_phi, s.ln_fugacity.ln_phi);
+        assert_eq!(fug.dn, s.ln_fugacity.dn);
+        assert_eq!(prep.heat_capacity_p(t, p, phase)?, s.heat_capacity_p);
+        assert_eq!(prep.heat_capacity_v(t, p, phase)?, s.heat_capacity_v);
+        assert_eq!(prep.speed_of_sound(t, p, phase)?, s.speed_of_sound.unwrap());
+    }
+
+    // 2. MinimumGibbs selects the lower-Gibbs phase between Liquid and Vapor
+    let g_min = prep.gibbs_energy_departure(t, p, Phase::MinimumGibbs)?;
+    let g_liq = prep.gibbs_energy_departure(t, p, Phase::Liquid)?;
+    let g_vap = prep.gibbs_energy_departure(t, p, Phase::Vapor)?;
+    assert!((g_min - g_liq.min(g_vap)).abs() <= 1e-12 * g_min.abs().max(1.0));
+
+    // 3. Zero-component mixture [0.6, 0.0, 0.4]: finite residual/fugacity derivatives match
+    //    the [0.6, 0.4] binary sub-mixture, while total S/G apply 1e-100 regularization.
+    let bin = LeeKesler::new(&["C1", "C3"])?;
+    let s_tern = model.state_tp(320.0, 3.0e6, &[0.6, 0.0, 0.4], Phase::Vapor)?;
+    let s_bin = bin.state_tp(320.0, 3.0e6, &[0.6, 0.4], Phase::Vapor)?;
+    assert!(s_tern.ln_fugacity.ln_phi.iter().all(|v| v.is_finite()));
+    assert!(s_tern.ln_fugacity.dn.iter().all(|v| v.is_finite()));
+    assert!(s_tern.entropy.dn.iter().all(|v| v.is_finite()));
+    assert!(s_tern.gibbs.dn.iter().all(|v| v.is_finite()));
+    assert!((s_tern.specific_volume.value - s_bin.specific_volume.value).abs() <= 1e-12);
+    assert!((s_tern.ln_fugacity.ln_phi[0] - s_bin.ln_fugacity.ln_phi[0]).abs() <= 1e-12);
+    assert!((s_tern.ln_fugacity.ln_phi[2] - s_bin.ln_fugacity.ln_phi[1]).abs() <= 1e-12);
+    assert!(
+        (s_tern.entropy.value - model.entropy(320.0, 3.0e6, &[0.6, 0.0, 0.4], Phase::Vapor)?).abs()
+            <= 1e-12
+    );
+
     Ok(())
 }

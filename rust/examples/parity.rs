@@ -228,7 +228,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let z = model.compressibility_factor_derivatives(t, p, &x, phase)?;
                 values.extend([z.value, z.dt, z.dp]);
                 values.extend(z.dn);
-                let v = model.specific_volume_derivatives(t, p, &x, phase)?;
+                let v = model.volume_tp_derivatives(t, p, &x, phase)?;
                 values.extend([v.value, v.dt, v.dp]);
                 values.extend(v.dn);
                 let hr = model.residual_enthalpy_derivatives(t, p, &x, phase)?;

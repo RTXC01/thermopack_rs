@@ -133,9 +133,10 @@
   "generator": "tools/rust_port/validate_lee_kesler.py",
   "fixture_sha256": "7860a85ef510de4ddb9bf00d392b51ad505d55494c7eb60a526f5454a570e97a",
   "relative_tolerance": 1e-08,
-  "absolute_tolerance": 1e-10,
+  "absolute_tolerance_scale": 1e-12,
+  "tolerance_policy": "unit-aware per-quantity physical scales (atol_i = absolute_tolerance_scale * phys_scale_i)",
   "reference_errors": [],
   "censored_calls": [],
   "unqualified_returns": [],
-  "worst_scaled_error": 3.703526610449809e-14
+  "worst_scaled_error": 1.7763568394002505e-11
 }

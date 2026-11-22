@@ -510,3 +510,41 @@ while `tests/extcsp.rs` independently verifies all three reference backends
 (`Multiparameter`, `Cubic`, `Mbwr` 19/32), Twu alpha, and Wong-Sandler via
 central finite differences, thermodynamic identities, and pure-reference-fluid
 identities.
+
+## PC-SAFT association upstream pair-RDF and zero-mole defects
+
+Two upstream defects affect `src/saft_association.f90` for associating PC-SAFT
+and PCP-SAFT mixtures:
+
+1. `src/saft_association.f90:136,147` (`calc_Delta`): the per-pair RDF dispatch
+   condition checks only `eosSAFT_VR_MIE` and `eosOPC_SAFT`, omitting
+   `eosPCP_SAFT` even though `PCP-SAFT` uses the pair-dependent BMCSL contact
+   RDF `g_pc_saft_TVn(ic, jc)`. Consequently, Fortran `PCP-SAFT` evaluates
+   `g_pc_saft_TVn(1, 1)` once outside the site loop and reuses it for every
+   `(ic, jc)` pair, breaking component-order symmetry whenever associating
+   mixtures have unequal segment diameters. For example, at `T = 290 K`,
+   `V = 5.744117894993951e-5 m^3`, `n = [0.5, 0.5]`, Fortran `PCP-SAFT`
+   returns `P = 4,000,000.00 Pa` for `"CO2,H2S"` versus `3,993,327.81 Pa` for
+   `"H2S,CO2"` (`6.67 kPa` difference), and at `T = 320 K`, `V = 2.5e-5 m^3`,
+   `"NH3,H2O"` vs `"H2O,NH3"` shifts Fortran pressure by `11.59 MPa`.
+2. `src/saft_association.f90:407-410` (`solve_for_X_k`): sets `X_k(k) = 1.0`
+   whenever `m_mich_k(k) == 0.0` instead of evaluating the physical
+   infinite-dilution limit `X_k = 1 / (1 + sum_l (n_l / V) Delta_{kl} X_l)`.
+   For cross-associating trace species, this makes the analytical chemical
+   potential derivative `F_n` inconsistent with `F`. At `PC-SAFT` `"H2O,MEOH"`,
+   `T = 340 K`, `V = 1.87166793e-5 m^3`, `n = [1.0, 0.0]`, Fortran returns
+   `X_MEOH = [1.0, 1.0]` and analytic `F_n(MEOH) = +0.88228336`, whereas its
+   own forward finite difference `(F(1, 1e-7) - F(1, 0)) / 1e-7 = -8.14932442`
+   (a `9.03`-unit discrepancy; at `n_MEOH = 1e-7`, `X_MEOH = [0.007762, 0.015404]`).
+
+The native `thermopack_rs::association` and `thermopack_rs::pc_saft::PcSaft`
+fix both issues: `PcpSaft` evaluates `g_pc_saft_TVn(ic, jc)` per component pair
+(preserving component-order symmetry), and `association::solve_for_x_k`
+computes exact infinite-dilution site fractions so `F_n` matches finite
+differences at `n_i = 0`. Exact-source qualification
+(`tools/rust_port/validate_pcsaft.py`) verifies 35 states across all four
+variants (placing `H2S` first for the `PCP-SAFT` `"H2S,CO2"` case so Fortran's
+`g(1, 1)` equals the physical `g(H2S, H2S)`, alongside `"CO2,H2S"` and
+`"NH3,H2O"` in `sPCP-SAFT`), while `tests/pc_saft_assoc_polar.rs` independently
+verifies `PCP-SAFT` component-order symmetry, finite differences on associating
+`PCP-SAFT` mixtures, and zero-mole infinite-dilution cross-association.

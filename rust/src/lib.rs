@@ -64,6 +64,7 @@
 //! # }
 //! ```
 pub mod alpha;
+pub mod association;
 pub mod beta;
 pub mod bmcsl;
 pub mod caloric;
@@ -99,6 +100,7 @@ pub mod mixture_spinodal;
 pub mod multiparameter;
 pub mod multiparameter_data;
 pub mod multiparameter_ideal_mixture;
+pub mod multipol;
 pub mod mut_flash;
 pub mod numerics;
 pub mod pc_saft;
@@ -124,6 +126,10 @@ pub mod unifac_data;
 pub mod wong_sandler;
 
 pub use alpha::{Alpha, AlphaCorrelation, AlphaValue};
+pub use association::{
+    AssocCombRule, AssociationHelmholtz, AssociationParams, AssociationPressureJet,
+    AssociationRdfProvider, DeltaCombRule,
+};
 pub use beta::{Beta, BetaCorrelation, BetaValue};
 pub use caloric::{
     CaloricFlashOptions, EquilibriumProperties, EquilibriumResponse, VolumeFlashOptions,
@@ -176,8 +182,10 @@ pub use multiparameter_data::{
 pub use multiparameter_ideal_mixture::{
     MultiparameterIdealMixture, MultiparameterIdealMixtureState,
 };
+pub use multipol::{MultipolHelmholtz, MultipolParams, MultipolPressureJet};
 pub use pc_saft::{
-    PcSaft, PcSaftComponent, PcSaftKind, PcSaftPressureJet, PcSaftSaturation, PcSaftState,
+    PcSaft, PcSaftComponent, PcSaftDerivatives, PcSaftFugacityDerivatives, PcSaftHelmholtz,
+    PcSaftKind, PcSaftOptions, PcSaftPressureJet, PcSaftSaturation, PcSaftState, PcSaftTpState,
     PreparedPcSaft,
 };
 pub use pc_saft_data::{PcSaftKijRecord, PcSaftRecord};

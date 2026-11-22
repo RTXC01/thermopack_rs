@@ -4,34 +4,7 @@
 
 #![allow(clippy::excessive_precision)]
 
-/// Association scheme classification.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AssocScheme {
-    NoAssoc,
-    Scheme1,
-    Scheme2A,
-    Scheme2B,
-    Scheme2C,
-    Scheme3A,
-    Scheme3B,
-    Scheme4A,
-    Scheme4B,
-    Scheme4C,
-    Scheme1ea,
-}
-
-impl AssocScheme {
-    /// Number of association sites.
-    pub const fn num_sites(self) -> usize {
-        match self {
-            AssocScheme::NoAssoc => 0,
-            AssocScheme::Scheme1 | AssocScheme::Scheme1ea => 1,
-            AssocScheme::Scheme2A | AssocScheme::Scheme2B | AssocScheme::Scheme2C => 2,
-            AssocScheme::Scheme3A | AssocScheme::Scheme3B => 3,
-            AssocScheme::Scheme4A | AssocScheme::Scheme4B | AssocScheme::Scheme4C => 4,
-        }
-    }
-}
+pub use crate::association::AssocScheme;
 
 /// Pure component CPA parameters.
 #[derive(Debug, Clone)]

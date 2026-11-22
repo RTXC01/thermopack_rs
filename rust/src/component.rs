@@ -17,6 +17,10 @@ pub struct Component {
     pub acentric_factor: f64,
     pub rackett_factor: f64,
     pub critical_compressibility: f64,
+    /// Dipole moment `[D]` from `compdatadb.f90`.
+    pub mu_dipole: f64,
+    /// Quadrupole moment `[ÅD]` from `compdatadb.f90`.
+    pub q_quadrupole: f64,
     pub(crate) cp_type: u8,
     pub(crate) cp: [f64; 21],
     pub(crate) reference_enthalpy: f64,

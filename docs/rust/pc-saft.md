@@ -265,3 +265,44 @@ the derivative with respect to the density.
 The [analytic first mole derivative qualification](pc-saft-mole-derivatives.md)
 covers mixture fugacity in both variants, source failures, missing ideal-data
 construction and the remaining derivative scope.
+
+## Association, Multipolar PCP-SAFT, and Complete 10-Block Derivatives
+
+The PC-SAFT family now covers all four ThermoPack variants (`PcSaft`, `SPcSaft`,
+`PcpSaft`, `SPcpSaft`):
+
+- **Complete parameter database** (`tools/rust_port/generate_pcsaft_data.py` ->
+  `rust/src/pc_saft_data.rs`): extracts all 77 pure records including `eos`,
+  `eps`, `beta`, `assoc_scheme`, `mu`, `Q` (with `compdatadb.f90`
+  `mu_dipole`/`q_quadrupole` fallback matching `pc_saft_parameters.f90:191-192`
+  and `"Gross2005/Gross2006"` polar default reference override matching
+  `eoslibinit.f90:983-985`) and all 34 binary records including `eps_comb_rule`
+  and `beta_comb_rule` (`DefaultComb`, `AriComb`, `GeoComb`).
+- **Shared Wertheim TPT1 association engine** (`rust/src/association.rs`):
+  reusable across PC-SAFT, SAFT-VR Mie, and CPA; supports all 11 association
+  schemes (`NoAssoc` through `Scheme4C` plus `Scheme1ea`), CR-1 (`Standard`)
+  and `Elliot` combining rules, unweighted Michelsen Newton site solver with
+  successive-substitution fallback, exact infinite-dilution `X_k` for zero-mole
+  species, and full 10-block `(T, V, n)` Helmholtz derivatives (`F..F_nn`).
+- **Multipolar perturbation module** (`rust/src/multipol.rs`): implements
+  Gross (2005) quadrupole-quadrupole, Gross & Vrabec (2006) dipole-dipole, and
+  Vrabec & Gross (2008) dipole-quadrupole Padé contributions with exact
+  10-block `(T, V, n)` derivatives via `crate::hyperdual::HyperDual` and
+  fast-skip when no polar terms are active.
+- **Unit-mole Euler scaling**: `residual_helmholtz_tv`, `assoc_residual_helmholtz_tv`,
+  `multipol_residual_helmholtz_tv`, and `state_tp` evaluate in unit-mole
+  `(v_u = V/N, x = n/N)` coordinates and apply exact Euler homogeneity scaling,
+  preserving scaling invariance down to `N = 1e-140` mol while returning an
+  explicit error on genuine floating-point overflow (`N = 1e-310` mol).
+- **Exact-source qualification** (`tools/rust_port/validate_pcsaft.py` ->
+  `tests/fixtures/pcsaft_full.csv`, `tests/pc_saft_assoc_polar.rs`):
+  35 exact-source cases across all four variants (non-associating, associating
+  pure and binary/ternary mixtures including `NH3+H2O` `ariComb`/`geoComb`,
+  polar `CO2`/`ACETONE`/`H2S`, and polar+associating states) compare all 10
+  `(T, V, n)` derivative blocks from `query_pcsaft_full_fres`, solved `X_k`,
+  and complete TP state derivatives (`Z, v, H_res, H, S_res, S, ln_phi` with
+  `(T, P, n)` derivatives and speed of sound), matching with worst unit-aware
+  scaled error `3.55e-10`. Simplified `rdf::spcsaft_rdf` is qualified in 3
+  cases against `query_spcsaft_rdf` with worst scaled error `1.16e-14`.
+  Use `PcSaft::new_nonassoc` when explicitly evaluating the non-associating
+  `F_PC_SAFT_TVn` / `F_sPC_SAFT_TVn` kernels on associating fluids.

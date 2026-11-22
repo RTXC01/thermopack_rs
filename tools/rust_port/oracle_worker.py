@@ -113,6 +113,10 @@ def load_probe():
     probe.query_extcsp_fres.restype=None
     probe.query_lk_gdep.argtypes=[c_double,c_double,POINTER(c_double),c_int,POINTER(c_double),POINTER(c_int)]
     probe.query_lk_gdep.restype=None
+    probe.query_pcsaft_full_fres.argtypes=[c_double,c_double,POINTER(c_double),c_int,POINTER(c_double),POINTER(c_int),POINTER(c_int)]
+    probe.query_pcsaft_full_fres.restype=None
+    probe.query_spcsaft_rdf.argtypes=[c_double,c_double,POINTER(c_double),c_int,POINTER(c_double),POINTER(c_int)]
+    probe.query_spcsaft_rdf.restype=None
     return probe
 
 
@@ -122,6 +126,68 @@ def main(compiler_directory):
     probe=None
     for line in sys.stdin:
         request=json.loads(line)
+        if request['mode']=='PCSAFT_FULL':
+            if probe is None:probe=load_probe()
+            from thermopack.pcsaft import pcsaft
+            comps=request['components']
+            simplified=bool(request.get('simplified',False))
+            polar=bool(request.get('polar',False))
+            param_ref=request.get('parameter_reference','Default')
+            key=('PCSAFT_FULL',comps,simplified,polar,param_ref)
+            if previous!=key:
+                model=pcsaft(comps,parameter_reference=param_ref,simplified=simplified,polar=polar)
+                previous=key
+            model.activate()
+            t=float(request['temperature']);p=float(request['pressure'])
+            n_vec=list(map(float,request['moles']));sumn=sum(n_vec)
+            x_vec=[v/sumn for v in n_vec];nc=len(n_vec)
+            phase=model.LIQPH if request['phase']=='L' else model.VAPPH
+            v_tp,dvdt,dvdp,dvdn=model.specific_volume(t,p,x_vec,phase,dvdt=True,dvdp=True,dvdn=True)
+            v_tv=float(request.get('volume',v_tp*sumn))
+            amounts=(c_double*16)(*n_vec,*([0.0]*(16-nc)))
+            fres_cap=max(256,6+3*nc+nc*nc+64)
+            fres_out=(c_double*fres_cap)();fres_cnt=c_int();nsites=c_int()
+            probe.query_pcsaft_full_fres(t,v_tv,amounts,fres_cap,fres_out,byref(fres_cnt),byref(nsites))
+            fres_vals=[float(fres_out[i]) for i in range(fres_cnt.value)]
+            z_val,dzdt,dzdp,dzdn=model.zfac(t,p,x_vec,phase,dzdt=True,dzdp=True,dzdn=True)
+            hr,dhrdt,dhrdp,dhrdn=model.enthalpy(t,p,x_vec,phase,dhdt=True,dhdp=True,dhdn=True,residual=True)
+            ht,dhtdt,dhtdp,dhtdn=model.enthalpy(t,p,x_vec,phase,dhdt=True,dhdp=True,dhdn=True,residual=False)
+            sr,dsrdt,dsrdp,dsrdn=model.entropy(t,p,x_vec,phase,dsdt=True,dsdp=True,dsdn=True,residual=True)
+            st,dstdt,dstdp,dstdn=model.entropy(t,p,x_vec,phase,dsdt=True,dsdp=True,dsdn=True,residual=False)
+            lnphi,dlnphidt,dlnphidp,dlnphidn=model.thermo(t,p,x_vec,phase,dlnfugdt=True,dlnfugdp=True,dlnfugdn=True)
+            sostp=model.speed_of_sound(t,p,x_vec,x_vec,x_vec,0.0,1.0,phase)
+            values=[
+                *fres_vals,
+                float(z_val),float(dzdt),float(dzdp),*[float(x) for x in dzdn],
+                float(v_tp),float(dvdt),float(dvdp),*[float(x) for x in dvdn],
+                float(hr),float(dhrdt),float(dhrdp),*[float(x) for x in dhrdn],
+                float(ht),float(dhtdt),float(dhtdp),*[float(x) for x in dhtdn],
+                float(sr),float(dsrdt),float(dsrdp),*[float(x) for x in dsrdn],
+                float(st),float(dstdt),float(dstdp),*[float(x) for x in dstdn],
+                *[float(x) for x in lnphi],
+                *[float(x) for x in dlnphidt],
+                *[float(x) for x in dlnphidp],
+                *[float(dlnphidn[i][j]) for i in range(nc) for j in range(nc)],
+                float(sostp),
+            ]
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=values,volume=v_tv,nsites=nsites.value)),flush=True)
+            continue
+        if request['mode']=='SPCSAFT_RDF':
+            if probe is None:probe=load_probe()
+            from thermopack.pcsaft import pcsaft
+            comps=request['components']
+            key=('SPCSAFT_RDF',comps)
+            if previous!=key:
+                model=pcsaft(comps,simplified=True)
+                previous=key
+            model.activate()
+            n_vec=list(map(float,request['moles']));nc=len(n_vec)
+            amounts=(c_double*16)(*n_vec,*([0.0]*(16-nc)))
+            cap=max(256,6+3*nc+nc*nc)
+            out=(c_double*cap)();cnt=c_int()
+            probe.query_spcsaft_rdf(float(request['temperature']),float(request['volume']),amounts,cap,out,byref(cnt))
+            print('THERMOPACK_RESULT='+json.dumps(dict(values=[float(out[i]) for i in range(cnt.value)])),flush=True)
+            continue
         if request['mode']=='LEE_KESLER':
             if probe is None:probe=load_probe()
             from thermopack.lee_kesler import lee_kesler

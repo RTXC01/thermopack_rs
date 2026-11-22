@@ -540,16 +540,45 @@ impl PcSaft {
         self.kij[i * self.components.len() + j]
     }
 
-    pub fn set_kij(&mut self, i: usize, j: usize, val: f64) {
+    /// Sets the binary dispersion interaction parameter `kij(i, j)` symmetrically
+    /// and atomically rebuilds multipolar parameters when polar mode is active.
+    ///
+    /// Returns an error without mutating `self` if indices are out of bounds,
+    /// `val` is non-finite, a diagonal entry is non-zero, `val >= 1.0` (which
+    /// would yield a non-positive cross dispersion energy), or multipolar
+    /// parameter reconstruction fails.
+    pub fn set_kij(&mut self, i: usize, j: usize, val: f64) -> Result<()> {
         let nc = self.components.len();
-        self.kij[i * nc + j] = val;
-        self.kij[j * nc + i] = val;
-        if let Some(mp) = &self.multipol {
-            let (dd, qq, dq) = (mp.enable_dd, mp.enable_qq, mp.enable_dq);
-            if let Ok(rebuilt) = build_multipol_params(&self.components, &self.kij, dd, qq, dq) {
-                self.multipol = Some(rebuilt);
-            }
+        if i >= nc || j >= nc {
+            return Err(Error::InvalidInput("component index out of bounds"));
         }
+        if !val.is_finite() {
+            return Err(Error::InvalidInput("kij must be finite"));
+        }
+        if i == j && val != 0.0 {
+            return Err(Error::InvalidInput("diagonal kij must be zero"));
+        }
+        if val >= 1.0 {
+            return Err(Error::InvalidInput("kij must be strictly less than 1"));
+        }
+        let mut next_kij = self.kij.clone();
+        next_kij[i * nc + j] = val;
+        next_kij[j * nc + i] = val;
+        let next_multipol = if let Some(mp) = &self.multipol {
+            let (dd, qq, dq) = (mp.enable_dd, mp.enable_qq, mp.enable_dq);
+            Some(build_multipol_params(
+                &self.components,
+                &next_kij,
+                dd,
+                qq,
+                dq,
+            )?)
+        } else {
+            None
+        };
+        self.kij = next_kij;
+        self.multipol = next_multipol;
+        Ok(())
     }
 
     /// Returns the active association parameter table.
@@ -573,7 +602,7 @@ impl PcSaft {
     }
 
     /// Updates the pure-component association parameters for component `index`
-    /// and rebuilds the association parameter table.
+    /// and atomically rebuilds the association parameter table.
     pub fn set_assoc_params(
         &mut self,
         index: usize,
@@ -589,22 +618,25 @@ impl PcSaft {
                 "association parameters must be finite and non-negative",
             ));
         }
-        self.components[index].eps = eps;
-        self.components[index].beta = beta;
-        self.components[index].assoc_scheme = scheme;
-        self.enable_association = true;
-        self.assoc = build_association_params(
-            &self.components,
+        let mut next_components = self.components.clone();
+        next_components[index].eps = eps;
+        next_components[index].beta = beta;
+        next_components[index].assoc_scheme = scheme;
+        let next_assoc = build_association_params(
+            &next_components,
             &self.eps_comb_rules,
             &self.beta_comb_rules,
-            self.enable_association,
+            true,
             self.delta_comb_rule,
         )?;
+        self.components = next_components;
+        self.enable_association = true;
+        self.assoc = next_assoc;
         Ok(())
     }
 
-    /// Sets the cross-association combining rules for pair `(i, j)` and rebuilds
-    /// the association parameter table.
+    /// Sets the cross-association combining rules for pair `(i, j)` and atomically
+    /// rebuilds the association parameter table.
     pub fn set_assoc_comb_rules(
         &mut self,
         i: usize,
@@ -616,36 +648,42 @@ impl PcSaft {
         if i >= nc || j >= nc {
             return Err(Error::InvalidInput("component index out of bounds"));
         }
-        self.eps_comb_rules[i * nc + j] = eps_rule;
-        self.eps_comb_rules[j * nc + i] = eps_rule;
-        self.beta_comb_rules[i * nc + j] = beta_rule;
-        self.beta_comb_rules[j * nc + i] = beta_rule;
-        self.assoc = build_association_params(
+        let mut next_eps = self.eps_comb_rules.clone();
+        let mut next_beta = self.beta_comb_rules.clone();
+        next_eps[i * nc + j] = eps_rule;
+        next_eps[j * nc + i] = eps_rule;
+        next_beta[i * nc + j] = beta_rule;
+        next_beta[j * nc + i] = beta_rule;
+        let next_assoc = build_association_params(
             &self.components,
-            &self.eps_comb_rules,
-            &self.beta_comb_rules,
+            &next_eps,
+            &next_beta,
             self.enable_association,
             self.delta_comb_rule,
         )?;
+        self.eps_comb_rules = next_eps;
+        self.beta_comb_rules = next_beta;
+        self.assoc = next_assoc;
         Ok(())
     }
 
-    /// Sets the cross-association strength combining rule (`Cr1` or `Elliot`) and
-    /// rebuilds the association parameter table.
+    /// Sets the cross-association strength combining rule (`Standard` or `Elliot`)
+    /// and atomically rebuilds the association parameter table.
     pub fn set_delta_comb_rule(&mut self, rule: DeltaCombRule) -> Result<()> {
-        self.delta_comb_rule = rule;
-        self.assoc = build_association_params(
+        let next_assoc = build_association_params(
             &self.components,
             &self.eps_comb_rules,
             &self.beta_comb_rules,
             self.enable_association,
-            self.delta_comb_rule,
+            rule,
         )?;
+        self.delta_comb_rule = rule;
+        self.assoc = next_assoc;
         Ok(())
     }
 
     /// Updates dipole (`mu` `[D]`) and quadrupole (`q` `[D·Å]`) moments for component
-    /// `index` and rebuilds the multipolar parameters if polar mode is active.
+    /// `index` and atomically rebuilds the multipolar parameters if polar mode is active.
     pub fn set_polar_moments(&mut self, index: usize, mu: f64, q: f64) -> Result<()> {
         if index >= self.components.len() {
             return Err(Error::InvalidInput("component index out of bounds"));
@@ -653,18 +691,23 @@ impl PcSaft {
         if !mu.is_finite() || !q.is_finite() {
             return Err(Error::InvalidInput("polar moments must be finite"));
         }
-        self.components[index].mu = mu;
-        self.components[index].q = q;
-        if let Some(mp) = &self.multipol {
+        let mut next_components = self.components.clone();
+        next_components[index].mu = mu;
+        next_components[index].q = q;
+        let next_multipol = if let Some(mp) = &self.multipol {
             let (dd, qq, dq) = (mp.enable_dd, mp.enable_qq, mp.enable_dq);
-            self.multipol = Some(build_multipol_params(
-                &self.components,
+            Some(build_multipol_params(
+                &next_components,
                 &self.kij,
                 dd,
                 qq,
                 dq,
-            )?);
-        }
+            )?)
+        } else {
+            None
+        };
+        self.components = next_components;
+        self.multipol = next_multipol;
         Ok(())
     }
 
@@ -842,6 +885,11 @@ impl PcSaft {
 
     /// Evaluates the complete TP state with exact first `(T, P, n)` derivatives
     /// at `(T, P, n)` for the requested `phase`.
+    ///
+    /// For mixture total ideal entropy `s_id`, the exact `0 * ln(0) = 0` limit
+    /// is preserved. For partial molar ideal entropy `entropy.dn[i]`, zero mole
+    /// fractions use ThermoPack's `x[i].max(1.0e-100).ln()` cutoff
+    /// (`src/ideal.f90:621`), while `ln_fugacity` remains unaffected.
     pub fn state_tp(
         &self,
         temperature: f64,
@@ -965,10 +1013,11 @@ impl PcSaft {
             let id = self.ideal[i].properties(t, p_eval)?;
             h_id += x[i] * id.enthalpy;
             cp_id += x[i] * id.cp;
-            let xi_ln = if x[i] > 0.0 { x[i].ln() } else { 0.0 };
-            s_id += x[i] * (id.entropy - RGAS * xi_ln);
+            if x[i] > 0.0 {
+                s_id += x[i] * (id.entropy - RGAS * x[i].ln());
+            }
             h_id_comp.push(id.enthalpy);
-            s_id_comp.push(id.entropy - RGAS * xi_ln);
+            s_id_comp.push(id.entropy - RGAS * x[i].max(1.0e-100).ln());
         }
         let mut h_tot_dn = Vec::with_capacity(nc);
         let mut s_tot_dn = Vec::with_capacity(nc);
@@ -2075,6 +2124,13 @@ impl<'a> PreparedPcSaft<'a> {
     }
 
     /// Pure fluid saturation pressure at temperature `T`.
+    ///
+    /// Locates the vapor-branch pressure maximum (`P_spin_v`) and liquid-branch
+    /// pressure minimum (`P_spin_l`) along the pure-fluid isotherm `P(eta)` in
+    /// dimensionless packing fraction, brackets the coexistence pressure strictly
+    /// inside `(max(P_spin_l, 0), P_spin_v)`, solves liquid and vapor densities on
+    /// their respective monotone branches, and converges `ln(phi_l / phi_v) = 0`
+    /// using safeguarded Newton in `ln P` with bisection fallback.
     pub fn saturation_pressure(&self, temperature: f64) -> Result<PcSaftSaturation> {
         if self.model.components.len() != 1 {
             return Err(Error::Unsupported(
@@ -2083,48 +2139,231 @@ impl<'a> PreparedPcSaft<'a> {
         }
 
         let prep = self.model.prepare(temperature, &[1.0])?;
+        let conv_num = prep.conversion_numerator();
+        let rt = RGAS * temperature;
 
-        let comp_data = crate::component::component(self.model.components[0].ident)?;
-        let tc = comp_data.critical_temperature;
-        let pc = comp_data.critical_pressure;
-        let omega = comp_data.acentric_factor;
-
-        let exp_arg: f64 = 5.373 * (1.0 + omega) * (1.0 - tc / temperature);
-        let mut p_est = pc * exp_arg.exp();
-        if p_est >= pc || p_est <= 0.0 || !p_est.is_finite() {
-            p_est = 0.5 * pc;
+        // 1. Scan the pure-fluid isotherm P(eta) to locate the van der Waals
+        //    vapor spinodal (dP/drho: + -> -) and liquid spinodal (dP/drho: - -> +).
+        let mut grid = Vec::with_capacity(400);
+        for k in 0..40 {
+            grid.push(10.0_f64.powf(-12.0 + 0.25 * (k as f64)));
+        }
+        for k in 0..=355 {
+            grid.push(0.01 + 0.002 * (k as f64));
         }
 
-        let mut p = p_est;
-        let max_iter = 60;
+        let mut prev_eta = grid[0];
+        let mut prev_dp = prep.pressure_and_derivatives(prev_eta / conv_num).dp_drho;
+        let mut vap_bracket: Option<(f64, f64)> = None;
+        let mut liq_bracket: Option<(f64, f64)> = None;
 
-        for _ in 0..max_iter {
-            let vl = match prep.volume(p, Phase::Liquid) {
-                Ok(v) => v,
-                Err(_) => {
-                    p *= 0.8;
-                    continue;
-                }
-            };
-            let vv = match prep.volume(p, Phase::Vapor) {
-                Ok(v) => v,
-                Err(_) => {
-                    p *= 1.2;
-                    continue;
-                }
-            };
-
-            if (vv - vl).abs() < 1e-12 * vl {
-                return Err(Error::NotConverged(
-                    "liquid and vapor volumes converged to the same critical root",
-                ));
+        for &eta in &grid[1..] {
+            let jet = prep.pressure_and_derivatives(eta / conv_num);
+            if !jet.pressure.is_finite() || !jet.dp_drho.is_finite() {
+                break;
             }
+            if vap_bracket.is_none() && prev_dp > 0.0 && jet.dp_drho <= 0.0 {
+                vap_bracket = Some((prev_eta, eta));
+            } else if vap_bracket.is_some()
+                && liq_bracket.is_none()
+                && prev_dp <= 0.0
+                && jet.dp_drho > 0.0
+            {
+                liq_bracket = Some((prev_eta, eta));
+                break;
+            }
+            prev_eta = eta;
+            prev_dp = jet.dp_drho;
+        }
 
-            let state_l = prep.state(1.0 / vl)?;
-            let state_v = prep.state(1.0 / vv)?;
+        let (Some((mut v_lo, mut v_hi)), Some((mut l_lo, mut l_hi))) = (vap_bracket, liq_bracket)
+        else {
+            return Err(Error::NotConverged(
+                "isotherm is supercritical or monotone; no vapor-liquid coexistence",
+            ));
+        };
 
-            let delta_ln_phi = state_l.ln_phi[0] - state_v.ln_phi[0];
-            if delta_ln_phi.abs() < 1e-10 {
+        // Refine both spinodal packing fractions by bisection on dP/drho = 0.
+        for _ in 0..50 {
+            let mid = 0.5 * (v_lo + v_hi);
+            let dp = prep.pressure_and_derivatives(mid / conv_num).dp_drho;
+            if dp > 0.0 {
+                v_lo = mid;
+            } else {
+                v_hi = mid;
+            }
+        }
+        let eta_spin_v = v_lo; // Strictly on the dP/drho > 0 vapor side
+        let p_spin_v = prep
+            .pressure_and_derivatives(eta_spin_v / conv_num)
+            .pressure;
+
+        for _ in 0..50 {
+            let mid = 0.5 * (l_lo + l_hi);
+            let dp = prep.pressure_and_derivatives(mid / conv_num).dp_drho;
+            if dp <= 0.0 {
+                l_lo = mid;
+            } else {
+                l_hi = mid;
+            }
+        }
+        let eta_spin_l = l_hi; // Strictly on the dP/drho > 0 liquid side
+        let p_spin_l = prep
+            .pressure_and_derivatives(eta_spin_l / conv_num)
+            .pressure;
+
+        if !p_spin_v.is_finite() || p_spin_v <= 0.0 {
+            return Err(Error::NotConverged(
+                "vapor spinodal pressure is non-positive",
+            ));
+        }
+
+        // Solve for unique eta on a strictly increasing branch [eta_lo, eta_hi]
+        // with P(eta_lo) <= p_target <= P(eta_hi).
+        let solve_branch_eta = |p_target: f64, is_liquid: bool| -> Result<f64> {
+            let (mut lo, mut hi) = if is_liquid {
+                let mut hi = 0.72_f64.max(eta_spin_l + 1.0e-4);
+                while hi < 0.7495 {
+                    let p_hi_eval = prep.pressure_and_derivatives(hi / conv_num).pressure;
+                    if p_hi_eval.is_finite() && p_hi_eval >= p_target {
+                        break;
+                    }
+                    hi = 0.5 * (hi + 0.7499);
+                }
+                (eta_spin_l, hi)
+            } else {
+                let eta_ig = (p_target * conv_num / rt).clamp(1.0e-30, 0.5 * eta_spin_v);
+                let mut lo = 0.1 * eta_ig;
+                while lo > 1.0e-300 {
+                    let p_lo_eval = prep.pressure_and_derivatives(lo / conv_num).pressure;
+                    if p_lo_eval.is_finite() && p_lo_eval <= p_target {
+                        break;
+                    }
+                    lo *= 0.1;
+                }
+                (lo, eta_spin_v)
+            };
+
+            let mut eta = if is_liquid {
+                0.5 * (lo + hi)
+            } else {
+                (p_target * conv_num / rt).clamp(lo, hi)
+            };
+
+            for _ in 0..100 {
+                let jet = prep.pressure_and_derivatives(eta / conv_num);
+                let diff = jet.pressure - p_target;
+                if diff.abs() <= 1.0e-13 * p_target.max(1.0e-30)
+                    || (hi - lo) <= 4.0 * f64::EPSILON * hi
+                {
+                    return Ok(eta);
+                }
+                if diff > 0.0 {
+                    hi = eta;
+                } else {
+                    lo = eta;
+                }
+                let dp_deta = jet.dp_drho / conv_num;
+                let next = if dp_deta.is_finite() && dp_deta > 0.0 {
+                    eta - diff / dp_deta
+                } else {
+                    0.5 * (lo + hi)
+                };
+                eta = if next > lo && next < hi && next.is_finite() {
+                    next
+                } else {
+                    0.5 * (lo + hi)
+                };
+            }
+            let final_p = prep.pressure_and_derivatives(eta / conv_num).pressure;
+            if final_p.is_finite() && (final_p - p_target).abs() <= 1.0e-7 * p_target.max(1.0) {
+                Ok(eta)
+            } else {
+                Err(Error::NotConverged(
+                    "monotone-branch volume solve did not converge",
+                ))
+            }
+        };
+
+        let eval_delta_ln_phi = |p_trial: f64| -> Result<(f64, f64, f64)> {
+            let eta_l = solve_branch_eta(p_trial, true)?;
+            let eta_v = solve_branch_eta(p_trial, false)?;
+            let rho_l = eta_l / conv_num;
+            let rho_v = eta_v / conv_num;
+            let vl = 1.0 / rho_l;
+            let vv = 1.0 / rho_v;
+            let jet_l = prep.pressure_and_derivatives(rho_l);
+            let jet_v = prep.pressure_and_derivatives(rho_v);
+            let z_l = p_trial * vl / rt;
+            let z_v = p_trial * vv / rt;
+            if !jet_l.residual_helmholtz.is_finite()
+                || !jet_v.residual_helmholtz.is_finite()
+                || z_l <= 0.0
+                || z_v <= 0.0
+            {
+                return Err(Error::NotConverged("non-positive compressibility"));
+            }
+            // Use the Gibbs-stationary Z = P_trial * v / (R T) so low-pressure
+            // incompressible liquid branches avoid (K_T^-1 / P) * eps_mach noise.
+            let ln_phi_l = jet_l.residual_helmholtz + (z_l - 1.0) - z_l.ln();
+            let ln_phi_v = jet_v.residual_helmholtz + (z_v - 1.0) - z_v.ln();
+            Ok((ln_phi_l - ln_phi_v, vl, vv))
+        };
+
+        // 2. Establish a strict sign bracket [ln_p_lo, ln_p_hi] with
+        //    delta_ln_phi(p_lo) > 0 > delta_ln_phi(p_hi).
+        let p_hi = p_spin_v * (1.0 - 1.0e-9);
+        let (d_hi, _, _) = eval_delta_ln_phi(p_hi)?;
+        if d_hi > 0.0 {
+            return Err(Error::NotConverged(
+                "saturation pressure lies outside vapor spinodal bound",
+            ));
+        }
+
+        let mut p_lo = if p_spin_l > 0.0 {
+            (p_spin_l * (1.0 + 1.0e-9)).min(0.5 * p_hi)
+        } else {
+            let mut seed = 0.5 * p_hi;
+            if let Ok(comp_data) = crate::component::component(self.model.components[0].ident) {
+                let exp_arg = 5.373
+                    * (1.0 + comp_data.acentric_factor)
+                    * (1.0 - comp_data.critical_temperature / temperature);
+                let p_w = comp_data.critical_pressure * exp_arg.exp();
+                if p_w.is_finite() && p_w > 0.0 && p_w < p_hi {
+                    seed = p_w;
+                }
+            }
+            seed
+        };
+
+        let mut d_lo = eval_delta_ln_phi(p_lo)?.0;
+        let mut shrink_steps = 0;
+        while d_lo < 0.0 && shrink_steps < 40 {
+            p_lo *= 0.1;
+            if p_lo <= p_spin_l.max(0.0) || p_lo <= 1.0e-30 * p_hi {
+                break;
+            }
+            d_lo = eval_delta_ln_phi(p_lo)?.0;
+            shrink_steps += 1;
+        }
+        if d_lo < 0.0 {
+            return Err(Error::NotConverged(
+                "failed to bracket pure-fluid saturation pressure",
+            ));
+        }
+
+        // 3. Safeguarded Newton in ln(P) with bisection fallback.
+        let mut ln_p_lo = p_lo.ln();
+        let mut ln_p_hi = p_hi.ln();
+        let mut ln_p = 0.5 * (ln_p_lo + ln_p_hi);
+
+        for _ in 0..80 {
+            let p = ln_p.exp();
+            let (delta_ln_phi, vl, vv) = eval_delta_ln_phi(p)?;
+
+            if delta_ln_phi.abs() < 1.0e-11 || (ln_p_hi - ln_p_lo) < 1.0e-13 {
+                let state_l = prep.state(1.0 / vl)?;
+                let state_v = prep.state(1.0 / vv)?;
                 return Ok(PcSaftSaturation {
                     pressure: p,
                     temperature,
@@ -2135,19 +2374,26 @@ impl<'a> PreparedPcSaft<'a> {
                 });
             }
 
-            let d_delta_dp = (vl - vv) / (RGAS * temperature);
-            let mut dp = -delta_ln_phi / d_delta_dp;
-
-            if dp > 0.5 * p {
-                dp = 0.5 * p;
-            } else if dp < -0.5 * p {
-                dp = -0.5 * p;
+            if delta_ln_phi > 0.0 {
+                ln_p_lo = ln_p;
+            } else {
+                ln_p_hi = ln_p;
             }
 
-            p += dp;
-            if p <= 0.0 {
-                p = 0.1 * p_est;
-            }
+            // d(ln(phi_l / phi_v)) / d(ln P) = P * (v_l - v_v) / (R T) < 0
+            // Newton step: delta_ln_p = delta_ln_phi / (P * (v_v - v_l) / (R T))
+            let denom = p * (vv - vl) / rt;
+            let next = if denom.is_finite() && denom > 0.0 {
+                ln_p + delta_ln_phi / denom
+            } else {
+                0.5 * (ln_p_lo + ln_p_hi)
+            };
+
+            ln_p = if next > ln_p_lo && next < ln_p_hi && next.is_finite() {
+                next
+            } else {
+                0.5 * (ln_p_lo + ln_p_hi)
+            };
         }
 
         Err(Error::NotConverged(

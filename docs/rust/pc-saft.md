@@ -302,7 +302,12 @@ The PC-SAFT family now covers all four ThermoPack variants (`PcSaft`, `SPcSaft`,
   `(T, V, n)` derivative blocks from `query_pcsaft_full_fres`, solved `X_k`,
   and complete TP state derivatives (`Z, v, H_res, H, S_res, S, ln_phi` with
   `(T, P, n)` derivatives and speed of sound), matching with worst unit-aware
-  scaled error `3.55e-10`. Simplified `rdf::spcsaft_rdf` is qualified in 3
+  scaled error `3.55e-10`. Each `PCSAFT_FULL` fixture row evaluates the TV
+  residual Helmholtz kernel on raw extensive `moles` and the TP columns on
+  normalized unit-mole `x = moles / sum(moles)` matching ThermoPack's TP
+  oracle; direct raw-amount non-unit-mole `state_tp` scaling (including
+  `N = 1e-140` mol) is tested directly in `tests/pc_saft_assoc_polar.rs`.
+  Simplified `rdf::spcsaft_rdf` is qualified in 3
   cases against `query_spcsaft_rdf` with worst scaled error `1.16e-14`.
   Use `PcSaft::new_nonassoc` when explicitly evaluating the non-associating
   `F_PC_SAFT_TVn` / `F_sPC_SAFT_TVn` kernels on associating fluids.

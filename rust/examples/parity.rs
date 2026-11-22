@@ -119,6 +119,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 values.extend(f.f_vn);
                 values.extend(f.f_nn);
                 values.extend(f.x_k);
+                // TV residual block uses raw extensive `moles`; TP state columns
+                // use normalized unit-mole `x = moles / sum(moles)` to match
+                // ThermoPack's TP oracle (raw non-unit-mole TP scaling is tested
+                // directly in `tests/pc_saft_assoc_polar.rs`).
                 let s = model.state_tp(t, p, &x, phase)?;
                 values.extend([
                     s.compressibility_factor.value,

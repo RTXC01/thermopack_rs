@@ -2,10 +2,10 @@
 //! `PCP-SAFT`, `sPCP-SAFT`), shared Wertheim TPT1 association, Gross/Vrabec
 //! multipolar terms, and simplified PC-SAFT RDF.
 
-use thermopack_rs::Phase;
 use thermopack_rs::association::{self, AssocCombRule, AssocScheme, DeltaCombRule};
 use thermopack_rs::pc_saft::{PcSaft, PcSaftKind, PcSaftOptions, RGAS};
 use thermopack_rs::rdf::spcsaft_rdf;
+use thermopack_rs::{Error, Phase};
 
 fn approx_eq(actual: f64, expected: f64, rtol: f64, atol: f64, label: &str) {
     assert!(
@@ -658,4 +658,519 @@ fn association_site_scheme_utilities() {
     assert_eq!(AssocScheme::Scheme4C.num_sites(), 4);
     let empty = association::AssociationParams::empty(2);
     assert!(!empty.has_sites());
+}
+
+#[test]
+fn induced_association_zero_mole_absent_partner_matches_limit_and_fd() {
+    let mut model = PcSaft::new(&["CO2", "H2O"]).unwrap();
+    model
+        .set_assoc_params(0, 10_000.0, 0.03, AssocScheme::Scheme1ea)
+        .unwrap();
+
+    let t = 340.0;
+    let v = 1.0e-4;
+    let f0 = model.residual_helmholtz_tv(t, v, &[1.0, 0.0]).unwrap();
+    let f_lim = model.residual_helmholtz_tv(t, v, &[1.0, 1.0e-8]).unwrap();
+
+    // Present CO2 has no self-association (`Scheme1ea` cannot bond to itself),
+    // while absent H2O sites still cross-associate with present CO2.
+    approx_eq(f0.x_k[0], 1.0, 1e-12, 1e-13, "present CO2 X_k");
+    assert!(
+        f0.x_k[1..].iter().any(|&xk| xk < 0.8),
+        "expected induced cross-association on absent H2O sites, got {:?}",
+        f0.x_k
+    );
+    for (k, (&xk0, &xkl)) in f0.x_k.iter().zip(f_lim.x_k.iter()).enumerate() {
+        approx_eq(xk0, xkl, 1e-5, 1e-6, &format!("X_k[{k}] limit"));
+    }
+
+    // Verify F_n(H2O), F_Tn(H2O), F_Vn(H2O), and F_nn(*, H2O) against one-sided FD.
+    let h = 1.0e-7;
+    let f_p = model.residual_helmholtz_tv(t, v, &[1.0, h]).unwrap();
+    let f_2p = model.residual_helmholtz_tv(t, v, &[1.0, 2.0 * h]).unwrap();
+
+    let fn1_fd = (-3.0 * f0.f + 4.0 * f_p.f - f_2p.f) / (2.0 * h);
+    let ftn1_fd = (-3.0 * f0.f_t + 4.0 * f_p.f_t - f_2p.f_t) / (2.0 * h);
+    let fvn1_fd = (-3.0 * f0.f_v + 4.0 * f_p.f_v - f_2p.f_v) / (2.0 * h);
+    let fnn01_fd = (-3.0 * f0.f_n[0] + 4.0 * f_p.f_n[0] - f_2p.f_n[0]) / (2.0 * h);
+    let fnn11_fd = (-3.0 * f0.f_n[1] + 4.0 * f_p.f_n[1] - f_2p.f_n[1]) / (2.0 * h);
+
+    approx_eq(f0.f_n[1], fn1_fd, 1e-6, 1e-7, "induced assoc F_n(H2O)");
+    approx_eq(f0.f_tn[1], ftn1_fd, 1e-5, 1e-7, "induced assoc F_Tn(H2O)");
+    approx_eq(f0.f_vn[1], fvn1_fd, 1e-5, 1e-4, "induced assoc F_Vn(H2O)");
+    approx_eq(
+        f0.f_nn[1],
+        fnn01_fd,
+        1e-5,
+        1e-6,
+        "induced assoc F_nn(CO2,H2O)",
+    );
+    approx_eq(
+        f0.f_nn[3],
+        fnn11_fd,
+        1e-5,
+        1e-6,
+        "induced assoc F_nn(H2O,H2O)",
+    );
+}
+
+#[test]
+fn multipol_dq_zero_mole_boundary_matches_fd_and_rejects_ambiguous_mixed_boundary() {
+    let mut model = PcSaft::new_polar(&["ACETONE", "CO2"]).unwrap();
+    model.set_multipol_control(false, false, true).unwrap();
+
+    let t = 340.0;
+    let v = 1.0e-4;
+    let h = 1.0e-7;
+
+    // Test both boundary faces: absent quadrupole [1, 0] and absent dipole [0, 1].
+    for (n0, absent, present, label) in [
+        ([1.0, 0.0], 1usize, 0usize, "absent_CO2"),
+        ([0.0, 1.0], 0usize, 1usize, "absent_ACETONE"),
+    ] {
+        let f0 = model.multipol_residual_helmholtz_tv(t, v, &n0).unwrap();
+        let mut n1 = n0;
+        let mut n2 = n0;
+        n1[absent] = h;
+        n2[absent] = 2.0 * h;
+        let f1 = model.multipol_residual_helmholtz_tv(t, v, &n1).unwrap();
+        let f2 = model.multipol_residual_helmholtz_tv(t, v, &n2).unwrap();
+
+        let fn_abs_fd = (-3.0 * f0.f + 4.0 * f1.f - f2.f) / (2.0 * h);
+        let ftn_abs_fd = (-3.0 * f0.f_t + 4.0 * f1.f_t - f2.f_t) / (2.0 * h);
+        let fvn_abs_fd = (-3.0 * f0.f_v + 4.0 * f1.f_v - f2.f_v) / (2.0 * h);
+        let fnn_pa_fd =
+            (-3.0 * f0.f_n[present] + 4.0 * f1.f_n[present] - f2.f_n[present]) / (2.0 * h);
+        let fnn_aa_fd = (-3.0 * f0.f_n[absent] + 4.0 * f1.f_n[absent] - f2.f_n[absent]) / (2.0 * h);
+
+        approx_eq(f0.f, 0.0, 0.0, 1e-15, &format!("{label} F == 0"));
+        assert!(
+            f0.f_n[absent].abs() > 1.0e-3,
+            "{label}: expected non-trivial DQ Pade boundary derivative"
+        );
+        approx_eq(
+            f0.f_n[absent],
+            fn_abs_fd,
+            1e-6,
+            1e-8,
+            &format!("{label} F_n"),
+        );
+        approx_eq(
+            f0.f_tn[absent],
+            ftn_abs_fd,
+            1e-5,
+            1e-8,
+            &format!("{label} F_Tn"),
+        );
+        approx_eq(
+            f0.f_vn[absent],
+            fvn_abs_fd,
+            1e-5,
+            1e-4,
+            &format!("{label} F_Vn"),
+        );
+        approx_eq(
+            f0.f_nn[present * 2 + absent],
+            fnn_pa_fd,
+            1e-5,
+            1e-7,
+            &format!("{label} F_nn(present,absent)"),
+        );
+        approx_eq(
+            f0.f_nn[absent * 2 + absent],
+            fnn_aa_fd,
+            1e-5,
+            1e-6,
+            &format!("{label} F_nn(absent,absent)"),
+        );
+    }
+
+    // Explicit reference magnitude check for ACETONE + absent CO2 (proves Pade
+    // factor a2'^2 / (a2' - a3') is preserved rather than collapsing to a2').
+    let f_ref = model
+        .multipol_residual_helmholtz_tv(t, v, &[1.0, 0.0])
+        .unwrap();
+    approx_eq(
+        f_ref.f_n[1],
+        -0.861_517_502_5,
+        1e-6,
+        1e-6,
+        "ACETONE/absent-CO2 DQ F_n reference",
+    );
+
+    // When two species in the absent polar family are simultaneously zero, the
+    // mixed DQ Pade boundary second derivative is path-dependent and must error.
+    let mut ambig_q = PcSaft::new_polar(&["ACETONE", "CO2", "N2"]).unwrap();
+    ambig_q.set_polar_moments(2, 0.0, 1.5).unwrap();
+    ambig_q.set_multipol_control(false, false, true).unwrap();
+    let err_q = ambig_q
+        .multipol_residual_helmholtz_tv(t, v, &[1.0, 0.0, 0.0])
+        .unwrap_err();
+    assert!(matches!(err_q, Error::InvalidInput(_)));
+
+    let mut ambig_d = PcSaft::new_polar(&["CO2", "ACETONE", "NH3"]).unwrap();
+    ambig_d.set_polar_moments(2, 1.47, 0.0).unwrap();
+    ambig_d.set_multipol_control(false, false, true).unwrap();
+    let err_d = ambig_d
+        .multipol_residual_helmholtz_tv(t, v, &[1.0, 0.0, 0.0])
+        .unwrap_err();
+    assert!(matches!(err_d, Error::InvalidInput(_)));
+
+    // When both polar families are absent in a non-polar solvent, a_2 = O(eps^2)
+    // and a_3 = O(eps^3), so the boundary is smooth and matches FD.
+    let mut both_absent = PcSaft::new_polar(&["ACETONE", "CO2", "C1"]).unwrap();
+    both_absent
+        .set_multipol_control(false, false, true)
+        .unwrap();
+    let f_ba = both_absent
+        .multipol_residual_helmholtz_tv(t, v, &[0.0, 0.0, 1.0])
+        .unwrap();
+    let f_ba_h = both_absent
+        .multipol_residual_helmholtz_tv(t, v, &[h, h, 1.0])
+        .unwrap();
+    approx_eq(
+        f_ba.f_nn[1],
+        f_ba_h.f / (h * h),
+        1e-4,
+        1e-6,
+        "both polar families absent F_nn(ACETONE,CO2)",
+    );
+}
+
+#[test]
+fn zero_mole_state_tp_partial_molar_ideal_entropy_uses_thermopack_cutoff() {
+    let mix = PcSaft::new(&["C1", "C2"]).unwrap();
+    let pure = PcSaft::new(&["C1"]).unwrap();
+
+    let t = 340.0;
+    let p = 1.0e5;
+    let s_mix = mix.state_tp(t, p, &[1.0, 0.0], Phase::Vapor).unwrap();
+    let s_pure = pure.state_tp(t, p, &[1.0], Phase::Vapor).unwrap();
+
+    // Mixture entropy preserves exact 0 * ln(0) = 0 matching pure C1.
+    approx_eq(
+        s_mix.entropy.value,
+        s_pure.entropy.value,
+        1e-12,
+        1e-12,
+        "mixture entropy at [1,0] == pure C1",
+    );
+    // Partial molar entropy of absent C2 uses ThermoPack's 1e-100 floor
+    // (`s_id_i = s_id_pure_i - R * ln(1e-100)`), staying finite (~2151.24 J/(mol K)).
+    assert!(s_mix.entropy.dn[1].is_finite());
+    approx_eq(
+        s_mix.entropy.dn[1],
+        2_151.242_215_167,
+        1e-6,
+        1e-4,
+        "zero-mole partial molar entropy matches ThermoPack cutoff",
+    );
+
+    // Fugacity coefficients remain finite and exact (`ln_phi_i = F_n_i - ln(Z)`).
+    let f = mix
+        .residual_helmholtz_tv(t, s_mix.specific_volume.value, &[1.0, 0.0])
+        .unwrap();
+    let ln_z = s_mix.compressibility_factor.value.ln();
+    for i in 0..2 {
+        approx_eq(
+            s_mix.ln_fugacity.ln_phi[i],
+            f.f_n[i] - ln_z,
+            1e-12,
+            1e-13,
+            &format!("zero-mole ln_phi[{i}]"),
+        );
+    }
+}
+
+#[test]
+fn set_kij_validates_inputs_and_is_atomic_on_error() {
+    let mut model = PcSaft::new_polar(&["CO2", "ACETONE"]).unwrap();
+    let orig_kij = [
+        model.get_kij(0, 0),
+        model.get_kij(0, 1),
+        model.get_kij(1, 0),
+        model.get_kij(1, 1),
+    ];
+    let orig_eps = model.multipol().unwrap().eps_divk_ij.clone();
+
+    for (i, j, val) in [
+        (0, 0, 1.0),
+        (0, 0, 0.1),
+        (0, 1, 1.0),
+        (0, 1, 1.5),
+        (0, 2, 0.0),
+        (2, 0, 0.0),
+        (0, 1, f64::NAN),
+        (0, 1, f64::INFINITY),
+        (0, 1, f64::NEG_INFINITY),
+    ] {
+        let err = model.set_kij(i, j, val).unwrap_err();
+        assert!(
+            matches!(err, Error::InvalidInput(_)),
+            "expected InvalidInput for set_kij({i}, {j}, {val}), got {err:?}"
+        );
+        assert_eq!(model.get_kij(0, 0), orig_kij[0]);
+        assert_eq!(model.get_kij(0, 1), orig_kij[1]);
+        assert_eq!(model.get_kij(1, 0), orig_kij[2]);
+        assert_eq!(model.get_kij(1, 1), orig_kij[3]);
+        assert_eq!(model.multipol().unwrap().eps_divk_ij, orig_eps);
+    }
+
+    model.set_kij(0, 1, 0.05).unwrap();
+    assert_eq!(model.get_kij(0, 1), 0.05);
+    assert_eq!(model.get_kij(1, 0), 0.05);
+    assert_ne!(model.multipol().unwrap().eps_divk_ij[1], orig_eps[1]);
+    assert_eq!(
+        model.multipol().unwrap().eps_divk_ij[1],
+        model.multipol().unwrap().eps_divk_ij[2]
+    );
+}
+
+#[test]
+fn pure_fluid_saturation_converges_for_polar_meoh_low_t_water_and_rejects_supercritical() {
+    for (comp, t, expected_p, rtol_p) in [
+        ("MEOH", 450.0, 444_367.074_811, 1e-5),
+        ("MEOH", 500.0, 1_227_151.027, 1e-4),
+        ("H2O", 280.0, 991.643, 1e-3),
+    ] {
+        let model = PcSaft::new_polar(&[comp]).unwrap();
+        let prep = model.prepare(t, &[1.0]).unwrap();
+        let sat = prep.saturation_pressure(t).unwrap();
+
+        assert!(sat.pressure > 0.0 && sat.liquid_volume < sat.vapor_volume);
+        assert!(sat.enthalpy_vaporization > 0.0 && sat.entropy_vaporization > 0.0);
+        approx_eq(
+            sat.pressure,
+            expected_p,
+            rtol_p,
+            1.0,
+            &format!("{comp}@{t}K P_sat"),
+        );
+
+        let sl = prep.state(1.0 / sat.liquid_volume).unwrap();
+        let sv = prep.state(1.0 / sat.vapor_volume).unwrap();
+        approx_eq(
+            sl.pressure,
+            sat.pressure,
+            1e-8,
+            1.0,
+            &format!("{comp}@{t}K liquid P"),
+        );
+        approx_eq(
+            sv.pressure,
+            sat.pressure,
+            1e-8,
+            1.0,
+            &format!("{comp}@{t}K vapor P"),
+        );
+        let rt = RGAS * t;
+        let zl = sat.pressure * sat.liquid_volume / rt;
+        let zv = sat.pressure * sat.vapor_volume / rt;
+        let ln_phi_l_gibbs = sl.residual_helmholtz + (zl - 1.0) - zl.ln();
+        let ln_phi_v_gibbs = sv.residual_helmholtz + (zv - 1.0) - zv.ln();
+        approx_eq(
+            ln_phi_l_gibbs,
+            ln_phi_v_gibbs,
+            1e-10,
+            1e-10,
+            &format!("{comp}@{t}K Gibbs fugacity eq"),
+        );
+        approx_eq(
+            sl.ln_phi[0],
+            sv.ln_phi[0],
+            1e-8,
+            1e-8,
+            &format!("{comp}@{t}K state fugacity eq"),
+        );
+    }
+
+    // Supercritical CO2 has a monotone isotherm and must return NotConverged.
+    let co2 = PcSaft::new_polar(&["CO2"]).unwrap();
+    let prep = co2.prepare(400.0, &[1.0]).unwrap();
+    let err = prep.saturation_pressure(400.0).unwrap_err();
+    assert!(matches!(err, Error::NotConverged(_)));
+}
+
+#[test]
+fn state_tp_raw_non_unit_moles_scaling_and_fd_derivatives() {
+    type ScalingCase<'a> = (
+        &'a str,
+        PcSaftKind,
+        &'a [&'a str],
+        f64,
+        f64,
+        &'a [f64],
+        Phase,
+    );
+    let cases: &[ScalingCase<'_>] = &[
+        (
+            "sPC-SAFT_C1_C2_C3_N2",
+            PcSaftKind::SPcSaft,
+            &["C1", "C2", "C3"],
+            320.0,
+            4.0e6,
+            &[1.2, 0.5, 0.3],
+            Phase::Vapor,
+        ),
+        (
+            "sPC-SAFT_H2O_MEOH_C1_N2",
+            PcSaftKind::SPcSaft,
+            &["H2O", "MEOH", "C1"],
+            360.0,
+            6.0e6,
+            &[0.8, 0.6, 0.6],
+            Phase::Liquid,
+        ),
+        (
+            "sPCP-SAFT_NH3_H2O_1e-140",
+            PcSaftKind::SPcpSaft,
+            &["NH3", "H2O"],
+            320.0,
+            3.0e6,
+            &[0.4e-140, 0.6e-140],
+            Phase::Liquid,
+        ),
+    ];
+
+    for &(label, kind, comps, t, p, moles, phase) in cases {
+        let model = PcSaft::new_with_options(kind, comps, "default").unwrap();
+        let nc = comps.len();
+        let total: f64 = moles.iter().sum();
+        let x: Vec<f64> = moles.iter().map(|&v| v / total).collect();
+
+        let s_raw = model.state_tp(t, p, moles, phase).unwrap();
+        let s_unit = model.state_tp(t, p, &x, phase).unwrap();
+
+        // Intensive quantities and partial molar properties are invariant in total moles.
+        approx_eq(
+            s_raw.specific_volume.value,
+            s_unit.specific_volume.value,
+            1e-12,
+            1e-15,
+            &format!("{label} v"),
+        );
+        approx_eq(
+            s_raw.compressibility_factor.value,
+            s_unit.compressibility_factor.value,
+            1e-12,
+            1e-15,
+            &format!("{label} Z"),
+        );
+        approx_eq(
+            s_raw.enthalpy.value,
+            s_unit.enthalpy.value,
+            1e-12,
+            1e-12,
+            &format!("{label} h"),
+        );
+        approx_eq(
+            s_raw.entropy.value,
+            s_unit.entropy.value,
+            1e-12,
+            1e-12,
+            &format!("{label} s"),
+        );
+        approx_eq(
+            s_raw.speed_of_sound,
+            s_unit.speed_of_sound,
+            1e-12,
+            1e-12,
+            &format!("{label} sos"),
+        );
+
+        for i in 0..nc {
+            approx_eq(
+                s_raw.specific_volume.dn[i],
+                s_unit.specific_volume.dn[i],
+                1e-12,
+                1e-15,
+                &format!("{label} v_bar[{i}]"),
+            );
+            approx_eq(
+                s_raw.enthalpy.dn[i],
+                s_unit.enthalpy.dn[i],
+                1e-12,
+                1e-12,
+                &format!("{label} h_bar[{i}]"),
+            );
+            approx_eq(
+                s_raw.entropy.dn[i],
+                s_unit.entropy.dn[i],
+                1e-12,
+                1e-12,
+                &format!("{label} s_bar[{i}]"),
+            );
+            approx_eq(
+                s_raw.ln_fugacity.ln_phi[i],
+                s_unit.ln_fugacity.ln_phi[i],
+                1e-12,
+                1e-13,
+                &format!("{label} ln_phi[{i}]"),
+            );
+            // Intensive mole derivatives scale strictly as 1/N.
+            approx_eq(
+                s_raw.compressibility_factor.dn[i] * total,
+                s_unit.compressibility_factor.dn[i],
+                1e-12,
+                1e-13,
+                &format!("{label} Z_dn[{i}] * N"),
+            );
+            for j in 0..nc {
+                approx_eq(
+                    s_raw.ln_fugacity.dn[i * nc + j] * total,
+                    s_unit.ln_fugacity.dn[i * nc + j],
+                    1e-12,
+                    1e-13,
+                    &format!("{label} ln_phi_dn[{i},{j}] * N"),
+                );
+            }
+        }
+
+        // Direct central FD verification at raw non-unit moles for N = 2.0 cases.
+        if total > 0.5 {
+            for j in 0..nc {
+                let h = 1.0e-6 * moles[j].max(1.0);
+                let mut np = moles.to_vec();
+                let mut nm = moles.to_vec();
+                np[j] += h;
+                nm[j] -= h;
+                let sp = model.state_tp(t, p, &np, phase).unwrap();
+                let sm = model.state_tp(t, p, &nm, phase).unwrap();
+
+                let z_dn_fd =
+                    (sp.compressibility_factor.value - sm.compressibility_factor.value) / (2.0 * h);
+                approx_eq(
+                    s_raw.compressibility_factor.dn[j],
+                    z_dn_fd,
+                    1e-6,
+                    1e-8,
+                    &format!("{label} FD Z_dn[{j}]"),
+                );
+
+                // Partial molar volume relation: dv_molar/dn_j = (V_bar_j - v_molar) / N.
+                let v_dn_fd = (sp.specific_volume.value - sm.specific_volume.value) / (2.0 * h);
+                let v_dn_analytic =
+                    (s_raw.specific_volume.dn[j] - s_raw.specific_volume.value) / total;
+                approx_eq(
+                    v_dn_analytic,
+                    v_dn_fd,
+                    1e-6,
+                    1e-10,
+                    &format!("{label} FD dv_molar/dn[{j}]"),
+                );
+
+                for i in 0..nc {
+                    let lnp_dn_fd =
+                        (sp.ln_fugacity.ln_phi[i] - sm.ln_fugacity.ln_phi[i]) / (2.0 * h);
+                    approx_eq(
+                        s_raw.ln_fugacity.dn[i * nc + j],
+                        lnp_dn_fd,
+                        1e-6,
+                        1e-8,
+                        &format!("{label} FD ln_phi_dn[{i},{j}]"),
+                    );
+                }
+            }
+        }
+    }
 }

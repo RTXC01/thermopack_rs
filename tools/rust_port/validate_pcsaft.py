@@ -1,5 +1,12 @@
 """Exact-source parity qualification for PC-SAFT, sPC-SAFT, PCP-SAFT, and sPCP-SAFT
-(including association, multipolar DD/QQ/DQ, and simplified RDF kernels)."""
+(including association, multipolar DD/QQ/DQ, and simplified RDF kernels).
+
+Note: Each PCSAFT_FULL row evaluates the 10-block TV residual Helmholtz kernel
+(`query_pcsaft_full_fres`) on raw extensive `moles`, and the TP property/derivative
+columns on normalized unit-mole `x = moles / sum(moles)` matching ThermoPack's
+TP wrapper convention. Direct raw-amount non-unit-mole TP scaling is verified in
+`tests/pc_saft_assoc_polar.rs`.
+"""
 import argparse
 import csv
 import hashlib

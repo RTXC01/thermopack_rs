@@ -1125,7 +1125,10 @@ fn solve_x_k_from_delta(
         return Ok(vec![1.0; ns]);
     }
 
-    // Check whether all active Delta entries vanish (fast path: X_k = 1).
+    // Check whether any active-active Delta entry is positive.
+    // Even if `!any_delta` (e.g. a present non-self-associating `Scheme1ea`
+    // component with an absent cross-associating species), active sites have
+    // `X_k = 1.0`, while absent sites still need the infinite-dilution pass below.
     let mut any_delta = false;
     for &k in &active_sites {
         for &l in &active_sites {
@@ -1138,117 +1141,35 @@ fn solve_x_k_from_delta(
             break;
         }
     }
-    if !any_delta {
-        return Ok(vec![1.0; ns]);
-    }
 
-    let na = active_sites.len();
-    // Active scaled matrix: C_{ab} = (m_b / v_u) * Delta_{ab}
-    // Site equation: 1 / X_a - 1 - sum_b C_{ab} X_b = 0.
-    // Multiply row a by m_a gives symmetric Michelsen K_{ab} = m_a * C_{ab} = m_a m_b Delta_{ab} / v_u.
-    let mut c_mat = vec![0.0; na * na];
-    for (a, &ka) in active_sites.iter().enumerate() {
-        for (b, &kb) in active_sites.iter().enumerate() {
-            let val = m_u[kb] * delta[ka * ns + kb] / v_u;
-            if !val.is_finite() || val < 0.0 {
-                return Err(Error::InvalidInput(
-                    "invalid association strength matrix entry",
-                ));
-            }
-            c_mat[a * na + b] = val;
-        }
-    }
-
-    let mut xa = vec![0.2; na];
-    let mut resid = vec![0.0; na];
-    let mut jac = vec![0.0; na * na];
-
-    // Michelsen modified-Newton iterations on unweighted site residual
-    // g_a = (1 / X_a - 1) - sum_b C_{ab} X_b = 0 so trace active components
-    // (e.g. x_i = 1e-12) converge to full relative precision too!
-    let mut converged = false;
-    for _ in 0..40 {
-        let mut max_rel_err = 0.0_f64;
-        for a in 0..na {
-            let mut sum_cx = 0.0;
-            for b in 0..na {
-                sum_cx += c_mat[a * na + b] * xa[b];
-            }
-            let inv_x = 1.0 / xa[a];
-            let g_a = (inv_x - 1.0) - sum_cx;
-            resid[a] = g_a;
-            let scale = inv_x.max(1.0);
-            max_rel_err = max_rel_err.max(g_a.abs() / scale);
-
-            for b in 0..na {
-                jac[a * na + b] = -c_mat[a * na + b];
-            }
-            // Michelsen modified diagonal: -(1 + sum_b C_{ab} X_b) / X_a
-            jac[a * na + a] -= (1.0 + sum_cx) / xa[a];
-        }
-
-        if !max_rel_err.is_finite() {
-            break;
-        }
-        if max_rel_err <= tol {
-            converged = true;
-            break;
-        }
-
-        // Solve jac * dx = -resid
-        let rhs: Vec<f64> = resid.iter().map(|&v| -v).collect();
-        let Ok(mut dx) = solve_linear_system(na, &jac, &rhs) else {
-            break;
-        };
-
-        // Step limiting matching `saft_association::limit` (max 80% reduction, X <= 1).
-        let mut scaling = 1.0_f64;
-        for a in 0..na {
-            if xa[a] + dx[a] < 0.2 * xa[a] {
-                scaling = scaling.min(-0.8 * xa[a] / dx[a]);
-            }
-            if xa[a] + dx[a] > 1.0 && dx[a].abs() > 1e-9 {
-                scaling = scaling.min((1.0 - xa[a]) / dx[a]);
-            }
-        }
-        if scaling < 1.0 {
-            for d in &mut dx {
-                *d *= scaling;
-            }
-        }
-
-        let mut max_step = 0.0_f64;
-        for a in 0..na {
-            xa[a] = (xa[a] + dx[a]).clamp(1e-300, 1.0);
-            max_step = max_step.max(dx[a].abs());
-        }
-        if max_step <= tol * 0.1 && max_rel_err <= tol * 10.0 {
-            // Re-check residual once more on next iteration before accepting.
-            continue;
-        }
-    }
-
-    // Damped successive substitution fallback (`saft_association::succ_subs`) + Newton polish.
-    if !converged {
-        xa.fill(0.2);
-        let omega = 0.2;
-        for _ in 0..400 {
-            let mut max_diff = 0.0_f64;
-            for a in 0..na {
-                let mut sum_cx = 0.0;
-                for b in 0..na {
-                    sum_cx += c_mat[a * na + b] * xa[b];
+    let mut x_k = vec![1.0; ns];
+    if any_delta {
+        let na = active_sites.len();
+        // Active scaled matrix: C_{ab} = (m_b / v_u) * Delta_{ab}
+        // Site equation: 1 / X_a - 1 - sum_b C_{ab} X_b = 0.
+        // Multiply row a by m_a gives symmetric Michelsen K_{ab} = m_a * C_{ab} = m_a m_b Delta_{ab} / v_u.
+        let mut c_mat = vec![0.0; na * na];
+        for (a, &ka) in active_sites.iter().enumerate() {
+            for (b, &kb) in active_sites.iter().enumerate() {
+                let val = m_u[kb] * delta[ka * ns + kb] / v_u;
+                if !val.is_finite() || val < 0.0 {
+                    return Err(Error::InvalidInput(
+                        "invalid association strength matrix entry",
+                    ));
                 }
-                let x_new = (1.0 - omega) / (1.0 + sum_cx) + omega * xa[a];
-                max_diff = max_diff.max((x_new - xa[a]).abs());
-                xa[a] = x_new;
-            }
-            if max_diff < 1e6 * f64::EPSILON {
-                break;
+                c_mat[a * na + b] = val;
             }
         }
-        // Final Newton polish to tighten residual to `tol`.
-        for _ in 0..20 {
+
+        let mut xa = vec![0.2; na];
+        let mut resid = vec![0.0; na];
+        let mut jac = vec![0.0; na * na];
+
+        // Michelsen modified-Newton iterations on unweighted site residual
+        // g_a = (1 / X_a - 1) - sum_b C_{ab} X_b = 0 so trace active components
+        // (e.g. x_i = 1e-12) converge to full relative precision too!
+        let mut converged = false;
+        for _ in 0..40 {
             let mut max_rel_err = 0.0_f64;
             for a in 0..na {
                 let mut sum_cx = 0.0;
@@ -1258,20 +1179,31 @@ fn solve_x_k_from_delta(
                 let inv_x = 1.0 / xa[a];
                 let g_a = (inv_x - 1.0) - sum_cx;
                 resid[a] = g_a;
-                max_rel_err = max_rel_err.max(g_a.abs() / inv_x.max(1.0));
+                let scale = inv_x.max(1.0);
+                max_rel_err = max_rel_err.max(g_a.abs() / scale);
+
                 for b in 0..na {
                     jac[a * na + b] = -c_mat[a * na + b];
                 }
+                // Michelsen modified diagonal: -(1 + sum_b C_{ab} X_b) / X_a
                 jac[a * na + a] -= (1.0 + sum_cx) / xa[a];
             }
-            if max_rel_err.is_finite() && max_rel_err <= tol.max(1e-10) {
+
+            if !max_rel_err.is_finite() {
+                break;
+            }
+            if max_rel_err <= tol {
                 converged = true;
                 break;
             }
+
+            // Solve jac * dx = -resid
             let rhs: Vec<f64> = resid.iter().map(|&v| -v).collect();
-            let Ok(dx) = solve_linear_system(na, &jac, &rhs) else {
+            let Ok(mut dx) = solve_linear_system(na, &jac, &rhs) else {
                 break;
             };
+
+            // Step limiting matching `saft_association::limit` (max 80% reduction, X <= 1).
             let mut scaling = 1.0_f64;
             for a in 0..na {
                 if xa[a] + dx[a] < 0.2 * xa[a] {
@@ -1281,26 +1213,96 @@ fn solve_x_k_from_delta(
                     scaling = scaling.min((1.0 - xa[a]) / dx[a]);
                 }
             }
+            if scaling < 1.0 {
+                for d in &mut dx {
+                    *d *= scaling;
+                }
+            }
+
+            let mut max_step = 0.0_f64;
             for a in 0..na {
-                xa[a] = (xa[a] + scaling * dx[a]).clamp(1e-300, 1.0);
+                xa[a] = (xa[a] + dx[a]).clamp(1e-300, 1.0);
+                max_step = max_step.max(dx[a].abs());
+            }
+            if max_step <= tol * 0.1 && max_rel_err <= tol * 10.0 {
+                // Re-check residual once more on next iteration before accepting.
+                continue;
             }
         }
-    }
 
-    if !converged {
-        return Err(Error::NotConverged(
-            "association site fraction solver did not converge",
-        ));
-    }
+        // Damped successive substitution fallback (`saft_association::succ_subs`) + Newton polish.
+        if !converged {
+            xa.fill(0.2);
+            let omega = 0.2;
+            for _ in 0..400 {
+                let mut max_diff = 0.0_f64;
+                for a in 0..na {
+                    let mut sum_cx = 0.0;
+                    for b in 0..na {
+                        sum_cx += c_mat[a * na + b] * xa[b];
+                    }
+                    let x_new = (1.0 - omega) / (1.0 + sum_cx) + omega * xa[a];
+                    max_diff = max_diff.max((x_new - xa[a]).abs());
+                    xa[a] = x_new;
+                }
+                if max_diff < 1e6 * f64::EPSILON {
+                    break;
+                }
+            }
+            // Final Newton polish to tighten residual to `tol`.
+            for _ in 0..20 {
+                let mut max_rel_err = 0.0_f64;
+                for a in 0..na {
+                    let mut sum_cx = 0.0;
+                    for b in 0..na {
+                        sum_cx += c_mat[a * na + b] * xa[b];
+                    }
+                    let inv_x = 1.0 / xa[a];
+                    let g_a = (inv_x - 1.0) - sum_cx;
+                    resid[a] = g_a;
+                    max_rel_err = max_rel_err.max(g_a.abs() / inv_x.max(1.0));
+                    for b in 0..na {
+                        jac[a * na + b] = -c_mat[a * na + b];
+                    }
+                    jac[a * na + a] -= (1.0 + sum_cx) / xa[a];
+                }
+                if max_rel_err.is_finite() && max_rel_err <= tol.max(1e-10) {
+                    converged = true;
+                    break;
+                }
+                let rhs: Vec<f64> = resid.iter().map(|&v| -v).collect();
+                let Ok(dx) = solve_linear_system(na, &jac, &rhs) else {
+                    break;
+                };
+                let mut scaling = 1.0_f64;
+                for a in 0..na {
+                    if xa[a] + dx[a] < 0.2 * xa[a] {
+                        scaling = scaling.min(-0.8 * xa[a] / dx[a]);
+                    }
+                    if xa[a] + dx[a] > 1.0 && dx[a].abs() > 1e-9 {
+                        scaling = scaling.min((1.0 - xa[a]) / dx[a]);
+                    }
+                }
+                for a in 0..na {
+                    xa[a] = (xa[a] + scaling * dx[a]).clamp(1e-300, 1.0);
+                }
+            }
+        }
 
-    let mut x_k = vec![1.0; ns];
-    for (a, &ka) in active_sites.iter().enumerate() {
-        if !xa[a].is_finite() || xa[a] <= 0.0 || xa[a] > 1.0 + 1e-12 {
+        if !converged {
             return Err(Error::NotConverged(
-                "non-physical association site fraction",
+                "association site fraction solver did not converge",
             ));
         }
-        x_k[ka] = xa[a].min(1.0);
+
+        for (a, &ka) in active_sites.iter().enumerate() {
+            if !xa[a].is_finite() || xa[a] <= 0.0 || xa[a] > 1.0 + 1e-12 {
+                return Err(Error::NotConverged(
+                    "non-physical association site fraction",
+                ));
+            }
+            x_k[ka] = xa[a].min(1.0);
+        }
     }
 
     // Exact infinite-dilution limit for zero-mole associating sites:

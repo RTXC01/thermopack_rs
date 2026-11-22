@@ -382,13 +382,149 @@ impl MultipolParams {
         sum
     }
 
+    fn pade_dd_qq(a2: HyperDual, a3: HyperDual) -> Result<HyperDual> {
+        if a2.f0 != 0.0 || a3.f0 != 0.0 {
+            let denom = a2.f0 - a3.f0;
+            if !denom.is_finite() || denom == 0.0 {
+                return Err(Error::InvalidInput("singular multipolar Pade denominator"));
+            }
+            let res = (a2 * a2) / (a2 - a3);
+            if !res.f0.is_finite()
+                || !res.f1.is_finite()
+                || !res.f2.is_finite()
+                || !res.f12.is_finite()
+            {
+                return Err(Error::InvalidInput("non-finite multipolar Pade result"));
+            }
+            Ok(res)
+        } else {
+            // For DD and QQ when the polar family is absent, `a_2 = O(eps^2)` and
+            // `a_3 = O(eps^3)`, so `a_2` is exact through second derivatives.
+            Ok(a2)
+        }
+    }
+
+    fn pade_dq(a2: HyperDual, a3: HyperDual, same_direction: bool) -> Result<HyperDual> {
+        if a2.f0 != 0.0 || a3.f0 != 0.0 {
+            let denom = a2.f0 - a3.f0;
+            if !denom.is_finite() || denom == 0.0 {
+                return Err(Error::InvalidInput("singular multipolar Pade denominator"));
+            }
+            let res = (a2 * a2) / (a2 - a3);
+            if !res.f0.is_finite()
+                || !res.f1.is_finite()
+                || !res.f2.is_finite()
+                || !res.f12.is_finite()
+            {
+                return Err(Error::InvalidInput("non-finite multipolar Pade result"));
+            }
+            return Ok(res);
+        }
+
+        // Boundary where `a_2(0) = a_3(0) = 0`:
+        // If one polar family is present and the other is absent, `a_2` and `a_3`
+        // vanish linearly along an absent-species direction, so L'Hopital gives
+        // a finite non-trivial Padé ratio `a_2'^2 / (a_2' - a_3')`!
+        let f1_nz = a2.f1 != 0.0;
+        let f2_nz = a2.f2 != 0.0;
+        if !f1_nz && !f2_nz {
+            return Ok(a2);
+        }
+        if f1_nz && !f2_nz {
+            let d = a2.f1 - a3.f1;
+            if !d.is_finite() || d == 0.0 {
+                return Err(Error::InvalidInput(
+                    "singular multipolar DQ Pade boundary denominator",
+                ));
+            }
+            let f1 = (a2.f1 * a2.f1) / d;
+            let f12 = (2.0 * a2.f1 * a2.f12 * d - a2.f1 * a2.f1 * (a2.f12 - a3.f12)) / (d * d);
+            if !f1.is_finite() || !f12.is_finite() {
+                return Err(Error::InvalidInput(
+                    "non-finite multipolar DQ Pade boundary derivative",
+                ));
+            }
+            return Ok(HyperDual {
+                f0: 0.0,
+                f1,
+                f2: 0.0,
+                f3: 0.0,
+                f12,
+                f13: 0.0,
+                f23: 0.0,
+                f123: 0.0,
+                order: a2.order,
+            });
+        }
+        if !f1_nz && f2_nz {
+            let d = a2.f2 - a3.f2;
+            if !d.is_finite() || d == 0.0 {
+                return Err(Error::InvalidInput(
+                    "singular multipolar DQ Pade boundary denominator",
+                ));
+            }
+            let f2 = (a2.f2 * a2.f2) / d;
+            let f12 = (2.0 * a2.f2 * a2.f12 * d - a2.f2 * a2.f2 * (a2.f12 - a3.f12)) / (d * d);
+            if !f2.is_finite() || !f12.is_finite() {
+                return Err(Error::InvalidInput(
+                    "non-finite multipolar DQ Pade boundary derivative",
+                ));
+            }
+            return Ok(HyperDual {
+                f0: 0.0,
+                f1: 0.0,
+                f2,
+                f3: 0.0,
+                f12,
+                f13: 0.0,
+                f23: 0.0,
+                f123: 0.0,
+                order: a2.order,
+            });
+        }
+
+        // Both `a2.f1 != 0.0` and `a2.f2 != 0.0`.
+        if same_direction {
+            let d = a2.f1 - a3.f1;
+            if !d.is_finite() || d == 0.0 {
+                return Err(Error::InvalidInput(
+                    "singular multipolar DQ Pade boundary denominator",
+                ));
+            }
+            let f1 = (a2.f1 * a2.f1) / d;
+            // Along a single direction `eps`, `d^2/d(eps)^2 [eps * h(eps)] = 2 * h'(0)`
+            // cancels the factor of `1/2` in the second Taylor coefficient `f12`.
+            let f12 = (2.0 * a2.f1 * a2.f12 * d - a2.f1 * a2.f1 * (a2.f12 - a3.f12)) / (d * d);
+            if !f1.is_finite() || !f12.is_finite() {
+                return Err(Error::InvalidInput(
+                    "non-finite multipolar DQ Pade boundary derivative",
+                ));
+            }
+            Ok(HyperDual {
+                f0: 0.0,
+                f1,
+                f2: f1,
+                f3: 0.0,
+                f12,
+                f13: 0.0,
+                f23: 0.0,
+                f123: 0.0,
+                order: a2.order,
+            })
+        } else {
+            Err(Error::InvalidInput(
+                "undefined multipolar DQ Pade mixed boundary derivative with multiple absent polar species",
+            ))
+        }
+    }
+
     fn hyperdual_f_qq(
         &self,
         t: HyperDual,
         v: HyperDual,
         n: &[HyperDual],
         eta: HyperDual,
-    ) -> HyperDual {
+    ) -> Result<HyperDual> {
         let nc = self.nc;
         let t2 = t * t;
         let t3 = t2 * t;
@@ -456,11 +592,7 @@ impl MultipolParams {
 
         a2 = pre2 * a2;
         a3 = pre3 * a3;
-        if a2.f0 - a3.f0 != 0.0 {
-            (a2 * a2) / (a2 - a3)
-        } else {
-            a2
-        }
+        Self::pade_dd_qq(a2, a3)
     }
 
     fn hyperdual_f_dd(
@@ -469,7 +601,7 @@ impl MultipolParams {
         v: HyperDual,
         n: &[HyperDual],
         eta: HyperDual,
-    ) -> HyperDual {
+    ) -> Result<HyperDual> {
         let nc = self.nc;
         let t2 = t * t;
         let t3 = t2 * t;
@@ -536,11 +668,7 @@ impl MultipolParams {
 
         a2 = pre2 * a2;
         a3 = pre3 * a3;
-        if a2.f0 - a3.f0 != 0.0 {
-            (a2 * a2) / (a2 - a3)
-        } else {
-            a2
-        }
+        Self::pade_dd_qq(a2, a3)
     }
 
     fn hyperdual_f_dq(
@@ -549,7 +677,8 @@ impl MultipolParams {
         v: HyperDual,
         n: &[HyperDual],
         eta: HyperDual,
-    ) -> HyperDual {
+        same_direction: bool,
+    ) -> Result<HyperDual> {
         let nc = self.nc;
         let t2 = t * t;
         let t3 = t2 * t;
@@ -622,14 +751,16 @@ impl MultipolParams {
 
         a2 = pre2 * a2;
         a3 = pre3 * a3;
-        if a2.f0 - a3.f0 != 0.0 {
-            (a2 * a2) / (a2 - a3)
-        } else {
-            a2
-        }
+        Self::pade_dq(a2, a3, same_direction)
     }
 
-    fn eval_hyperdual(&self, t: HyperDual, v: HyperDual, n: &[HyperDual]) -> HyperDual {
+    fn eval_hyperdual(
+        &self,
+        t: HyperDual,
+        v: HyperDual,
+        n: &[HyperDual],
+        same_direction: bool,
+    ) -> Result<HyperDual> {
         let nc = self.nc;
         let mut eta_sum = HyperDual::real(0.0);
         for i in 0..nc {
@@ -644,15 +775,15 @@ impl MultipolParams {
 
         let mut f = HyperDual::real(0.0);
         if self.enable_dd && !self.mu_indices.is_empty() {
-            f = f + self.hyperdual_f_dd(t, v, n, eta);
+            f = f + self.hyperdual_f_dd(t, v, n, eta)?;
         }
         if self.enable_qq && !self.q_indices.is_empty() {
-            f = f + self.hyperdual_f_qq(t, v, n, eta);
+            f = f + self.hyperdual_f_qq(t, v, n, eta)?;
         }
         if self.enable_dq && !self.mu_indices.is_empty() && !self.q_indices.is_empty() {
-            f = f + self.hyperdual_f_dq(t, v, n, eta);
+            f = f + self.hyperdual_f_dq(t, v, n, eta, same_direction)?;
         }
-        f
+        Ok(f)
     }
 
     /// Value-only multipolar reduced residual Helmholtz energy `F = A_mp / (R T)`.
@@ -670,7 +801,7 @@ impl MultipolParams {
             .iter()
             .map(|&ni| HyperDual::with_order(ni / sumn, 0))
             .collect();
-        let f_u = self.eval_hyperdual(t_hd, v_hd, &n_hd).f0;
+        let f_u = self.eval_hyperdual(t_hd, v_hd, &n_hd, false)?.f0;
         let f = sumn * f_u;
         if !f.is_finite() {
             return Err(Error::InvalidInput(
@@ -694,19 +825,22 @@ impl MultipolParams {
             HyperDual::second(t, 1.0, 1.0),
             HyperDual::real(v_u),
             &n_base,
-        );
+            true,
+        )?;
         // Pass 2: (V, V) -> F_V, F_VV
         let r_vv = self.eval_hyperdual(
             HyperDual::real(t),
             HyperDual::second(v_u, 1.0, 1.0),
             &n_base,
-        );
+            true,
+        )?;
         // Pass 3: (T, V) -> F_TV
         let r_tv = self.eval_hyperdual(
             HyperDual::second(t, 1.0, 0.0),
             HyperDual::second(v_u, 0.0, 1.0),
             &n_base,
-        );
+            false,
+        )?;
 
         let out = MultipolPressureJet {
             f: sumn * r_tt.f0,
@@ -744,7 +878,7 @@ impl MultipolParams {
         let mut f_n = vec![0.0; self.nc];
         for i in 0..self.nc {
             n_hd[i].f1 = 1.0;
-            let res = self.eval_hyperdual(t_hd, v_hd, &n_hd);
+            let res = self.eval_hyperdual(t_hd, v_hd, &n_hd, false)?;
             n_hd[i].f1 = 0.0;
             if !res.f1.is_finite() {
                 return Err(Error::InvalidInput("non-finite multipolar mole derivative"));
@@ -770,13 +904,24 @@ impl MultipolParams {
         let x: Vec<f64> = n.iter().map(|&ni| ni / sumn).collect();
         let mut n_hd: Vec<HyperDual> = x.iter().map(|&xi| HyperDual::real(xi)).collect();
 
-        let r_tt = self.eval_hyperdual(HyperDual::second(t, 1.0, 1.0), HyperDual::real(v_u), &n_hd);
-        let r_vv = self.eval_hyperdual(HyperDual::real(t), HyperDual::second(v_u, 1.0, 1.0), &n_hd);
+        let r_tt = self.eval_hyperdual(
+            HyperDual::second(t, 1.0, 1.0),
+            HyperDual::real(v_u),
+            &n_hd,
+            true,
+        )?;
+        let r_vv = self.eval_hyperdual(
+            HyperDual::real(t),
+            HyperDual::second(v_u, 1.0, 1.0),
+            &n_hd,
+            true,
+        )?;
         let r_tv = self.eval_hyperdual(
             HyperDual::second(t, 1.0, 0.0),
             HyperDual::second(v_u, 0.0, 1.0),
             &n_hd,
-        );
+            false,
+        )?;
 
         let mut f_n = vec![0.0; nc];
         let mut f_tn = vec![0.0; nc];
@@ -790,8 +935,8 @@ impl MultipolParams {
 
         for i in 0..nc {
             n_hd[i].f2 = 1.0;
-            let r_tn = self.eval_hyperdual(t_e1, v_0, &n_hd);
-            let r_vn = self.eval_hyperdual(t_0, v_e1, &n_hd);
+            let r_tn = self.eval_hyperdual(t_e1, v_0, &n_hd, false)?;
+            let r_vn = self.eval_hyperdual(t_0, v_e1, &n_hd, false)?;
             f_n[i] = r_tn.f2;
             f_tn[i] = r_tn.f12;
             f_vn_u[i] = r_vn.f12;
@@ -800,7 +945,7 @@ impl MultipolParams {
             for j in i..nc {
                 n_hd[i].f1 = 1.0;
                 n_hd[j].f2 = 1.0;
-                let r_nn = self.eval_hyperdual(t_0, v_0, &n_hd);
+                let r_nn = self.eval_hyperdual(t_0, v_0, &n_hd, i == j)?;
                 n_hd[i].f1 = 0.0;
                 n_hd[j].f2 = 0.0;
                 f_nn_u[i * nc + j] = r_nn.f12;

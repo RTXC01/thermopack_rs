@@ -2063,3 +2063,97 @@ subroutine query_binary_third_virial_matrix(temperature,values,count) &
     end do
   end do
 end subroutine query_binary_third_virial_matrix
+
+! Evaluate ExtCSP reduced residual Helmholtz energy F and all first/second
+! derivatives (F, F_T, F_V, F_n, F_TT, F_VV, F_TV, F_Tn, F_Vn, F_nn) in SI.
+subroutine query_extcsp_fres(temperature,volume,moles,out_cap,values,count) &
+     bind(C,name='query_extcsp_fres')
+  use, intrinsic :: iso_c_binding, only: c_int, c_double
+  use thermopack_var, only: nc, get_active_eos, base_eos_param
+  use extcsp, only: extcsp_eos, csp_calcFres
+  implicit none
+  real(c_double), value :: temperature, volume
+  real(c_double), intent(in) :: moles(16)
+  integer(c_int), value :: out_cap
+  real(c_double), intent(out) :: values(*)
+  integer(c_int), intent(out) :: count
+  ! Locals
+  class(base_eos_param), pointer :: eos
+  real :: F, F_T, F_V, F_TT, F_VV, F_TV
+  real, dimension(nc) :: n, F_n, F_Tn, F_Vn
+  real, dimension(nc,nc) :: F_nn
+  integer :: i, j, pos, required
+  if (nc < 1 .or. nc > 16) error stop 'query_extcsp_fres: unsupported component count'
+  required = 6 + 3*nc + nc*nc
+  if (int(out_cap) < required) error stop 'query_extcsp_fres: output buffer too small'
+  eos => get_active_eos()
+  select type (p_eos => eos)
+  class is (extcsp_eos)
+    do i = 1, nc
+      n(i) = moles(i)
+    end do
+    call csp_calcFres(nc, p_eos, temperature, volume, n, F=F, F_T=F_T, F_V=F_V, &
+         F_n=F_n, F_TT=F_TT, F_TV=F_TV, F_VV=F_VV, F_Tn=F_Tn, F_Vn=F_Vn, F_nn=F_nn)
+  class default
+    error stop 'query_extcsp_fres: active EOS is not extcsp_eos'
+  end select
+  pos = 1
+  values(pos) = F;    pos = pos + 1
+  values(pos) = F_T;  pos = pos + 1
+  values(pos) = F_V;  pos = pos + 1
+  do i = 1, nc
+    values(pos) = F_n(i); pos = pos + 1
+  end do
+  values(pos) = F_TT; pos = pos + 1
+  values(pos) = F_VV; pos = pos + 1
+  values(pos) = F_TV; pos = pos + 1
+  do i = 1, nc
+    values(pos) = F_Tn(i); pos = pos + 1
+  end do
+  do i = 1, nc
+    values(pos) = F_Vn(i); pos = pos + 1
+  end do
+  do i = 1, nc
+    do j = 1, nc
+      values(pos) = F_nn(i, j); pos = pos + 1
+    end do
+  end do
+  count = pos - 1
+end subroutine query_extcsp_fres
+
+! Evaluate Lee-Kesler residual Gibbs energy departure (G_dep, dG/dT, dG/dP).
+subroutine query_lk_gdep(temperature,pressure,moles,phase,values,count) &
+     bind(C,name='query_lk_gdep')
+  use, intrinsic :: iso_c_binding, only: c_int, c_double
+  use thermopack_var, only: nc, get_active_eos, get_active_comps, base_eos_param, gendata_pointer
+  use cubic_eos, only: lk_eos
+  use LeeKesler, only: lkCalcGdep
+  implicit none
+  real(c_double), value :: temperature, pressure
+  real(c_double), intent(in) :: moles(16)
+  integer(c_int), value :: phase
+  real(c_double), intent(out) :: values(3)
+  integer(c_int), intent(out) :: count
+  ! Locals
+  class(base_eos_param), pointer :: eos
+  type(gendata_pointer), pointer :: comp(:)
+  real, dimension(nc) :: n
+  real :: g, dgdt, dgdp
+  integer :: i
+  if (nc < 1 .or. nc > 16) error stop 'query_lk_gdep: unsupported component count'
+  eos => get_active_eos()
+  comp => get_active_comps()
+  select type (p_eos => eos)
+  class is (lk_eos)
+    do i = 1, nc
+      n(i) = moles(i)
+    end do
+    call lkCalcGdep(nc, comp, p_eos, temperature, pressure, n, int(phase), g, dgdt, dgdp)
+  class default
+    error stop 'query_lk_gdep: active EOS is not lk_eos'
+  end select
+  values(1) = g
+  values(2) = dgdt
+  values(3) = dgdp
+  count = 3
+end subroutine query_lk_gdep

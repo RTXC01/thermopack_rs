@@ -519,6 +519,115 @@ impl Unifac {
         Ok(result)
     }
 
+    /// Value-only molar excess Gibbs energy `g^E` (`[J/mol]`) without computing
+    /// temperature or composition derivative matrices.
+    #[allow(clippy::needless_range_loop)]
+    pub(crate) fn excess_gibbs_value(
+        &self,
+        temperature: f64,
+        mole_fractions: &[f64],
+    ) -> Result<f64> {
+        let nc = self.nc;
+        let ng = self.ng;
+        if mole_fractions.len() != nc {
+            return Err(Error::InvalidInput(
+                "component count mismatch in UNIFAC excess Gibbs",
+            ));
+        }
+        if !temperature.is_finite() || temperature <= 0.0 {
+            return Err(Error::InvalidInput("UNIFAC temperature must be positive"));
+        }
+        let t = temperature;
+        let n = mole_fractions;
+
+        let mut ejk = vec![0.0; ng * ng];
+        for j in 0..ng {
+            for k in 0..ng {
+                let index = j * ng + k;
+                let value = (-(self.ajk[index] / t + self.bjk[index] + self.cjk[index] * t)).exp();
+                if !value.is_finite() {
+                    return Err(Error::NotConverged("non-finite UNIFAC excess Gibbs energy"));
+                }
+                ejk[index] = value;
+            }
+        }
+
+        let mut sum_vik_qk = vec![0.0; nc];
+        let mut sum_nivik_qk = 0.0;
+        for i in 0..nc {
+            let mut s = 0.0;
+            for k in 0..ng {
+                s += self.vik[i * ng + k] * self.qk[k];
+            }
+            sum_vik_qk[i] = s;
+            sum_nivik_qk += n[i] * s;
+        }
+
+        let mut theta_j = vec![0.0; ng];
+        for j in 0..ng {
+            let mut sum = 0.0;
+            for i in 0..nc {
+                sum += n[i] * self.vik[i * ng + j];
+            }
+            theta_j[j] = sum * self.qk[j] / sum_nivik_qk;
+        }
+
+        let mut lambda_k = vec![0.0; ng];
+        for k in 0..ng {
+            let mut sum = 0.0;
+            for j in 0..ng {
+                sum += theta_j[j] * ejk[j * ng + k];
+            }
+            lambda_k[k] = sum.ln();
+        }
+
+        let mut ge = 0.0;
+        for i in 0..nc {
+            let mut sum_vq_lambda = 0.0;
+            for k in 0..ng {
+                let mut sum = 0.0;
+                for j in 0..ng {
+                    let theta_ij = self.vik[i * ng + j] * self.qk[j] / sum_vik_qk[i];
+                    sum += theta_ij * ejk[j * ng + k];
+                }
+                sum_vq_lambda += self.vik[i * ng + k] * self.qk[k] * (lambda_k[k] - sum.ln());
+            }
+            ge -= n[i] * sum_vq_lambda;
+        }
+        ge *= RGAS * t;
+
+        if self.variant.flory_huggins() {
+            let mut sumn = 0.0;
+            let mut sumnr = 0.0;
+            let mut sumlnr = 0.0;
+            for i in 0..nc {
+                sumn += n[i];
+                sumnr += n[i] * self.ri[i];
+                sumlnr += n[i] * self.ri[i].ln();
+            }
+            let ge_fh = sumlnr - sumn * sumnr.ln() + sumn * sumn.ln();
+            ge += ge_fh * RGAS * t;
+        }
+        if self.variant.staverman_guggenheim() {
+            const ZDIV2: f64 = 5.0;
+            let mut sumnr = 0.0;
+            let mut sumnq = 0.0;
+            let mut sum = 0.0;
+            for i in 0..nc {
+                sumnr += n[i] * self.ri[i];
+                sumnq += n[i] * self.qi[i];
+                sum += n[i] * self.qi[i] * (self.qi[i] / self.ri[i]).ln();
+            }
+            let ge_sg = ZDIV2 * (sum - sumnq * sumnq.ln() + sumnq * sumnr.ln());
+            ge += ge_sg * RGAS * t;
+        }
+
+        if !ge.is_finite() {
+            return Err(Error::NotConverged("non-finite UNIFAC excess Gibbs energy"));
+        }
+        Ok(ge)
+    }
+
     /// Flory-Huggins combinatorial term.
     ///
     /// The term is temperature independent, so it contributes no energy

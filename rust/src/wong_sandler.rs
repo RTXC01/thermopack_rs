@@ -398,3 +398,48 @@ pub fn wong_sandler_mix(
         count,
     })
 }
+
+/// Value-only Wong-Sandler mixture attraction `a` and covolume `b` without
+/// allocating or computing first/second temperature or composition derivatives.
+pub(crate) fn wong_sandler_ab_values(
+    data: &WongSandlerData,
+    temperature: f64,
+    composition: &[f64],
+    a_pure: &[f64],
+    b_pure: &[f64],
+    limit_c: f64,
+    excess_gibbs: f64,
+) -> Result<(f64, f64)> {
+    let count = data.count;
+    if composition.len() != count || a_pure.len() != count || b_pure.len() != count {
+        return Err(Error::InvalidInput("component count mismatch"));
+    }
+    if limit_c == 0.0 {
+        return Err(Error::InvalidInput("the limiting constant vanishes"));
+    }
+    let gas_temperature = crate::R * temperature;
+    let total: f64 = composition.iter().copied().sum();
+    if total <= 0.0 {
+        return Err(Error::InvalidInput("the composition must be positive"));
+    }
+    let mut q = 0.0;
+    let mut d_sum = 0.0;
+    for i in 0..count {
+        let reduced_i = b_pure[i] - a_pure[i] / gas_temperature;
+        d_sum += composition[i] * a_pure[i] / b_pure[i];
+        for j in 0..count {
+            let reduced_j = b_pure[j] - a_pure[j] / gas_temperature;
+            let (kij, _, _) = data.kij[i * count + j].evaluate(temperature);
+            let pair = 0.5 * (reduced_i + reduced_j) * (1.0 - kij);
+            q += composition[i] * composition[j] * pair;
+        }
+    }
+    let d = (d_sum - excess_gibbs / limit_c) / gas_temperature;
+    let denominator = total - d;
+    let b = q / denominator;
+    let a = q * d * gas_temperature / denominator;
+    if !q.is_finite() || !d.is_finite() || !a.is_finite() || !b.is_finite() {
+        return Err(Error::InvalidInput("temperature outside numerical range"));
+    }
+    Ok((a, b))
+}

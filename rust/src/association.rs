@@ -166,17 +166,37 @@ pub enum AssocCombRule {
 }
 
 impl AssocCombRule {
-    /// Apply explicit arithmetic or geometric combining rule.
+    /// Apply explicit arithmetic or geometric combining rule without intermediate
+    /// overflow.
     pub fn apply(self, val1: f64, val2: f64) -> Result<f64> {
+        if !val1.is_finite() || !val2.is_finite() {
+            return Err(Error::InvalidInput(
+                "non-finite parameter in association combining rule",
+            ));
+        }
         match self {
-            AssocCombRule::AriComb => Ok(0.5 * (val1 + val2)),
+            AssocCombRule::AriComb => {
+                let out = 0.5 * val1 + 0.5 * val2;
+                if !out.is_finite() {
+                    return Err(Error::InvalidInput(
+                        "overflow in arithmetic association combining rule",
+                    ));
+                }
+                Ok(out)
+            }
             AssocCombRule::GeoComb => {
                 if val1 < 0.0 || val2 < 0.0 {
                     return Err(Error::InvalidInput(
                         "negative parameter in geometric association combining rule",
                     ));
                 }
-                Ok((val1 * val2).sqrt())
+                let out = val1.sqrt() * val2.sqrt();
+                if !out.is_finite() {
+                    return Err(Error::InvalidInput(
+                        "overflow in geometric association combining rule",
+                    ));
+                }
+                Ok(out)
             }
             AssocCombRule::DefaultComb => Err(Error::InvalidInput(
                 "cannot apply DefaultComb directly without EOS-specific rule",
@@ -265,6 +285,39 @@ impl AssociationParams {
         (num_sites, comp_indices, comp_vs_sites, site_to_comp)
     }
 
+    fn validate_params(&self) -> Result<()> {
+        if self.eps_kl.iter().any(|&v| !v.is_finite() || v < 0.0) {
+            return Err(Error::InvalidInput(
+                "association energy parameters must be finite and non-negative",
+            ));
+        }
+        if self.beta_kl.iter().any(|&v| !v.is_finite() || v < 0.0) {
+            return Err(Error::InvalidInput(
+                "association volume parameters must be finite and non-negative",
+            ));
+        }
+        if self.delta_comb_rule == DeltaCombRule::Elliot {
+            let nc = self.num_components;
+            let ns = self.num_sites;
+            for ic in 0..nc {
+                let Some((k1, k2)) = self.comp_vs_sites[ic] else {
+                    continue;
+                };
+                for jc in (ic + 1)..nc {
+                    let Some((l1, l2)) = self.comp_vs_sites[jc] else {
+                        continue;
+                    };
+                    if self.beta_kl[k1 * ns + k2] <= 0.0 || self.beta_kl[l1 * ns + l2] <= 0.0 {
+                        return Err(Error::Unsupported(
+                            "Elliot combining rule requires nonzero self-association beta",
+                        ));
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Build association parameters for PC-SAFT / sPC-SAFT / PCP-SAFT / sPCP-SAFT.
     ///
     /// Mirrors `saft_interface::saft_setAssocParams` (`src/saft_interface.f90:273-336`).
@@ -286,6 +339,18 @@ impl AssociationParams {
         {
             return Err(Error::InvalidInput(
                 "association parameter dimension mismatch",
+            ));
+        }
+        if sigma.iter().any(|&s| !s.is_finite() || s <= 0.0) {
+            return Err(Error::InvalidInput(
+                "segment diameters must be finite and strictly positive",
+            ));
+        }
+        if eps.iter().any(|&v| !v.is_finite() || v < 0.0)
+            || beta.iter().any(|&v| !v.is_finite() || v < 0.0)
+        {
+            return Err(Error::InvalidInput(
+                "association parameters must be finite and non-negative",
             ));
         }
 
@@ -311,14 +376,14 @@ impl AssociationParams {
                     let eps_rule = eps_comb_rules[pair];
                     let beta_rule = beta_comb_rules[pair];
                     eps_kl[idx] = match eps_rule {
-                        AssocCombRule::DefaultComb => 0.5 * (eps[ic] + eps[jc]),
+                        AssocCombRule::DefaultComb => 0.5 * eps[ic] + 0.5 * eps[jc],
                         other => other.apply(eps[ic], eps[jc])?,
                     };
                     beta_kl[idx] = match beta_rule {
                         AssocCombRule::DefaultComb => {
-                            let ratio =
-                                2.0 * (sigma[ic] * sigma[jc]).sqrt() / (sigma[ic] + sigma[jc]);
-                            (beta[ic] * beta[jc]).sqrt() * (ratio * ratio * ratio)
+                            let ratio = (sigma[ic].sqrt() * sigma[jc].sqrt())
+                                / (0.5 * sigma[ic] + 0.5 * sigma[jc]);
+                            (beta[ic].sqrt() * beta[jc].sqrt()) * (ratio * ratio * ratio)
                         }
                         other => other.apply(beta[ic], beta[jc])?,
                     };
@@ -326,7 +391,7 @@ impl AssociationParams {
             }
         }
 
-        Ok(Self {
+        let out = Self {
             num_components: nc,
             num_sites,
             comp_indices,
@@ -335,7 +400,9 @@ impl AssociationParams {
             beta_kl,
             eps_kl,
             delta_comb_rule,
-        })
+        };
+        out.validate_params()?;
+        Ok(out)
     }
 
     /// Build association parameters for SAFT-VR Mie (`saft_interface.f90:314-316`).
@@ -349,6 +416,13 @@ impl AssociationParams {
         if eps.len() != nc || beta.len() != nc {
             return Err(Error::InvalidInput(
                 "association parameter dimension mismatch",
+            ));
+        }
+        if eps.iter().any(|&v| !v.is_finite() || v < 0.0)
+            || beta.iter().any(|&v| !v.is_finite() || v < 0.0)
+        {
+            return Err(Error::InvalidInput(
+                "association parameters must be finite and non-negative",
             ));
         }
 
@@ -370,14 +444,14 @@ impl AssociationParams {
                         beta_kl[idx] = beta[ic];
                     }
                 } else if schemes[ic].cross_site_interaction(site_k, schemes[jc], site_l) {
-                    eps_kl[idx] = (eps[ic] * eps[jc]).sqrt();
-                    let avg = 0.5 * (beta[ic].cbrt() + beta[jc].cbrt());
+                    eps_kl[idx] = eps[ic].sqrt() * eps[jc].sqrt();
+                    let avg = 0.5 * beta[ic].cbrt() + 0.5 * beta[jc].cbrt();
                     beta_kl[idx] = avg * avg * avg;
                 }
             }
         }
 
-        Ok(Self {
+        let out = Self {
             num_components: nc,
             num_sites,
             comp_indices,
@@ -386,7 +460,9 @@ impl AssociationParams {
             beta_kl,
             eps_kl,
             delta_comb_rule,
-        })
+        };
+        out.validate_params()?;
+        Ok(out)
     }
 
     /// Build association parameters for CPA (`saft_interface.f90:338-389`).
@@ -411,6 +487,15 @@ impl AssociationParams {
         {
             return Err(Error::InvalidInput(
                 "association parameter dimension mismatch",
+            ));
+        }
+        if eps.iter().any(|&v| !v.is_finite() || v < 0.0)
+            || beta.iter().any(|&v| !v.is_finite() || v < 0.0)
+            || kij_eps.iter().any(|&v| !v.is_finite())
+            || kij_beta.iter().any(|&v| !v.is_finite())
+        {
+            return Err(Error::InvalidInput(
+                "association parameters must be finite and non-negative",
             ));
         }
 
@@ -447,7 +532,7 @@ impl AssociationParams {
             }
         }
 
-        Ok(Self {
+        let out = Self {
             num_components: nc,
             num_sites,
             comp_indices,
@@ -456,7 +541,9 @@ impl AssociationParams {
             beta_kl,
             eps_kl,
             delta_comb_rule,
-        })
+        };
+        out.validate_params()?;
+        Ok(out)
     }
 }
 

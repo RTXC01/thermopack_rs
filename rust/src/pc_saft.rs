@@ -561,6 +561,14 @@ impl PcSaft {
         if val >= 1.0 {
             return Err(Error::InvalidInput("kij must be strictly less than 1"));
         }
+        let eps_ij = (self.components[i].eps_depth_divk.sqrt()
+            * self.components[j].eps_depth_divk.sqrt())
+            * (1.0 - val);
+        if !eps_ij.is_finite() || eps_ij <= 0.0 || !(eps_ij * eps_ij).is_finite() {
+            return Err(Error::InvalidInput(
+                "kij produces non-finite or non-positive cross dispersion energy",
+            ));
+        }
         let mut next_kij = self.kij.clone();
         next_kij[i * nc + j] = val;
         next_kij[j * nc + i] = val;
@@ -2152,28 +2160,93 @@ impl<'a> PreparedPcSaft<'a> {
             grid.push(0.01 + 0.002 * (k as f64));
         }
 
-        let mut prev_eta = grid[0];
-        let mut prev_dp = prep.pressure_and_derivatives(prev_eta / conv_num).dp_drho;
-        let mut vap_bracket: Option<(f64, f64)> = None;
-        let mut liq_bracket: Option<(f64, f64)> = None;
-
-        for &eta in &grid[1..] {
+        let mut etas = Vec::with_capacity(grid.len());
+        let mut dps = Vec::with_capacity(grid.len());
+        for &eta in &grid {
             let jet = prep.pressure_and_derivatives(eta / conv_num);
             if !jet.pressure.is_finite() || !jet.dp_drho.is_finite() {
                 break;
             }
-            if vap_bracket.is_none() && prev_dp > 0.0 && jet.dp_drho <= 0.0 {
-                vap_bracket = Some((prev_eta, eta));
-            } else if vap_bracket.is_some()
-                && liq_bracket.is_none()
-                && prev_dp <= 0.0
-                && jet.dp_drho > 0.0
-            {
-                liq_bracket = Some((prev_eta, eta));
+            etas.push(eta);
+            dps.push(jet.dp_drho);
+        }
+        if etas.len() < 3 {
+            return Err(Error::NotConverged(
+                "insufficient finite isotherm points for spinodal scan",
+            ));
+        }
+
+        let mut vap_bracket: Option<(f64, f64)> = None;
+        let mut liq_bracket: Option<(f64, f64)> = None;
+        for idx in 1..etas.len() {
+            let prev_dp = dps[idx - 1];
+            let dp = dps[idx];
+            if vap_bracket.is_none() && prev_dp > 0.0 && dp <= 0.0 {
+                vap_bracket = Some((etas[idx - 1], etas[idx]));
+            } else if vap_bracket.is_some() && liq_bracket.is_none() && prev_dp <= 0.0 && dp > 0.0 {
+                liq_bracket = Some((etas[idx - 1], etas[idx]));
                 break;
             }
-            prev_eta = eta;
-            prev_dp = jet.dp_drho;
+        }
+
+        // Near-critical fallback: if the coarse grid stepped over a narrow
+        // negative-slope pocket, refine all interior local minima (plus the
+        // global minimum in [1e-4, 0.65]) of dP/drho via golden-section search.
+        if vap_bracket.is_none() || liq_bracket.is_none() {
+            let mut candidates = Vec::new();
+            let mut global_min_idx: Option<usize> = None;
+            let mut global_min_dp = f64::INFINITY;
+            for idx in 1..(etas.len() - 1) {
+                if dps[idx] <= dps[idx - 1] && dps[idx] <= dps[idx + 1] {
+                    candidates.push(idx);
+                }
+                if etas[idx] >= 1.0e-4 && etas[idx] <= 0.65 && dps[idx] < global_min_dp {
+                    global_min_dp = dps[idx];
+                    global_min_idx = Some(idx);
+                }
+            }
+            if let Some(gidx) = global_min_idx
+                && !candidates.contains(&gidx)
+            {
+                candidates.push(gidx);
+            }
+
+            let inv_phi = 0.5 * (5.0_f64.sqrt() - 1.0);
+            for idx in candidates {
+                if dps[idx - 1] <= 0.0 || dps[idx + 1] <= 0.0 {
+                    continue;
+                }
+                let mut lo = etas[idx - 1];
+                let mut hi = etas[idx + 1];
+                let mut x1 = hi - inv_phi * (hi - lo);
+                let mut x2 = lo + inv_phi * (hi - lo);
+                let mut f1 = prep.pressure_and_derivatives(x1 / conv_num).dp_drho;
+                let mut f2 = prep.pressure_and_derivatives(x2 / conv_num).dp_drho;
+                for _ in 0..55 {
+                    if !f1.is_finite() || !f2.is_finite() {
+                        break;
+                    }
+                    if f1 < f2 {
+                        hi = x2;
+                        x2 = x1;
+                        f2 = f1;
+                        x1 = hi - inv_phi * (hi - lo);
+                        f1 = prep.pressure_and_derivatives(x1 / conv_num).dp_drho;
+                    } else {
+                        lo = x1;
+                        x1 = x2;
+                        f1 = f2;
+                        x2 = lo + inv_phi * (hi - lo);
+                        f2 = prep.pressure_and_derivatives(x2 / conv_num).dp_drho;
+                    }
+                }
+                let (eta_min, dp_min) = if f1 < f2 { (x1, f1) } else { (x2, f2) };
+                if dp_min.is_finite() && dp_min < 0.0 {
+                    vap_bracket = Some((etas[idx - 1], eta_min));
+                    liq_bracket = Some((eta_min, etas[idx + 1]));
+                    break;
+                }
+            }
         }
 
         let (Some((mut v_lo, mut v_hi)), Some((mut l_lo, mut l_hi))) = (vap_bracket, liq_bracket)
@@ -2184,8 +2257,11 @@ impl<'a> PreparedPcSaft<'a> {
         };
 
         // Refine both spinodal packing fractions by bisection on dP/drho = 0.
-        for _ in 0..50 {
+        for _ in 0..60 {
             let mid = 0.5 * (v_lo + v_hi);
+            if mid == v_lo || mid == v_hi || (v_hi - v_lo) <= f64::EPSILON * v_hi {
+                break;
+            }
             let dp = prep.pressure_and_derivatives(mid / conv_num).dp_drho;
             if dp > 0.0 {
                 v_lo = mid;
@@ -2198,8 +2274,11 @@ impl<'a> PreparedPcSaft<'a> {
             .pressure_and_derivatives(eta_spin_v / conv_num)
             .pressure;
 
-        for _ in 0..50 {
+        for _ in 0..60 {
             let mid = 0.5 * (l_lo + l_hi);
+            if mid == l_lo || mid == l_hi || (l_hi - l_lo) <= f64::EPSILON * l_hi {
+                break;
+            }
             let dp = prep.pressure_and_derivatives(mid / conv_num).dp_drho;
             if dp <= 0.0 {
                 l_lo = mid;
@@ -2212,7 +2291,7 @@ impl<'a> PreparedPcSaft<'a> {
             .pressure_and_derivatives(eta_spin_l / conv_num)
             .pressure;
 
-        if !p_spin_v.is_finite() || p_spin_v <= 0.0 {
+        if !p_spin_v.is_finite() || !p_spin_l.is_finite() || p_spin_v <= 0.0 {
             return Err(Error::NotConverged(
                 "vapor spinodal pressure is non-positive",
             ));
@@ -2244,6 +2323,22 @@ impl<'a> PreparedPcSaft<'a> {
                 (lo, eta_spin_v)
             };
 
+            let best_of = |a: f64, b: f64, c: f64| -> (f64, f64) {
+                let mut best_eta = b;
+                let mut best_err = f64::INFINITY;
+                for cand in [a, b, c] {
+                    let p_c = prep.pressure_and_derivatives(cand / conv_num).pressure;
+                    if p_c.is_finite() {
+                        let err = (p_c - p_target).abs();
+                        if err < best_err {
+                            best_err = err;
+                            best_eta = cand;
+                        }
+                    }
+                }
+                (best_eta, best_err)
+            };
+
             let mut eta = if is_liquid {
                 0.5 * (lo + hi)
             } else {
@@ -2253,9 +2348,7 @@ impl<'a> PreparedPcSaft<'a> {
             for _ in 0..100 {
                 let jet = prep.pressure_and_derivatives(eta / conv_num);
                 let diff = jet.pressure - p_target;
-                if diff.abs() <= 1.0e-13 * p_target.max(1.0e-30)
-                    || (hi - lo) <= 4.0 * f64::EPSILON * hi
-                {
+                if diff.abs() <= 1.0e-13 * p_target.max(1.0e-30) {
                     return Ok(eta);
                 }
                 if diff > 0.0 {
@@ -2263,21 +2356,26 @@ impl<'a> PreparedPcSaft<'a> {
                 } else {
                     lo = eta;
                 }
+                let mid = 0.5 * (lo + hi);
+                if (hi - lo) <= f64::EPSILON * hi || mid == lo || mid == hi {
+                    let (best_eta, _) = best_of(lo, eta, hi);
+                    return Ok(best_eta);
+                }
                 let dp_deta = jet.dp_drho / conv_num;
                 let next = if dp_deta.is_finite() && dp_deta > 0.0 {
                     eta - diff / dp_deta
                 } else {
-                    0.5 * (lo + hi)
+                    mid
                 };
                 eta = if next > lo && next < hi && next.is_finite() {
                     next
                 } else {
-                    0.5 * (lo + hi)
+                    mid
                 };
             }
-            let final_p = prep.pressure_and_derivatives(eta / conv_num).pressure;
-            if final_p.is_finite() && (final_p - p_target).abs() <= 1.0e-7 * p_target.max(1.0) {
-                Ok(eta)
+            let (best_eta, best_err) = best_of(lo, eta, hi);
+            if best_err.is_finite() && best_err <= 1.0e-7 * p_target.max(1.0) {
+                Ok(best_eta)
             } else {
                 Err(Error::NotConverged(
                     "monotone-branch volume solve did not converge",
@@ -2310,9 +2408,22 @@ impl<'a> PreparedPcSaft<'a> {
             Ok((ln_phi_l - ln_phi_v, vl, vv))
         };
 
-        // 2. Establish a strict sign bracket [ln_p_lo, ln_p_hi] with
-        //    delta_ln_phi(p_lo) > 0 > delta_ln_phi(p_hi).
-        let p_hi = p_spin_v * (1.0 - 1.0e-9);
+        // 2. Establish a strict sign bracket [ln_p_lo, ln_p_hi] inside
+        //    (max(p_spin_l, 0), p_spin_v) with delta_ln_phi(p_lo) > 0 > delta_ln_phi(p_hi).
+        let p_floor = p_spin_l.max(0.0);
+        let dp_span = p_spin_v - p_floor;
+        if !dp_span.is_finite() || dp_span <= 0.0 {
+            return Err(Error::NotConverged(
+                "spinodal pressure span is non-positive",
+            ));
+        }
+        let eps_p = (1.0e-6 * dp_span)
+            .min(1.0e-9 * p_spin_v)
+            .max(4.0 * f64::EPSILON * p_spin_v);
+        let p_hi = p_spin_v - eps_p;
+        if !(p_hi > p_floor && p_hi < p_spin_v) {
+            return Err(Error::NotConverged("spinodal pressure bracket collapsed"));
+        }
         let (d_hi, _, _) = eval_delta_ln_phi(p_hi)?;
         if d_hi > 0.0 {
             return Err(Error::NotConverged(
@@ -2321,7 +2432,11 @@ impl<'a> PreparedPcSaft<'a> {
         }
 
         let mut p_lo = if p_spin_l > 0.0 {
-            (p_spin_l * (1.0 + 1.0e-9)).min(0.5 * p_hi)
+            let p_l = p_spin_l + eps_p;
+            if !(p_l > p_spin_l && p_l < p_hi) {
+                return Err(Error::NotConverged("spinodal pressure bracket collapsed"));
+            }
+            p_l
         } else {
             let mut seed = 0.5 * p_hi;
             if let Ok(comp_data) = crate::component::component(self.model.components[0].ident) {
@@ -2337,14 +2452,27 @@ impl<'a> PreparedPcSaft<'a> {
         };
 
         let mut d_lo = eval_delta_ln_phi(p_lo)?.0;
-        let mut shrink_steps = 0;
-        while d_lo < 0.0 && shrink_steps < 40 {
-            p_lo *= 0.1;
-            if p_lo <= p_spin_l.max(0.0) || p_lo <= 1.0e-30 * p_hi {
-                break;
+        if p_spin_l > 0.0 {
+            let mut shrink_steps = 0;
+            while d_lo < 0.0 && shrink_steps < 25 {
+                let next_lo = 0.5 * (p_spin_l + p_lo);
+                if next_lo <= p_spin_l || next_lo == p_lo {
+                    break;
+                }
+                p_lo = next_lo;
+                d_lo = eval_delta_ln_phi(p_lo)?.0;
+                shrink_steps += 1;
             }
-            d_lo = eval_delta_ln_phi(p_lo)?.0;
-            shrink_steps += 1;
+        } else {
+            let mut shrink_steps = 0;
+            while d_lo < 0.0 && shrink_steps < 60 {
+                p_lo *= 0.1;
+                if p_lo <= 1.0e-300 {
+                    break;
+                }
+                d_lo = eval_delta_ln_phi(p_lo)?.0;
+                shrink_steps += 1;
+            }
         }
         if d_lo < 0.0 {
             return Err(Error::NotConverged(
@@ -2362,6 +2490,22 @@ impl<'a> PreparedPcSaft<'a> {
             let (delta_ln_phi, vl, vv) = eval_delta_ln_phi(p)?;
 
             if delta_ln_phi.abs() < 1.0e-11 || (ln_p_hi - ln_p_lo) < 1.0e-13 {
+                // Certify both pressure closure and fugacity closure on the
+                // returned liquid and vapor volumes before returning Ok.
+                let p_l = prep.pressure_and_derivatives(1.0 / vl).pressure;
+                let p_v = prep.pressure_and_derivatives(1.0 / vv).pressure;
+                let phase_distinct = vl.is_finite()
+                    && vv.is_finite()
+                    && vl > 0.0
+                    && vv > vl
+                    && (vv - vl) > 1.0e-12 * vl;
+                let p_l_ok = p_l.is_finite() && p_l > 0.0 && (p_l - p).abs() <= 1.0e-6 * p;
+                let p_v_ok = p_v.is_finite() && p_v > 0.0 && (p_v - p).abs() <= 1.0e-6 * p;
+                if !phase_distinct || !p_l_ok || !p_v_ok || delta_ln_phi.abs() > 1.0e-9 {
+                    return Err(Error::NotConverged(
+                        "saturation pressure below f64 liquid pressure resolution limit",
+                    ));
+                }
                 let state_l = prep.state(1.0 / vl)?;
                 let state_v = prep.state(1.0 / vv)?;
                 return Ok(PcSaftSaturation {

@@ -3,6 +3,7 @@
 //! multipolar terms, and simplified PC-SAFT RDF.
 
 use thermopack_rs::association::{self, AssocCombRule, AssocScheme, DeltaCombRule};
+use thermopack_rs::multipol::MultipolParams;
 use thermopack_rs::pc_saft::{PcSaft, PcSaftKind, PcSaftOptions, RGAS};
 use thermopack_rs::rdf::spcsaft_rdf;
 use thermopack_rs::{Error, Phase};
@@ -952,15 +953,15 @@ fn pure_fluid_saturation_converges_for_polar_meoh_low_t_water_and_rejects_superc
         approx_eq(
             sl.pressure,
             sat.pressure,
-            1e-8,
-            1.0,
+            1e-6,
+            0.0,
             &format!("{comp}@{t}K liquid P"),
         );
         approx_eq(
             sv.pressure,
             sat.pressure,
-            1e-8,
-            1.0,
+            1e-6,
+            0.0,
             &format!("{comp}@{t}K vapor P"),
         );
         let rt = RGAS * t;
@@ -1173,4 +1174,419 @@ fn state_tp_raw_non_unit_moles_scaling_and_fd_derivatives() {
             }
         }
     }
+}
+
+#[test]
+fn multipol_dq_positive_trace_sweep_is_smooth_across_fres_fn_and_full() {
+    let mut model = PcSaft::new_polar(&["ACETONE", "CO2"]).unwrap();
+    model.set_multipol_control(false, false, true).unwrap();
+    let mp = model.multipol().unwrap();
+
+    let t = 340.0;
+    let v = 1.0e-4;
+    let f_zero = model
+        .multipol_residual_helmholtz_tv(t, v, &[1.0, 0.0])
+        .unwrap();
+    approx_eq(
+        f_zero.f_n[1],
+        -0.861_517_495,
+        1e-6,
+        1e-6,
+        "DQ F_n(CO2) at n_CO2=0",
+    );
+    approx_eq(
+        f_zero.f_nn[3],
+        -1.417_187,
+        1e-4,
+        1e-4,
+        "DQ F_nn(CO2,CO2) at n_CO2=0",
+    );
+
+    for n_co2 in [0.0, 1.0e-30, 1.0e-16, 1.0e-15, 1.0e-12, 1.0e-10, 1.0e-8] {
+        let n = [1.0, n_co2];
+        let val = mp.fres_value(t, v, &n).unwrap();
+        let jet = mp.fres_pressure_jet(t, v, &n).unwrap();
+        let fn_only = mp.fres_fn(t, v, &n).unwrap();
+        let full = model.multipol_residual_helmholtz_tv(t, v, &n).unwrap();
+
+        approx_eq(val, full.f, 1e-13, 1e-15, &format!("DQ val n={n_co2:e}"));
+        approx_eq(
+            jet.f,
+            full.f,
+            1e-13,
+            1e-15,
+            &format!("DQ jet.f n={n_co2:e}"),
+        );
+        approx_eq(
+            jet.f_v,
+            full.f_v,
+            1e-13,
+            1e-15,
+            &format!("DQ jet.f_v n={n_co2:e}"),
+        );
+        for i in 0..2 {
+            approx_eq(
+                fn_only[i],
+                full.f_n[i],
+                1e-13,
+                1e-15,
+                &format!("DQ fres_fn[{i}] vs full n={n_co2:e}"),
+            );
+        }
+
+        // Continuity relative to the exact n_CO2 = 0 boundary (no 1e-15 clamp jump).
+        let tol = if n_co2 <= 1.0e-12 { 1e-10 } else { 1e-5 };
+        approx_eq(
+            full.f_n[1],
+            f_zero.f_n[1],
+            tol,
+            tol,
+            &format!("DQ smooth F_n(CO2) n={n_co2:e}"),
+        );
+        approx_eq(
+            full.f_tn[1],
+            f_zero.f_tn[1],
+            tol,
+            tol,
+            &format!("DQ smooth F_Tn(CO2) n={n_co2:e}"),
+        );
+        approx_eq(
+            full.f_vn[1],
+            f_zero.f_vn[1],
+            tol,
+            tol * 1.0e4,
+            &format!("DQ smooth F_Vn(CO2) n={n_co2:e}"),
+        );
+        approx_eq(
+            full.f_nn[1],
+            f_zero.f_nn[1],
+            tol,
+            tol,
+            &format!("DQ smooth F_nn(0,1) n={n_co2:e}"),
+        );
+        approx_eq(
+            full.f_nn[3],
+            f_zero.f_nn[3],
+            tol,
+            tol,
+            &format!("DQ smooth F_nn(1,1) n={n_co2:e}"),
+        );
+    }
+
+    // DD and QQ ultra-trace sweep (including 1e-16 and 1e-140) stays finite and smooth.
+    for (comps, dd, qq) in [
+        (&["C1", "ACETONE"][..], true, false),
+        (&["C1", "CO2"][..], false, true),
+    ] {
+        let mut m = PcSaft::new_polar(comps).unwrap();
+        m.set_multipol_control(dd, qq, false).unwrap();
+        let mp_sub = m.multipol().unwrap();
+        let f0 = m.multipol_residual_helmholtz_tv(t, v, &[1.0, 0.0]).unwrap();
+        for n_tr in [1.0e-140, 1.0e-30, 1.0e-16, 1.0e-15, 1.0e-12] {
+            let n = [1.0, n_tr];
+            let fn_only = mp_sub.fres_fn(t, v, &n).unwrap();
+            let full = m.multipol_residual_helmholtz_tv(t, v, &n).unwrap();
+            approx_eq(
+                fn_only[1],
+                full.f_n[1],
+                1e-12,
+                1e-15,
+                &format!("DD/QQ fres_fn n={n_tr:e}"),
+            );
+            approx_eq(
+                full.f_nn[3],
+                f0.f_nn[3],
+                1e-8,
+                1e-10,
+                &format!("DD/QQ smooth F_nn(1,1) n={n_tr:e}"),
+            );
+        }
+    }
+}
+
+#[test]
+fn multipol_dq_identical_trace_species_boundary_matches_binary_diagonal() {
+    let t = 340.0;
+    let v = 1.0e-4;
+
+    let mut bin = PcSaft::new_polar(&["ACETONE", "CO2"]).unwrap();
+    bin.set_multipol_control(false, false, true).unwrap();
+    let f_bin = bin
+        .multipol_residual_helmholtz_tv(t, v, &[1.0, 0.0])
+        .unwrap();
+
+    let mut dup_q = PcSaft::new_polar(&["ACETONE", "CO2", "CO2"]).unwrap();
+    dup_q.set_multipol_control(false, false, true).unwrap();
+
+    for n in [[1.0, 0.0, 0.0], [1.0, 1.0e-16, 0.0]] {
+        let f_dup = dup_q.multipol_residual_helmholtz_tv(t, v, &n).unwrap();
+        approx_eq(
+            f_dup.f_n[1],
+            f_bin.f_n[1],
+            1e-12,
+            1e-13,
+            &format!("dup Q F_n[1] at {n:?}"),
+        );
+        approx_eq(
+            f_dup.f_n[2],
+            f_bin.f_n[1],
+            1e-12,
+            1e-13,
+            &format!("dup Q F_n[2] at {n:?}"),
+        );
+        approx_eq(
+            f_dup.f_nn[4],
+            f_bin.f_nn[3],
+            1e-10,
+            1e-10,
+            &format!("dup Q F_nn(1,1) at {n:?}"),
+        );
+        approx_eq(
+            f_dup.f_nn[5],
+            f_bin.f_nn[3],
+            1e-10,
+            1e-10,
+            &format!("dup Q F_nn(1,2) at {n:?}"),
+        );
+        approx_eq(
+            f_dup.f_nn[8],
+            f_bin.f_nn[3],
+            1e-10,
+            1e-10,
+            &format!("dup Q F_nn(2,2) at {n:?}"),
+        );
+        approx_eq(
+            f_dup.f_nn[5],
+            -1.417_187,
+            1e-4,
+            1e-4,
+            &format!("dup Q F_nn(1,2) reference at {n:?}"),
+        );
+    }
+
+    // Symmetric check: duplicate absent dipolar species with present quadrupole.
+    let f_bin_d = bin
+        .multipol_residual_helmholtz_tv(t, v, &[0.0, 1.0])
+        .unwrap();
+    let mut dup_d = PcSaft::new_polar(&["CO2", "ACETONE", "ACETONE"]).unwrap();
+    dup_d.set_multipol_control(false, false, true).unwrap();
+    for n in [[1.0, 0.0, 0.0], [1.0, 1.0e-16, 0.0]] {
+        let f_dup = dup_d.multipol_residual_helmholtz_tv(t, v, &n).unwrap();
+        approx_eq(
+            f_dup.f_n[1],
+            f_bin_d.f_n[0],
+            1e-12,
+            1e-13,
+            &format!("dup D F_n[1] at {n:?}"),
+        );
+        approx_eq(
+            f_dup.f_nn[5],
+            f_bin_d.f_nn[0],
+            1e-10,
+            1e-10,
+            &format!("dup D F_nn(1,2) at {n:?}"),
+        );
+    }
+}
+
+#[test]
+fn near_critical_methane_saturation_and_ultra_low_t_water_rejection() {
+    // Near-critical methane: narrow van der Waals loop stepped over by coarse grid.
+    let c1 = PcSaft::new(&["C1"]).unwrap();
+    let t_nc = 191.399_581_288_3;
+    let prep = c1.prepare(t_nc, &[1.0]).unwrap();
+    let sat = prep.saturation_pressure(t_nc).unwrap();
+
+    approx_eq(sat.pressure, 4_674_933.015_24, 1e-6, 1.0, "near-crit C1 P");
+    approx_eq(
+        sat.liquid_volume,
+        1.076_017_99e-4,
+        1e-4,
+        1e-9,
+        "near-crit C1 Vl",
+    );
+    approx_eq(
+        sat.vapor_volume,
+        1.091_267_66e-4,
+        1e-4,
+        1e-9,
+        "near-crit C1 Vv",
+    );
+    assert!(sat.liquid_volume < sat.vapor_volume);
+
+    let sl = prep.state(1.0 / sat.liquid_volume).unwrap();
+    let sv = prep.state(1.0 / sat.vapor_volume).unwrap();
+    approx_eq(
+        sl.pressure,
+        sat.pressure,
+        1e-6,
+        0.0,
+        "near-crit C1 liquid P",
+    );
+    approx_eq(sv.pressure, sat.pressure, 1e-6, 0.0, "near-crit C1 vapor P");
+    approx_eq(
+        sl.ln_phi[0],
+        sv.ln_phi[0],
+        1e-9,
+        1e-9,
+        "near-crit C1 fugacity",
+    );
+
+    // Ultra-low-T PCP-SAFT water below f64 liquid pressure resolution must return NotConverged.
+    let h2o = PcSaft::new_polar(&["H2O"]).unwrap();
+    for t_low in [150.0, 100.0] {
+        let p_low = h2o.prepare(t_low, &[1.0]).unwrap();
+        let err = p_low.saturation_pressure(t_low).unwrap_err();
+        assert!(
+            matches!(err, Error::NotConverged(_)),
+            "expected NotConverged for PCP-SAFT H2O at {t_low} K, got {err:?}"
+        );
+    }
+}
+
+#[test]
+fn elliot_precondition_enforced_at_build_time_and_atomic_on_error() {
+    let t = 340.0;
+    let v = 1.0e-4;
+    let n = [0.4, 0.6];
+
+    // Order (a): Scheme1ea already set, then switching to Elliot must fail atomically.
+    let mut co2_h2o = PcSaft::new(&["CO2", "H2O"]).unwrap();
+    co2_h2o
+        .set_assoc_params(0, 10_000.0, 0.03, AssocScheme::Scheme1ea)
+        .unwrap();
+    let before_a = co2_h2o.residual_helmholtz_tv(t, v, &n).unwrap();
+    let err_a = co2_h2o
+        .set_delta_comb_rule(DeltaCombRule::Elliot)
+        .unwrap_err();
+    assert!(matches!(err_a, Error::Unsupported(_)));
+    assert_eq!(
+        co2_h2o.association().delta_comb_rule,
+        DeltaCombRule::Standard
+    );
+    let after_a = co2_h2o.residual_helmholtz_tv(t, v, &n).unwrap();
+    approx_eq(
+        after_a.f,
+        before_a.f,
+        0.0,
+        1e-15,
+        "Order (a) model preserved",
+    );
+
+    // Order (b): Elliot already active, then switching component 0 to Scheme1ea must fail atomically.
+    let mut nh3_h2o = PcSaft::new(&["NH3", "H2O"]).unwrap();
+    nh3_h2o.set_delta_comb_rule(DeltaCombRule::Elliot).unwrap();
+    let before_b = nh3_h2o.residual_helmholtz_tv(t, v, &n).unwrap();
+    let err_b = nh3_h2o
+        .set_assoc_params(0, 10_000.0, 0.03, AssocScheme::Scheme1ea)
+        .unwrap_err();
+    assert!(matches!(err_b, Error::Unsupported(_)));
+    assert_eq!(nh3_h2o.association().delta_comb_rule, DeltaCombRule::Elliot);
+    let after_b = nh3_h2o.residual_helmholtz_tv(t, v, &n).unwrap();
+    approx_eq(
+        after_b.f,
+        before_b.f,
+        0.0,
+        1e-15,
+        "Order (b) model preserved",
+    );
+}
+
+#[test]
+fn set_kij_rejects_overflowing_cross_dispersion_energy_on_polar_and_nonpolar() {
+    // Polar CO2/H2O
+    let mut polar = PcSaft::new_polar(&["CO2", "H2O"]).unwrap();
+    let orig_polar_kij = polar.get_kij(0, 1);
+    let orig_polar_eps = polar.multipol().unwrap().eps_divk_ij.clone();
+    for bad_kij in [-f64::MAX, -1.0e160] {
+        let err = polar.set_kij(0, 1, bad_kij).unwrap_err();
+        assert!(matches!(err, Error::InvalidInput(_)));
+        assert_eq!(polar.get_kij(0, 1), orig_polar_kij);
+        assert_eq!(polar.get_kij(1, 0), orig_polar_kij);
+        assert_eq!(polar.multipol().unwrap().eps_divk_ij, orig_polar_eps);
+    }
+    let f_polar = polar
+        .residual_helmholtz_tv(340.0, 1.0e-4, &[0.5, 0.5])
+        .unwrap();
+    assert!(f_polar.f.is_finite());
+
+    // Non-polar C1/C2
+    let mut nonpolar = PcSaft::new(&["C1", "C2"]).unwrap();
+    let orig_np_kij = nonpolar.get_kij(0, 1);
+    for bad_kij in [-f64::MAX, -1.0e160] {
+        let err = nonpolar.set_kij(0, 1, bad_kij).unwrap_err();
+        assert!(matches!(err, Error::InvalidInput(_)));
+        assert_eq!(nonpolar.get_kij(0, 1), orig_np_kij);
+        assert_eq!(nonpolar.get_kij(1, 0), orig_np_kij);
+    }
+    let f_np = nonpolar
+        .residual_helmholtz_tv(300.0, 1.0e-4, &[0.5, 0.5])
+        .unwrap();
+    assert!(f_np.f.is_finite());
+
+    // Direct MultipolParams::new validation of sigma_ij, eps_divk_ij, m, mu, q.
+    assert!(matches!(
+        MultipolParams::new(&[1.0], &[0.0], &[1.0], &[3.0e-10], &[f64::INFINITY]),
+        Err(Error::InvalidInput(_))
+    ));
+    assert!(matches!(
+        MultipolParams::new(&[1.0], &[0.0], &[1.0], &[3.0e-10], &[0.0]),
+        Err(Error::InvalidInput(_))
+    ));
+    assert!(matches!(
+        MultipolParams::new(&[1.0], &[0.0], &[1.0], &[0.0], &[200.0]),
+        Err(Error::InvalidInput(_))
+    ));
+    assert!(matches!(
+        MultipolParams::new(&[1.0], &[0.0], &[1.0], &[1.0e100], &[200.0]),
+        Err(Error::InvalidInput(_))
+    ));
+    assert!(matches!(
+        MultipolParams::new(&[1.0], &[0.0], &[0.0], &[3.0e-10], &[200.0]),
+        Err(Error::InvalidInput(_))
+    ));
+    assert!(matches!(
+        MultipolParams::new(&[f64::NAN], &[0.0], &[1.0], &[3.0e-10], &[200.0]),
+        Err(Error::InvalidInput(_))
+    ));
+}
+
+#[test]
+fn association_combining_rules_are_overflow_free_and_validate_finiteness() {
+    // Direct AriComb and GeoComb overflow-free checks.
+    let ari_max = AssocCombRule::AriComb.apply(f64::MAX, f64::MAX).unwrap();
+    assert!(ari_max.is_finite());
+    let geo_big = AssocCombRule::GeoComb.apply(1.0e200, 1.0e200).unwrap();
+    approx_eq(geo_big, 1.0e200, 1e-14, 0.0, "GeoComb(1e200, 1e200)");
+
+    // NH3/H2O with AriComb + beta=1e200 switching to GeoComb yields finite 1e200.
+    let mut m1 = PcSaft::new(&["NH3", "H2O"]).unwrap();
+    m1.set_assoc_comb_rules(0, 1, AssocCombRule::AriComb, AssocCombRule::AriComb)
+        .unwrap();
+    m1.set_assoc_params(0, 10_000.0, 1.0e200, AssocScheme::Scheme4C)
+        .unwrap();
+    m1.set_assoc_params(1, 10_000.0, 1.0e200, AssocScheme::Scheme4C)
+        .unwrap();
+    m1.set_assoc_comb_rules(0, 1, AssocCombRule::GeoComb, AssocCombRule::GeoComb)
+        .unwrap();
+    assert!(m1.association().beta_kl.iter().all(|v| v.is_finite()));
+    let ns = m1.association().num_sites;
+    // Site 0 belongs to NH3 (+), site 6 belongs to H2O (-) -> cross-associating pair.
+    approx_eq(
+        m1.association().beta_kl[6],
+        1.0e200,
+        1e-14,
+        0.0,
+        "GeoComb cross beta_kl",
+    );
+    assert!(m1.association().beta_kl[ns * ns - 1].is_finite());
+
+    // NH3/H2O with DefaultComb and beta=1e308 produces finite cross beta_kl without overflow.
+    let mut m2 = PcSaft::new(&["NH3", "H2O"]).unwrap();
+    m2.set_assoc_params(0, 10_000.0, 1.0e308, AssocScheme::Scheme4C)
+        .unwrap();
+    m2.set_assoc_params(1, 10_000.0, 1.0e308, AssocScheme::Scheme4C)
+        .unwrap();
+    assert!(m2.association().beta_kl.iter().all(|v| v.is_finite()));
+    assert!(m2.association().beta_kl[6] > 0.0 && m2.association().beta_kl[6].is_finite());
 }

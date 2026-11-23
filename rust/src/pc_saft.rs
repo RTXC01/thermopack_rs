@@ -621,9 +621,14 @@ impl PcSaft {
         if index >= self.components.len() {
             return Err(Error::InvalidInput("component index out of bounds"));
         }
-        if !eps.is_finite() || eps < 0.0 || !beta.is_finite() || beta < 0.0 {
+        if !eps.is_finite()
+            || eps < 0.0
+            || !beta.is_finite()
+            || beta < 0.0
+            || beta > association::MAX_ASSOC_BETA
+        {
             return Err(Error::InvalidInput(
-                "association parameters must be finite and non-negative",
+                "association parameters must be finite, non-negative, and within supported bounds",
             ));
         }
         let mut next_components = self.components.clone();

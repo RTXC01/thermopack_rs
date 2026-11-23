@@ -217,6 +217,13 @@ pub enum DeltaCombRule {
     Elliot,
 }
 
+/// Maximum supported dimensionless association volume parameter `beta`.
+///
+/// Physical PC-SAFT/CPA association volumes are `<= 1`; `1e12` leaves 12 orders
+/// of magnitude of headroom while guaranteeing finite `Delta`, first/second
+/// derivatives, site-fraction convergence, and Elliot combining.
+pub const MAX_ASSOC_BETA: f64 = 1.0e12;
+
 /// Site-level association bookkeeping and interaction matrices.
 ///
 /// Mirrors `association_var::association`.
@@ -291,9 +298,13 @@ impl AssociationParams {
                 "association energy parameters must be finite and non-negative",
             ));
         }
-        if self.beta_kl.iter().any(|&v| !v.is_finite() || v < 0.0) {
+        if self
+            .beta_kl
+            .iter()
+            .any(|&v| !v.is_finite() || v < 0.0 || v > MAX_ASSOC_BETA)
+        {
             return Err(Error::InvalidInput(
-                "association volume parameters must be finite and non-negative",
+                "association volume parameters must be finite, non-negative, and at most MAX_ASSOC_BETA",
             ));
         }
         if self.delta_comb_rule == DeltaCombRule::Elliot {
@@ -347,10 +358,12 @@ impl AssociationParams {
             ));
         }
         if eps.iter().any(|&v| !v.is_finite() || v < 0.0)
-            || beta.iter().any(|&v| !v.is_finite() || v < 0.0)
+            || beta
+                .iter()
+                .any(|&v| !v.is_finite() || v < 0.0 || v > MAX_ASSOC_BETA)
         {
             return Err(Error::InvalidInput(
-                "association parameters must be finite and non-negative",
+                "association parameters must be finite, non-negative, and within supported bounds",
             ));
         }
 
@@ -419,10 +432,12 @@ impl AssociationParams {
             ));
         }
         if eps.iter().any(|&v| !v.is_finite() || v < 0.0)
-            || beta.iter().any(|&v| !v.is_finite() || v < 0.0)
+            || beta
+                .iter()
+                .any(|&v| !v.is_finite() || v < 0.0 || v > MAX_ASSOC_BETA)
         {
             return Err(Error::InvalidInput(
-                "association parameters must be finite and non-negative",
+                "association parameters must be finite, non-negative, and within supported bounds",
             ));
         }
 
@@ -490,12 +505,14 @@ impl AssociationParams {
             ));
         }
         if eps.iter().any(|&v| !v.is_finite() || v < 0.0)
-            || beta.iter().any(|&v| !v.is_finite() || v < 0.0)
+            || beta
+                .iter()
+                .any(|&v| !v.is_finite() || v < 0.0 || v > MAX_ASSOC_BETA)
             || kij_eps.iter().any(|&v| !v.is_finite())
             || kij_beta.iter().any(|&v| !v.is_finite())
         {
             return Err(Error::InvalidInput(
-                "association parameters must be finite and non-negative",
+                "association parameters must be finite, non-negative, and within supported bounds",
             ));
         }
 
@@ -844,8 +861,10 @@ fn assemble_delta(
                         let pair_r = provider.rdf_first(ic, jc)?;
                         (shared_first.as_ref().unwrap(), pair_r.covol, pair_r.covol_t)
                     };
-                    let h = beta * covol * expo_m1;
-                    let h_t = -eps * expo * covol * beta / rt2 + beta * covol_t * expo_m1;
+                    let bc = beta * covol;
+                    let h = bc * expo_m1;
+                    let eps_rt2 = eps / rt2;
+                    let h_t = -(eps_rt2 * expo) * bc + (beta * covol_t) * expo_m1;
                     let d = r.g * h;
                     let dt = r.g_t * h + r.g * h_t;
                     let dv = r.g_v * h;
@@ -881,11 +900,13 @@ fn assemble_delta(
                             pair_r.covol_tt,
                         )
                     };
-                    let h = beta * covol * expo_m1;
-                    let h_t = -eps * expo * covol * beta / rt2 + beta * covol_t * expo_m1;
-                    let h_tt = (2.0 + eps / rt) * eps / rt3 * expo * beta * covol
-                        - 2.0 * eps * expo * covol_t * beta / rt2
-                        + beta * covol_tt * expo_m1;
+                    let bc = beta * covol;
+                    let h = bc * expo_m1;
+                    let eps_rt2 = eps / rt2;
+                    let h_t = -(eps_rt2 * expo) * bc + (beta * covol_t) * expo_m1;
+                    let h_tt = (((2.0 + eps / rt) * (eps / rt3)) * expo) * bc
+                        - 2.0 * (eps_rt2 * expo) * (beta * covol_t)
+                        + (beta * covol_tt) * expo_m1;
 
                     let d = r.g * h;
                     let dt = r.temperature * h + r.g * h_t;
@@ -959,48 +980,55 @@ fn assemble_delta(
                         if assoc.beta_kl[kl] <= 0.0 {
                             continue;
                         }
-                        let d = (da * db).sqrt();
+                        let d = da.sqrt() * db.sqrt();
                         delta[kl] = d;
                         delta[lk] = d;
                         if d == 0.0 {
                             continue;
                         }
-                        let inv_2d = 1.0 / (2.0 * d);
-                        let inv_4d3 = 1.0 / (4.0 * d * d * d);
+                        if !d.is_finite() {
+                            return Err(Error::InvalidInput("non-finite Elliot Delta"));
+                        }
+                        let r_ba = (db / da).sqrt();
+                        let r_ab = (da / db).sqrt();
 
                         if order != DeltaOrder::Value {
-                            let dt = (delta_t[ka] * db + da * delta_t[lb]) * inv_2d;
-                            let dv = (delta_v[ka] * db + da * delta_v[lb]) * inv_2d;
+                            let dt = 0.5 * (delta_t[ka] * r_ba + delta_t[lb] * r_ab);
+                            let dv = 0.5 * (delta_v[ka] * r_ba + delta_v[lb] * r_ab);
+                            if !dt.is_finite() || !dv.is_finite() {
+                                return Err(Error::InvalidInput("non-finite Elliot Delta"));
+                            }
                             delta_t[kl] = dt;
                             delta_t[lk] = dt;
                             delta_v[kl] = dv;
                             delta_v[lk] = dv;
                             for i in 0..nc {
-                                let dn = (delta_n[ka * nc + i] * db + da * delta_n[lb * nc + i])
-                                    * inv_2d;
+                                let dn = 0.5
+                                    * (delta_n[ka * nc + i] * r_ba + delta_n[lb * nc + i] * r_ab);
+                                if !dn.is_finite() {
+                                    return Err(Error::InvalidInput("non-finite Elliot Delta_n"));
+                                }
                                 delta_n[kl * nc + i] = dn;
                                 delta_n[lk * nc + i] = dn;
                             }
                         }
                         if order == DeltaOrder::Second {
-                            let st = delta_t[ka] * db + da * delta_t[lb];
-                            let sv = delta_v[ka] * db + da * delta_v[lb];
-                            let dtt = (delta_tt[ka] * db
-                                + 2.0 * delta_t[ka] * delta_t[lb]
-                                + da * delta_tt[lb])
-                                * inv_2d
-                                - st * st * inv_4d3;
-                            let dtv = (delta_tv[ka] * db
-                                + delta_t[ka] * delta_v[lb]
-                                + delta_v[ka] * delta_t[lb]
-                                + da * delta_tv[lb])
-                                * inv_2d
-                                - st * sv * inv_4d3;
-                            let dvv = (delta_vv[ka] * db
-                                + 2.0 * delta_v[ka] * delta_v[lb]
-                                + da * delta_vv[lb])
-                                * inv_2d
-                                - sv * sv * inv_4d3;
+                            let dt = delta_t[kl];
+                            let dv = delta_v[kl];
+                            let dtt = 0.5 * (delta_tt[ka] * r_ba + delta_tt[lb] * r_ab)
+                                + (delta_t[ka] / d) * delta_t[lb]
+                                - (dt / d) * dt;
+                            let dtv = 0.5 * (delta_tv[ka] * r_ba + delta_tv[lb] * r_ab)
+                                + 0.5
+                                    * ((delta_t[ka] / d) * delta_v[lb]
+                                        + (delta_v[ka] / d) * delta_t[lb])
+                                - (dt / d) * dv;
+                            let dvv = 0.5 * (delta_vv[ka] * r_ba + delta_vv[lb] * r_ab)
+                                + (delta_v[ka] / d) * delta_v[lb]
+                                - (dv / d) * dv;
+                            if !dtt.is_finite() || !dtv.is_finite() || !dvv.is_finite() {
+                                return Err(Error::InvalidInput("non-finite Elliot Delta"));
+                            }
                             delta_tt[kl] = dtt;
                             delta_tt[lk] = dtt;
                             delta_tv[kl] = dtv;
@@ -1009,32 +1037,33 @@ fn assemble_delta(
                             delta_vv[lk] = dvv;
 
                             for i in 0..nc {
-                                let sn_i = delta_n[ka * nc + i] * db + da * delta_n[lb * nc + i];
-                                let dtn = (delta_tn[ka * nc + i] * db
-                                    + delta_t[ka] * delta_n[lb * nc + i]
-                                    + delta_n[ka * nc + i] * delta_t[lb]
-                                    + da * delta_tn[lb * nc + i])
-                                    * inv_2d
-                                    - st * sn_i * inv_4d3;
-                                let dvn = (delta_vn[ka * nc + i] * db
-                                    + delta_v[ka] * delta_n[lb * nc + i]
-                                    + delta_n[ka * nc + i] * delta_v[lb]
-                                    + da * delta_vn[lb * nc + i])
-                                    * inv_2d
-                                    - sv * sn_i * inv_4d3;
+                                let dn_i = delta_n[kl * nc + i];
+                                let dtn = 0.5
+                                    * (delta_tn[ka * nc + i] * r_ba + delta_tn[lb * nc + i] * r_ab)
+                                    + 0.5
+                                        * ((delta_t[ka] / d) * delta_n[lb * nc + i]
+                                            + (delta_n[ka * nc + i] / d) * delta_t[lb])
+                                    - (dt / d) * dn_i;
+                                let dvn = 0.5
+                                    * (delta_vn[ka * nc + i] * r_ba + delta_vn[lb * nc + i] * r_ab)
+                                    + 0.5
+                                        * ((delta_v[ka] / d) * delta_n[lb * nc + i]
+                                            + (delta_n[ka * nc + i] / d) * delta_v[lb])
+                                    - (dv / d) * dn_i;
                                 delta_tn[kl * nc + i] = dtn;
                                 delta_tn[lk * nc + i] = dtn;
                                 delta_vn[kl * nc + i] = dvn;
                                 delta_vn[lk * nc + i] = dvn;
                                 for j in 0..nc {
-                                    let sn_j =
-                                        delta_n[ka * nc + j] * db + da * delta_n[lb * nc + j];
-                                    let dnn = (delta_nn[(ka * nc + i) * nc + j] * db
-                                        + delta_n[ka * nc + i] * delta_n[lb * nc + j]
-                                        + delta_n[ka * nc + j] * delta_n[lb * nc + i]
-                                        + da * delta_nn[(lb * nc + i) * nc + j])
-                                        * inv_2d
-                                        - sn_i * sn_j * inv_4d3;
+                                    let dn_j = delta_n[kl * nc + j];
+                                    let dnn = 0.5
+                                        * (delta_nn[(ka * nc + i) * nc + j] * r_ba
+                                            + delta_nn[(lb * nc + i) * nc + j] * r_ab)
+                                        + 0.5
+                                            * ((delta_n[ka * nc + i] / d) * delta_n[lb * nc + j]
+                                                + (delta_n[ka * nc + j] / d)
+                                                    * delta_n[lb * nc + i])
+                                        - (dn_i / d) * dn_j;
                                     delta_nn[(kl * nc + i) * nc + j] = dnn;
                                     delta_nn[(lk * nc + i) * nc + j] = dnn;
                                 }
@@ -1329,7 +1358,7 @@ fn solve_x_k_from_delta(
                         sum_cx += c_mat[a * na + b] * xa[b];
                     }
                     let x_new = (1.0 - omega) / (1.0 + sum_cx) + omega * xa[a];
-                    max_diff = max_diff.max((x_new - xa[a]).abs());
+                    max_diff = max_diff.max((x_new - xa[a]).abs() / x_new.max(1.0e-300));
                     xa[a] = x_new;
                 }
                 if max_diff < 1e6 * f64::EPSILON {

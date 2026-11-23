@@ -1553,40 +1553,290 @@ fn set_kij_rejects_overflowing_cross_dispersion_energy_on_polar_and_nonpolar() {
 
 #[test]
 fn association_combining_rules_are_overflow_free_and_validate_finiteness() {
-    // Direct AriComb and GeoComb overflow-free checks.
+    // Direct AriComb and GeoComb overflow-free pure helper checks.
     let ari_max = AssocCombRule::AriComb.apply(f64::MAX, f64::MAX).unwrap();
     assert!(ari_max.is_finite());
     let geo_big = AssocCombRule::GeoComb.apply(1.0e200, 1.0e200).unwrap();
     approx_eq(geo_big, 1.0e200, 1e-14, 0.0, "GeoComb(1e200, 1e200)");
 
-    // NH3/H2O with AriComb + beta=1e200 switching to GeoComb yields finite 1e200.
-    let mut m1 = PcSaft::new(&["NH3", "H2O"]).unwrap();
-    m1.set_assoc_comb_rules(0, 1, AssocCombRule::AriComb, AssocCombRule::AriComb)
-        .unwrap();
-    m1.set_assoc_params(0, 10_000.0, 1.0e200, AssocScheme::Scheme4C)
-        .unwrap();
-    m1.set_assoc_params(1, 10_000.0, 1.0e200, AssocScheme::Scheme4C)
-        .unwrap();
-    m1.set_assoc_comb_rules(0, 1, AssocCombRule::GeoComb, AssocCombRule::GeoComb)
-        .unwrap();
-    assert!(m1.association().beta_kl.iter().all(|v| v.is_finite()));
-    let ns = m1.association().num_sites;
-    // Site 0 belongs to NH3 (+), site 6 belongs to H2O (-) -> cross-associating pair.
-    approx_eq(
-        m1.association().beta_kl[6],
-        1.0e200,
-        1e-14,
-        0.0,
-        "GeoComb cross beta_kl",
-    );
-    assert!(m1.association().beta_kl[ns * ns - 1].is_finite());
+    let t = 340.0;
+    let v = 1.0e-4;
+    let n = [0.4, 0.6];
 
-    // NH3/H2O with DefaultComb and beta=1e308 produces finite cross beta_kl without overflow.
-    let mut m2 = PcSaft::new(&["NH3", "H2O"]).unwrap();
-    m2.set_assoc_params(0, 10_000.0, 1.0e308, AssocScheme::Scheme4C)
+    // set_assoc_params rejects unphysical beta > MAX_ASSOC_BETA transactionally
+    // across AriComb, GeoComb, and DefaultComb without corrupting the prior model.
+    for rule in [
+        AssocCombRule::AriComb,
+        AssocCombRule::GeoComb,
+        AssocCombRule::DefaultComb,
+    ] {
+        let mut m = PcSaft::new(&["NH3", "H2O"]).unwrap();
+        m.set_assoc_comb_rules(0, 1, rule, rule).unwrap();
+        let before = m.assoc_residual_helmholtz_tv(t, v, &n).unwrap();
+        for bad_beta in [1.0e200, 1.0e308] {
+            let err = m
+                .set_assoc_params(0, 10_000.0, bad_beta, AssocScheme::Scheme4C)
+                .unwrap_err();
+            assert!(matches!(err, Error::InvalidInput(_)));
+        }
+        let after = m.assoc_residual_helmholtz_tv(t, v, &n).unwrap();
+        approx_eq(
+            after.f,
+            before.f,
+            0.0,
+            1e-15,
+            &format!("{rule:?} preserved after rejected beta"),
+        );
+    }
+
+    // Supported upper bound beta = MAX_ASSOC_BETA (1e12) succeeds across all
+    // combining rules and Delta rules and matches central finite differences.
+    let max_beta = association::MAX_ASSOC_BETA;
+    for comb in [
+        AssocCombRule::AriComb,
+        AssocCombRule::GeoComb,
+        AssocCombRule::DefaultComb,
+    ] {
+        for delta_rule in [DeltaCombRule::Standard, DeltaCombRule::Elliot] {
+            let mut m = PcSaft::new(&["NH3", "H2O"]).unwrap();
+            m.set_assoc_comb_rules(0, 1, comb, comb).unwrap();
+            m.set_delta_comb_rule(delta_rule).unwrap();
+            m.set_assoc_params(0, 10_000.0, max_beta, AssocScheme::Scheme4C)
+                .unwrap();
+            m.set_assoc_params(1, 10_000.0, max_beta, AssocScheme::Scheme4C)
+                .unwrap();
+            assert!(m.association().beta_kl.iter().all(|v| v.is_finite()));
+
+            let f0 = m.assoc_residual_helmholtz_tv(t, v, &n).unwrap();
+            assert!(f0.f.is_finite() && f0.f_t.is_finite() && f0.f_v.is_finite());
+            assert!(f0.f_tt.is_finite() && f0.f_tv.is_finite() && f0.f_vv.is_finite());
+            assert!(f0.f_n.iter().all(|v| v.is_finite()));
+            assert!(f0.f_tn.iter().all(|v| v.is_finite()));
+            assert!(f0.f_vn.iter().all(|v| v.is_finite()));
+            assert!(f0.f_nn.iter().all(|v| v.is_finite()));
+
+            // Central FD check for Standard and Elliot at MAX_ASSOC_BETA.
+            if comb == AssocCombRule::DefaultComb {
+                let ht = 1.0e-4;
+                let hv = 1.0e-10;
+                let hn = 1.0e-6;
+                let ftp = m.assoc_residual_helmholtz_tv(t + ht, v, &n).unwrap();
+                let ftm = m.assoc_residual_helmholtz_tv(t - ht, v, &n).unwrap();
+                let fvp = m.assoc_residual_helmholtz_tv(t, v + hv, &n).unwrap();
+                let fvm = m.assoc_residual_helmholtz_tv(t, v - hv, &n).unwrap();
+                let fnp = m
+                    .assoc_residual_helmholtz_tv(t, v, &[n[0] + hn, n[1]])
+                    .unwrap();
+                let fnm = m
+                    .assoc_residual_helmholtz_tv(t, v, &[n[0] - hn, n[1]])
+                    .unwrap();
+
+                approx_eq(
+                    f0.f_t,
+                    (ftp.f - ftm.f) / (2.0 * ht),
+                    1e-6,
+                    1e-8,
+                    &format!("MAX_ASSOC_BETA {delta_rule:?} F_T"),
+                );
+                approx_eq(
+                    f0.f_v,
+                    (fvp.f - fvm.f) / (2.0 * hv),
+                    1e-6,
+                    1e-4,
+                    &format!("MAX_ASSOC_BETA {delta_rule:?} F_V"),
+                );
+                approx_eq(
+                    f0.f_n[0],
+                    (fnp.f - fnm.f) / (2.0 * hn),
+                    1e-6,
+                    1e-7,
+                    &format!("MAX_ASSOC_BETA {delta_rule:?} F_n[0]"),
+                );
+                approx_eq(
+                    f0.f_tt,
+                    (ftp.f_t - ftm.f_t) / (2.0 * ht),
+                    1e-5,
+                    1e-8,
+                    &format!("MAX_ASSOC_BETA {delta_rule:?} F_TT"),
+                );
+                approx_eq(
+                    f0.f_tv,
+                    (ftp.f_v - ftm.f_v) / (2.0 * ht),
+                    1e-5,
+                    1e-5,
+                    &format!("MAX_ASSOC_BETA {delta_rule:?} F_TV"),
+                );
+                approx_eq(
+                    f0.f_vv,
+                    (fvp.f_v - fvm.f_v) / (2.0 * hv),
+                    1e-5,
+                    1.0,
+                    &format!("MAX_ASSOC_BETA {delta_rule:?} F_VV"),
+                );
+                approx_eq(
+                    f0.f_nn[0],
+                    (fnp.f_n[0] - fnm.f_n[0]) / (2.0 * hn),
+                    1e-5,
+                    1e-6,
+                    &format!("MAX_ASSOC_BETA {delta_rule:?} F_nn[0,0]"),
+                );
+                approx_eq(
+                    f0.f_nn[1],
+                    (fnp.f_n[1] - fnm.f_n[1]) / (2.0 * hn),
+                    1e-5,
+                    1e-6,
+                    &format!("MAX_ASSOC_BETA {delta_rule:?} F_nn[0,1]"),
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn multipol_dq_structural_proportionality_rejects_kij_perturbation_and_allows_scaled_moments() {
+    let t = 340.0;
+    let v = 1.0e-4;
+
+    // 1. Unmodified duplicate CO2 species match [1, 1e-30, 1e-30] exactly.
+    let mut dup = PcSaft::new_polar(&["ACETONE", "CO2", "CO2"]).unwrap();
+    dup.set_multipol_control(false, false, true).unwrap();
+    let f_zero = dup
+        .multipol_residual_helmholtz_tv(t, v, &[1.0, 0.0, 0.0])
         .unwrap();
-    m2.set_assoc_params(1, 10_000.0, 1.0e308, AssocScheme::Scheme4C)
+    let f_tiny = dup
+        .multipol_residual_helmholtz_tv(t, v, &[1.0, 1.0e-30, 1.0e-30])
         .unwrap();
-    assert!(m2.association().beta_kl.iter().all(|v| v.is_finite()));
-    assert!(m2.association().beta_kl[6] > 0.0 && m2.association().beta_kl[6].is_finite());
+    approx_eq(
+        f_zero.f_nn[5],
+        -1.417_186_792_393,
+        1e-9,
+        1e-9,
+        "unmodified dup CO2 F_nn(1,2)",
+    );
+    approx_eq(
+        f_zero.f_nn[5],
+        f_tiny.f_nn[5],
+        1e-12,
+        1e-12,
+        "unmodified dup CO2 boundary vs 1e-30",
+    );
+
+    // 2. Any nonzero kij perturbation breaks structural proportionality and must error at [1, 0, 0].
+    for dk in [1.0e-12, 1.0e-15] {
+        let mut pert = PcSaft::new_polar(&["ACETONE", "CO2", "CO2"]).unwrap();
+        pert.set_multipol_control(false, false, true).unwrap();
+        pert.set_kij(0, 2, dk).unwrap();
+        let err = pert
+            .multipol_residual_helmholtz_tv(t, v, &[1.0, 0.0, 0.0])
+            .unwrap_err();
+        assert!(
+            matches!(err, Error::InvalidInput(_)),
+            "expected InvalidInput for kij perturbation {dk:e}, got {err:?}"
+        );
+    }
+
+    // 3. Structurally proportional species with scaled quadrupole moment (q_2 = 2 * q_1,
+    //    identical m, sigma, eps_ij) remain smooth at [1, 0, 0] and match [1, 1e-30, 1e-30].
+    let mut scaled = PcSaft::new_polar(&["ACETONE", "CO2", "CO2"]).unwrap();
+    let q_co2 = scaled.components()[1].q;
+    scaled.set_polar_moments(2, 0.0, 2.0 * q_co2).unwrap();
+    scaled.set_multipol_control(false, false, true).unwrap();
+    let fs_zero = scaled
+        .multipol_residual_helmholtz_tv(t, v, &[1.0, 0.0, 0.0])
+        .unwrap();
+    let fs_tiny = scaled
+        .multipol_residual_helmholtz_tv(t, v, &[1.0, 1.0e-30, 1.0e-30])
+        .unwrap();
+    approx_eq(
+        fs_zero.f_n[2],
+        4.0 * fs_zero.f_n[1],
+        1e-12,
+        1e-13,
+        "scaled Q F_n scales as q^2",
+    );
+    approx_eq(
+        fs_zero.f_nn[5],
+        fs_tiny.f_nn[5],
+        1e-11,
+        1e-11,
+        "scaled Q boundary vs 1e-30",
+    );
+
+    // 4. Both polar families absent in non-polar solvent: smooth zero mixed derivative
+    //    even for distinct absent dipole species.
+    let mut all_absent = PcSaft::new_polar(&["CO2", "ACETONE", "NH3", "C1"]).unwrap();
+    all_absent.set_polar_moments(2, 1.47, 0.0).unwrap();
+    all_absent.set_multipol_control(false, false, true).unwrap();
+    let faa = all_absent
+        .multipol_residual_helmholtz_tv(t, v, &[0.0, 0.0, 0.0, 1.0])
+        .unwrap();
+    approx_eq(
+        faa.f_nn[6],
+        0.0,
+        0.0,
+        1e-15,
+        "both polar families absent F_nn(ACETONE, NH3) == 0",
+    );
+}
+
+#[test]
+fn multipol_eps_square_and_active_coeff_validation_and_ultra_trace_dd_qq_precision() {
+    // Direct MultipolParams::new rejects eps^2 overflow (1e155) and active coeff overflow (mu=1e80),
+    // while accepting eps=1e150 and evaluating cleanly.
+    assert!(matches!(
+        MultipolParams::new(&[1.0], &[0.0], &[1.0], &[3.0e-10], &[1.0e155]),
+        Err(Error::InvalidInput(_))
+    ));
+    assert!(matches!(
+        MultipolParams::new(&[1.0e80], &[0.0], &[1.0], &[3.0e-10], &[200.0]),
+        Err(Error::InvalidInput(_))
+    ));
+    let mp_big = MultipolParams::new(&[1.0], &[0.0], &[1.0], &[3.0e-10], &[1.0e150]).unwrap();
+    let val_big = mp_big.fres_value(340.0, 1.0e-4, &[1.0]).unwrap();
+    let all_big = mp_big.fres_all(340.0, 1.0e-4, &[1.0]).unwrap();
+    assert!(val_big.is_finite() && all_big.f.is_finite() && all_big.f_nn[0].is_finite());
+
+    let t = 340.0;
+    let v = 1.0e-4;
+    let eps1 = 1.0e-300;
+    let eps2 = 2.0e-300;
+
+    // DD ultra-trace at 1e-300: no subnormal precision loss in C1/ACETONE/MEOH gradient.
+    let mut dd_model = PcSaft::new_polar(&["C1", "ACETONE", "MEOH"]).unwrap();
+    dd_model.set_multipol_control(true, false, false).unwrap();
+    let dd0 = dd_model
+        .multipol_residual_helmholtz_tv(t, v, &[1.0, 0.0, 0.0])
+        .unwrap();
+    let dd_tr = dd_model
+        .multipol_residual_helmholtz_tv(t, v, &[1.0, eps1, eps2])
+        .unwrap();
+    let dd_expected_fn1 = dd0.f_nn[4] * eps1 + dd0.f_nn[5] * eps2;
+    assert!(dd_expected_fn1.abs() > 0.0);
+    approx_eq(
+        dd_tr.f_n[1],
+        dd_expected_fn1,
+        1e-12,
+        0.0,
+        "DD 1e-300 trace F_n(ACETONE) without subnormal loss",
+    );
+
+    // QQ ultra-trace at 1e-300: no subnormal precision loss in C1/CO2/N2 gradient.
+    let mut qq_model = PcSaft::new_polar(&["C1", "CO2", "N2"]).unwrap();
+    qq_model.set_polar_moments(2, 0.0, 1.5).unwrap();
+    qq_model.set_multipol_control(false, true, false).unwrap();
+    let qq0 = qq_model
+        .multipol_residual_helmholtz_tv(t, v, &[1.0, 0.0, 0.0])
+        .unwrap();
+    let qq_tr = qq_model
+        .multipol_residual_helmholtz_tv(t, v, &[1.0, eps1, eps2])
+        .unwrap();
+    let qq_expected_fn1 = qq0.f_nn[4] * eps1 + qq0.f_nn[5] * eps2;
+    assert!(qq_expected_fn1.abs() > 0.0);
+    approx_eq(
+        qq_tr.f_n[1],
+        qq_expected_fn1,
+        1e-12,
+        0.0,
+        "QQ 1e-300 trace F_n(CO2) without subnormal loss",
+    );
 }

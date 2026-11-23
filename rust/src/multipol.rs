@@ -223,9 +223,12 @@ impl MultipolParams {
         if mu.iter().any(|&v| !v.is_finite()) || q.iter().any(|&v| !v.is_finite()) {
             return Err(Error::InvalidInput("polar moments must be finite"));
         }
-        if eps_divk_ij.iter().any(|&e| !e.is_finite() || e <= 0.0) {
+        if eps_divk_ij
+            .iter()
+            .any(|&e| !e.is_finite() || e <= 0.0 || !(e * e).is_finite())
+        {
             return Err(Error::InvalidInput(
-                "dispersion energy matrix entries must be finite and strictly positive",
+                "dispersion energy matrix entries must be finite, strictly positive, and have finite square",
             ));
         }
 
@@ -329,7 +332,7 @@ impl MultipolParams {
             }
         }
 
-        Ok(Self {
+        let out = Self {
             nc,
             mu_star_2,
             q_star_2,
@@ -352,7 +355,200 @@ impl MultipolParams {
             enable_qq: true,
             enable_dd: true,
             enable_dq: true,
-        })
+        };
+        out.validate_active_coefficients()?;
+        Ok(out)
+    }
+
+    #[inline]
+    fn dd_coeff2(&self, i: usize, j: usize, fac: f64) -> f64 {
+        let nc = self.nc;
+        let ii = i * nc + i;
+        let jj = j * nc + j;
+        let ij = i * nc + j;
+        fac * (-PI)
+            * ((N_AVOGADRO * self.sigma_ij_3[ii]) * (self.eps_divk_ij[ii] * self.mu_star_2[i]))
+            * ((self.sigma_ij_3[jj] / self.sigma_ij_3[ij])
+                * (self.eps_divk_ij[jj] * self.mu_star_2[j]))
+    }
+
+    #[inline]
+    fn dd_coeff3(&self, i: usize, j: usize, k: usize, fac: f64) -> f64 {
+        let nc = self.nc;
+        let ii = i * nc + i;
+        let jj = j * nc + j;
+        let kk = k * nc + k;
+        let s_k = self.sigma_ij[kk];
+        let s_ratio = (s_k / self.sigma_ij[i * nc + j])
+            * (s_k / self.sigma_ij[i * nc + k])
+            * (s_k / self.sigma_ij[j * nc + k]);
+        fac * (-(4.0 / 3.0) * PI * PI)
+            * ((N_AVOGADRO * self.sigma_ij_3[ii]) * (self.eps_divk_ij[ii] * self.mu_star_2[i]))
+            * ((N_AVOGADRO * self.sigma_ij_3[jj]) * (self.eps_divk_ij[jj] * self.mu_star_2[j]))
+            * (s_ratio * (self.eps_divk_ij[kk] * self.mu_star_2[k]))
+    }
+
+    #[inline]
+    fn qq_coeff2(&self, i: usize, j: usize, fac: f64) -> f64 {
+        let nc = self.nc;
+        let ii = i * nc + i;
+        let jj = j * nc + j;
+        let ij = i * nc + j;
+        let r_i = self.sigma_ij[ii] / self.sigma_ij[ij];
+        fac * (-PI * 0.75 * 0.75)
+            * ((N_AVOGADRO * self.sigma_ij_3[ii])
+                * (r_i * r_i)
+                * (self.eps_divk_ij[ii] * self.q_star_2[i]))
+            * ((self.sigma_ij_5[jj] / self.sigma_ij_5[ij])
+                * (self.eps_divk_ij[jj] * self.q_star_2[j]))
+    }
+
+    #[inline]
+    fn qq_coeff3(&self, i: usize, j: usize, k: usize, fac: f64) -> f64 {
+        let nc = self.nc;
+        let ii = i * nc + i;
+        let jj = j * nc + j;
+        let kk = k * nc + k;
+        let s_i = self.sigma_ij[ii];
+        let s_j = self.sigma_ij[jj];
+        let s_k = self.sigma_ij[kk];
+        let s_ij = self.sigma_ij[i * nc + j];
+        let s_ik = self.sigma_ij[i * nc + k];
+        let s_jk = self.sigma_ij[j * nc + k];
+        let r_k_ik = s_k / s_ik;
+        let r_k_jk = s_k / s_jk;
+        fac * ((PI * 0.75) * (PI * 0.75))
+            * ((N_AVOGADRO * self.sigma_ij_3[ii])
+                * ((s_i / s_ij) * (s_i / s_ik))
+                * (self.eps_divk_ij[ii] * self.q_star_2[i]))
+            * ((N_AVOGADRO * self.sigma_ij_3[jj])
+                * ((s_j / s_ij) * (s_j / s_jk))
+                * (self.eps_divk_ij[jj] * self.q_star_2[j]))
+            * (((s_k / s_ij) * (r_k_ik * r_k_ik) * (r_k_jk * r_k_jk))
+                * (self.eps_divk_ij[kk] * self.q_star_2[k]))
+    }
+
+    #[inline]
+    fn dq_coeff2(&self, i: usize, j: usize) -> f64 {
+        let nc = self.nc;
+        let ii = i * nc + i;
+        let jj = j * nc + j;
+        let ij = i * nc + j;
+        (-(9.0 / 4.0) * PI)
+            * ((N_AVOGADRO * self.sigma_ij_3[ii]) * (self.eps_divk_ij[ii] * self.mu_star_2[i]))
+            * ((self.sigma_ij_5[jj] / self.sigma_ij_5[ij])
+                * (self.eps_divk_ij[jj] * self.q_star_2[j]))
+    }
+
+    #[inline]
+    fn dq_coeff3_mu(&self, i: usize, k: usize, j: usize) -> f64 {
+        let nc = self.nc;
+        let ii = i * nc + i;
+        let kk = k * nc + k;
+        let jj = j * nc + j;
+        let s_i = self.sigma_ij[ii];
+        let s_k = self.sigma_ij[kk];
+        let s_j = self.sigma_ij[jj];
+        let s_ik = self.sigma_ij[i * nc + k];
+        let s_ij = self.sigma_ij[i * nc + j];
+        let s_kj = self.sigma_ij[k * nc + j];
+        let r_j_ij = s_j / s_ij;
+        let r_j_kj = s_j / s_kj;
+        (-PI * PI)
+            * ((N_AVOGADRO * self.sigma_ij_3[ii])
+                * (s_i / s_ik)
+                * (self.eps_divk_ij[ii] * self.mu_star_2[i]))
+            * ((N_AVOGADRO * self.sigma_ij_3[kk])
+                * (s_k / s_ik)
+                * (self.eps_divk_ij[kk] * self.mu_star_2[k]))
+            * (((r_j_ij * r_j_ij) * (r_j_kj * r_j_kj)) * (self.eps_divk_ij[jj] * self.q_star_2[j]))
+    }
+
+    #[inline]
+    fn dq_coeff3_q(&self, i: usize, j: usize, k: usize) -> f64 {
+        let nc = self.nc;
+        let ii = i * nc + i;
+        let jj = j * nc + j;
+        let kk = k * nc + k;
+        let s_i = self.sigma_ij[ii];
+        let s_j = self.sigma_ij[jj];
+        let s_k = self.sigma_ij[kk];
+        let s_ij = self.sigma_ij[i * nc + j];
+        let s_ik = self.sigma_ij[i * nc + k];
+        let s_jk = self.sigma_ij[j * nc + k];
+        let r_k_ik = s_k / s_ik;
+        let r_k_jk = s_k / s_jk;
+        (-PI * PI * ALPHA_DQ)
+            * ((N_AVOGADRO * self.sigma_ij_3[ii])
+                * (s_i / s_ij)
+                * (self.eps_divk_ij[ii] * self.mu_star_2[i]))
+            * ((N_AVOGADRO * self.sigma_ij_3[jj])
+                * (s_j / s_ij)
+                * (self.eps_divk_ij[jj] * self.q_star_2[j]))
+            * (((r_k_ik * r_k_ik) * (r_k_jk * r_k_jk)) * (self.eps_divk_ij[kk] * self.q_star_2[k]))
+    }
+
+    fn validate_active_coefficients(&self) -> Result<()> {
+        let nmu = self.mu_indices.len();
+        for ii in 0..nmu {
+            let i = self.mu_indices[ii];
+            if !self.dd_coeff2(i, i, 1.0).is_finite() || !self.dd_coeff3(i, i, i, 1.0).is_finite() {
+                return Err(Error::InvalidInput("non-finite DD multipolar coefficient"));
+            }
+            for jj in (ii + 1)..nmu {
+                let j = self.mu_indices[jj];
+                if !self.dd_coeff2(i, j, 2.0).is_finite()
+                    || !self.dd_coeff3(i, i, j, 3.0).is_finite()
+                    || !self.dd_coeff3(i, j, j, 3.0).is_finite()
+                {
+                    return Err(Error::InvalidInput("non-finite DD multipolar coefficient"));
+                }
+                for &k in &self.mu_indices[(jj + 1)..nmu] {
+                    if !self.dd_coeff3(i, j, k, 6.0).is_finite() {
+                        return Err(Error::InvalidInput("non-finite DD multipolar coefficient"));
+                    }
+                }
+            }
+        }
+        let nq = self.q_indices.len();
+        for ii in 0..nq {
+            let i = self.q_indices[ii];
+            if !self.qq_coeff2(i, i, 1.0).is_finite() || !self.qq_coeff3(i, i, i, 1.0).is_finite() {
+                return Err(Error::InvalidInput("non-finite QQ multipolar coefficient"));
+            }
+            for jj in (ii + 1)..nq {
+                let j = self.q_indices[jj];
+                if !self.qq_coeff2(i, j, 2.0).is_finite()
+                    || !self.qq_coeff3(i, i, j, 3.0).is_finite()
+                    || !self.qq_coeff3(i, j, j, 3.0).is_finite()
+                {
+                    return Err(Error::InvalidInput("non-finite QQ multipolar coefficient"));
+                }
+                for &k in &self.q_indices[(jj + 1)..nq] {
+                    if !self.qq_coeff3(i, j, k, 6.0).is_finite() {
+                        return Err(Error::InvalidInput("non-finite QQ multipolar coefficient"));
+                    }
+                }
+            }
+        }
+        for &i in &self.mu_indices {
+            for &j in &self.q_indices {
+                if !self.dq_coeff2(i, j).is_finite() {
+                    return Err(Error::InvalidInput("non-finite DQ multipolar coefficient"));
+                }
+                for &k in &self.mu_indices {
+                    if !self.dq_coeff3_mu(i, k, j).is_finite() {
+                        return Err(Error::InvalidInput("non-finite DQ multipolar coefficient"));
+                    }
+                }
+                for &k in &self.q_indices {
+                    if !self.dq_coeff3_q(i, j, k).is_finite() {
+                        return Err(Error::InvalidInput("non-finite DQ multipolar coefficient"));
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Whether any polar interaction term is active.
@@ -483,11 +679,56 @@ impl MultipolParams {
         Self::pade_exact_with_wronskian(a2, a3, uv1_minus_vu1, uv2_minus_vu2, order)
     }
 
+    /// Exact structural proportionality test for two species `a` and `b` in the
+    /// same polar family. When `true`, `alpha_a / alpha_b == beta_a / beta_b`
+    /// identically at all `(T, V)` for the active composition `n`.
+    fn dq_species_proportional(
+        &self,
+        a: usize,
+        b: usize,
+        absent_is_quadrupole: bool,
+        family_indices: &[usize],
+        opposite_indices: &[usize],
+        n: &[HyperDual],
+    ) -> bool {
+        if a == b {
+            return true;
+        }
+        let nc = self.nc;
+        if self.m[a].min(2.0) != self.m[b].min(2.0) {
+            return false;
+        }
+        if self.sigma_ij[a * nc + a] != self.sigma_ij[b * nc + b] {
+            return false;
+        }
+        for &opp in opposite_indices {
+            if n[opp].f0 > 0.0 {
+                let (pa, pb) = if absent_is_quadrupole {
+                    (opp * nc + a, opp * nc + b)
+                } else {
+                    (a * nc + opp, b * nc + opp)
+                };
+                if self.sigma_ij[pa] != self.sigma_ij[pb]
+                    || self.eps_divk_ij[pa] != self.eps_divk_ij[pb]
+                {
+                    return false;
+                }
+            }
+        }
+        for &k in family_indices {
+            if n[k].f0 > 0.0 && self.sigma_ij[a * nc + k] != self.sigma_ij[b * nc + k] {
+                return false;
+            }
+        }
+        true
+    }
+
     /// Exact L'Hôpital DQ Padé boundary evaluator when `a_2(0) == 0 && a_3(0) == 0`.
     fn pade_dq_boundary(
         a2: HyperDual,
         a3: HyperDual,
         same_direction: bool,
+        proportional: bool,
         order: u8,
     ) -> Result<HyperDual> {
         let f1_nz = a2.f1 != 0.0;
@@ -566,11 +807,20 @@ impl MultipolParams {
                 "singular multipolar DQ Pade boundary denominator",
             ));
         }
-        let cross = (a2.f1 * a3.f2 - a2.f2 * a3.f1).abs();
-        let scale = (a2.f1 * a3.f2).abs() + (a2.f2 * a3.f1).abs();
-        if same_direction || cross <= 1.0e-12 * scale.max(1.0e-300) {
+        // Only allow the mixed boundary derivative when the directions are
+        // identical, structurally proportional, or `a_3` vanishes to higher
+        // order (`a3.f1 == 0 && a3.f2 == 0`, i.e., opposite family also absent).
+        if same_direction || proportional || (a3.f1 == 0.0 && a3.f2 == 0.0) {
             let k1 = d1 / a2.f1;
             let k2 = d2 / a2.f2;
+            if !k1.is_finite()
+                || !k2.is_finite()
+                || (k1 - k2).abs() > 1.0e-12 * (k1.abs() + k2.abs()).max(1.0)
+            {
+                return Err(Error::InvalidInput(
+                    "undefined multipolar DQ Pade mixed boundary derivative with multiple absent polar species",
+                ));
+            }
             let kappa = 0.5 * (k1 + k2);
             if !kappa.is_finite() || kappa == 0.0 {
                 return Err(Error::InvalidInput(
@@ -609,9 +859,13 @@ impl MultipolParams {
 
     /// Evaluates `u^2 / (u - v)` for linear family sums `u = sum_a n[f_a] * alpha[a]`,
     /// `v = sum_a n[f_a] * beta[a]` using a cancellation-free Wronskian that cancels
-    /// diagonal and identical-species terms before subtraction.
+    /// diagonal and structurally proportional species terms before subtraction.
+    #[allow(clippy::too_many_arguments)]
     fn pade_dq_family_sum(
+        &self,
+        absent_is_quadrupole: bool,
         family_indices: &[usize],
+        opposite_indices: &[usize],
         n: &[HyperDual],
         alpha: &[HyperDual],
         beta: &[HyperDual],
@@ -627,20 +881,53 @@ impl MultipolParams {
             v = v + na * beta[a];
         }
         if u.f0 == 0.0 && v.f0 == 0.0 {
-            return Self::pade_dq_boundary(u, v, same_direction, order);
+            let mut proportional = true;
+            'check: for &fa in family_indices {
+                if n[fa].f1 != 0.0 {
+                    for &fb in family_indices {
+                        if n[fb].f2 != 0.0
+                            && !self.dq_species_proportional(
+                                fa,
+                                fb,
+                                absent_is_quadrupole,
+                                family_indices,
+                                opposite_indices,
+                                n,
+                            )
+                        {
+                            proportional = false;
+                            break 'check;
+                        }
+                    }
+                }
+            }
+            return Self::pade_dq_boundary(u, v, same_direction, proportional, order);
         }
         let mut uv1_minus_vu1 = 0.0;
         let mut uv2_minus_vu2 = 0.0;
         if order >= 2 {
             for a in 0..m {
-                let na = n[family_indices[a]];
+                let fa = family_indices[a];
+                let na = n[fa];
                 let aa = alpha[a];
                 let ba = beta[a];
                 for b in (a + 1)..m {
-                    let nb = n[family_indices[b]];
+                    let fb = family_indices[b];
+                    let nb = n[fb];
                     let ab = alpha[b];
                     let bb = beta[b];
-                    let ab_cross = aa.f0 * bb.f0 - ba.f0 * ab.f0;
+                    let ab_cross = if self.dq_species_proportional(
+                        fa,
+                        fb,
+                        absent_is_quadrupole,
+                        family_indices,
+                        opposite_indices,
+                        n,
+                    ) {
+                        0.0
+                    } else {
+                        aa.f0 * bb.f0 - ba.f0 * ab.f0
+                    };
                     uv1_minus_vu1 += (na.f0 * nb.f1 - nb.f0 * na.f1) * ab_cross;
                     uv2_minus_vu2 += (na.f0 * nb.f2 - nb.f0 * na.f2) * ab_cross;
                 }
@@ -669,49 +956,24 @@ impl MultipolParams {
         let t2 = t * t;
         let t3 = t2 * t;
         let v2 = v * v;
-        let pre2 = HyperDual::real(-PI * 0.75 * 0.75 * N_AVOGADRO) / v / t2;
-        let pre3 = HyperDual::real((PI * 0.75) * (PI * 0.75) * N_AVOGADRO * N_AVOGADRO) / v2 / t3;
+        let inv_vt2 = HyperDual::real(1.0) / v / t2;
+        let inv_v2t3 = HyperDual::real(1.0) / v2 / t3;
 
-        let mut a2 = HyperDual::real(0.0);
-        let mut a3 = HyperDual::real(0.0);
+        let mut a2 = HyperDual::with_order(0.0, order);
+        let mut a3 = HyperDual::with_order(0.0, order);
 
         let mut add_a2 = |is: usize, js: usize, fac: f64| {
             let ij = is * nc + js;
-            let ii = is * nc + is;
-            let jj = js * nc + js;
             let j2 = Self::hd_j2_5(t, eta, &self.a_ij_qq[ij], &self.b_ij_qq[ij]);
-            let s_ij = self.sigma_ij[ij];
-            let coeff = fac
-                * self.eps_divk_ij[ii]
-                * self.eps_divk_ij[jj]
-                * self.sigma_ij_5[ii]
-                * self.sigma_ij_5[jj]
-                / (self.sigma_ij_5[ij] * s_ij * s_ij)
-                * self.q_star_2[is]
-                * self.q_star_2[js];
-            a2 = a2 + n[is] * n[js] * HyperDual::real(coeff) * j2;
+            let coeff = self.qq_coeff2(is, js, fac);
+            a2 = a2 + (HyperDual::real(coeff) * inv_vt2 * j2) * (n[is] * n[js]);
         };
 
         let mut add_a3 = |is: usize, js: usize, ks: usize, fac: f64| {
             let ijk = (is * nc + js) * nc + ks;
-            let ii = is * nc + is;
-            let jj = js * nc + js;
-            let kk = ks * nc + ks;
             let j3 = Self::hd_j3_4(eta, &self.c_ijk_qq[ijk]);
-            let coeff = fac
-                * self.eps_divk_ij[ii]
-                * self.eps_divk_ij[jj]
-                * self.eps_divk_ij[kk]
-                * self.sigma_ij_5[ii]
-                * self.sigma_ij_5[jj]
-                * self.sigma_ij_5[kk]
-                / (self.sigma_ij_3[is * nc + js]
-                    * self.sigma_ij_3[is * nc + ks]
-                    * self.sigma_ij_3[js * nc + ks])
-                * self.q_star_2[is]
-                * self.q_star_2[js]
-                * self.q_star_2[ks];
-            a3 = a3 + n[is] * n[js] * n[ks] * HyperDual::real(coeff) * j3;
+            let coeff = self.qq_coeff3(is, js, ks, fac);
+            a3 = a3 + (HyperDual::real(coeff) * inv_v2t3 * j3) * (n[is] * n[js] * n[ks]);
         };
 
         let nq = self.q_indices.len();
@@ -730,8 +992,6 @@ impl MultipolParams {
             }
         }
 
-        a2 = pre2 * a2;
-        a3 = pre3 * a3;
         Self::pade_dd_qq(a2, a3, order)
     }
 
@@ -747,48 +1007,24 @@ impl MultipolParams {
         let t2 = t * t;
         let t3 = t2 * t;
         let v2 = v * v;
-        let pre2 = HyperDual::real(-PI * N_AVOGADRO) / v / t2;
-        let pre3 = HyperDual::real(-(4.0 / 3.0) * (PI * N_AVOGADRO) * (PI * N_AVOGADRO)) / v2 / t3;
+        let inv_vt2 = HyperDual::real(1.0) / v / t2;
+        let inv_v2t3 = HyperDual::real(1.0) / v2 / t3;
 
-        let mut a2 = HyperDual::real(0.0);
-        let mut a3 = HyperDual::real(0.0);
+        let mut a2 = HyperDual::with_order(0.0, order);
+        let mut a3 = HyperDual::with_order(0.0, order);
 
         let mut add_a2 = |is: usize, js: usize, fac: f64| {
             let ij = is * nc + js;
-            let ii = is * nc + is;
-            let jj = js * nc + js;
             let j2 = Self::hd_j2_5(t, eta, &self.a_ij_dd[ij], &self.b_ij_dd[ij]);
-            let coeff = fac
-                * self.eps_divk_ij[ii]
-                * self.eps_divk_ij[jj]
-                * self.sigma_ij_3[ii]
-                * self.sigma_ij_3[jj]
-                / self.sigma_ij_3[ij]
-                * self.mu_star_2[is]
-                * self.mu_star_2[js];
-            a2 = a2 + n[is] * n[js] * HyperDual::real(coeff) * j2;
+            let coeff = self.dd_coeff2(is, js, fac);
+            a2 = a2 + (HyperDual::real(coeff) * inv_vt2 * j2) * (n[is] * n[js]);
         };
 
         let mut add_a3 = |is: usize, js: usize, ks: usize, fac: f64| {
             let ijk = (is * nc + js) * nc + ks;
-            let ii = is * nc + is;
-            let jj = js * nc + js;
-            let kk = ks * nc + ks;
             let j3 = Self::hd_j3_4(eta, &self.c_ijk_dd[ijk]);
-            let coeff = fac
-                * self.eps_divk_ij[ii]
-                * self.eps_divk_ij[jj]
-                * self.eps_divk_ij[kk]
-                * self.sigma_ij_3[ii]
-                * self.sigma_ij_3[jj]
-                * self.sigma_ij_3[kk]
-                / (self.sigma_ij[is * nc + js]
-                    * self.sigma_ij[is * nc + ks]
-                    * self.sigma_ij[js * nc + ks])
-                * self.mu_star_2[is]
-                * self.mu_star_2[js]
-                * self.mu_star_2[ks];
-            a3 = a3 + n[is] * n[js] * n[ks] * HyperDual::real(coeff) * j3;
+            let coeff = self.dd_coeff3(is, js, ks, fac);
+            a3 = a3 + (HyperDual::real(coeff) * inv_v2t3 * j3) * (n[is] * n[js] * n[ks]);
         };
 
         let nmu = self.mu_indices.len();
@@ -807,8 +1043,6 @@ impl MultipolParams {
             }
         }
 
-        a2 = pre2 * a2;
-        a3 = pre3 * a3;
         Self::pade_dd_qq(a2, a3, order)
     }
 
@@ -825,65 +1059,25 @@ impl MultipolParams {
         let t2 = t * t;
         let t3 = t2 * t;
         let v2 = v * v;
-        let pre2 = HyperDual::real(-(9.0 / 4.0) * PI * N_AVOGADRO) / v / t2;
-        let pre3 = HyperDual::real(-(PI * N_AVOGADRO) * (PI * N_AVOGADRO)) / v2 / t3;
+        let inv_vt2 = HyperDual::real(1.0) / v / t2;
+        let inv_v2t3 = HyperDual::real(1.0) / v2 / t3;
 
         let dq_term2 = |i: usize, j: usize| -> HyperDual {
-            let ii = i * nc + i;
-            let jj = j * nc + j;
             let ij = i * nc + j;
             let j2 = Self::hd_j2_4(t, eta, &self.a_ij_dq[ij], &self.b_ij_dq[ij]);
-            let coeff2 = self.eps_divk_ij[ii]
-                * self.eps_divk_ij[jj]
-                * self.sigma_ij_3[ii]
-                * self.sigma_ij_5[jj]
-                / self.sigma_ij_5[ij]
-                * self.mu_star_2[i]
-                * self.q_star_2[j];
-            HyperDual::real(coeff2) * j2
+            HyperDual::real(self.dq_coeff2(i, j)) * inv_vt2 * j2
         };
 
         let dq_term3_mu = |i: usize, k: usize, j: usize| -> HyperDual {
-            let ii = i * nc + i;
-            let kk = k * nc + k;
-            let jj = j * nc + j;
             let ijk = (i * nc + k) * nc + j;
             let j3 = Self::hd_j3_3(eta, &self.c_ijk_dq[ijk]);
-            let s_num = self.sigma_ij[ii] * self.sigma_ij[kk] * self.sigma_ij[jj];
-            let s_num2 = s_num * s_num;
-            let s_den =
-                self.sigma_ij[i * nc + k] * self.sigma_ij[i * nc + j] * self.sigma_ij[k * nc + j];
-            let coeff3 = self.eps_divk_ij[ii]
-                * self.eps_divk_ij[kk]
-                * self.eps_divk_ij[jj]
-                * (s_num2 * s_num2)
-                / (s_den * s_den)
-                * self.mu_star_2[k]
-                * self.mu_star_2[i]
-                * self.q_star_2[j];
-            HyperDual::real(coeff3) * j3
+            HyperDual::real(self.dq_coeff3_mu(i, k, j)) * inv_v2t3 * j3
         };
 
         let dq_term3_q = |i: usize, j: usize, k: usize| -> HyperDual {
-            let ii = i * nc + i;
-            let jj = j * nc + j;
-            let kk = k * nc + k;
             let ijk = (i * nc + j) * nc + k;
             let j3 = Self::hd_j3_3(eta, &self.c_ijk_dq[ijk]);
-            let s_num = self.sigma_ij[ii] * self.sigma_ij[jj] * self.sigma_ij[kk];
-            let s_num2 = s_num * s_num;
-            let s_den =
-                self.sigma_ij[i * nc + j] * self.sigma_ij[i * nc + k] * self.sigma_ij[j * nc + k];
-            let coeff3 = ALPHA_DQ
-                * self.eps_divk_ij[ii]
-                * self.eps_divk_ij[jj]
-                * self.eps_divk_ij[kk]
-                * (s_num2 * s_num2)
-                / (s_den * s_den)
-                * self.q_star_2[j]
-                * self.mu_star_2[i]
-                * self.q_star_2[k];
-            HyperDual::real(coeff3) * j3
+            HyperDual::real(self.dq_coeff3_q(i, j, k)) * inv_v2t3 * j3
         };
 
         // Case 1: Single dipole and single quadrupole — structurally factor out
@@ -891,8 +1085,8 @@ impl MultipolParams {
         if self.mu_indices.len() == 1 && self.q_indices.len() == 1 {
             let m = self.mu_indices[0];
             let q = self.q_indices[0];
-            let a2_bar = pre2 * dq_term2(m, q);
-            let a3_bar = pre3 * (n[m] * dq_term3_mu(m, m, q) + n[q] * dq_term3_q(m, q, q));
+            let a2_bar = dq_term2(m, q);
+            let a3_bar = n[m] * dq_term3_mu(m, m, q) + n[q] * dq_term3_q(m, q, q);
             let uv1_minus_vu1 = a2_bar.f0 * a3_bar.f1 - a3_bar.f0 * a2_bar.f1;
             let uv2_minus_vu2 = a2_bar.f0 * a3_bar.f2 - a3_bar.f0 * a2_bar.f2;
             let p_bar = Self::pade_exact_with_wronskian(
@@ -914,16 +1108,18 @@ impl MultipolParams {
             let mut alpha = Vec::with_capacity(nmu);
             let mut beta = Vec::with_capacity(nmu);
             for &i in &self.mu_indices {
-                let a_i = pre2 * dq_term2(i, q);
+                let a_i = dq_term2(i, q);
                 let mut b_sum = n[q] * dq_term3_q(i, q, q);
                 for &k in &self.mu_indices {
                     b_sum = b_sum + n[k] * dq_term3_mu(i, k, q);
                 }
                 alpha.push(a_i);
-                beta.push(pre3 * b_sum);
+                beta.push(b_sum);
             }
-            let p_bar = Self::pade_dq_family_sum(
+            let p_bar = self.pade_dq_family_sum(
+                false,
                 &self.mu_indices,
+                &self.q_indices,
                 n,
                 &alpha,
                 &beta,
@@ -942,16 +1138,24 @@ impl MultipolParams {
             let mut alpha = Vec::with_capacity(nq);
             let mut beta = Vec::with_capacity(nq);
             for &j in &self.q_indices {
-                let a_j = pre2 * dq_term2(m, j);
+                let a_j = dq_term2(m, j);
                 let mut b_sum = n[m] * dq_term3_mu(m, m, j);
                 for &k in &self.q_indices {
                     b_sum = b_sum + n[k] * dq_term3_q(m, j, k);
                 }
                 alpha.push(a_j);
-                beta.push(pre3 * b_sum);
+                beta.push(b_sum);
             }
-            let p_bar =
-                Self::pade_dq_family_sum(&self.q_indices, n, &alpha, &beta, same_direction, order)?;
+            let p_bar = self.pade_dq_family_sum(
+                true,
+                &self.q_indices,
+                &self.mu_indices,
+                n,
+                &alpha,
+                &beta,
+                same_direction,
+                order,
+            )?;
             return Ok(n[m] * p_bar);
         }
 
@@ -966,8 +1170,8 @@ impl MultipolParams {
             let mut alpha = Vec::with_capacity(nq);
             let mut beta = Vec::with_capacity(nq);
             for &j in &self.q_indices {
-                let mut a_sum = HyperDual::real(0.0);
-                let mut b_sum = HyperDual::real(0.0);
+                let mut a_sum = HyperDual::with_order(0.0, order);
+                let mut b_sum = HyperDual::with_order(0.0, order);
                 for &i in &self.mu_indices {
                     a_sum = a_sum + n[i] * dq_term2(i, j);
                     for &k in &self.mu_indices {
@@ -977,17 +1181,26 @@ impl MultipolParams {
                         b_sum = b_sum + n[i] * n[k] * dq_term3_q(i, j, k);
                     }
                 }
-                alpha.push(pre2 * a_sum);
-                beta.push(pre3 * b_sum);
+                alpha.push(a_sum);
+                beta.push(b_sum);
             }
-            Self::pade_dq_family_sum(&self.q_indices, n, &alpha, &beta, same_direction, order)
+            self.pade_dq_family_sum(
+                true,
+                &self.q_indices,
+                &self.mu_indices,
+                n,
+                &alpha,
+                &beta,
+                same_direction,
+                order,
+            )
         } else {
             let nmu = self.mu_indices.len();
             let mut alpha = Vec::with_capacity(nmu);
             let mut beta = Vec::with_capacity(nmu);
             for &i in &self.mu_indices {
-                let mut a_sum = HyperDual::real(0.0);
-                let mut b_sum = HyperDual::real(0.0);
+                let mut a_sum = HyperDual::with_order(0.0, order);
+                let mut b_sum = HyperDual::with_order(0.0, order);
                 for &j in &self.q_indices {
                     a_sum = a_sum + n[j] * dq_term2(i, j);
                     for &k in &self.mu_indices {
@@ -997,10 +1210,19 @@ impl MultipolParams {
                         b_sum = b_sum + n[j] * n[k] * dq_term3_q(i, j, k);
                     }
                 }
-                alpha.push(pre2 * a_sum);
-                beta.push(pre3 * b_sum);
+                alpha.push(a_sum);
+                beta.push(b_sum);
             }
-            Self::pade_dq_family_sum(&self.mu_indices, n, &alpha, &beta, same_direction, order)
+            self.pade_dq_family_sum(
+                false,
+                &self.mu_indices,
+                &self.q_indices,
+                n,
+                &alpha,
+                &beta,
+                same_direction,
+                order,
+            )
         }
     }
 

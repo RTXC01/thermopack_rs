@@ -1840,3 +1840,109 @@ fn multipol_eps_square_and_active_coeff_validation_and_ultra_trace_dd_qq_precisi
         "QQ 1e-300 trace F_n(CO2) without subnormal loss",
     );
 }
+
+#[test]
+fn multipol_dq_custom_diameters_have_a_smooth_mixed_boundary() {
+    let s = 2.328_306_436_538_696_3e-10;
+    let sigma = [s, s, 2.0 * s, s, s, 1.5 * s, 2.0 * s, 1.5 * s, 2.0 * s];
+    let mut mp = MultipolParams::new(
+        &[2.0, 0.0, 0.0],
+        &[0.0, 3.0, 3.0],
+        &[1.0; 3],
+        &sigma,
+        &[200.0; 9],
+    )
+    .unwrap();
+    mp.enable_dd = false;
+    mp.enable_qq = false;
+    let (t, v) = (340.0, 1e-4);
+    for (a, b) in [(0.0, 0.0), (1e-30, 1e-30), (2e-30, 1e-30), (1e-30, 2e-30)] {
+        let full = mp.fres_all(t, v, &[1.0, a, b]).unwrap();
+        approx_eq(
+            full.f_nn[5],
+            -14.054_142_104_610_15,
+            0.0,
+            2e-14,
+            "DQ custom diameter boundary",
+        );
+    }
+
+    // Away from the boundary the two-quadrupole terms have different diameter ratios.
+    let n = [1.0, 0.08, 0.03];
+    let h = 1e-6;
+    let plus = mp.fres_fn(t, v, &[n[0], n[1], n[2] + h]).unwrap();
+    let minus = mp.fres_fn(t, v, &[n[0], n[1], n[2] - h]).unwrap();
+    approx_eq(
+        mp.fres_all(t, v, &n).unwrap().f_nn[5],
+        (plus[1] - minus[1]) / (2.0 * h),
+        1e-8,
+        0.0,
+        "DQ interior mixed derivative",
+    );
+}
+
+#[test]
+fn multipol_dq_absent_dipoles_require_equal_diameter_products() {
+    let s: f64 = 3.0 * 2.0_f64.powi(-33);
+    let make_dq = |cross, pure| {
+        let sigma = [s, s, cross, s, s, s, cross, s, pure];
+        let mut mp = MultipolParams::new(
+            &[0.0, 2.0, 2.0],
+            &[3.0, 0.0, 0.0],
+            &[1.0; 3],
+            &sigma,
+            &[200.0; 9],
+        )
+        .unwrap();
+        mp.enable_dd = false;
+        mp.enable_qq = false;
+        mp
+    };
+    let (t, v) = (340.0, 1e-4);
+    let mp = make_dq(s / 2.0, 2.0 * s);
+    let boundary = mp.fres_all(t, v, &[1.0, 0.0, 0.0]).unwrap();
+    for (a, b) in [(1e-30, 2e-30), (2e-30, 1e-30)] {
+        let trace = mp.fres_all(t, v, &[1.0, a, b]).unwrap();
+        approx_eq(
+            trace.f_nn[5],
+            boundary.f_nn[5],
+            1e-13,
+            0.0,
+            "DQ dipole limit",
+        );
+    }
+
+    // (s + ulp)*(s - ulp) rounds to s*s but differs by ulp squared.
+    assert_eq!(s.next_up() * s.next_down(), s * s);
+    let perturbed = make_dq(s.next_up(), s.next_down());
+    assert!(matches!(
+        perturbed.fres_all(t, v, &[1.0, 0.0, 0.0]),
+        Err(Error::InvalidInput(_))
+    ));
+}
+
+#[test]
+fn multipol_large_dipole_hessian_matches_gradient_differences() {
+    let mp = MultipolParams::new(&[1e32], &[0.0], &[1.0], &[3e-10], &[200.0]).unwrap();
+    let (t, v) = (340.0, 1e-4);
+    let h = 1e-5;
+    let plus = mp.fres_fn(t, v, &[1.0 + h]).unwrap();
+    let minus = mp.fres_fn(t, v, &[1.0 - h]).unwrap();
+    let fd = (plus[0] - minus[0]) / (2.0 * h);
+    let full = mp.fres_all(t, v, &[1.0]).unwrap();
+    approx_eq(
+        full.f,
+        -1.591_022_486_043_386e64,
+        1e-14,
+        0.0,
+        "large DD value",
+    );
+    approx_eq(
+        full.f_nn[0],
+        2.863_395_002e63,
+        1e-8,
+        0.0,
+        "large DD Hessian",
+    );
+    approx_eq(full.f_nn[0], fd, 1e-8, 0.0, "large DD gradient difference");
+}

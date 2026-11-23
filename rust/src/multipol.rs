@@ -193,6 +193,21 @@ impl MultipolHelmholtz {
     }
 }
 
+/// Coefficients of one family mole number in A2 and A3. Splitting A3 by
+/// degree in this family keeps its quadratic contribution visible at trace.
+#[derive(Clone, Copy)]
+struct DqFamilyTerm {
+    alpha: HyperDual,
+    beta_linear: HyperDual,
+    beta_quadratic: HyperDual,
+}
+
+impl DqFamilyTerm {
+    fn beta(self) -> HyperDual {
+        self.beta_linear + self.beta_quadratic
+    }
+}
+
 impl MultipolParams {
     /// Initialize multipolar parameters from pure moments (`mu` `[D]`, `q` `[ÅD]`),
     /// segment numbers `m`, and full `nc x nc` pair matrices `sigma_ij` `[m]` and
@@ -613,15 +628,13 @@ impl MultipolParams {
         sum
     }
 
-    /// Exact, clamp-free, cancellation-free Padé evaluator for `u^2 / (u - v)`
-    /// using precomputed Wronskians `uv1_minus_vu1 = u_0 v_1 - v_0 u_1` and
-    /// `uv2_minus_vu2 = u_0 v_2 - v_0 u_2`.
+    /// Evaluate u^2/(u-v). The Hessian needs (u dv - v du)/(u-v)
+    /// for each seed. Form these normalized products only at second order.
     fn pade_exact_with_wronskian(
         u: HyperDual,
         v: HyperDual,
-        uv1_minus_vu1: f64,
-        uv2_minus_vu2: f64,
         order: u8,
+        normalized_wronskians: impl FnOnce(f64) -> (f64, f64),
     ) -> Result<HyperDual> {
         let w0 = u.f0 - v.f0;
         if !w0.is_finite() || w0 == 0.0 {
@@ -643,9 +656,8 @@ impl MultipolParams {
             (0.0, 0.0)
         };
         let f12 = if order >= 2 {
-            let t1 = uv1_minus_vu1 / w0;
-            let t2 = uv2_minus_vu2 / w0;
-            let f12 = 2.0 * r * u.f12 - (r * r) * (u.f12 - v.f12) + 2.0 * t1 * (t2 / w0);
+            let (t1, t2) = normalized_wronskians(w0);
+            let f12 = r * (2.0 * u.f12 - r * (u.f12 - v.f12)) + 2.0 * t1 * (t2 / w0);
             if !f12.is_finite() {
                 return Err(Error::InvalidInput("non-finite multipolar Pade result"));
             }
@@ -666,6 +678,17 @@ impl MultipolParams {
         })
     }
 
+    fn pade_exact(u: HyperDual, v: HyperDual, order: u8) -> Result<HyperDual> {
+        Self::pade_exact_with_wronskian(u, v, order, |w| {
+            let u_over_w = u.f0 / w;
+            let v_over_w = v.f0 / w;
+            (
+                u_over_w * v.f1 - v_over_w * u.f1,
+                u_over_w * v.f2 - v_over_w * u.f2,
+            )
+        })
+    }
+
     fn pade_dd_qq(a2: HyperDual, a3: HyperDual, order: u8) -> Result<HyperDual> {
         // For DD and QQ when the polar family is absent or ultra-trace,
         // `a_2 = O(eps^2)` and `a_3 = O(eps^3)`, so `a_3 / a_2` is below f64
@@ -674,53 +697,52 @@ impl MultipolParams {
         if a2.f0.abs() < 1.0e-100 && a3.f0.abs() <= 1.0e-20 * a2.f0.abs() {
             return Ok(a2);
         }
-        let uv1_minus_vu1 = a2.f0 * a3.f1 - a3.f0 * a2.f1;
-        let uv2_minus_vu2 = a2.f0 * a3.f2 - a3.f0 * a2.f2;
-        Self::pade_exact_with_wronskian(a2, a3, uv1_minus_vu1, uv2_minus_vu2, order)
+        Self::pade_exact(a2, a3, order)
     }
 
-    /// Exact structural proportionality test for two species `a` and `b` in the
-    /// same polar family. When `true`, `alpha_a / alpha_b == beta_a / beta_b`
-    /// identically at all `(T, V)` for the active composition `n`.
-    fn dq_species_proportional(
+    /// Test proportionality of A2 and the part of A3 linear in this family.
+    /// The varying species' moment cancels in the coefficient ratios.
+    /// For fixed i, coeff3_mu(i,i,j)/coeff2(i,j) varies as s_ij/s_jj.
+    /// For fixed j, coeff3_q(i,j,j)/coeff2(i,j) varies as s_ii*s_ij.
+    /// Matching each active cross diameter this way also gives the common
+    /// scaling for triples containing two distinct opposite species.
+    fn dq_linear_proportional(
         &self,
         a: usize,
         b: usize,
-        absent_is_quadrupole: bool,
-        family_indices: &[usize],
+        quadrupoles: bool,
         opposite_indices: &[usize],
         n: &[HyperDual],
     ) -> bool {
         if a == b {
             return true;
         }
-        let nc = self.nc;
         if self.m[a].min(2.0) != self.m[b].min(2.0) {
             return false;
         }
-        if self.sigma_ij[a * nc + a] != self.sigma_ij[b * nc + b] {
-            return false;
-        }
-        for &opp in opposite_indices {
-            if n[opp].f0 > 0.0 {
-                let (pa, pb) = if absent_is_quadrupole {
-                    (opp * nc + a, opp * nc + b)
+        let nc = self.nc;
+        let sa = self.sigma_ij[a * nc + a];
+        let sb = self.sigma_ij[b * nc + b];
+        opposite_indices
+            .iter()
+            .filter(|&&i| n[i].f0 > 0.0)
+            .all(|&i| {
+                let (ia, ib) = if quadrupoles {
+                    (i * nc + a, i * nc + b)
                 } else {
-                    (a * nc + opp, b * nc + opp)
+                    (a * nc + i, b * nc + i)
                 };
-                if self.sigma_ij[pa] != self.sigma_ij[pb]
-                    || self.eps_divk_ij[pa] != self.eps_divk_ij[pb]
-                {
-                    return false;
-                }
-            }
-        }
-        for &k in family_indices {
-            if n[k].f0 > 0.0 && self.sigma_ij[a * nc + k] != self.sigma_ij[b * nc + k] {
-                return false;
-            }
-        }
-        true
+                let (x, y) = if quadrupoles { (sb, sa) } else { (sa, sb) };
+                let ca = self.sigma_ij[ia];
+                let cb = self.sigma_ij[ib];
+                let product = ca * x;
+                // The constructor bounds diameter fifth powers, so both products
+                // and their rounding residuals are in range. Compare both parts
+                // to distinguish even ratios that round to the same float.
+                self.eps_divk_ij[ia] == self.eps_divk_ij[ib]
+                    && product == cb * y
+                    && ca.mul_add(x, -product) == cb.mul_add(y, -product)
+            })
     }
 
     /// Exact L'Hôpital DQ Padé boundary evaluator when `a_2(0) == 0 && a_3(0) == 0`.
@@ -811,26 +833,13 @@ impl MultipolParams {
         // identical, structurally proportional, or `a_3` vanishes to higher
         // order (`a3.f1 == 0 && a3.f2 == 0`, i.e., opposite family also absent).
         if same_direction || proportional || (a3.f1 == 0.0 && a3.f2 == 0.0) {
-            let k1 = d1 / a2.f1;
-            let k2 = d2 / a2.f2;
-            if !k1.is_finite()
-                || !k2.is_finite()
-                || (k1 - k2).abs() > 1.0e-12 * (k1.abs() + k2.abs()).max(1.0)
-            {
-                return Err(Error::InvalidInput(
-                    "undefined multipolar DQ Pade mixed boundary derivative with multiple absent polar species",
-                ));
-            }
-            let kappa = 0.5 * (k1 + k2);
-            if !kappa.is_finite() || kappa == 0.0 {
-                return Err(Error::InvalidInput(
-                    "singular multipolar DQ Pade boundary denominator",
-                ));
-            }
-            let f1 = a2.f1 / k1;
-            let f2 = a2.f2 / k2;
+            // Structural proportionality gives a common directional ratio.
+            // Either nonzero direction therefore supplies the Hessian limit.
+            let r = a2.f1 / d1;
+            let f1 = a2.f1 * r;
+            let f2 = a2.f2 * (a2.f2 / d2);
             let f12 = if order >= 2 {
-                (2.0 * kappa * a2.f12 - (a2.f12 - a3.f12)) / (kappa * kappa)
+                r * (2.0 * a2.f12 - r * (a2.f12 - a3.f12))
             } else {
                 0.0
             };
@@ -863,22 +872,19 @@ impl MultipolParams {
     #[allow(clippy::too_many_arguments)]
     fn pade_dq_family_sum(
         &self,
-        absent_is_quadrupole: bool,
+        quadrupoles: bool,
         family_indices: &[usize],
         opposite_indices: &[usize],
         n: &[HyperDual],
-        alpha: &[HyperDual],
-        beta: &[HyperDual],
+        terms: &[DqFamilyTerm],
         same_direction: bool,
         order: u8,
     ) -> Result<HyperDual> {
-        let m = family_indices.len();
         let mut u = HyperDual::with_order(0.0, order);
         let mut v = HyperDual::with_order(0.0, order);
-        for a in 0..m {
-            let na = n[family_indices[a]];
-            u = u + na * alpha[a];
-            v = v + na * beta[a];
+        for (&i, term) in family_indices.iter().zip(terms) {
+            u = u + n[i] * term.alpha;
+            v = v + n[i] * term.beta();
         }
         if u.f0 == 0.0 && v.f0 == 0.0 {
             let mut proportional = true;
@@ -886,11 +892,10 @@ impl MultipolParams {
                 if n[fa].f1 != 0.0 {
                     for &fb in family_indices {
                         if n[fb].f2 != 0.0
-                            && !self.dq_species_proportional(
+                            && !self.dq_linear_proportional(
                                 fa,
                                 fb,
-                                absent_is_quadrupole,
-                                family_indices,
+                                quadrupoles,
                                 opposite_indices,
                                 n,
                             )
@@ -903,45 +908,37 @@ impl MultipolParams {
             }
             return Self::pade_dq_boundary(u, v, same_direction, proportional, order);
         }
-        let mut uv1_minus_vu1 = 0.0;
-        let mut uv2_minus_vu2 = 0.0;
-        if order >= 2 {
-            for a in 0..m {
-                let fa = family_indices[a];
+        Self::pade_exact_with_wronskian(u, v, order, |w| {
+            let mut t1 = 0.0;
+            let mut t2 = 0.0;
+            let u_over_w = u.f0 / w;
+            let v_over_w = v.f0 / w;
+            for (a, (&fa, ta)) in family_indices.iter().zip(terms).enumerate() {
                 let na = n[fa];
-                let aa = alpha[a];
-                let ba = beta[a];
-                for b in (a + 1)..m {
-                    let fb = family_indices[b];
+                let ba = ta.beta();
+                for (&fb, tb) in family_indices[a + 1..].iter().zip(&terms[a + 1..]) {
                     let nb = n[fb];
-                    let ab = alpha[b];
-                    let bb = beta[b];
-                    let ab_cross = if self.dq_species_proportional(
-                        fa,
-                        fb,
-                        absent_is_quadrupole,
-                        family_indices,
-                        opposite_indices,
-                        n,
-                    ) {
-                        0.0
-                    } else {
-                        aa.f0 * bb.f0 - ba.f0 * ab.f0
+                    // Cancel only the proven linear determinant. The quadratic
+                    // terms can have different same-family cross diameters.
+                    let (ba0, bb0) =
+                        if self.dq_linear_proportional(fa, fb, quadrupoles, opposite_indices, n) {
+                            (ta.beta_quadratic.f0, tb.beta_quadratic.f0)
+                        } else {
+                            (ba.f0, tb.beta().f0)
+                        };
+                    let cross = |dna, dnb| {
+                        let weight = (na.f0 * dnb - nb.f0 * dna) / w;
+                        (weight * ta.alpha.f0) * bb0 - (weight * tb.alpha.f0) * ba0
                     };
-                    uv1_minus_vu1 += (na.f0 * nb.f1 - nb.f0 * na.f1) * ab_cross;
-                    uv2_minus_vu2 += (na.f0 * nb.f2 - nb.f0 * na.f2) * ab_cross;
+                    t1 += cross(na.f1, nb.f1);
+                    t2 += cross(na.f2, nb.f2);
                 }
-                for b in 0..m {
-                    let nb = n[family_indices[b]];
-                    let ab = alpha[b];
-                    let bb = beta[b];
-                    let nn0 = na.f0 * nb.f0;
-                    uv1_minus_vu1 += nn0 * (aa.f0 * bb.f1 - ba.f0 * ab.f1);
-                    uv2_minus_vu2 += nn0 * (aa.f0 * bb.f2 - ba.f0 * ab.f2);
-                }
+                // Coefficient derivatives carry another family mole factor.
+                t1 += u_over_w * (na.f0 * ba.f1) - v_over_w * (na.f0 * ta.alpha.f1);
+                t2 += u_over_w * (na.f0 * ba.f2) - v_over_w * (na.f0 * ta.alpha.f2);
             }
-        }
-        Self::pade_exact_with_wronskian(u, v, uv1_minus_vu1, uv2_minus_vu2, order)
+            (t1, t2)
+        })
     }
 
     fn hyperdual_f_qq(
@@ -1080,149 +1077,76 @@ impl MultipolParams {
             HyperDual::real(self.dq_coeff3_q(i, j, k)) * inv_v2t3 * j3
         };
 
-        // Case 1: Single dipole and single quadrupole — structurally factor out
+        // Single dipole and single quadrupole — structurally factor out
         // BOTH `n[m]` and `n[q]` so the Padé quotient is O(1) smooth everywhere.
         if self.mu_indices.len() == 1 && self.q_indices.len() == 1 {
             let m = self.mu_indices[0];
             let q = self.q_indices[0];
             let a2_bar = dq_term2(m, q);
             let a3_bar = n[m] * dq_term3_mu(m, m, q) + n[q] * dq_term3_q(m, q, q);
-            let uv1_minus_vu1 = a2_bar.f0 * a3_bar.f1 - a3_bar.f0 * a2_bar.f1;
-            let uv2_minus_vu2 = a2_bar.f0 * a3_bar.f2 - a3_bar.f0 * a2_bar.f2;
-            let p_bar = Self::pade_exact_with_wronskian(
-                a2_bar,
-                a3_bar,
-                uv1_minus_vu1,
-                uv2_minus_vu2,
-                order,
-            )?;
+            let p_bar = Self::pade_exact(a2_bar, a3_bar, order)?;
             return Ok(n[m] * n[q] * p_bar);
         }
 
-        // Case 2: Single quadrupole (multiple dipoles) — structurally factor `n[q]`
-        // and evaluate the remaining linear sum over dipoles with the cancellation-free
-        // Wronskian (or L'Hôpital boundary when all dipoles vanish).
-        if self.q_indices.len() == 1 {
-            let q = self.q_indices[0];
-            let nmu = self.mu_indices.len();
-            let mut alpha = Vec::with_capacity(nmu);
-            let mut beta = Vec::with_capacity(nmu);
-            for &i in &self.mu_indices {
-                let a_i = dq_term2(i, q);
-                let mut b_sum = n[q] * dq_term3_q(i, q, q);
-                for &k in &self.mu_indices {
-                    b_sum = b_sum + n[k] * dq_term3_mu(i, k, q);
-                }
-                alpha.push(a_i);
-                beta.push(b_sum);
-            }
-            let p_bar = self.pade_dq_family_sum(
-                false,
-                &self.mu_indices,
-                &self.q_indices,
-                n,
-                &alpha,
-                &beta,
-                same_direction,
-                order,
-            )?;
-            return Ok(n[q] * p_bar);
-        }
-
-        // Case 3: Single dipole (multiple quadrupoles) — structurally factor `n[m]`
-        // and evaluate the remaining linear sum over quadrupoles with the
-        // cancellation-free Wronskian (or L'Hôpital boundary when all quadrupoles vanish).
-        if self.mu_indices.len() == 1 {
-            let m = self.mu_indices[0];
-            let nq = self.q_indices.len();
-            let mut alpha = Vec::with_capacity(nq);
-            let mut beta = Vec::with_capacity(nq);
-            for &j in &self.q_indices {
-                let a_j = dq_term2(m, j);
-                let mut b_sum = n[m] * dq_term3_mu(m, m, j);
-                for &k in &self.q_indices {
-                    b_sum = b_sum + n[k] * dq_term3_q(m, j, k);
-                }
-                alpha.push(a_j);
-                beta.push(b_sum);
-            }
-            let p_bar = self.pade_dq_family_sum(
-                true,
-                &self.q_indices,
-                &self.mu_indices,
-                n,
-                &alpha,
-                &beta,
-                same_direction,
-                order,
-            )?;
-            return Ok(n[m] * p_bar);
-        }
-
-        // Case 4: Multiple dipoles and multiple quadrupoles — expand over the
-        // smaller polar family so the trace family's mole fractions are factored
-        // linearly into the cancellation-free Wronskian.
+        // Expand in the trace family. A singleton opposite family has a
+        // common mole factor in A2 and A3 which can be removed exactly.
         let s_mu: f64 = self.mu_indices.iter().map(|&i| n[i].f0).sum();
         let s_q: f64 = self.q_indices.iter().map(|&j| n[j].f0).sum();
-
-        if s_q <= s_mu {
-            let nq = self.q_indices.len();
-            let mut alpha = Vec::with_capacity(nq);
-            let mut beta = Vec::with_capacity(nq);
-            for &j in &self.q_indices {
-                let mut a_sum = HyperDual::with_order(0.0, order);
-                let mut b_sum = HyperDual::with_order(0.0, order);
-                for &i in &self.mu_indices {
-                    a_sum = a_sum + n[i] * dq_term2(i, j);
-                    for &k in &self.mu_indices {
-                        b_sum = b_sum + n[i] * n[k] * dq_term3_mu(i, k, j);
-                    }
-                    for &k in &self.q_indices {
-                        b_sum = b_sum + n[i] * n[k] * dq_term3_q(i, j, k);
-                    }
-                }
-                alpha.push(a_sum);
-                beta.push(b_sum);
-            }
-            self.pade_dq_family_sum(
-                true,
-                &self.q_indices,
-                &self.mu_indices,
-                n,
-                &alpha,
-                &beta,
-                same_direction,
-                order,
-            )
+        let quadrupoles = self.mu_indices.len() == 1 || (self.q_indices.len() > 1 && s_q <= s_mu);
+        let (family, opposite) = if quadrupoles {
+            (&self.q_indices, &self.mu_indices)
         } else {
-            let nmu = self.mu_indices.len();
-            let mut alpha = Vec::with_capacity(nmu);
-            let mut beta = Vec::with_capacity(nmu);
-            for &i in &self.mu_indices {
-                let mut a_sum = HyperDual::with_order(0.0, order);
-                let mut b_sum = HyperDual::with_order(0.0, order);
-                for &j in &self.q_indices {
-                    a_sum = a_sum + n[j] * dq_term2(i, j);
-                    for &k in &self.mu_indices {
-                        b_sum = b_sum + n[j] * n[k] * dq_term3_mu(i, k, j);
-                    }
-                    for &k in &self.q_indices {
-                        b_sum = b_sum + n[j] * n[k] * dq_term3_q(i, j, k);
-                    }
+            (&self.mu_indices, &self.q_indices)
+        };
+        let mut terms = Vec::with_capacity(family.len());
+        for &a in family {
+            let mut alpha = HyperDual::with_order(0.0, order);
+            let mut beta_linear = HyperDual::with_order(0.0, order);
+            let mut beta_quadratic = HyperDual::with_order(0.0, order);
+            for &b in opposite {
+                let weight = if opposite.len() == 1 {
+                    HyperDual::real(1.0)
+                } else {
+                    n[b]
+                };
+                let (i, j) = if quadrupoles { (b, a) } else { (a, b) };
+                alpha = alpha + weight * dq_term2(i, j);
+                for &k in opposite {
+                    let term = if quadrupoles {
+                        dq_term3_mu(i, k, j)
+                    } else {
+                        dq_term3_q(i, j, k)
+                    };
+                    beta_linear = beta_linear + weight * n[k] * term;
                 }
-                alpha.push(a_sum);
-                beta.push(b_sum);
+                for &k in family {
+                    let term = if quadrupoles {
+                        dq_term3_q(i, j, k)
+                    } else {
+                        dq_term3_mu(i, k, j)
+                    };
+                    beta_quadratic = beta_quadratic + weight * n[k] * term;
+                }
             }
-            self.pade_dq_family_sum(
-                false,
-                &self.mu_indices,
-                &self.q_indices,
-                n,
-                &alpha,
-                &beta,
-                same_direction,
-                order,
-            )
+            terms.push(DqFamilyTerm {
+                alpha,
+                beta_linear,
+                beta_quadratic,
+            });
+        }
+        let pade = self.pade_dq_family_sum(
+            quadrupoles,
+            family,
+            opposite,
+            n,
+            &terms,
+            same_direction,
+            order,
+        )?;
+        if opposite.len() == 1 {
+            Ok(n[opposite[0]] * pade)
+        } else {
+            Ok(pade)
         }
     }
 

@@ -42,6 +42,7 @@ jobs:
       - run: python -m unittest discover -s tools/rust_port -p test_mbwr_coexistence_audit.py
       - run: python -m unittest discover -s tools/rust_port -p test_quality_validation.py
       - run: python -m unittest discover -s tools/rust_port -p test_csp_lk_validators.py
+      - run: python -m unittest discover -s tools/rust_port -p test_pcsaft_validators.py
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test --all-targets
       - run: cargo test --release --tests
@@ -50,13 +51,14 @@ jobs:
         env:
           RUSTDOCFLAGS: '-D warnings'
       - run: python tools/rust_port/generate_data.py
+      - run: python tools/rust_port/generate_pcsaft_data.py
       - run: python tools/rust_port/generate_mbwr_data.py
       - run: python tools/rust_port/generate_unifac_data.py
       - run: python tools/rust_port/generate_solid_data.py
       - run: python tools/rust_port/generate_lj_meos_data.py
       - run: cargo fmt --all
       - run: python tools/rust_port/inventory.py
-      - run: git diff --exit-code -- rust/src/data.rs rust/src/mbwr_data.rs rust/src/unifac_data.rs rust/src/solid_data.rs rust/src/lj_meos_data.rs docs/rust/mbwr-data.json docs/rust/inventory.json
+      - run: git diff --exit-code -- rust/src/data.rs rust/src/pc_saft_data.rs rust/src/mbwr_data.rs rust/src/unifac_data.rs rust/src/solid_data.rs rust/src/lj_meos_data.rs docs/rust/mbwr-data.json docs/rust/inventory.json
 
   source-parity:
     runs-on: ubuntu-24.04
@@ -178,4 +180,5 @@ jobs:
       - run: python tools/rust_port/validate_translated_flash.py
       - run: python tools/rust_port/validate_lee_kesler.py
       - run: python tools/rust_port/validate_extcsp.py
+      - run: python tools/rust_port/validate_pcsaft.py
       - run: python tools/rust_port/verify_fixtures.py

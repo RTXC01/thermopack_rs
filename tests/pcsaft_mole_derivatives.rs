@@ -74,7 +74,7 @@ fn mole_derivatives_match_exact_fortran_source() {
         } else {
             PcSaftKind::PcSaft
         };
-        let model = match PcSaft::new_with_options(kind, &components, fields[6]) {
+        let model = match PcSaft::new_nonassoc(kind, &components, fields[6]) {
             Ok(model) => model,
             Err(error) => {
                 // The fit exists, but the public constructor also requires an

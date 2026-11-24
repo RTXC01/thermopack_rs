@@ -63,6 +63,8 @@ def generate():
             "acentric_factor: " + number(baseline['acf']),
             "rackett_factor: " + number(baseline['Zra']),
             "critical_compressibility: " + number(baseline['Zc']),
+            "mu_dipole: " + number(baseline.get('mu_dipole', 0.0)),
+            "q_quadrupole: " + number(baseline.get('q_quadrupole', 0.0)),
             "cp_type: " + str(int(cp['cptype']) if cp else 0),
             "cp: [" + ", ".join(map(number, coefficients)) + "]",
             "reference_enthalpy: " + number(baseline['href']),

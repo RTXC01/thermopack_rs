@@ -35,7 +35,12 @@ fn the_state_matches_the_source() {
         let composition: Vec<f64> = moles.iter().map(|amount| amount / total).collect();
         let rho = total / volume;
 
-        let model = thermopack_rs::PcSaft::new(&components).expect("the model of the case");
+        let model = thermopack_rs::PcSaft::new_nonassoc(
+            thermopack_rs::PcSaftKind::PcSaft,
+            &components,
+            "Default",
+        )
+        .expect("the model of the case");
         let prepared = model
             .prepare(temperature, &composition)
             .expect("the prepared state of the case");

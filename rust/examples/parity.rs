@@ -87,6 +87,115 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for line in io::stdin().lock().lines() {
         let line = line?;
         let fields: Vec<_> = line.split('|').collect();
+        if fields[0] == "PCSAFT_FULL" {
+            let kind = match fields[1] {
+                "PC-SAFT" => thermopack_rs::PcSaftKind::PcSaft,
+                "sPC-SAFT" => thermopack_rs::PcSaftKind::SPcSaft,
+                "PCP-SAFT" => thermopack_rs::PcSaftKind::PcpSaft,
+                "sPCP-SAFT" => thermopack_rs::PcSaftKind::SPcpSaft,
+                _ => return Err("unknown PCSAFT_FULL kind".into()),
+            };
+            let param_ref = fields[2];
+            let names: Vec<_> = fields[3].split(',').collect();
+            let t: f64 = fields[4].parse()?;
+            let p: f64 = fields[5].parse()?;
+            let v_tv: f64 = fields[6].parse()?;
+            let moles: Vec<f64> = fields[7].split(',').map(|v| v.parse().unwrap()).collect();
+            let sumn: f64 = moles.iter().sum();
+            let x: Vec<f64> = moles.iter().map(|&v| v / sumn).collect();
+            let phase = if fields[8] == "L" {
+                Phase::Liquid
+            } else {
+                Phase::Vapor
+            };
+            let model = thermopack_rs::PcSaft::new_with_options(kind, &names, param_ref)?;
+            let run = || -> thermopack_rs::Result<Vec<f64>> {
+                let mut values = Vec::new();
+                let f = model.residual_helmholtz_tv(t, v_tv, &moles)?;
+                values.extend([f.f, f.f_t, f.f_v]);
+                values.extend(f.f_n);
+                values.extend([f.f_tt, f.f_vv, f.f_tv]);
+                values.extend(f.f_tn);
+                values.extend(f.f_vn);
+                values.extend(f.f_nn);
+                values.extend(f.x_k);
+                // TV residual block uses raw extensive `moles`; TP state columns
+                // use normalized unit-mole `x = moles / sum(moles)` to match
+                // ThermoPack's TP oracle (raw non-unit-mole TP scaling is tested
+                // directly in `tests/pc_saft_assoc_polar.rs`).
+                let s = model.state_tp(t, p, &x, phase)?;
+                values.extend([
+                    s.compressibility_factor.value,
+                    s.compressibility_factor.dt,
+                    s.compressibility_factor.dp,
+                ]);
+                values.extend(s.compressibility_factor.dn);
+                values.extend([
+                    s.specific_volume.value,
+                    s.specific_volume.dt,
+                    s.specific_volume.dp,
+                ]);
+                values.extend(s.specific_volume.dn);
+                values.extend([
+                    s.residual_enthalpy.value,
+                    s.residual_enthalpy.dt,
+                    s.residual_enthalpy.dp,
+                ]);
+                values.extend(s.residual_enthalpy.dn);
+                values.extend([s.enthalpy.value, s.enthalpy.dt, s.enthalpy.dp]);
+                values.extend(s.enthalpy.dn);
+                values.extend([
+                    s.residual_entropy.value,
+                    s.residual_entropy.dt,
+                    s.residual_entropy.dp,
+                ]);
+                values.extend(s.residual_entropy.dn);
+                values.extend([s.entropy.value, s.entropy.dt, s.entropy.dp]);
+                values.extend(s.entropy.dn);
+                values.extend(s.ln_fugacity.ln_phi);
+                values.extend(s.ln_fugacity.dt);
+                values.extend(s.ln_fugacity.dp);
+                values.extend(s.ln_fugacity.dn);
+                values.push(s.speed_of_sound);
+                Ok(values)
+            };
+            match run() {
+                Ok(values) => println!(
+                    "{}",
+                    values
+                        .iter()
+                        .map(|v| format!("{v:.17e}"))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                ),
+                Err(e) => println!("ERROR:{e}"),
+            }
+            continue;
+        }
+        if fields[0] == "SPCSAFT_RDF" {
+            let names: Vec<_> = fields[1].split(',').collect();
+            let t: f64 = fields[2].parse()?;
+            let v: f64 = fields[3].parse()?;
+            let moles: Vec<f64> = fields[4].split(',').map(|v| v.parse().unwrap()).collect();
+            let model = thermopack_rs::PcSaft::new_simplified(&names)?;
+            let rdf = thermopack_rs::rdf::spcsaft_rdf(&model, t, v, &moles)?;
+            let mut values = vec![rdf.g, rdf.temperature, rdf.volume];
+            values.extend(rdf.moles);
+            values.extend([rdf.temperature_second, rdf.temperature_volume]);
+            values.extend(rdf.temperature_moles);
+            values.push(rdf.volume_second);
+            values.extend(rdf.volume_moles);
+            values.extend(rdf.moles_second);
+            println!(
+                "{}",
+                values
+                    .iter()
+                    .map(|v| format!("{v:.17e}"))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            );
+            continue;
+        }
         if fields[0] == "LEE_KESLER" {
             let names: Vec<_> = fields[1].split(',').collect();
             let reference = fields[2];
@@ -1312,7 +1421,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let total: f64 = moles.iter().sum();
             let composition: Vec<f64> = moles.iter().map(|amount| amount / total).collect();
             let rho = total / volume;
-            let model = thermopack_rs::PcSaft::new(&components)?;
+            let model = thermopack_rs::PcSaft::new_nonassoc(
+                thermopack_rs::PcSaftKind::PcSaft,
+                &components,
+                "Default",
+            )?;
             let prepared = model.prepare(temperature, &composition)?;
             let alpha = prepared.residual_helmholtz_energy(rho);
             let compressibility = prepared.compressibility_factor(rho);

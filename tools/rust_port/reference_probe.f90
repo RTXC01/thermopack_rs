@@ -2157,3 +2157,136 @@ subroutine query_lk_gdep(temperature,pressure,moles,phase,values,count) &
   values(3) = dgdp
   count = 3
 end subroutine query_lk_gdep
+
+! Evaluate full PC-SAFT / sPC-SAFT / PCP-SAFT / sPCP-SAFT reduced residual
+! Helmholtz energy (hard-chain + dispersion + association + multipolar)
+! and all 10 derivative blocks plus solved non-bonded site fractions X_k.
+subroutine query_pcsaft_full_fres(temperature,volume,moles,out_cap,values,count,nsites) &
+     bind(C,name='query_pcsaft_full_fres')
+  use, intrinsic :: iso_c_binding, only: c_int, c_double
+  use thermopack_var, only: nc, get_active_eos, base_eos_param
+  use pc_saft_nonassoc, only: sPCSAFT_eos
+  use saft_interface, only: calcSaftFder_res
+  use saft_association, only: numAssocSites
+  implicit none
+  real(c_double), value :: temperature, volume
+  real(c_double), intent(in) :: moles(16)
+  integer(c_int), value :: out_cap
+  real(c_double), intent(out) :: values(*)
+  integer(c_int), intent(out) :: count, nsites
+  ! Locals
+  class(base_eos_param), pointer :: eos
+  real :: F, F_T, F_V, F_TT, F_VV, F_TV
+  real, dimension(nc) :: n, F_n, F_Tn, F_Vn
+  real, dimension(nc,nc) :: F_nn
+  real, allocatable :: Xk(:)
+  integer :: i, j, pos, required, ns
+  if (nc < 1 .or. nc > 16) error stop 'query_pcsaft_full_fres: unsupported component count'
+  ns = numAssocSites
+  if (ns < 0 .or. ns > 64) error stop 'query_pcsaft_full_fres: unsupported association site count'
+  required = 6 + 3*nc + nc*nc + ns
+  if (int(out_cap) < required) error stop 'query_pcsaft_full_fres: output buffer too small'
+  eos => get_active_eos()
+  select type (p_eos => eos)
+  class is (sPCSAFT_eos)
+    do i = 1, nc
+      n(i) = moles(i)
+    end do
+    if (ns > 0) then
+      allocate(Xk(ns))
+      Xk = 1.0
+      call calcSaftFder_res(nc, p_eos, temperature, volume, n, F=F, F_T=F_T, F_V=F_V, &
+           F_n=F_n, F_TT=F_TT, F_TV=F_TV, F_VV=F_VV, F_Tn=F_Tn, F_Vn=F_Vn, F_nn=F_nn, Xk=Xk)
+    else
+      call calcSaftFder_res(nc, p_eos, temperature, volume, n, F=F, F_T=F_T, F_V=F_V, &
+           F_n=F_n, F_TT=F_TT, F_TV=F_TV, F_VV=F_VV, F_Tn=F_Tn, F_Vn=F_Vn, F_nn=F_nn)
+    end if
+  class default
+    error stop 'query_pcsaft_full_fres: active EOS is not PC-SAFT'
+  end select
+  pos = 1
+  values(pos) = F;    pos = pos + 1
+  values(pos) = F_T;  pos = pos + 1
+  values(pos) = F_V;  pos = pos + 1
+  do i = 1, nc
+    values(pos) = F_n(i); pos = pos + 1
+  end do
+  values(pos) = F_TT; pos = pos + 1
+  values(pos) = F_VV; pos = pos + 1
+  values(pos) = F_TV; pos = pos + 1
+  do i = 1, nc
+    values(pos) = F_Tn(i); pos = pos + 1
+  end do
+  do i = 1, nc
+    values(pos) = F_Vn(i); pos = pos + 1
+  end do
+  do i = 1, nc
+    do j = 1, nc
+      values(pos) = F_nn(i, j); pos = pos + 1
+    end do
+  end do
+  if (ns > 0) then
+    do i = 1, ns
+      values(pos) = Xk(i); pos = pos + 1
+    end do
+    deallocate(Xk)
+  end if
+  nsites = ns
+  count = pos - 1
+end subroutine query_pcsaft_full_fres
+
+! Evaluate simplified PC-SAFT (sPC-SAFT / sPCP-SAFT) contact radial distribution
+! function g and all 10 derivative blocks via saft_rdf::master_saft_rdf.
+subroutine query_spcsaft_rdf(temperature,volume,moles,out_cap,values,count) &
+     bind(C,name='query_spcsaft_rdf')
+  use, intrinsic :: iso_c_binding, only: c_int, c_double
+  use thermopack_var, only: nc, get_active_eos, base_eos_param
+  use pc_saft_nonassoc, only: sPCSAFT_eos
+  use saft_rdf, only: master_saft_rdf
+  implicit none
+  real(c_double), value :: temperature, volume
+  real(c_double), intent(in) :: moles(16)
+  integer(c_int), value :: out_cap
+  real(c_double), intent(out) :: values(*)
+  integer(c_int), intent(out) :: count
+  ! Locals
+  class(base_eos_param), pointer :: eos
+  real :: g, g_T, g_V, g_TT, g_TV, g_VV
+  real, dimension(nc) :: g_n, g_Tn, g_Vn
+  real, dimension(nc,nc) :: g_nn
+  integer :: i, j, pos, required
+  if (nc < 1 .or. nc > 16) error stop 'query_spcsaft_rdf: unsupported component count'
+  required = 6 + 3*nc + nc*nc
+  if (int(out_cap) < required) error stop 'query_spcsaft_rdf: output buffer too small'
+  eos => get_active_eos()
+  select type (p_eos => eos)
+  class is (sPCSAFT_eos)
+    call p_eos%assoc%state%init(nc, temperature, volume, moles(1:nc))
+    call master_saft_rdf(p_eos, nc, 1, 1, g, g_T=g_T, g_V=g_V, g_n=g_n, &
+         g_TT=g_TT, g_TV=g_TV, g_Tn=g_Tn, g_VV=g_VV, g_Vn=g_Vn, g_nn=g_nn)
+  class default
+    error stop 'query_spcsaft_rdf: active EOS is not sPCSAFT_eos'
+  end select
+  pos = 1
+  values(pos) = g;    pos = pos + 1
+  values(pos) = g_T;  pos = pos + 1
+  values(pos) = g_V;  pos = pos + 1
+  do i = 1, nc
+    values(pos) = g_n(i); pos = pos + 1
+  end do
+  values(pos) = g_TT; pos = pos + 1
+  values(pos) = g_TV; pos = pos + 1
+  do i = 1, nc
+    values(pos) = g_Tn(i); pos = pos + 1
+  end do
+  values(pos) = g_VV; pos = pos + 1
+  do i = 1, nc
+    values(pos) = g_Vn(i); pos = pos + 1
+  end do
+  do i = 1, nc
+    do j = 1, nc
+      values(pos) = g_nn(i, j); pos = pos + 1
+    end do
+  end do
+  count = pos - 1
+end subroutine query_spcsaft_rdf

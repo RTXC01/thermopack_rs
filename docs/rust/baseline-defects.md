@@ -548,3 +548,45 @@ variants (placing `H2S` first for the `PCP-SAFT` `"H2S,CO2"` case so Fortran's
 `"NH3,H2O"` in `sPCP-SAFT`), while `tests/pc_saft_assoc_polar.rs` independently
 verifies `PCP-SAFT` component-order symmetry, finite differences on associating
 `PCP-SAFT` mixtures, and zero-mole infinite-dilution cross-association.
+
+## SAFT-VR Mie upstream hard-sphere, FMT compatibility, and classical de Broglie defects
+
+Five upstream defects affect `src/saftvrmie_hardsphere.f90`,
+`src/saftvrmie_interface.f90`, `src/saftvrmie_options.f90`, and
+`src/saft_interface.f90` for SAFT-VR Mie / SAFT-VRQ Mie:
+
+1. `src/saftvrmie_hardsphere.f90:235` (`calc_hardsphere_extra_helmholtzenergy`):
+   the second volume derivative `a_VV` adds an extraneous
+   `+(2.0*pi/V**2)*n(i)*n(j)*term1*g*term3` term on top of the subsequent
+   `-a_V/V + a/V**2`, corrupting `F_VV` for `Additive` (`hs=3`) and
+   `AdditiveExact` (`hs=5`) mixtures (`nc > 1`) when `enable_hs_extra` is true.
+2. `src/saftvrmie_interface.f90:880,898` (`calc_saftvrmie_hard_sphere`): line
+   898 writes `F_TV = xs*Fhs_TV - Fhse_TV` (opposite sign on `Fhse_TV`; it
+   should be `+`), corrupting `F_TV` for `Additive`/`AdditiveExact` mixtures
+   with `enable_hs_extra`. In addition, line 880 unconditionally assigns
+   `F = xs*Fhs + Fhse` without checking `present(F)` even though `calc_saft_hard_sphere`
+   declares `a` optional, causing a segmentation fault if called without `a`.
+3. `src/saftvrmie_options.f90:282-285` (`test_fmt_compatibility`): when
+   `has_additive_hs_ref` is true and `na_enabled` (`enable_hs_extra`) is false,
+   `is_fmt_consistent` is never assigned (leaving an `intent(out)` logical
+   uninitialized).
+4. `src/saft_interface.f90:859-862` (`de_Broglie_wavelength`): checks
+   `if (mass < 0.0)` before falling back to `comp%mw / N_Avogadro`, whereas
+   classical `saftvrmie_datadb` components initialize `mass = 0.0`, causing a
+   divide-by-zero (`Infinity`) for classical SAFT-VR Mie components.
+5. `src/saft_association.f90:407-410` (`solve_for_X_k`, shared with PC-SAFT
+   above): sets `X_k = 1.0` at `n_i = 0`, breaking consistency between `F_n`
+   and finite differences of `F` for trace cross-associating components.
+   Separately, `src/saftvrmie_dispersion.f90:3209` (`KHS_EOS_SANTOS`) calls
+   `stoperror("KHS_EOS_SANTOS not yet implemented")` upstream and is omitted.
+
+Native `thermopack_rs::saft_vrmie::SaftVrMie` computes the mathematically exact
+`F_VV` and `F_TV`, returns `(true, false)` for additive non-extra FMT
+compatibility, falls back to molar mass when `mass <= 0.0`, and solves exact
+infinite-dilution `X_k` at `n_i = 0`. In `tools/rust_port/validate_saftvrmie.py`
+and `tests/saft_vrmie.rs`, the defective Fortran `F_VV` (and `F_TV` for
+`calc_saft_hard_sphere`) entries on `Additive`/`AdditiveExact` mixtures are
+qualified against central finite differences of Fortran's own `F_V` (passing
+`a` explicitly to avoid the null-pointer crash), and `tests/saft_vrmie.rs`
+independently verifies analytic derivatives, FMT compatibility combinations,
+and zero-mole infinite dilution.

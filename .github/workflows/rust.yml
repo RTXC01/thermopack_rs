@@ -52,13 +52,14 @@ jobs:
           RUSTDOCFLAGS: '-D warnings'
       - run: python tools/rust_port/generate_data.py
       - run: python tools/rust_port/generate_pcsaft_data.py
+      - run: python tools/rust_port/generate_saftvrmie_data.py
       - run: python tools/rust_port/generate_mbwr_data.py
       - run: python tools/rust_port/generate_unifac_data.py
       - run: python tools/rust_port/generate_solid_data.py
       - run: python tools/rust_port/generate_lj_meos_data.py
       - run: cargo fmt --all
       - run: python tools/rust_port/inventory.py
-      - run: git diff --exit-code -- rust/src/data.rs rust/src/pc_saft_data.rs rust/src/mbwr_data.rs rust/src/unifac_data.rs rust/src/solid_data.rs rust/src/lj_meos_data.rs docs/rust/mbwr-data.json docs/rust/inventory.json
+      - run: git diff --exit-code -- rust/src/data.rs rust/src/pc_saft_data.rs rust/src/saft_vrmie_data.rs rust/src/mbwr_data.rs rust/src/unifac_data.rs rust/src/solid_data.rs rust/src/lj_meos_data.rs docs/rust/mbwr-data.json docs/rust/inventory.json
 
   source-parity:
     runs-on: ubuntu-24.04
@@ -181,4 +182,5 @@ jobs:
       - run: python tools/rust_port/validate_lee_kesler.py
       - run: python tools/rust_port/validate_extcsp.py
       - run: python tools/rust_port/validate_pcsaft.py
+      - run: python tools/rust_port/validate_saftvrmie.py --compiler /usr/bin/gfortran-13
       - run: python tools/rust_port/verify_fixtures.py

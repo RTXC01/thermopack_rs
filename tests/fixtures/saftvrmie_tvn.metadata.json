@@ -1,6 +1,6 @@
 {
-  "cases": 64,
-  "fixture_sha256": "a328d8344bb2876a5a6366cd3179d28443d9a132657bb38014ba1e175c653ea4",
+  "cases": 66,
+  "fixture_sha256": "e391352e9b663e23d31d57a2f15a44e3c4cddd61df2969926016e2f0a2df9cb5",
   "probe_sha256": "cec335342df40e8887283a16e07ed6f5c0ed485d8091b197a71716429aed547d",
   "build": {
     "baseline": "d68c794",

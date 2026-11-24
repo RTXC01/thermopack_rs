@@ -73,6 +73,8 @@ def cases():
     yield case("H2O", 300, 0, "1", kind=6)
     yield case("H2O", 325, 0, "1", kind=6)
     yield case("H2O", 373.15, 0, "1", kind=6)
+    yield case("H2O", 679.0, 0, "1", kind=6)
+    yield case("H2O", 679.03, 0, "1", kind=6)
     yield case("CO2", 260, 0, "1", kind=6)
     # Pair potential (default 500*eps cap) and uncapped force: v = r / sigma_ij (kind=7)
     yield case("CO2", 260, 0.5, "1", kind=7)

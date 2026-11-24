@@ -58,6 +58,77 @@ const WK_21: [f64; 11] = [
     0.149445554002916905664936468389821,
 ];
 
+#[allow(clippy::excessive_precision)]
+const X_NODES_21: [f64; 21] = [
+    -XK_21[0], -XK_21[1], -XK_21[2], -XK_21[3], -XK_21[4], -XK_21[5], -XK_21[6], -XK_21[7],
+    -XK_21[8], -XK_21[9], XK_21[10], XK_21[9], XK_21[8], XK_21[7], XK_21[6], XK_21[5], XK_21[4],
+    XK_21[3], XK_21[2], XK_21[1], XK_21[0],
+];
+
+#[allow(clippy::excessive_precision)]
+const W_NODES_21: [f64; 21] = [
+    WK_21[0], WK_21[1], WK_21[2], WK_21[3], WK_21[4], WK_21[5], WK_21[6], WK_21[7], WK_21[8],
+    WK_21[9], WK_21[10], WK_21[9], WK_21[8], WK_21[7], WK_21[6], WK_21[5], WK_21[4], WK_21[3],
+    WK_21[2], WK_21[1], WK_21[0],
+];
+
+/// Evaluate `exp(-z) - 1 + z` without catastrophic cancellation for small `|z|`.
+#[inline]
+fn expm1_minus(z: f64) -> f64 {
+    if z.abs() < 1.0e-2 {
+        let z2 = z * z;
+        z2 * (0.5
+            - z * (1.0 / 6.0
+                - z * (1.0 / 24.0
+                    - z * (1.0 / 120.0 - z * (1.0 / 720.0 - z * (1.0 / 5040.0 - z / 40320.0))))))
+    } else {
+        (-z).exp_m1() + z
+    }
+}
+
+/// Evaluate the reduced Mie excess above the well minimum, `u*(r_min * (1 + tau)) + 1 >= 0`,
+/// without catastrophic cancellation near `tau = 0`.
+#[inline]
+fn mie_well_excess_tau(tau: f64, la: f64, lr: f64) -> f64 {
+    let ln_t = tau.ln_1p();
+    (la * expm1_minus(lr * ln_t) - lr * expm1_minus(la * ln_t)) / (lr - la)
+}
+
+/// Evaluate `d[u*(r_min - d)]/dd > 0` for `d > 0` without cancellation near `d = 0`.
+#[inline]
+fn mie_well_left_deriv(d: f64, r_min: f64, la: f64, lr: f64) -> f64 {
+    let tau = -d / r_min;
+    let ln_t = tau.ln_1p();
+    let r = r_min - d;
+    let pref = (la * lr) / ((lr - la) * r);
+    pref * (-la * ln_t).exp() * (-(lr - la) * ln_t).exp_m1()
+}
+
+/// Fast positive-exponent power avoiding `libm::pow` for exact small integers
+/// and sharing a single `ln(base)` across `(base^n, base^m)` when both are non-integer.
+#[inline(always)]
+fn pow_pos_pair(base: f64, n: f64, m: f64) -> (f64, f64) {
+    let n_int = (1.0..=64.0).contains(&n) && n == (n as i32) as f64;
+    let m_int = (1.0..=64.0).contains(&m) && m == (m as i32) as f64;
+    let eval_int = |b: f64, e: f64| -> f64 {
+        if e == 6.0 {
+            let b2 = b * b;
+            b2 * b2 * b2
+        } else {
+            b.powi(e as i32)
+        }
+    };
+    match (n_int, m_int) {
+        (true, true) => (eval_int(base, n), eval_int(base, m)),
+        (true, false) => (eval_int(base, n), (m * base.ln()).exp()),
+        (false, true) => ((n * base.ln()).exp(), eval_int(base, m)),
+        (false, false) => {
+            let ln_b = base.ln();
+            ((n * ln_b).exp(), (m * ln_b).exp())
+        }
+    }
+}
+
 // Effective packing fraction polynomial coefficients for Sutherland potential (row: 0..3, col: 0..3)
 const LAM_COEFF: [[f64; 4]; 4] = [
     [0.81096, 1.0205, -1.9057, 1.0885],
@@ -1151,7 +1222,7 @@ impl SaftVrMie {
             return Err(Error::InvalidInput("component index out of bounds"));
         }
         let dummy_x = vec![1.0 / nc as f64; nc];
-        let prep = PreparedSaftVrMie::new(self, temperature, &dummy_x)?;
+        let prep = PreparedSaftVrMie::new(self, temperature, dummy_x)?;
         let k = i * nc + j;
         Ok((prep.d[k], prep.d_t[k], prep.d_tt[k]))
     }
@@ -1169,7 +1240,7 @@ impl SaftVrMie {
             return Err(Error::InvalidInput("component index out of bounds"));
         }
         let dummy_x = vec![1.0 / nc as f64; nc];
-        let prep = PreparedSaftVrMie::new(self, temperature, &dummy_x)?;
+        let prep = PreparedSaftVrMie::new(self, temperature, dummy_x)?;
         let [v, vt, vtt] = prep.effective[i * nc + j].0;
         Ok((v, vt, vtt))
     }
@@ -1187,13 +1258,20 @@ impl SaftVrMie {
             return Err(Error::InvalidInput("component index out of bounds"));
         }
         let dummy_x = vec![1.0 / nc as f64; nc];
-        let prep = PreparedSaftVrMie::new(self, temperature, &dummy_x)?;
+        let prep = PreparedSaftVrMie::new(self, temperature, dummy_x)?;
         let [v, vt, vtt] = prep.effective[i * nc + j].1;
         Ok((v, vt, vtt))
     }
 
     /// Dimensionless van der Waals attractive energy matrix `alpha_ij(T)` (`nc x nc`),
     /// matching `saft_interface::alpha` (including truncated/shifted classical potentials).
+    ///
+    /// For shifted cutoffs, the inner shifted zero `sigma_eff` is certified
+    /// relative to the shifted well depth `eps_eff = u*(r_cut) + 1`, and shallow
+    /// wells (`eps_eff < 0.25`) integrate `1 - (u*(r) + 1) / eps_eff` directly
+    /// with 21-point Gauss-Kronrod quadrature on each side of `r_min` to avoid
+    /// catastrophic cancellation. Cutoffs at, below, or unresolvably close to
+    /// `r_min` (`r_cut - r_min <= 1e-12 * r_min`) return `Error::NotConverged`.
     pub fn alpha_vdw(&self, temperature: f64) -> Result<Vec<f64>> {
         positive(temperature, "temperature")?;
         let nc = self.num_components();
@@ -1210,82 +1288,97 @@ impl SaftVrMie {
                     let la = self.lambda_a_ij[idx];
                     let lr = self.lambda_r_ij[idx];
                     let c = self.c_ij[idx];
-                    let (sigma_eff, eps_eff, u_cut) = if shift {
+                    let a = if shift {
                         let r_min = (lr / la).powf(1.0 / (lr - la));
-                        let u_cut = c * (r_cut.powf(-la) - r_cut.powf(-lr));
-                        let eps_eff = 1.0 - u_cut;
-                        if !r_min.is_finite()
-                            || r_cut <= r_min
-                            || !u_cut.is_finite()
-                            || u_cut <= 0.0
-                            || !eps_eff.is_finite()
-                            || eps_eff <= 0.0
+                        let delta_c = r_cut - r_min;
+                        if !r_min.is_finite() || !delta_c.is_finite() || delta_c <= 1.0e-12 * r_min
                         {
                             return Err(Error::NotConverged(
-                                "cannot solve shifted potential zero for cutoff radius",
+                                "cannot resolve shifted potential well for cutoff radius",
                             ));
                         }
-                        // Solve f(rs) = c * (rs^-lr - rs^-la) + u_cut = 0 on (1.0, r_min),
-                        // where f(1.0) = u_cut > 0 and f(r_min) = -eps_eff < 0.
-                        let mut lo = 1.0_f64;
-                        let mut hi = r_min;
-                        let mut rs = 1.0_f64;
+                        let eps_eff = mie_well_excess_tau(delta_c / r_min, la, lr);
+                        if !eps_eff.is_finite() || eps_eff <= 0.0 || eps_eff >= 1.0 {
+                            return Err(Error::NotConverged(
+                                "cannot resolve shifted potential well depth for cutoff radius",
+                            ));
+                        }
+                        // Solve g(d) = (u*(r_min - d) + 1) - eps_eff = 0 for the positive
+                        // offset d = r_min - sigma_eff in (0, r_min - 1), avoiding catastrophic
+                        // subtraction of rs - r_min for shallow wells.
+                        let d_max = r_min - 1.0;
+                        let mut lo = 0.0_f64;
+                        let mut hi = d_max;
+                        let mut d_s = delta_c.min(0.5 * d_max);
                         let mut converged = false;
-                        for _ in 0..40 {
-                            let inv = 1.0 / rs;
-                            let r_r = inv.powf(lr);
-                            let r_a = inv.powf(la);
-                            let f = c * (r_r - r_a) + u_cut;
-                            if f.abs() <= 1e-13 {
+                        for _ in 0..60 {
+                            let f = mie_well_excess_tau(-d_s / r_min, la, lr) - eps_eff;
+                            if f.abs() <= 1.0e-13 * eps_eff {
                                 converged = true;
                                 break;
                             }
-                            if f > 0.0 {
-                                lo = rs;
+                            if f < 0.0 {
+                                lo = d_s;
                             } else {
-                                hi = rs;
+                                hi = d_s;
                             }
-                            let df = c * (-lr * r_r + la * r_a) * inv;
-                            let d2f =
-                                c * (lr * (lr + 1.0) * r_r - la * (la + 1.0) * r_a) * inv * inv;
-                            let mut next = if df.is_finite() && df != 0.0 {
-                                let step = -f / df * (1.0 + f * d2f / (2.0 * df * df));
-                                rs + step
+                            let df = mie_well_left_deriv(d_s, r_min, la, lr);
+                            let mut next = if df.is_finite() && df > 0.0 {
+                                d_s - f / df
                             } else {
                                 0.5 * (lo + hi)
                             };
                             if !next.is_finite() || next <= lo || next >= hi {
                                 next = 0.5 * (lo + hi);
                             }
-                            let delta = (next - rs).abs();
-                            rs = next;
-                            if delta <= 1e-14 * rs {
-                                let inv_chk = 1.0 / rs;
-                                let f_chk = c * (inv_chk.powf(lr) - inv_chk.powf(la)) + u_cut;
-                                converged = f_chk.is_finite() && f_chk.abs() <= 1e-12;
+                            let step = (next - d_s).abs();
+                            d_s = next;
+                            if step <= 1.0e-14 * d_s || (hi - lo) <= 1.0e-14 * d_s {
+                                let f_chk = mie_well_excess_tau(-d_s / r_min, la, lr) - eps_eff;
+                                converged = f_chk.is_finite() && f_chk.abs() <= 1.0e-11 * eps_eff;
                                 break;
                             }
                         }
-                        if !converged || !rs.is_finite() || rs <= 0.0 {
+                        if !converged || !d_s.is_finite() || d_s <= 0.0 || d_s >= d_max {
                             return Err(Error::NotConverged(
                                 "cannot solve shifted potential zero for cutoff radius",
                             ));
                         }
-                        (rs, eps_eff, u_cut)
+                        let sigma_eff = r_min - d_s;
+                        if eps_eff < 0.25 {
+                            // Integrate the strictly positive integrand
+                            // (1 - (u*(r_min + x) + 1) / eps_eff) * (r_min + x)^2 over
+                            // x in [-d_s, 0] and [0, delta_c] with 21-point Gauss-Kronrod.
+                            let quad_x = |x_lo: f64, x_hi: f64| -> f64 {
+                                let mid = 0.5 * (x_lo + x_hi);
+                                let half = 0.5 * (x_hi - x_lo);
+                                let mut acc = 0.0;
+                                for k in 0..21 {
+                                    let x = mid + half * X_NODES_21[k];
+                                    let r = r_min + x;
+                                    let excess = mie_well_excess_tau(x / r_min, la, lr);
+                                    let depth = (1.0 - excess / eps_eff).max(0.0);
+                                    acc += W_NODES_21[k] * depth * r * r;
+                                }
+                                half * acc
+                            };
+                            (quad_x(-d_s, 0.0) + quad_x(0.0, delta_c)) / sigma_eff.powi(3)
+                        } else {
+                            let u_cut = 1.0 - eps_eff;
+                            let num = c / (sigma_eff.powf(la - 3.0) * (la - 3.0))
+                                - c / (sigma_eff.powf(lr - 3.0) * (lr - 3.0))
+                                + c / (r_cut.powf(lr - 3.0) * (lr - 3.0))
+                                - c / (r_cut.powf(la - 3.0) * (la - 3.0))
+                                - u_cut * (r_cut.powi(3) - sigma_eff.powi(3)) / 3.0;
+                            num / (eps_eff * sigma_eff.powi(3))
+                        }
                     } else {
-                        (1.0, 1.0, 0.0)
+                        c / (la - 3.0) - c / (lr - 3.0) + c / (r_cut.powf(lr - 3.0) * (lr - 3.0))
+                            - c / (r_cut.powf(la - 3.0) * (la - 3.0))
                     };
-                    let mut a = c / (sigma_eff.powf(la - 3.0) * (la - 3.0))
-                        - c / (sigma_eff.powf(lr - 3.0) * (lr - 3.0))
-                        + c / (r_cut.powf(lr - 3.0) * (lr - 3.0))
-                        - c / (r_cut.powf(la - 3.0) * (la - 3.0));
-                    if shift {
-                        a -= u_cut * (r_cut.powi(3) - sigma_eff.powi(3)) / 3.0;
-                    }
-                    a /= eps_eff * sigma_eff.powi(3);
-                    if !a.is_finite() {
+                    if !a.is_finite() || (shift && a <= 0.0) {
                         return Err(Error::NotConverged(
-                            "non-finite truncated van der Waals alpha parameter",
+                            "non-finite or non-positive truncated van der Waals alpha parameter",
                         ));
                     }
                     out[idx] = a;
@@ -1300,7 +1393,7 @@ impl SaftVrMie {
         }
 
         let dummy_x = vec![1.0 / nc as f64; nc];
-        let prep = PreparedSaftVrMie::new(self, temperature, &dummy_x)?;
+        let prep = PreparedSaftVrMie::new(self, temperature, dummy_x)?;
         let mut out = vec![0.0; nc * nc];
         for i in 0..nc {
             for j in i..nc {
@@ -1553,6 +1646,7 @@ impl SaftVrMie {
         &self.components
     }
 
+    #[inline(always)]
     fn potential(&self, i: usize, j: usize) -> PairPotential {
         let k = i * self.num_components() + j;
         PairPotential {
@@ -1712,7 +1806,7 @@ impl SaftVrMie {
         }
         let x: Vec<f64> = mole_fractions.iter().map(|&v| v / sum_x).collect();
 
-        PreparedSaftVrMie::new(self, temperature, &x)
+        PreparedSaftVrMie::new(self, temperature, x)
     }
 }
 
@@ -1735,14 +1829,19 @@ pub struct PreparedSaftVrMie<'a> {
 }
 
 impl<'a> PreparedSaftVrMie<'a> {
-    fn new(model: &'a SaftVrMie, temperature: f64, x: &[f64]) -> Result<Self> {
+    fn new(model: &'a SaftVrMie, temperature: f64, x: Vec<f64>) -> Result<Self> {
         let nc = model.num_components();
         let mut d = vec![0.0; nc * nc];
         let mut d_t = vec![0.0; nc * nc];
         let mut d_tt = vec![0.0; nc * nc];
 
         let extra = model.options.extra_hard_sphere;
-        let mut exact_d = vec![[0.; 3]; nc * nc];
+        let need_exact_d = extra && nc > 1;
+        let mut exact_d = if need_exact_d {
+            vec![[0.; 3]; nc * nc]
+        } else {
+            Vec::new()
+        };
         let mut effective = vec![([0.; 3], [0.; 3]); nc * nc];
         for i in 0..nc {
             for j in i..nc {
@@ -1798,23 +1897,40 @@ impl<'a> PreparedSaftVrMie<'a> {
                     }
                     effective[j * nc + i] = effective[k];
                 }
-                if i == j || model.exact_binary_dhs || extra {
+                if i == j || model.exact_binary_dhs || need_exact_d {
                     let [se, st, stt] = effective[k].0;
                     let (v, vt, vtt) =
                         model.potential(i, j).diameter(temperature, (se, st, stt))?;
-                    exact_d[k] = [v, vt, vtt];
-                    exact_d[j * nc + i] = exact_d[k];
+                    if need_exact_d {
+                        exact_d[k] = [v, vt, vtt];
+                        exact_d[j * nc + i] = exact_d[k];
+                    }
+                    if i == j || model.exact_binary_dhs {
+                        d[k] = v;
+                        d_t[k] = vt;
+                        d_tt[k] = vtt;
+                        let sym = j * nc + i;
+                        d[sym] = v;
+                        d_t[sym] = vt;
+                        d_tt[sym] = vtt;
+                    }
                 }
             }
         }
-        for i in 0..nc {
-            for j in 0..nc {
-                let k = i * nc + j;
-                [d[k], d_t[k], d_tt[k]] = if model.exact_binary_dhs || i == j {
-                    exact_d[k]
-                } else {
-                    std::array::from_fn(|a| 0.5 * (exact_d[i * nc + i][a] + exact_d[j * nc + j][a]))
-                };
+        if !model.exact_binary_dhs {
+            for i in 0..nc {
+                let ii = i * nc + i;
+                for j in i + 1..nc {
+                    let jj = j * nc + j;
+                    let k = i * nc + j;
+                    let sym = j * nc + i;
+                    d[k] = 0.5 * (d[ii] + d[jj]);
+                    d_t[k] = 0.5 * (d_t[ii] + d_t[jj]);
+                    d_tt[k] = 0.5 * (d_tt[ii] + d_tt[jj]);
+                    d[sym] = d[k];
+                    d_t[sym] = d_t[k];
+                    d_tt[sym] = d_tt[k];
+                }
             }
         }
 
@@ -1868,7 +1984,7 @@ impl<'a> PreparedSaftVrMie<'a> {
         Ok(Self {
             model,
             temperature,
-            mole_fractions: x.to_vec(),
+            mole_fractions: x,
             d,
             d_t,
             d_tt,
@@ -2221,9 +2337,11 @@ impl<'a> PreparedSaftVrMie<'a> {
             jet = self.pressure_and_derivatives(1.0 / v)?;
             f = (1.0 - zeta) * (jet.pressure - pressure_target);
 
-            let v_converged = (v - v_old).abs() < 1e5 * MACHINE_PREC * v_old;
-            let p_converged = jet.pressure.is_finite()
-                && (jet.pressure - pressure_target).abs() < 1e8 * MACHINE_PREC * pressure_target;
+            let v_converged = (v - v_old).abs() <= 1e2 * MACHINE_PREC * v_old;
+            let p_tol = (1e5 * MACHINE_PREC * pressure_target)
+                .max(1e2 * MACHINE_PREC * (jet.dp_dv * v).abs());
+            let p_converged =
+                jet.pressure.is_finite() && (jet.pressure - pressure_target).abs() <= p_tol;
 
             if v_converged && p_converged {
                 return Ok(v);
@@ -2247,6 +2365,256 @@ impl<'a> PreparedSaftVrMie<'a> {
                 "SAFT-VR Mie volume solver did not converge",
             ))
         }
+    }
+
+    /// Solve `P(conv_eta / zeta) = pressure_target` strictly within a monotone
+    /// branch bracket `[zeta_lo, zeta_hi]`.
+    fn volume_in_zeta_bracket(
+        &self,
+        pressure_target: f64,
+        mut zeta_min: f64,
+        mut zeta_max: f64,
+        zeta_init: f64,
+    ) -> Result<f64> {
+        let conv_eta = self.conv_eta;
+        let mut zeta = zeta_init.clamp(zeta_min, zeta_max);
+        let mut v = conv_eta / zeta;
+        if !v.is_finite() || v <= 0.0 || !(1.0 / v).is_finite() || (1.0 / v) <= 0.0 {
+            return Err(Error::NotConverged(
+                "SAFT-VR Mie volume target exceeded representable molar volume",
+            ));
+        }
+        let mut jet = self.pressure_and_derivatives(1.0 / v)?;
+        let mut f = (1.0 - zeta) * (jet.pressure - pressure_target);
+
+        let max_iter = 80;
+        for _ in 0..max_iter {
+            let df_dzeta = pressure_target - jet.pressure - ((1.0 - zeta) / zeta) * jet.dp_dv * v;
+            let mut zeta_new = if df_dzeta.is_finite() && df_dzeta != 0.0 {
+                zeta - f / df_dzeta
+            } else {
+                0.5 * (zeta_max + zeta_min)
+            };
+
+            if zeta_new > zeta_max || zeta_new < zeta_min || !zeta_new.is_finite() {
+                zeta_new = 0.5 * (zeta_max + zeta_min);
+            }
+
+            let v_old = v;
+            zeta = zeta_new;
+            v = conv_eta / zeta;
+            if !v.is_finite() || v <= 0.0 || !(1.0 / v).is_finite() || (1.0 / v) <= 0.0 {
+                return Err(Error::NotConverged(
+                    "SAFT-VR Mie volume solver left representable molar volume range",
+                ));
+            }
+
+            jet = self.pressure_and_derivatives(1.0 / v)?;
+            f = (1.0 - zeta) * (jet.pressure - pressure_target);
+
+            let v_converged = (v - v_old).abs() <= 1e2 * MACHINE_PREC * v_old;
+            let p_tol = (1e5 * MACHINE_PREC * pressure_target)
+                .max(1e2 * MACHINE_PREC * (jet.dp_dv * v).abs());
+            let p_converged =
+                jet.pressure.is_finite() && (jet.pressure - pressure_target).abs() <= p_tol;
+
+            if v_converged && p_converged {
+                return Ok(v);
+            }
+
+            if f > 0.0 {
+                zeta_max = zeta;
+            } else if f < 0.0 {
+                zeta_min = zeta;
+            }
+        }
+
+        if v.is_finite()
+            && v > 0.0
+            && jet.pressure.is_finite()
+            && (jet.pressure - pressure_target).abs() <= 1e-6 * pressure_target
+        {
+            Ok(v)
+        } else {
+            Err(Error::NotConverged(
+                "SAFT-VR Mie volume solver did not converge",
+            ))
+        }
+    }
+
+    /// Locate the mechanical spinodals on this pure-fluid isotherm by searching
+    /// for `dP/drho < 0` in the physical fluid packing range (`eta <= 0.56`,
+    /// staying below unphysical high-packing association/dispersion polynomial poles).
+    ///
+    /// Returns `Ok(None)` when `dP/drho >= 0` everywhere (supercritical state,
+    /// where vapor-liquid coexistence does not exist).
+    fn locate_spinodals(&self) -> Result<Option<IsothermSpinodals>> {
+        let conv_eta = self.conv_eta;
+        let dp_drho_at = |eta: f64| -> Result<f64> {
+            Ok(self.pressure_and_derivatives(eta / conv_eta)?.dp_drho)
+        };
+
+        // Scan across the physical fluid packing range to spot or bracket the
+        // fluid-phase minimum of dP/drho without stepping into unphysical high-eta poles.
+        const N_GRID: usize = 40;
+        let eta_lo = 0.005_f64;
+        let eta_hi = 0.56_f64;
+        let mut grid_eta = [0.0_f64; N_GRID];
+        let mut grid_dp = [0.0_f64; N_GRID];
+        let mut min_idx = 0usize;
+        let mut min_dp = f64::INFINITY;
+        for k in 0..N_GRID {
+            let eta = eta_lo + (eta_hi - eta_lo) * (k as f64) / ((N_GRID - 1) as f64);
+            let dp = dp_drho_at(eta)?;
+            grid_eta[k] = eta;
+            grid_dp[k] = dp;
+            if dp < min_dp {
+                min_dp = dp;
+                min_idx = k;
+            }
+        }
+
+        let mut eta_mid = if min_dp < 0.0 {
+            Some(grid_eta[min_idx])
+        } else {
+            None
+        };
+
+        // If no coarse point was negative, minimize dP/drho around min_idx via
+        // golden-section search to catch narrow near-critical unstable loops.
+        if eta_mid.is_none() {
+            let mut a = if min_idx > 0 {
+                grid_eta[min_idx - 1]
+            } else {
+                1.0e-4
+            };
+            let mut b = if min_idx + 1 < N_GRID {
+                grid_eta[min_idx + 1]
+            } else {
+                0.58
+            };
+            let inv_phi = 0.5 * (5.0_f64.sqrt() - 1.0);
+            let mut c = b - inv_phi * (b - a);
+            let mut d = a + inv_phi * (b - a);
+            let mut fc = dp_drho_at(c)?;
+            let mut fd = dp_drho_at(d)?;
+            for _ in 0..55 {
+                if fc < 0.0 {
+                    eta_mid = Some(c);
+                    break;
+                }
+                if fd < 0.0 {
+                    eta_mid = Some(d);
+                    break;
+                }
+                if (b - a) <= 1.0e-10 * b {
+                    break;
+                }
+                if fc < fd {
+                    b = d;
+                    d = c;
+                    fd = fc;
+                    c = b - inv_phi * (b - a);
+                    fc = dp_drho_at(c)?;
+                } else {
+                    a = c;
+                    c = d;
+                    fc = fd;
+                    d = a + inv_phi * (b - a);
+                    fd = dp_drho_at(d)?;
+                }
+            }
+        }
+
+        let Some(eta_unstable) = eta_mid else {
+            return Ok(None);
+        };
+
+        // Vapor spinodal (local P maximum): dP/drho crosses + -> - on (0, eta_unstable).
+        let mut lo_v = 1.0e-8_f64.min(0.1 * eta_unstable);
+        while dp_drho_at(lo_v)? <= 0.0 && lo_v > 1.0e-30 {
+            lo_v *= 0.1;
+        }
+        let mut hi_v = eta_unstable;
+        for _ in 0..64 {
+            if (hi_v - lo_v) <= 1.0e-12 * hi_v {
+                break;
+            }
+            let mid = 0.5 * (lo_v + hi_v);
+            if dp_drho_at(mid)? > 0.0 {
+                lo_v = mid;
+            } else {
+                hi_v = mid;
+            }
+        }
+        let eta_spin_v = lo_v;
+        let p_max = self
+            .pressure_and_derivatives(eta_spin_v / conv_eta)?
+            .pressure;
+
+        // Liquid spinodal (local P minimum): find the first positive-dP/drho grid point
+        // strictly above eta_unstable, staying below any unphysical high-packing pole.
+        let mut lo_l = eta_unstable;
+        let mut hi_l = None;
+        for k in 0..N_GRID {
+            if grid_eta[k] > eta_unstable && grid_dp[k] > 0.0 {
+                hi_l = Some(grid_eta[k]);
+                break;
+            }
+        }
+        let mut hi_l = match hi_l {
+            Some(eta) => eta,
+            None => {
+                let mut probe = (eta_unstable + 0.02).min(0.58);
+                while probe < 0.72 && dp_drho_at(probe)? <= 0.0 {
+                    probe += 0.02;
+                }
+                if dp_drho_at(probe)? <= 0.0 {
+                    return Ok(None);
+                }
+                probe
+            }
+        };
+        for _ in 0..64 {
+            if (hi_l - lo_l) <= 1.0e-12 * hi_l {
+                break;
+            }
+            let mid = 0.5 * (lo_l + hi_l);
+            if dp_drho_at(mid)? < 0.0 {
+                lo_l = mid;
+            } else {
+                hi_l = mid;
+            }
+        }
+        let eta_spin_l = hi_l;
+        let p_min = self
+            .pressure_and_derivatives(eta_spin_l / conv_eta)?
+            .pressure;
+
+        // Choose a safe upper liquid-branch packing bound where dP/drho > 0 and P > p_max.
+        let mut eta_l_max = eta_spin_l;
+        for k in 0..N_GRID {
+            if grid_eta[k] > eta_spin_l {
+                if grid_dp[k] <= 0.0 {
+                    break;
+                }
+                eta_l_max = grid_eta[k];
+            }
+        }
+        if eta_l_max <= eta_spin_l {
+            eta_l_max = (eta_spin_l + 0.05).min(0.72);
+        }
+
+        if !p_max.is_finite() || !p_min.is_finite() || p_max <= 0.0 || p_max <= p_min {
+            return Ok(None);
+        }
+        Ok(Some(IsothermSpinodals {
+            eta_v: eta_spin_v,
+            p_max,
+            eta_l: eta_spin_l,
+            p_min,
+            eta_l_max,
+        }))
     }
 
     /// Pure-fluid saturation pressure at temperature T.
@@ -2277,43 +2645,58 @@ impl<'a> PreparedSaftVrMie<'a> {
 
         let mut p_lo: Option<f64> = None;
         let mut p_hi: Option<f64> = None;
+        let mut spinodals: Option<IsothermSpinodals> = None;
         let max_iter = 60;
 
         for _ in 0..max_iter {
-            let vl = match prep.volume(p, Phase::Liquid) {
-                Ok(v) => v,
-                Err(_) => {
-                    p_lo = Some(p_lo.map_or(p, |lo| lo.max(p)));
-                    p = p_hi.map_or(p * 1.5, |hi| (p * hi).sqrt());
-                    continue;
+            let (vl, vv) = if let Some(sp) = spinodals {
+                let zeta_ideal = prep.conv_eta * p / (RGAS * temperature);
+                let zeta_min_v = (1.0e-10_f64)
+                    .min(0.1 * zeta_ideal)
+                    .max(1.0e-140)
+                    .min(0.5 * sp.eta_v);
+                let vl = prep.volume_in_zeta_bracket(
+                    p,
+                    sp.eta_l,
+                    sp.eta_l_max,
+                    0.5 * (sp.eta_l + sp.eta_l_max),
+                )?;
+                let vv = prep.volume_in_zeta_bracket(
+                    p,
+                    zeta_min_v,
+                    sp.eta_v,
+                    zeta_ideal.clamp(zeta_min_v, 0.9 * sp.eta_v),
+                )?;
+                (vl, vv)
+            } else {
+                let vl_res = prep.volume(p, Phase::Liquid);
+                let vv_res = prep.volume(p, Phase::Vapor);
+                match (vl_res, vv_res) {
+                    (Ok(vl), Ok(vv)) if vv > vl && (vv - vl) > 1e-10 * vl => (vl, vv),
+                    _ => {
+                        // Switch to exact mechanical spinodal bounds so near-critical
+                        // coexistence is preserved and supercritical states are rejected.
+                        let Some(sp) = prep.locate_spinodals()? else {
+                            return Err(Error::NotConverged(
+                                "supercritical temperature: no vapor-liquid coexistence",
+                            ));
+                        };
+                        spinodals = Some(sp);
+                        if sp.p_min > 0.0 {
+                            p_lo = Some(p_lo.map_or(sp.p_min, |lo| lo.max(sp.p_min)));
+                        }
+                        p_hi = Some(p_hi.map_or(sp.p_max, |hi| hi.min(sp.p_max)));
+                        p = if sp.p_min > 0.0 {
+                            0.5 * (sp.p_min + sp.p_max)
+                        } else if p <= 0.0 || p >= sp.p_max {
+                            0.5 * sp.p_max
+                        } else {
+                            p
+                        };
+                        continue;
+                    }
                 }
             };
-            let vv = match prep.volume(p, Phase::Vapor) {
-                Ok(v) => v,
-                Err(_) => {
-                    p_hi = Some(p_hi.map_or(p, |hi| hi.min(p)));
-                    p = p_lo.map_or(p * 0.5, |lo| (lo * p).sqrt());
-                    continue;
-                }
-            };
-
-            if (vv - vl).abs() < 1e-10 * vl {
-                if prep.packing_fraction(1.0 / vl) > 0.15 {
-                    p_hi = Some(p_hi.map_or(p, |hi| hi.min(p)));
-                    p = p_lo.map_or(p * 0.5, |lo| (lo * p).sqrt());
-                } else {
-                    p_lo = Some(p_lo.map_or(p, |lo| lo.max(p)));
-                    p = p_hi.map_or(p * 2.0, |hi| (p * hi).sqrt());
-                }
-                if let (Some(lo), Some(hi)) = (p_lo, p_hi)
-                    && (hi - lo) <= 1e-12 * hi
-                {
-                    return Err(Error::NotConverged(
-                        "liquid and vapor volumes converged to the same critical root",
-                    ));
-                }
-                continue;
-            }
 
             let dg = prep.imposed_pressure_gibbs_diff(p, vl, vv)?;
             if dg > 0.0 {
@@ -2324,17 +2707,24 @@ impl<'a> PreparedSaftVrMie<'a> {
 
             let d_dg_dlnp = p * (vl - vv) / (RGAS * temperature);
             let d_ln_p = -dg / d_dg_dlnp;
-            if dg.abs() < 1e-11 && d_ln_p.abs() < 1e-10 {
+            let bracket_tight =
+                matches!((p_lo, p_hi), (Some(lo), Some(hi)) if (hi - lo) <= 1e-13 * hi);
+            if (dg.abs() < 1e-13 && d_ln_p.abs() < 1e-12) || (bracket_tight && dg.abs() < 1e-10) {
                 let state_l = prep.state(1.0 / vl)?;
                 let state_v = prep.state(1.0 / vv)?;
-                return Ok(SaftVrMieSaturation {
-                    pressure: p,
-                    temperature,
-                    liquid_volume: vl,
-                    vapor_volume: vv,
-                    enthalpy_vaporization: state_v.h_total - state_l.h_total,
-                    entropy_vaporization: state_v.s_total - state_l.s_total,
-                });
+                if vl < vv && state_l.dp_drho > 0.0 && state_v.dp_drho > 0.0 {
+                    return Ok(SaftVrMieSaturation {
+                        pressure: p,
+                        temperature,
+                        liquid_volume: vl,
+                        vapor_volume: vv,
+                        enthalpy_vaporization: state_v.h_total - state_l.h_total,
+                        entropy_vaporization: state_v.s_total - state_l.s_total,
+                    });
+                }
+                return Err(Error::NotConverged(
+                    "saturation roots failed mechanical stability check",
+                ));
             }
 
             let mut p_next = if d_ln_p.is_finite() {
@@ -2348,6 +2738,7 @@ impl<'a> PreparedSaftVrMie<'a> {
                 || p_hi.is_some_and(|hi| p_next >= hi)
             {
                 p_next = match (p_lo, p_hi) {
+                    (Some(lo), Some(hi)) if hi <= 10.0 * lo => 0.5 * (lo + hi),
                     (Some(lo), Some(hi)) => (lo * hi).sqrt(),
                     _ => p * d_ln_p.clamp(-1.0, 1.0).exp(),
                 };
@@ -2364,6 +2755,15 @@ impl<'a> PreparedSaftVrMie<'a> {
 // ----------------------------------------------------------------------------
 // Internal numerical & potential helper routines
 // ----------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy)]
+struct IsothermSpinodals {
+    eta_v: f64,
+    p_max: f64,
+    eta_l: f64,
+    p_min: f64,
+    eta_l_max: f64,
+}
 
 #[derive(Debug, Clone, Copy)]
 struct MiePot {
@@ -2387,6 +2787,26 @@ struct PairPotential {
     second_factor: f64,
 }
 impl PairPotential {
+    #[inline(always)]
+    fn evaluate_classical(self, r: f64) -> (f64, f64, f64) {
+        let n = self.lambda_r;
+        let m = self.lambda_a;
+        let en_r = 1.0 / r;
+        let r1 = self.sigma * en_r;
+        let (r_n, r_m) = pow_pos_pair(r1, n, m);
+        let dr_n = -n * r_n * en_r;
+        let dr_m = -m * r_m * en_r;
+        let d2r_n = -(n + 1.0) * dr_n * en_r;
+        let d2r_m = -(m + 1.0) * dr_m * en_r;
+        let pref = self.c_fac * self.eps_depth_divk;
+        (
+            (r_n - r_m) * pref,
+            (dr_n - dr_m) * pref,
+            (d2r_n - d2r_m) * pref,
+        )
+    }
+
+    #[inline(always)]
     fn evaluate(self, r: f64, temperature: f64) -> MiePot {
         let Self {
             sigma,
@@ -2403,8 +2823,7 @@ impl PairPotential {
         let en_r = 1.0 / r;
         let r1 = sigma * en_r;
 
-        let r_n = r1.powf(n);
-        let r_m = r1.powf(m);
+        let (r_n, r_m) = pow_pos_pair(r1, n, m);
         let dr_n = -n * r_n * en_r;
         let dr_m = -m * r_m * en_r;
         let d2r_n = -(n + 1.0) * dr_n * en_r;
@@ -2475,6 +2894,7 @@ impl PairPotential {
         }
     }
 
+    #[inline]
     fn effective_sigma(self, temperature: f64) -> (f64, f64, f64) {
         let sigma = self.sigma;
         let fh_order = self.fh_order;
@@ -2502,20 +2922,93 @@ impl PairPotential {
         }
     }
 
+    // Keep diameter self-contained so LLVM always optimizes its inner 21-point
+    // Gauss-Kronrod loop independently of unrelated callers in this module.
+    #[inline(never)]
     fn diameter(
         self,
         temperature: f64,
         (sigma_eff, sig_t, sig_tt): (f64, f64, f64),
     ) -> Result<(f64, f64, f64)> {
-        // 2. Solve r0 (where exp(-beta u(r0)) = machine_prec)
         let ln_eps = MACHINE_PREC.ln();
+        let inv_t = 1.0 / temperature;
+        let inv_t2 = inv_t * inv_t;
+        let inv_t3 = inv_t2 * inv_t;
+
+        if self.fh_order == 0 {
+            // Classical Mie fast path: u_t = u_tt = u_tr = 0 and sig_t = sig_tt = 0.
+            let mut rs = 0.70;
+            for _ in 0..25 {
+                let r = rs * sigma_eff;
+                let (u, u_r, u_rr) = self.evaluate_classical(r);
+                let f = u * inv_t + ln_eps;
+                let df = sigma_eff * u_r * inv_t;
+                let d2f = sigma_eff * sigma_eff * u_rr * inv_t;
+                let step = -f / df * (1.0 + f * d2f / (2.0 * df * df));
+                rs += step;
+                if step.abs() < 1e-15 {
+                    break;
+                }
+            }
+
+            let r0 = rs * sigma_eff;
+            let (_, u0_r, u0_rr) = self.evaluate_classical(r0);
+            let r0_t = -ln_eps / u0_r;
+            let r0_tt = -(u0_rr * r0_t * r0_t) / u0_r;
+
+            let mut d_int = 0.0;
+            let mut d_t_int = 0.0;
+            let mut d_tt_int = 0.0;
+
+            let sigma_j2 = 0.5 * (sigma_eff - r0);
+            let sigma_j2_t = -0.5 * r0_t;
+            let sigma_j2_tt = -0.5 * r0_tt;
+
+            for i in 0..21 {
+                let xk = X_NODES_21[i];
+                let wk = W_NODES_21[i];
+                let one_minus_xk = 1.0 - xk;
+
+                let r = sigma_j2 * xk + sigma_j2 + r0;
+                let r_t = 0.5 * one_minus_xk * r0_t;
+                let r_tt = 0.5 * one_minus_xk * r0_tt;
+
+                let (u, u_r, u_rr) = self.evaluate_classical(r);
+
+                let pref = sigma_j2 * wk;
+                let pref_t = sigma_j2_t * wk;
+                let pref_tt = sigma_j2_tt * wk;
+
+                let minus_exp = -(-u * inv_t).exp();
+                let one_plus_mexp = 1.0 + minus_exp;
+                d_int += pref * one_plus_mexp;
+
+                let dt3 = u * inv_t2 - u_r * r_t * inv_t;
+                d_t_int += pref * minus_exp * dt3 + pref_t * one_plus_mexp;
+
+                let d_tt2 = minus_exp * dt3;
+                let d_tt3 = 2.0 * u_r * r_t * inv_t2
+                    - 2.0 * u * inv_t3
+                    - u_rr * (r_t * r_t) * inv_t
+                    - u_r * r_tt * inv_t;
+                d_tt_int += pref_t * minus_exp * dt3
+                    + pref * d_tt2 * dt3
+                    + pref * minus_exp * d_tt3
+                    + pref_tt * one_plus_mexp
+                    + pref_t * d_tt2;
+            }
+
+            return Ok((r0 + d_int, r0_t + d_t_int, r0_tt + d_tt_int));
+        }
+
+        // Quantum Feynman-Hibbs path: solve r0 (where exp(-beta u(r0)) = machine_prec).
         let mut rs = 0.70;
         for _ in 0..25 {
             let r = rs * sigma_eff;
             let pot = self.evaluate(r, temperature);
-            let f = pot.u_divk / temperature + ln_eps;
-            let df = sigma_eff * pot.u_divk_r / temperature;
-            let d2f = sigma_eff * sigma_eff * pot.u_divk_rr / temperature;
+            let f = pot.u_divk * inv_t + ln_eps;
+            let df = sigma_eff * pot.u_divk_r * inv_t;
+            let d2f = sigma_eff * sigma_eff * pot.u_divk_rr * inv_t;
             let step = -f / df * (1.0 + f * d2f / (2.0 * df * df));
             rs += step;
             if step.abs() < 1e-15 {
@@ -2529,7 +3022,7 @@ impl PairPotential {
         let r0_tt = -(pot0.u_divk_tt + 2.0 * pot0.u_divk_tr * r0_t + pot0.u_divk_rr * r0_t * r0_t)
             / pot0.u_divk_r;
 
-        // 3. Kronrod 21 Quadrature integration on [r0, sigma_eff]
+        // Kronrod 21 quadrature integration on [r0, sigma_eff].
         let mut d_int = 0.0;
         let mut d_t_int = 0.0;
         let mut d_tt_int = 0.0;
@@ -2538,24 +3031,9 @@ impl PairPotential {
         let sigma_j2_t = 0.5 * (sig_t - r0_t);
         let sigma_j2_tt = 0.5 * (sig_tt - r0_tt);
 
-        // Symmetric 21 points
-        let mut x_nodes = [0.0; 21];
-        let mut w_nodes = [0.0; 21];
-        for i in 0..10 {
-            x_nodes[i] = -XK_21[i];
-            x_nodes[11 + i] = XK_21[9 - i];
-            w_nodes[i] = WK_21[i];
-            w_nodes[11 + i] = WK_21[9 - i];
-        }
-        x_nodes[10] = 0.0;
-        w_nodes[10] = WK_21[10];
-
-        let t2 = temperature * temperature;
-        let t3 = t2 * temperature;
-
         for i in 0..21 {
-            let xk = x_nodes[i];
-            let wk = w_nodes[i];
+            let xk = X_NODES_21[i];
+            let wk = W_NODES_21[i];
 
             let r = sigma_j2 * xk + sigma_j2 + r0;
             let r_t = sigma_j2_t * xk + sigma_j2_t + r0_t;
@@ -2567,11 +3045,10 @@ impl PairPotential {
             let pref_t = sigma_j2_t * wk;
             let pref_tt = sigma_j2_tt * wk;
 
-            let minus_exp = -(-pot.u_divk / temperature).exp();
+            let minus_exp = -(-pot.u_divk * inv_t).exp();
             d_int += pref * (1.0 + minus_exp);
 
-            let dt3 =
-                pot.u_divk / t2 - pot.u_divk_t / temperature - pot.u_divk_r * r_t / temperature;
+            let dt3 = pot.u_divk * inv_t2 - pot.u_divk_t * inv_t - pot.u_divk_r * r_t * inv_t;
             let d_t1 = pref;
             let d_t2 = minus_exp;
             let d_t4 = pref_t;
@@ -2580,15 +3057,12 @@ impl PairPotential {
 
             let d_tt1 = pref_t;
             let d_tt2 = minus_exp * dt3;
-            let d_tt3 = pot.u_divk_t / t2 + pot.u_divk_r * r_t / t2
-                - 2.0 * pot.u_divk / t3
-                - pot.u_divk_tt / temperature
-                - pot.u_divk_tr * r_t / temperature
-                + pot.u_divk_t / t2
-                - pot.u_divk_tr * r_t / temperature
-                - pot.u_divk_rr * (r_t * r_t) / temperature
-                - pot.u_divk_r * r_tt / temperature
-                + pot.u_divk_r * r_t / t2;
+            let d_tt3 = 2.0 * pot.u_divk_t * inv_t2 + 2.0 * pot.u_divk_r * r_t * inv_t2
+                - 2.0 * pot.u_divk * inv_t3
+                - pot.u_divk_tt * inv_t
+                - 2.0 * pot.u_divk_tr * r_t * inv_t
+                - pot.u_divk_rr * (r_t * r_t) * inv_t
+                - pot.u_divk_r * r_tt * inv_t;
             let d_tt4 = pref_tt;
             let d_tt5 = d_tt2;
             d_tt_int += d_tt1 * d_t2 * dt3

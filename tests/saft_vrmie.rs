@@ -586,7 +586,7 @@ const EXPECTED_FIXTURE_CASES: &[FixtureKey<'static>] = &[
         "0.65,0.35",
         "arithmetic-cross",
     ],
-    // kind=6: Pure-fluid saturation (4 cases)
+    // kind=6: Pure-fluid saturation (6 cases, including near-critical H2O)
     [
         "H2O", "DEFAULT", "-1", "1", "31", "0", "0", "6", "300", "0", "1", "default",
     ],
@@ -595,6 +595,12 @@ const EXPECTED_FIXTURE_CASES: &[FixtureKey<'static>] = &[
     ],
     [
         "H2O", "DEFAULT", "-1", "1", "31", "0", "0", "6", "373.15", "0", "1", "default",
+    ],
+    [
+        "H2O", "DEFAULT", "-1", "1", "31", "0", "0", "6", "679.0", "0", "1", "default",
+    ],
+    [
+        "H2O", "DEFAULT", "-1", "1", "31", "0", "0", "6", "679.03", "0", "1", "default",
     ],
     [
         "CO2", "DEFAULT", "-1", "1", "31", "0", "0", "6", "260", "0", "1", "default",
@@ -628,7 +634,7 @@ const EXPECTED_FIXTURE_CASES: &[FixtureKey<'static>] = &[
     ],
 ];
 
-const EXPECTED_PER_KIND: [usize; 8] = [34, 4, 1, 4, 8, 4, 4, 5];
+const EXPECTED_PER_KIND: [usize; 8] = [34, 4, 1, 4, 8, 4, 6, 5];
 
 fn slot_tolerances(kind: &str, nc: usize) -> Vec<(f64, f64)> {
     match kind {
@@ -676,7 +682,10 @@ fn slot_tolerances(kind: &str, nc: usize) -> Vec<(f64, f64)> {
         }
         "6" => {
             // [P_sat [Pa], v_liq [m^3/mol], v_vap [m^3/mol]]
-            vec![(1e-12, 1e-8), (1e-18, 1e-8), (1e-18, 1e-8)]
+            // Near-critical saturation has |d ln v / d ln P| ~ 2500, amplifying Fortran's
+            // own ~5e-12 fugacity tolerance into ~2.5e-7 volume shift; exact-P root parity
+            // is also asserted to 1e-8 below.
+            vec![(1e-12, 1e-8), (1e-18, 1e-6), (1e-18, 1e-6)]
         }
         "7" => {
             // [u/kB [K], force/kB [K/m]]
@@ -891,7 +900,7 @@ fn verify_saftvrmie_fixture(csv: &str) -> Result<FixtureCoverage, Vec<String>> {
                 let clapeyron_err =
                     (sat.enthalpy_vaporization - t * sat.entropy_vaporization).abs();
                 if !clapeyron_err.is_finite()
-                    || clapeyron_err > 1e-7 * sat.enthalpy_vaporization.abs().max(1.0)
+                    || clapeyron_err > 1e-6 * sat.enthalpy_vaporization.abs().max(1.0)
                 {
                     failures.push(format!(
                         "{:?}: Delta H != T Delta S ({:.8e} vs {:.8e})",
@@ -899,6 +908,27 @@ fn verify_saftvrmie_fixture(csv: &str) -> Result<FixtureCoverage, Vec<String>> {
                         sat.enthalpy_vaporization,
                         t * sat.entropy_vaporization
                     ));
+                }
+                // Also verify both phase volumes at Fortran's exact reference pressure to 1e-8.
+                if let [
+                    RefSlot::Value(ref_p),
+                    RefSlot::Value(ref_vl),
+                    RefSlot::Value(ref_vv),
+                ] = expected.as_slice()
+                    && ref_p.is_finite()
+                    && ref_vl.is_finite()
+                    && ref_vv.is_finite()
+                {
+                    let vl_at_ref = prep.volume(*ref_p, Phase::Liquid).unwrap();
+                    let vv_at_ref = prep.volume(*ref_p, Phase::Vapor).unwrap();
+                    if (vl_at_ref - ref_vl).abs() > 1e-8 * ref_vl.abs()
+                        || (vv_at_ref - ref_vv).abs() > 1e-8 * ref_vv.abs()
+                    {
+                        failures.push(format!(
+                            "{:?}: roots at ref P mismatch ({vl_at_ref:.8e}, {vv_at_ref:.8e}) vs ({ref_vl:.8e}, {ref_vv:.8e})",
+                            key_refs
+                        ));
+                    }
                 }
                 vec![sat.pressure, sat.liquid_volume, sat.vapor_volume]
             }
@@ -1602,19 +1632,116 @@ fn test_saft_vrmie_shifted_alpha_vdw_invalid_cutoff() {
         "shifted alpha_vdw at r_cut=0.9 must return Err, not Ok([NaN])"
     );
 
-    // Cutoff at sigma (1.0) or at the Mie minimum r_min has no attractive shifted well.
+    // Cutoff at sigma (1.0), at r_min, or unresolvably close to r_min must fail.
     let comp = co2.components()[0];
     let r_min = (comp.lambda_r / comp.lambda_a).powf(1.0 / (comp.lambda_r - comp.lambda_a));
-    for r_bad in [1.0, r_min] {
+    for r_bad in [1.0, r_min, r_min + 1.0e-14 * r_min] {
         co2.set_cutoff(Some((r_bad, true))).unwrap();
         assert!(co2.alpha_vdw(260.0).is_err());
     }
 
-    // Valid cutoff above r_min succeeds with finite positive alpha.
+    // Shallow attractive wells immediately above r_min must resolve positive alpha
+    // without catastrophic cancellation (85-digit references: 1.2372642e-6 and 1.2372673e-7).
+    for &(r_cut, ref_alpha) in &[
+        (1.0776444455346241_f64, 1.2372642e-6_f64),
+        (1.0776435455346243_f64, 1.2372673e-7_f64),
+    ] {
+        co2.set_cutoff(Some((r_cut, true))).unwrap();
+        let a = co2.alpha_vdw(260.0).unwrap();
+        assert_eq!(a.len(), 1);
+        assert!(
+            a[0].is_finite() && a[0] > 0.0 && (a[0] - ref_alpha).abs() < 1e-5 * ref_alpha,
+            "shallow shifted alpha_vdw at r_cut={r_cut}: got {:.10e}, expected {ref_alpha:.10e}",
+            a[0]
+        );
+    }
+
+    // Valid deep cutoff above r_min succeeds with finite positive alpha.
     co2.set_cutoff(Some((3.5, true))).unwrap();
     let a = co2.alpha_vdw(300.0).unwrap();
     assert_eq!(a.len(), 1);
     assert!(a[0].is_finite() && a[0] > 0.0);
+}
+
+#[test]
+fn test_saft_vrmie_near_critical_and_supercritical_saturation() {
+    // Near-critical H2O approaches the model critical point (~679.05+ K) with distinct
+    // stable liquid and vapor roots matching exact Fortran safe_bubP and specificVolume.
+    let h2o = SaftVrMie::new(&["H2O"]).unwrap();
+    for &(t, ref_p, ref_vl, ref_vv, v_tol) in &[
+        (
+            679.0_f64,
+            2.9899230947147384e7_f64,
+            5.3457096925394434e-5_f64,
+            5.6424951690857218e-5_f64,
+            5e-6_f64,
+        ),
+        (
+            679.02,
+            2.9905171742265098e7,
+            5.3714200709089771e-5,
+            5.6143937927108431e-5,
+            5e-6,
+        ),
+        (
+            679.03,
+            2.9908142399416812e7,
+            5.3868162605370886e-5,
+            5.5978197100523462e-5,
+            5e-6,
+        ),
+        (
+            679.05,
+            2.9914084757380079e7,
+            5.4286329803272869e-5,
+            5.5531591512499044e-5,
+            1e-4,
+        ),
+    ] {
+        let prep = h2o.prepare(t, &[1.0]).unwrap();
+        let sat = prep.saturation_pressure(t).unwrap();
+        assert!(
+            (sat.pressure - ref_p).abs() < 1e-7 * ref_p,
+            "H2O {t} K P_sat={} vs Fortran {ref_p}",
+            sat.pressure
+        );
+        assert!(
+            (sat.liquid_volume - ref_vl).abs() < v_tol * ref_vl,
+            "H2O {t} K v_l={} vs Fortran {ref_vl}",
+            sat.liquid_volume
+        );
+        assert!(
+            (sat.vapor_volume - ref_vv).abs() < v_tol * ref_vv,
+            "H2O {t} K v_v={} vs Fortran {ref_vv}",
+            sat.vapor_volume
+        );
+        let vl_ref = prep.volume(ref_p, Phase::Liquid).unwrap();
+        let vv_ref = prep.volume(ref_p, Phase::Vapor).unwrap();
+        assert!((vl_ref - ref_vl).abs() < 1e-7 * ref_vl);
+        assert!((vv_ref - ref_vv).abs() < 1e-7 * ref_vv);
+        assert!(sat.liquid_volume < sat.vapor_volume);
+        let st_l = prep.state(1.0 / sat.liquid_volume).unwrap();
+        let st_v = prep.state(1.0 / sat.vapor_volume).unwrap();
+        assert!(st_l.dp_drho > 0.0 && st_v.dp_drho > 0.0);
+        let tds = t * sat.entropy_vaporization;
+        assert!(
+            (sat.enthalpy_vaporization - tds).abs() < 1e-6 * sat.enthalpy_vaporization.abs(),
+            "H2O {t} K Delta H ({}) != T Delta S ({tds})",
+            sat.enthalpy_vaporization
+        );
+    }
+
+    // True supercritical states must return Err rather than fictitious coexistence.
+    for &t_sup in &[680.0_f64, 700.0] {
+        let prep = h2o.prepare(t_sup, &[1.0]).unwrap();
+        assert!(
+            prep.saturation_pressure(t_sup).is_err(),
+            "supercritical H2O at {t_sup} K must not report coexistence"
+        );
+    }
+    let co2 = SaftVrMie::new(&["CO2"]).unwrap();
+    let prep_co2 = co2.prepare(320.0, &[1.0]).unwrap();
+    assert!(prep_co2.saturation_pressure(320.0).is_err());
 }
 
 #[test]

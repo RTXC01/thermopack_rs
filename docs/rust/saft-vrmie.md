@@ -34,8 +34,12 @@ mole.
   `extra_hard_sphere`.
 - **Potential truncation and shift**: pure-fluid `set_cutoff(Some((r_cut, shift)))`
   for truncated and truncated-shifted Mie/quantum-Mie dispersion and pair
-  potentials (shifted `alpha_vdw` certifies the shifted zero on $(1, r_{\min})$
-  and rejects non-attractive cutoffs $r_{\text{cut}} \le r_{\min}$).
+  potentials (shifted `alpha_vdw` solves for the inner shifted zero in offset
+  coordinates $d_s = r_{\min} - \sigma_{\text{eff}}$ scaled to the shifted
+  well depth $\varepsilon_{\text{eff}} = u^*(r_{\text{cut}}) + 1$, uses
+  cancellation-free 21-point Gauss-Kronrod quadrature on each side of
+  $r_{\min}$ for shallow wells $\varepsilon_{\text{eff}} < 0.25$, and rejects
+  cutoffs at, below, or within $10^{-12} r_{\min}$ of $r_{\min}$).
 - **Association (`rust/src/association.rs`, `rust/src/saft_vrmie/association.rs`)**:
   reuses the shared Wertheim TPT1 site solver (`AssocScheme`, `Standard` and
   `Elliot` $\Delta$ combining rules, exact infinite-dilution zero-mole site
@@ -90,26 +94,30 @@ into `rust/src/saft_vrmie_data.rs`:
   `SaftVrMieDerivatives::intensive_dn(total_moles)` to convert any partial
   molar vector into $\partial q / \partial n_i = (\bar{q}_i - q)/N$.
 - `PreparedSaftVrMie` caches temperature-dependent Barker-Henderson diameters
-  (21-point Gauss-Kronrod quadrature) and effective quantum parameters for fast
-  repeated TV evaluations (`helmholtz_terms` via zero-overhead `f64`, analytic
-  `pressure_and_derivatives` and `state` via stack-buffered `Dual1`/`Dual2`
-  without re-preparing temperature caches, `volume` with strict relative
-  pressure closure and common-pressure `MinimumGibbs`, and pure
+  (21-point Gauss-Kronrod quadrature with self-contained classical/quantum
+  diameter paths and shared `ln`/integer-exponent power evaluation) and
+  effective quantum parameters for fast repeated TV evaluations
+  (`helmholtz_terms` via zero-overhead `f64`, analytic `pressure_and_derivatives`
+  and `state` via stack-buffered `Dual1`/`Dual2` without re-preparing
+  temperature caches, `volume` with condition-aware stopping, strict relative
+  pressure closure, and common-pressure `MinimumGibbs`, and pure
   `saturation_pressure` using the stabilized common-pressure Gibbs difference
-  $(F_l - F_v) + P(v_l - v_v)/(RT) - \ln(v_l/v_v)$). `SaftVrMieState::s_total`
-  combines ideal TV entropy with TV residual entropy so it agrees with
-  `state_tp.entropy.value` and satisfies $\Delta H = T\Delta S$ at coexistence.
+  $(F_l - F_v) + P(v_l - v_v)/(RT) - \ln(v_l/v_v)$ with mechanical-spinodal
+  branch bracketing near the model critical point and guaranteed supercritical
+  rejection). `SaftVrMieState::s_total` combines ideal TV entropy with TV
+  residual entropy so it agrees with `state_tp.entropy.value` and satisfies
+  $\Delta H = T\Delta S$ at coexistence.
 
 ## Exact-Source Qualification
 
 `tools/rust_port/validate_saftvrmie.py` compiles an isolated exact-source
 Fortran probe (`tools/rust_port/saftvrmie_probe.f90`) linked against
-`.reference` and qualifies **64 live cases** (**974 scalar comparisons** plus
+`.reference` and qualifies **66 live cases** (**980 scalar comparisons** plus
 **2 explicitly marked `UNSUPPORTED_SOURCE` slots** for classical
 `de_Broglie_wavelength`), persisted in `tests/fixtures/saftvrmie_tvn.csv` and
 verified in `tests/saft_vrmie.rs` with unit-aware per-slot tolerances,
 non-finite rejection, tamper-detection tests, and an independently pinned
-64-case roster:
+66-case roster:
 
 - **TVN residual, dispersion, hard-sphere, and Dufal RDF** (43 cases covering
   classical, associating `NH3`/`H2O,MEOH`/`ETOH,C1`, Elliot rule, non-unit mole
@@ -124,9 +132,12 @@ non-finite rejection, tamper-detection tests, and an independently pinned
   and quantum exact/arithmetic-cross diameters, $d_T$, $d_{TT}$, $d_{ij}$,
   $d_{ij,T}$, effective $\sigma_{ij}/\epsilon_{ij}$, $\alpha_{ij}$, and de
   Broglie wavelength with unit-resolved tolerances down to $10^{-29}$).
-- **Pure-fluid saturation** (4 cases covering cold and boiling associating
-  `H2O` at 300 K, 325 K, 373.15 K and `CO2` at 260 K against Fortran
-  `safe_bubP` and `specificVolume`, plus $\Delta H = T\Delta S$).
+- **Pure-fluid saturation** (6 cases covering cold, boiling, and near-critical
+  associating `H2O` at 300 K, 325 K, 373.15 K, 679.0 K, 679.03 K and `CO2` at
+  260 K against Fortran `safe_bubP` and `specificVolume`, exact-pressure root
+  checks to `1e-8`, plus $\Delta H = T\Delta S$; `tests/saft_vrmie.rs` also
+  verifies `H2O` at 679.02 K and 679.05 K and supercritical rejection at
+  680 K/700 K and `CO2` 320 K).
 - **Pair potential and force** (5 cases covering `CO2` capped core
   $r = 0.5\sigma$ at $500\epsilon/k_B$ with uncapped force, attractive well,
   truncated-shifted inside/beyond cutoff, and FH2 `H2,NE` cross potential
@@ -141,24 +152,33 @@ differences and thermodynamic identities in `tests/saft_vrmie.rs`.
 
 ## Prepared-State Release Performance
 
-Measured on the optimized generic `Scalar`/`Dual1`/`Dual2` kernel (`--release`,
-thin LTO, stack-buffered for $n_c \le 8$, symmetric pair loop, single
-association solve per state):
+Measured on Windows GNU Rust 1.100 (`--release`, thin LTO, `codegen-units=1`,
+stack-buffered for $n_c \le 8$, symmetric pair loop, single association solve
+per state). Matched 5-round interleaved `prepare` comparisons (`20,000`
+iterations per round, excluding constructor time) comparing `a2ca7d9`
+(out-of-line `PairPotential::evaluate`) against the self-contained
+`PairPotential::diameter` + `pow_pos_pair` implementation:
+
+| Workload | `a2ca7d9` median (range) | Current median (range) |
+|---|---|---|
+| `CO2/C1` `prepare` ($T=280\text{ K}, x=[0.4, 0.6]$) | 11.90 µs (11.30–12.42 µs) | 9.77 µs (9.56–9.94 µs) |
+| `C1` `prepare` ($T=160\text{ K}, x=[1.0]$) | 4.79 µs (4.55–5.02 µs) | 4.08 µs (4.01–4.29 µs) |
+| `H2` FH1 `prepare` ($T=40\text{ K}, x=[1.0]$) | 2.98 µs (2.70–3.29 µs) | 2.53 µs (2.37–2.69 µs) |
+
+Prepared-state evaluation latencies (same release profile):
 
 | Workload | Operation | Latency |
 |---|---|---|
-| `CO2/C1` ($T=280\text{ K}, x=[0.4, 0.6], \rho=5000$) | `prepare` | 10.6 µs |
-| `CO2/C1` | `helmholtz_terms` | 3.54 µs |
+| `CO2/C1` ($T=280\text{ K}, x=[0.4, 0.6], \rho=5000$) | `helmholtz_terms` | 3.54 µs |
 | `CO2/C1` | `pressure_and_derivatives` (analytic) | 12.2 µs |
-| `CO2/C1` | `state` (analytic) | 26.8 µs |
+| `CO2/C1` | `state` (analytic) | 26.8–30.4 µs |
 | `CO2/C1` | `residual_helmholtz_tvn` (all 10 blocks) | 71.5 µs |
 | `CO2/C1` | `state_tp` (root + all 10 blocks) | 146.1 µs |
-| `H2` FH1 ($T=40\text{ K}, x=[1.0], \rho=4000$) | `prepare` | 2.66 µs |
-| `H2` FH1 | `helmholtz_terms` | 0.81 µs |
+| `H2` FH1 ($T=40\text{ K}, x=[1.0], \rho=4000$) | `helmholtz_terms` | 0.81 µs |
 | `H2` FH1 | `pressure_and_derivatives` (analytic) | 4.03 µs |
 | `H2` FH1 | `state` (analytic) | 6.48 µs |
 | `H2` FH1 | `residual_helmholtz_tvn` (all 10 blocks) | 14.4 µs |
-| `H2O/MEOH` (7 sites, $T=380\text{ K}, x=[0.4, 0.6]$) | `state` (analytic + association) | 35.1 µs |
+| `H2O/MEOH` (7 sites, $T=380\text{ K}, x=[0.4, 0.6]$) | `state` (analytic + association) | 28.6–41.6 µs |
 
 Compared to the `57f0649` baseline where `PreparedSaftVrMie::pressure_and_derivatives`
 and `state` evaluated central finite differences by calling `PreparedSaftVrMie::new`

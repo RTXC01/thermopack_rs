@@ -628,6 +628,52 @@ impl MultipolParams {
         sum
     }
 
+    /// Compute a*b*c/denominator without losing a finite result to intermediate
+    /// overflow or underflow. The denominator is finite and nonzero.
+    #[inline]
+    fn pade_product_quotient(a: f64, b: f64, c: f64, denominator: f64) -> f64 {
+        let ratio = a / denominator;
+        let pair = ratio * b;
+        if ratio.is_normal() && pair.is_normal() {
+            return pair * c;
+        }
+        if !a.is_finite() || !b.is_finite() || !c.is_finite() {
+            return pair * c;
+        }
+        if a == 0.0 || b == 0.0 || c == 0.0 {
+            return 0.0;
+        }
+
+        // Split each nonzero operand into a signed significand and a base-2
+        // exponent. Products of the significands stay near one.
+        fn parts(x: f64) -> (f64, i32) {
+            const EXPONENT_MASK: u64 = 0x7ff << 52;
+            let (bits, adjustment) = if x.is_normal() {
+                (x.to_bits(), 0)
+            } else {
+                ((x * (1_u64 << 54) as f64).to_bits(), 54)
+            };
+            let exponent = ((bits & EXPONENT_MASK) >> 52) as i32 - 1023 - adjustment;
+            let significand = f64::from_bits((bits & !EXPONENT_MASK) | (1023 << 52));
+            (significand, exponent)
+        }
+
+        let (a, ae) = parts(a);
+        let (b, be) = parts(b);
+        let (c, ce) = parts(c);
+        let (denominator, de) = parts(denominator);
+        let (significand, adjust) = parts(a * b * c / denominator);
+        let exponent = ae + be + ce - de + adjust;
+        let scale = match exponent {
+            ..=-1076 => 0.0,
+            -1075 => return (significand * 0.5) * f64::from_bits(1),
+            -1074..=-1023 => f64::from_bits(1_u64 << (exponent + 1074)),
+            -1022..=1023 => f64::from_bits(((exponent + 1023) as u64) << 52),
+            _ => f64::INFINITY,
+        };
+        significand * scale
+    }
+
     /// Evaluate u^2/(u-v). The Hessian needs (u dv - v du)/(u-v)
     /// for each seed. Form these normalized products only at second order.
     fn pade_exact_with_wronskian(
@@ -657,7 +703,8 @@ impl MultipolParams {
         };
         let f12 = if order >= 2 {
             let (t1, t2) = normalized_wronskians(w0);
-            let f12 = r * (2.0 * u.f12 - r * (u.f12 - v.f12)) + 2.0 * t1 * (t2 / w0);
+            let correction = Self::pade_product_quotient(t2, t1, 2.0, w0);
+            let f12 = r * (2.0 * u.f12 - r * (u.f12 - v.f12)) + correction;
             if !f12.is_finite() {
                 return Err(Error::InvalidInput("non-finite multipolar Pade result"));
             }
@@ -927,8 +974,9 @@ impl MultipolParams {
                             (ba.f0, tb.beta().f0)
                         };
                     let cross = |dna, dnb| {
-                        let weight = (na.f0 * dnb - nb.f0 * dna) / w;
-                        (weight * ta.alpha.f0) * bb0 - (weight * tb.alpha.f0) * ba0
+                        let weight = na.f0 * dnb - nb.f0 * dna;
+                        Self::pade_product_quotient(weight, ta.alpha.f0, bb0, w)
+                            - Self::pade_product_quotient(weight, tb.alpha.f0, ba0, w)
                     };
                     t1 += cross(na.f1, nb.f1);
                     t2 += cross(na.f2, nb.f2);

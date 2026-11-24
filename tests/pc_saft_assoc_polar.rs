@@ -1946,3 +1946,74 @@ fn multipol_large_dipole_hessian_matches_gradient_differences() {
     );
     approx_eq(full.f_nn[0], fd, 1e-8, 0.0, "large DD gradient difference");
 }
+
+#[test]
+fn multipol_dq_hessian_with_a_subnormal_pade_denominator() {
+    let mut mp = MultipolParams::new(
+        &[2e-12, 0.0, 0.0],
+        &[0.0, 2e-12, 3e-12],
+        &[1.0; 3],
+        &[2.328_306_436_538_696_3e-10; 9],
+        &[200.0; 9],
+    )
+    .unwrap();
+    mp.enable_dd = false;
+    mp.enable_qq = false;
+
+    let (t, v, n) = (1e60, 1e145, [0.5, 0.25, 0.25]);
+    let full = mp.fres_all(t, v, &n).unwrap();
+    approx_eq(
+        full.f,
+        -1.478_840_498_596e-312,
+        0.0,
+        1e-320,
+        "subnormal DQ value",
+    );
+    approx_eq(
+        full.f_nn[1],
+        -3.640_222_765_773e-312,
+        0.0,
+        1e-320,
+        "subnormal DQ Hessian",
+    );
+}
+
+#[test]
+fn multipol_dq_hessian_correction_stays_finite_at_subnormal_traces() {
+    let mut eps = [200.0; 9];
+    eps[2] = 199.8;
+    eps[6] = 199.8;
+    let mut mp = MultipolParams::new(
+        &[2.0, 0.0, 0.0],
+        &[0.0, 3.0, 3.0],
+        &[1.0; 3],
+        &[2.328_306_436_538_696_3e-10; 9],
+        &eps,
+    )
+    .unwrap();
+    mp.enable_dd = false;
+    mp.enable_qq = false;
+
+    let (t, v, trace) = (340.0, 1e-4, 1e-312);
+    let h = 0.05 * trace;
+    let plus = mp.fres_fn(t, v, &[1.0, trace + h, trace]).unwrap();
+    let minus = mp.fres_fn(t, v, &[1.0, trace - h, trace]).unwrap();
+    let finite_difference = (plus[1] - minus[1]) / (2.0 * h);
+    let hessian = mp.fres_all(t, v, &[1.0, trace, trace]).unwrap().f_nn[4];
+    approx_eq(
+        hessian,
+        finite_difference,
+        2e-3,
+        0.0,
+        "ultra-trace DQ Hessian",
+    );
+
+    let larger_trace = mp.fres_all(t, v, &[1.0, 1e-310, 1e-310]).unwrap().f_nn[4];
+    approx_eq(
+        hessian * trace,
+        larger_trace * 1e-310,
+        1e-8,
+        0.0,
+        "DQ trace-scaled Hessian",
+    );
+}

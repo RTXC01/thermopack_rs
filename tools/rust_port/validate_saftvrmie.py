@@ -48,6 +48,7 @@ def cases():
     for variant in ("geometric", "arithmetic-cross", "linear", "bmcsl", "kolafa",
                     "pair-a3", "classical-a2"):
         yield case("H2,NE", 54, 0.0005, "1.3,0.7", order=2, hs=4, variant=variant)
+    yield case("H2,NE", 54, 0.00025, "0.65,0.35", order=2, hs=4, variant="linear-then-nonadd")
     yield case("CO2,C1", 280, 0.0004, "0.8,1.2", hs=5, variant="no-extra")
     # DFT molar hard-sphere (kind=3)
     yield case("H2O,MEOH", 380, 0.0003, "0.8,1.2", kind=3)
@@ -68,6 +69,17 @@ def cases():
     yield case("CO2", 300, 0.0004, "1", cutoff=3.5, shift=1, kind=5)
     yield case("H2,NE", 54, 0.0005, "0.65,0.35", order=2, hs=4, kind=5)
     yield case("H2,NE", 54, 0.0005, "0.65,0.35", order=2, hs=4, kind=5, variant="arithmetic-cross")
+    # Pure-fluid saturation pressure and coexisting roots (kind=6)
+    yield case("H2O", 300, 0, "1", kind=6)
+    yield case("H2O", 325, 0, "1", kind=6)
+    yield case("H2O", 373.15, 0, "1", kind=6)
+    yield case("CO2", 260, 0, "1", kind=6)
+    # Pair potential (default 500*eps cap) and uncapped force: v = r / sigma_ij (kind=7)
+    yield case("CO2", 260, 0.5, "1", kind=7)
+    yield case("CO2", 260, 1.3, "1", kind=7)
+    yield case("CO2", 300, 1.3, "1", cutoff=3.5, shift=1, kind=7)
+    yield case("CO2", 300, 3.6, "1", cutoff=3.5, shift=1, kind=7)
+    yield case("H2,NE", 54, 1.2, "0.65,0.35", order=2, hs=4, kind=7)
 
 
 def sha(path):
@@ -111,8 +123,23 @@ def main():
                 elif kind == 5:
                     blocks, = [s.split()[1:] for s in proc.stdout.splitlines() if s.startswith("HOOKS ")]
                     expected_len = 5 + 3 * nc + nc * nc
-                    if len(blocks) != expected_len or not all(math.isfinite(float(val)) for val in blocks):
+                    if len(blocks) != expected_len:
                         raise ValueError((c, len(blocks), expected_len, blocks))
+                    numeric = blocks[:-1] if order < 0 else blocks
+                    if not all(math.isfinite(float(val)) for val in numeric):
+                        raise ValueError((c, blocks))
+                    if order < 0 and blocks[-1] != "UNSUPPORTED_SOURCE":
+                        raise ValueError((c, "expected UNSUPPORTED_SOURCE marker", blocks[-1]))
+                    writer.writerow([*c, ",".join(blocks), "0", "0"])
+                elif kind == 6:
+                    blocks, = [s.split()[1:] for s in proc.stdout.splitlines() if s.startswith("SAT ")]
+                    if len(blocks) != 3 or not all(math.isfinite(float(val)) and float(val) > 0.0 for val in blocks):
+                        raise ValueError((c, blocks))
+                    writer.writerow([*c, ",".join(blocks), "0", "0"])
+                elif kind == 7:
+                    blocks, = [s.split()[1:] for s in proc.stdout.splitlines() if s.startswith("POT ")]
+                    if len(blocks) != 2 or not all(math.isfinite(float(val)) for val in blocks):
+                        raise ValueError((c, blocks))
                     writer.writerow([*c, ",".join(blocks), "0", "0"])
                 else:
                     blocks, = [s.split()[1:] for s in proc.stdout.splitlines() if s.startswith("TVN ")]

@@ -2,24 +2,27 @@
 program saftvrmie_probe
   use eoslibinit, only: init_saftvrmie, init_quantum_saftvrmie
   use eosTV, only: Fres
-  use eos, only: zfac, enthalpy, entropy, thermo
+  use eos, only: zfac, enthalpy, entropy, thermo, specificVolume
+  use saturation, only: safe_bubP
   use speed_of_sound, only: sound_velocity_2ph
+  use thermopack_constants, only: LIQPH, VAPPH
   use thermopack_var, only: get_active_eos, base_eos_param
   use association_var, only: ELLIOT
   use saftvrmie_containers, only: svrm_opt, saftvrmie_param, calcBinaryMieParmeters, svrmie_var
   use saftvrmie_association, only: g_rdf_saftvrmie_ij_TVN
   use saft_interface, only: calc_saft_dispersion, calc_saft_hard_sphere, &
        calc_hard_sphere_diameter, calc_hard_sphere_diameter_ij, &
-       sigma_eff_ij, epsilon_eff_ij, alpha, de_Broglie_wavelength
+       sigma_eff_ij, epsilon_eff_ij, alpha, de_Broglie_wavelength, potential
   implicit none
   character(len=128) :: comps, param, variant
-  integer :: nc, order, hs, controls, shift, kind, ph
+  integer :: nc, order, hs, controls, shift, kind, ph, ierr
   real :: t, v, cutoff, f, ft, fv, ftt, ftv, fvv
   real :: h, ftmp, fv_plus, fv_minus, dv_fv, dt_fv
   real :: z, dzdt, dzdp, hr, dhrdt, dhrdp, ht, dhtdt, dhtdp
   real :: sr, dsrdt, dsrdp, st, dstdt, dstdp, sos
-  real :: dij, dijt, seff, eeff, lam_db
-  real, allocatable :: n(:), x(:), fn(:), ftn(:), fvn(:), fnn(:,:)
+  real :: dij, dijt, seff, eeff, lam_db, psat, vl, vv
+  real :: r_arr(2), pot_arr(2), force_arr(2)
+  real, allocatable :: n(:), x(:), y(:), fn(:), ftn(:), fvn(:), fnn(:,:)
   real, allocatable :: dzdn(:), dhrdn(:), dhtdn(:), dsrdn(:), dstdn(:)
   real, allocatable :: lnphi(:), dlnphidt(:), dlnphidp(:), dlnphidn(:,:)
   real, allocatable :: d_diag(:), dt_diag(:), dtt_diag(:), amat(:,:)
@@ -29,7 +32,7 @@ program saftvrmie_probe
   read(*,'(A)') variant
   read(*,*) nc, order, hs, controls, cutoff, shift, kind
   read(*,*) t, v
-  allocate(n(nc), x(nc), fn(nc), ftn(nc), fvn(nc), fnn(nc,nc))
+  allocate(n(nc), x(nc), y(nc), fn(nc), ftn(nc), fvn(nc), fnn(nc,nc))
   allocate(dzdn(nc), dhrdn(nc), dhtdn(nc), dsrdn(nc), dstdn(nc))
   allocate(lnphi(nc), dlnphidt(nc), dlnphidp(nc), dlnphidn(nc,nc))
   allocate(d_diag(nc), dt_diag(nc), dtt_diag(nc), amat(nc,nc))
@@ -60,6 +63,9 @@ program saftvrmie_probe
     svrm_opt%exact_crosspot_eff = .false.
   case ('linear')
     svrm_opt%zeta_mixing_rule = 2
+  case ('linear-then-nonadd')
+    svrm_opt%zeta_mixing_rule = 2
+    call svrm_opt%set_hs_reference(4)
   case ('bmcsl')
     svrm_opt%Khs_EoS = 1
   case ('kolafa')
@@ -102,11 +108,28 @@ program saftvrmie_probe
     call alpha(t, amat)
     if (order >= 0) then
       call de_Broglie_wavelength(1, t, lam_db)
+      write(*,'(A,*(1X,ES25.16E3))') 'HOOKS', d_diag, dt_diag, dtt_diag, &
+           dij, dijt, seff, eeff, transpose(amat), lam_db
     else
-      lam_db = 0.0
+      write(*,'(A,*(1X,ES25.16E3))', advance='no') 'HOOKS', d_diag, dt_diag, dtt_diag, &
+           dij, dijt, seff, eeff, transpose(amat)
+      write(*,'(A)') ' UNSUPPORTED_SOURCE'
     endif
-    write(*,'(A,*(1X,ES25.16E3))') 'HOOKS', d_diag, dt_diag, dtt_diag, &
-         dij, dijt, seff, eeff, transpose(amat), lam_db
+  else if (kind == 6) then
+    ! Pure-fluid saturation pressure and coexisting liquid/vapor molar volumes.
+    x = n / sum(n)
+    psat = safe_bubP(t, x, y, ierr)
+    if (ierr /= 0) stop 2
+    call specificVolume(t, psat, x, LIQPH, vl)
+    call specificVolume(t, psat, x, VAPPH, vv)
+    write(*,'(A,*(1X,ES25.16E3))') 'SAT', psat, vl, vv
+  else if (kind == 7) then
+    ! Pair potential u(r)/kB [K] (with default 500*eps cap) and uncapped force -du/dr/kB [K/m].
+    ! v carries r / sigma_ij(1, nc). Pass a 2-point array so Fortran truncation handles r > r_cut.
+    r_arr(1) = v * saftvrmie_param%sigma_ij(1, nc)
+    r_arr(2) = 100.0 * saftvrmie_param%sigma_ij(1, nc)
+    call potential(1, nc, 2, r_arr, t, pot_arr, force=force_arr)
+    write(*,'(A,*(1X,ES25.16E3))') 'POT', pot_arr(1), force_arr(1)
   else
     if (kind == 0) then
       call Fres(t, v, n, f, ft, fv, fn, ftt, ftv, fvv, ftn, fvn, fnn)

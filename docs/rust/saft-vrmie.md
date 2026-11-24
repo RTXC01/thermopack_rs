@@ -22,7 +22,8 @@ mole.
 ### Core Submodels and Controls
 
 - **Hard-sphere references (`HardSphereReference`)**: `Lafitte` (default),
-  `SingleComponent`, `Additive`, `NonAdditive`, and `AdditiveExact`, plus
+  `SingleComponent`, `Additive`, `NonAdditive` (preserves active `PackingRule`,
+  matching `set_hs_reference(NON_ADD_HS_REF)`), and `AdditiveExact`, plus
   explicit `extra_hard_sphere` and `kolafa_pure_reference` controls.
 - **Term toggles (`MieTerms`)**: independent switches for `hard_sphere`,
   `first` ($a_1$), `second` ($a_2$), `third` ($a_3$), and `chain`.
@@ -33,7 +34,8 @@ mole.
   `extra_hard_sphere`.
 - **Potential truncation and shift**: pure-fluid `set_cutoff(Some((r_cut, shift)))`
   for truncated and truncated-shifted Mie/quantum-Mie dispersion and pair
-  potentials.
+  potentials (shifted `alpha_vdw` certifies the shifted zero on $(1, r_{\min})$
+  and rejects non-attractive cutoffs $r_{\text{cut}} \le r_{\min}$).
 - **Association (`rust/src/association.rs`, `rust/src/saft_vrmie/association.rs`)**:
   reuses the shared Wertheim TPT1 site solver (`AssocScheme`, `Standard` and
   `Elliot` $\Delta$ combining rules, exact infinite-dilution zero-mole site
@@ -47,8 +49,10 @@ mole.
   `de_broglie_wavelength`.
 - **Model-side FMT/DFT hooks**: `fmt_compatibility`, `dispersion_tvn`,
   `hard_sphere_tvn`, `hard_sphere_diameters`, `hard_sphere_diameter_ij`,
-  `effective_sigma_ij`, `effective_epsilon_ij`, `alpha_vdw`, and
-  `pair_potential`.
+  `effective_sigma_ij`, `effective_epsilon_ij`, `alpha_vdw`, `pair_potential`
+  (matching `saft_interface::potential` with default `500.0 * eps_ij/k_B` core
+  cap and uncapped analytical force), and `pair_potential_with_cap` (custom cap
+  or `None` for raw uncapped potential).
 
 ## Database and Parameters
 
@@ -77,36 +81,56 @@ into `rust/src/saft_vrmie_data.rs`:
   unit-mole TVN blocks to provide normal TP properties ($v, Z, H^{\text{res}},
   H, S^{\text{res}}, S, G^{\text{res}}, \ln\boldsymbol{\phi}, C_p, C_v$, speed
   of sound) together with exact analytical $(T, P, \mathbf{n})$ first
-  derivatives.
+  derivatives. Following ThermoPack Fortran `eos` conventions, `dn` on
+  `compressibility_factor` and `ln_fugacity` stores intensive raw-mole
+  derivatives ($\partial q / \partial n_i$, degree $-1$ in $N$), while `dn` on
+  `specific_volume`, `residual_enthalpy`, `enthalpy`, `residual_entropy`,
+  `entropy`, and `residual_gibbs` stores partial molar quantities
+  $\bar{q}_i = \partial(N q)/\partial n_i$ (degree $0$ in $N$). Call
+  `SaftVrMieDerivatives::intensive_dn(total_moles)` to convert any partial
+  molar vector into $\partial q / \partial n_i = (\bar{q}_i - q)/N$.
 - `PreparedSaftVrMie` caches temperature-dependent Barker-Henderson diameters
   (21-point Gauss-Kronrod quadrature) and effective quantum parameters for fast
   repeated TV evaluations (`helmholtz_terms` via zero-overhead `f64`, analytic
   `pressure_and_derivatives` and `state` via stack-buffered `Dual1`/`Dual2`
-  without re-preparing temperature caches, `volume` with `Liquid`/`Vapor`/`MinimumGibbs`,
-  and pure `saturation_pressure`).
+  without re-preparing temperature caches, `volume` with strict relative
+  pressure closure and common-pressure `MinimumGibbs`, and pure
+  `saturation_pressure` using the stabilized common-pressure Gibbs difference
+  $(F_l - F_v) + P(v_l - v_v)/(RT) - \ln(v_l/v_v)$). `SaftVrMieState::s_total`
+  combines ideal TV entropy with TV residual entropy so it agrees with
+  `state_tp.entropy.value` and satisfies $\Delta H = T\Delta S$ at coexistence.
 
 ## Exact-Source Qualification
 
 `tools/rust_port/validate_saftvrmie.py` compiles an isolated exact-source
 Fortran probe (`tools/rust_port/saftvrmie_probe.f90`) linked against
-`.reference` and qualifies **54 live cases** (**938 scalar comparisons**),
-persisted in `tests/fixtures/saftvrmie_tvn.csv` and verified in
-`tests/saft_vrmie.rs`:
+`.reference` and qualifies **64 live cases** (**974 scalar comparisons** plus
+**2 explicitly marked `UNSUPPORTED_SOURCE` slots** for classical
+`de_Broglie_wavelength`), persisted in `tests/fixtures/saftvrmie_tvn.csv` and
+verified in `tests/saft_vrmie.rs` with unit-aware per-slot tolerances,
+non-finite rejection, tamper-detection tests, and an independently pinned
+64-case roster:
 
-- **TVN residual, dispersion, hard-sphere, and Dufal RDF** (42 cases covering
+- **TVN residual, dispersion, hard-sphere, and Dufal RDF** (43 cases covering
   classical, associating `NH3`/`H2O,MEOH`/`ETOH,C1`, Elliot rule, non-unit mole
   scaling, all 5 hard-sphere references, all 5 term masks, cutoff/shift,
-  FH0/FH1/FH2, `additive-exact-quantum`, and all 9 independent submodel
-  options): worst scaled error **`2.57e-10`** (dominated by the central
-  finite-difference check replacing Fortran's defective extra hard-sphere
-  $F_{VV}$).
+  FH0/FH1/FH2, `additive-exact-quantum`, `linear-then-nonadd`, and all 9
+  independent submodel options).
 - **Normal TP states** (8 cases covering `CO2,C1` liquid/vapor, `NH3`,
   `H2O,MEOH` standard and Elliot, `ETOH,C1`, `H2` FH1, `H2,NE` FH2 across
   $Z, H^{\text{res}}, H, S^{\text{res}}, S, \ln\boldsymbol{\phi}$, all
-  $(T, P, n)$ derivatives, and speed of sound): worst scaled error **`7.21e-12`**.
+  $(T, P, n)$ derivatives, and speed of sound).
 - **Model-side FMT/DFT hooks** (4 cases covering classical, truncated-shifted,
-  and quantum exact/arithmetic-cross diameters, effective $\sigma_{ij}/\epsilon_{ij}$,
-  $\alpha_{ij}$, and de Broglie wavelength): worst scaled error **`4.05e-16`**.
+  and quantum exact/arithmetic-cross diameters, $d_T$, $d_{TT}$, $d_{ij}$,
+  $d_{ij,T}$, effective $\sigma_{ij}/\epsilon_{ij}$, $\alpha_{ij}$, and de
+  Broglie wavelength with unit-resolved tolerances down to $10^{-29}$).
+- **Pure-fluid saturation** (4 cases covering cold and boiling associating
+  `H2O` at 300 K, 325 K, 373.15 K and `CO2` at 260 K against Fortran
+  `safe_bubP` and `specificVolume`, plus $\Delta H = T\Delta S$).
+- **Pair potential and force** (5 cases covering `CO2` capped core
+  $r = 0.5\sigma$ at $500\epsilon/k_B$ with uncapped force, attractive well,
+  truncated-shifted inside/beyond cutoff, and FH2 `H2,NE` cross potential
+  against Fortran `saft_interface::potential`).
 
 Five verified upstream Fortran defects (extra hard-sphere $a_{VV}$,
 `calc_saftvrmie_hard_sphere` $F_{TV}$ sign and unguarded optional `F`,

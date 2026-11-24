@@ -216,27 +216,562 @@ fn test_saft_vrmie_quantum_h2() {
     assert!((st.ln_phi[0] - 3.2124502130409543e-02).abs() < 1e-5);
 }
 
-#[test]
-fn exact_source_tvn() {
+#[derive(Debug, Clone, Copy)]
+enum RefSlot {
+    Value(f64),
+    UnsupportedSource,
+}
+
+#[derive(Debug, Default)]
+struct FixtureCoverage {
+    total_cases: usize,
+    per_kind: [usize; 8],
+    scalar_comparisons: usize,
+    unsupported_source_slots: usize,
+}
+
+type FixtureKey<'a> = [&'a str; 12];
+
+// Independently pinned expected case roster for `tests/fixtures/saftvrmie_tvn.csv`.
+// Each entry is [components, ref, order, hs, terms, cutoff, shift, kind, T, V, n, variant].
+const EXPECTED_FIXTURE_CASES: &[FixtureKey<'static>] = &[
+    // kind=0: extensive TVN residual Helmholtz (34 cases)
+    [
+        "CO2,C1", "DEFAULT", "-1", "1", "31", "0", "0", "0", "280", "0.0004", "0.8,1.2", "default",
+    ],
+    [
+        "NH3", "DEFAULT", "-1", "1", "31", "0", "0", "0", "320", "0.0003", "2", "default",
+    ],
+    [
+        "H2O,MEOH", "DEFAULT", "-1", "1", "31", "0", "0", "0", "380", "0.0003", "0.8,1.2",
+        "default",
+    ],
+    [
+        "ETOH,C1", "DEFAULT", "-1", "1", "31", "0", "0", "0", "350", "0.0004", "1.2,0.8", "default",
+    ],
+    [
+        "CO2,C1", "DEFAULT", "-1", "2", "31", "0", "0", "0", "280", "0.0004", "0.8,1.2", "default",
+    ],
+    [
+        "CO2,C1", "DEFAULT", "-1", "3", "31", "0", "0", "0", "280", "0.0004", "0.8,1.2", "default",
+    ],
+    [
+        "CO2,C1", "DEFAULT", "-1", "4", "31", "0", "0", "0", "280", "0.0004", "0.8,1.2", "default",
+    ],
+    [
+        "CO2,C1", "DEFAULT", "-1", "5", "31", "0", "0", "0", "280", "0.0004", "0.8,1.2", "default",
+    ],
+    [
+        "CO2,C1", "DEFAULT", "-1", "1", "1", "0", "0", "0", "280", "0.0004", "0.8,1.2", "default",
+    ],
+    [
+        "CO2,C1", "DEFAULT", "-1", "1", "2", "0", "0", "0", "280", "0.0004", "0.8,1.2", "default",
+    ],
+    [
+        "CO2,C1", "DEFAULT", "-1", "1", "4", "0", "0", "0", "280", "0.0004", "0.8,1.2", "default",
+    ],
+    [
+        "CO2,C1", "DEFAULT", "-1", "1", "8", "0", "0", "0", "280", "0.0004", "0.8,1.2", "default",
+    ],
+    [
+        "CO2,C1", "DEFAULT", "-1", "1", "16", "0", "0", "0", "280", "0.0004", "0.8,1.2", "default",
+    ],
+    [
+        "CO2", "DEFAULT", "-1", "1", "31", "3.5", "0", "0", "300", "0.0004", "2", "default",
+    ],
+    [
+        "CO2", "DEFAULT", "-1", "1", "31", "3.5", "1", "0", "300", "0.0004", "2", "default",
+    ],
+    [
+        "H2", "DEFAULT", "0", "4", "31", "0", "0", "0", "40", "0.0005", "2", "default",
+    ],
+    [
+        "H2,NE", "DEFAULT", "0", "5", "31", "0", "0", "0", "54", "0.0005", "1.3,0.7", "default",
+    ],
+    [
+        "H2", "DEFAULT", "1", "4", "31", "0", "0", "0", "40", "0.0005", "2", "default",
+    ],
+    [
+        "H2,NE", "DEFAULT", "1", "5", "31", "0", "0", "0", "54", "0.0005", "1.3,0.7", "default",
+    ],
+    [
+        "H2", "DEFAULT", "2", "4", "31", "0", "0", "0", "40", "0.0005", "2", "default",
+    ],
+    [
+        "H2,NE", "DEFAULT", "2", "5", "31", "0", "0", "0", "54", "0.0005", "1.3,0.7", "default",
+    ],
+    [
+        "H2O,MEOH", "DEFAULT", "-1", "1", "31", "0", "0", "0", "380", "0.0015", "4,6", "default",
+    ],
+    [
+        "H2O,MEOH", "DEFAULT", "-1", "1", "31", "0", "0", "0", "380", "0.0003", "0.8,1.2", "elliot",
+    ],
+    [
+        "H2,NE",
+        "DEFAULT",
+        "1",
+        "5",
+        "31",
+        "0",
+        "0",
+        "0",
+        "54",
+        "0.0005",
+        "1.3,0.7",
+        "additive-exact-quantum",
+    ],
+    [
+        "H2",
+        "DEFAULT",
+        "2",
+        "4",
+        "31",
+        "3.5",
+        "1",
+        "0",
+        "45",
+        "0.0005",
+        "2",
+        "jaen-kahn",
+    ],
+    [
+        "H2,NE",
+        "DEFAULT",
+        "2",
+        "4",
+        "31",
+        "0",
+        "0",
+        "0",
+        "54",
+        "0.0005",
+        "1.3,0.7",
+        "geometric",
+    ],
+    [
+        "H2,NE",
+        "DEFAULT",
+        "2",
+        "4",
+        "31",
+        "0",
+        "0",
+        "0",
+        "54",
+        "0.0005",
+        "1.3,0.7",
+        "arithmetic-cross",
+    ],
+    [
+        "H2,NE", "DEFAULT", "2", "4", "31", "0", "0", "0", "54", "0.0005", "1.3,0.7", "linear",
+    ],
+    [
+        "H2,NE", "DEFAULT", "2", "4", "31", "0", "0", "0", "54", "0.0005", "1.3,0.7", "bmcsl",
+    ],
+    [
+        "H2,NE", "DEFAULT", "2", "4", "31", "0", "0", "0", "54", "0.0005", "1.3,0.7", "kolafa",
+    ],
+    [
+        "H2,NE", "DEFAULT", "2", "4", "31", "0", "0", "0", "54", "0.0005", "1.3,0.7", "pair-a3",
+    ],
+    [
+        "H2,NE",
+        "DEFAULT",
+        "2",
+        "4",
+        "31",
+        "0",
+        "0",
+        "0",
+        "54",
+        "0.0005",
+        "1.3,0.7",
+        "classical-a2",
+    ],
+    [
+        "H2,NE",
+        "DEFAULT",
+        "2",
+        "4",
+        "31",
+        "0",
+        "0",
+        "0",
+        "54",
+        "0.00025",
+        "0.65,0.35",
+        "linear-then-nonadd",
+    ],
+    [
+        "CO2,C1", "DEFAULT", "-1", "5", "31", "0", "0", "0", "280", "0.0004", "0.8,1.2", "no-extra",
+    ],
+    // kind=1: DFT molar dispersion (4 cases)
+    [
+        "H2O,MEOH", "DEFAULT", "-1", "1", "31", "0", "0", "1", "380", "0.0003", "0.8,1.2",
+        "default",
+    ],
+    [
+        "H2,HE", "DEFAULT", "2", "4", "31", "0", "0", "1", "65", "0.0007", "0.7,1.3", "default",
+    ],
+    [
+        "CO2", "DEFAULT", "-1", "1", "31", "3.5", "1", "1", "300", "0.0004", "2", "default",
+    ],
+    [
+        "H2", "DEFAULT", "2", "4", "31", "3.5", "1", "1", "45", "0.0005", "2", "default",
+    ],
+    // kind=2: Dufal association RDF (1 case)
+    [
+        "H2O,MEOH", "DEFAULT", "-1", "1", "31", "0", "0", "2", "380", "0.0003", "0.8,1.2",
+        "default",
+    ],
+    // kind=3: DFT molar hard-sphere (4 cases)
+    [
+        "H2O,MEOH", "DEFAULT", "-1", "1", "31", "0", "0", "3", "380", "0.0003", "0.8,1.2",
+        "default",
+    ],
+    [
+        "H2,HE", "DEFAULT", "2", "4", "31", "0", "0", "3", "65", "0.0007", "0.7,1.3", "default",
+    ],
+    [
+        "CO2,C1", "DEFAULT", "-1", "5", "31", "0", "0", "3", "280", "0.0004", "0.8,1.2", "no-extra",
+    ],
+    [
+        "CO2,C1", "DEFAULT", "-1", "5", "31", "0", "0", "3", "280", "0.0004", "0.8,1.2", "default",
+    ],
+    // kind=4: Normal TP states (8 cases)
+    [
+        "CO2,C1",
+        "DEFAULT",
+        "-1",
+        "1",
+        "31",
+        "0",
+        "2",
+        "4",
+        "280",
+        "5000000.0",
+        "0.4,0.6",
+        "default",
+    ],
+    [
+        "CO2,C1",
+        "DEFAULT",
+        "-1",
+        "1",
+        "31",
+        "0",
+        "1",
+        "4",
+        "250",
+        "8000000.0",
+        "0.8,0.2",
+        "default",
+    ],
+    [
+        "NH3",
+        "DEFAULT",
+        "-1",
+        "1",
+        "31",
+        "0",
+        "1",
+        "4",
+        "320",
+        "5000000.0",
+        "1",
+        "default",
+    ],
+    [
+        "H2O,MEOH",
+        "DEFAULT",
+        "-1",
+        "1",
+        "31",
+        "0",
+        "1",
+        "4",
+        "380",
+        "5000000.0",
+        "0.4,0.6",
+        "default",
+    ],
+    [
+        "H2O,MEOH",
+        "DEFAULT",
+        "-1",
+        "1",
+        "31",
+        "0",
+        "1",
+        "4",
+        "380",
+        "5000000.0",
+        "0.4,0.6",
+        "elliot",
+    ],
+    [
+        "ETOH,C1",
+        "DEFAULT",
+        "-1",
+        "1",
+        "31",
+        "0",
+        "2",
+        "4",
+        "350",
+        "3000000.0",
+        "0.6,0.4",
+        "default",
+    ],
+    [
+        "H2",
+        "DEFAULT",
+        "1",
+        "4",
+        "31",
+        "0",
+        "2",
+        "4",
+        "40",
+        "2000000.0",
+        "1",
+        "default",
+    ],
+    [
+        "H2,NE",
+        "DEFAULT",
+        "2",
+        "4",
+        "31",
+        "0",
+        "2",
+        "4",
+        "54",
+        "3000000.0",
+        "0.65,0.35",
+        "default",
+    ],
+    // kind=5: Model-side FMT/DFT hooks (4 cases)
+    [
+        "CO2,C1", "DEFAULT", "-1", "1", "31", "0", "0", "5", "280", "0.0004", "0.4,0.6", "default",
+    ],
+    [
+        "CO2", "DEFAULT", "-1", "1", "31", "3.5", "1", "5", "300", "0.0004", "1", "default",
+    ],
+    [
+        "H2,NE",
+        "DEFAULT",
+        "2",
+        "4",
+        "31",
+        "0",
+        "0",
+        "5",
+        "54",
+        "0.0005",
+        "0.65,0.35",
+        "default",
+    ],
+    [
+        "H2,NE",
+        "DEFAULT",
+        "2",
+        "4",
+        "31",
+        "0",
+        "0",
+        "5",
+        "54",
+        "0.0005",
+        "0.65,0.35",
+        "arithmetic-cross",
+    ],
+    // kind=6: Pure-fluid saturation (4 cases)
+    [
+        "H2O", "DEFAULT", "-1", "1", "31", "0", "0", "6", "300", "0", "1", "default",
+    ],
+    [
+        "H2O", "DEFAULT", "-1", "1", "31", "0", "0", "6", "325", "0", "1", "default",
+    ],
+    [
+        "H2O", "DEFAULT", "-1", "1", "31", "0", "0", "6", "373.15", "0", "1", "default",
+    ],
+    [
+        "CO2", "DEFAULT", "-1", "1", "31", "0", "0", "6", "260", "0", "1", "default",
+    ],
+    // kind=7: Pair potential & force (5 cases)
+    [
+        "CO2", "DEFAULT", "-1", "1", "31", "0", "0", "7", "260", "0.5", "1", "default",
+    ],
+    [
+        "CO2", "DEFAULT", "-1", "1", "31", "0", "0", "7", "260", "1.3", "1", "default",
+    ],
+    [
+        "CO2", "DEFAULT", "-1", "1", "31", "3.5", "1", "7", "300", "1.3", "1", "default",
+    ],
+    [
+        "CO2", "DEFAULT", "-1", "1", "31", "3.5", "1", "7", "300", "3.6", "1", "default",
+    ],
+    [
+        "H2,NE",
+        "DEFAULT",
+        "2",
+        "4",
+        "31",
+        "0",
+        "0",
+        "7",
+        "54",
+        "1.2",
+        "0.65,0.35",
+        "default",
+    ],
+];
+
+const EXPECTED_PER_KIND: [usize; 8] = [34, 4, 1, 4, 8, 4, 4, 5];
+
+fn slot_tolerances(kind: &str, nc: usize) -> Vec<(f64, f64)> {
+    match kind {
+        "4" => {
+            // [Z, dZ/dT, dZ/dP, dZ/dn(nc), H_res.., H.., S_res.., S.., lnphi(nc), dT(nc), dP(nc), dn(nc*nc), sos]
+            let mut tols = Vec::with_capacity(16 + 8 * nc + nc * nc);
+            // Z: dimensionless, 1/K, 1/Pa, 1/mol
+            tols.extend([(1e-12, 1e-9), (1e-13, 1e-8), (1e-16, 1e-8)]);
+            tols.extend(std::iter::repeat_n((1e-12, 1e-8), nc));
+            // H_res and H: J/mol, J/(mol K), m^3/mol, J/mol
+            for _ in 0..2 {
+                tols.extend([(1e-8, 1e-9), (1e-9, 1e-8), (1e-14, 1e-8)]);
+                tols.extend(std::iter::repeat_n((1e-8, 1e-8), nc));
+            }
+            // S_res and S: J/(mol K), J/(mol K^2), m^3/(mol K), J/(mol K)
+            for _ in 0..2 {
+                tols.extend([(1e-9, 1e-9), (1e-11, 1e-8), (1e-15, 1e-8)]);
+                tols.extend(std::iter::repeat_n((1e-9, 1e-8), nc));
+            }
+            // ln_phi, d/dT, d/dP, d/dn
+            tols.extend(std::iter::repeat_n((1e-11, 1e-9), nc));
+            tols.extend(std::iter::repeat_n((1e-12, 1e-8), nc));
+            tols.extend(std::iter::repeat_n((1e-16, 1e-8), nc));
+            tols.extend(std::iter::repeat_n((1e-12, 1e-8), nc * nc));
+            // speed of sound [m/s]
+            tols.push((1e-8, 1e-8));
+            tols
+        }
+        "5" => {
+            // [d(nc) [m], d_T(nc) [m/K], d_TT(nc) [m/K^2], d_ij [m], d_ij_T [m/K],
+            //  sigma_eff [m], eps_eff [K], alpha(nc*nc) [1], de_broglie [m]]
+            let mut tols = Vec::with_capacity(5 + 3 * nc + nc * nc);
+            tols.extend(std::iter::repeat_n((1e-22, 1e-10), nc));
+            tols.extend(std::iter::repeat_n((1e-26, 1e-8), nc));
+            tols.extend(std::iter::repeat_n((1e-29, 1e-7), nc));
+            tols.extend([
+                (1e-22, 1e-10),
+                (1e-26, 1e-8),
+                (1e-22, 1e-10),
+                (1e-12, 1e-10),
+            ]);
+            tols.extend(std::iter::repeat_n((1e-12, 1e-10), nc * nc));
+            tols.push((1e-22, 1e-10));
+            tols
+        }
+        "6" => {
+            // [P_sat [Pa], v_liq [m^3/mol], v_vap [m^3/mol]]
+            vec![(1e-12, 1e-8), (1e-18, 1e-8), (1e-18, 1e-8)]
+        }
+        "7" => {
+            // [u/kB [K], force/kB [K/m]]
+            vec![(1e-12, 1e-10), (1e-12, 1e-9)]
+        }
+        _ => {
+            // TVN blocks (kinds 0, 1, 2, 3)
+            vec![(1e-14, 3e-8); 6 + 3 * nc + nc * nc]
+        }
+    }
+}
+
+fn verify_saftvrmie_fixture(csv: &str) -> Result<FixtureCoverage, Vec<String>> {
+    use std::collections::BTreeSet;
     use thermopack_rs::association::DeltaCombRule;
     use thermopack_rs::saft_vrmie::{
         HardSphereReference as Hs, MieTerms, PackingRule, QuantumVariant, SaftVrMieHelmholtz,
     };
-    let path = std::env::var_os("SAFTVRMIE_FIXTURE")
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(|| {
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("tests/fixtures/saftvrmie_tvn.csv")
-        });
-    let csv = std::fs::read_to_string(path).unwrap();
-    let numbers = |s: &str| {
+
+    let parse_numbers = |s: &str| -> Result<Vec<f64>, String> {
         s.split(',')
-            .map(|v| v.parse::<f64>().unwrap())
-            .collect::<Vec<_>>()
+            .map(|v| {
+                v.parse::<f64>()
+                    .map_err(|e| format!("invalid float '{v}': {e}"))
+            })
+            .collect()
     };
+    let parse_ref_slots = |s: &str| -> Result<Vec<RefSlot>, String> {
+        s.split(',')
+            .map(|v| {
+                if v == "UNSUPPORTED_SOURCE" {
+                    Ok(RefSlot::UnsupportedSource)
+                } else {
+                    v.parse::<f64>()
+                        .map(RefSlot::Value)
+                        .map_err(|e| format!("invalid reference token '{v}': {e}"))
+                }
+            })
+            .collect()
+    };
+
+    let mut lines = csv.lines();
+    let Some(header) = lines.next() else {
+        return Err(vec!["empty SAFT-VR Mie fixture".to_string()]);
+    };
+    if !header.starts_with("components;ref;order;") {
+        return Err(vec![format!("unexpected fixture header: {header}")]);
+    }
+
+    let expected_keys: BTreeSet<FixtureKey<'static>> =
+        EXPECTED_FIXTURE_CASES.iter().copied().collect();
+    let mut seen_keys: BTreeSet<[String; 12]> = BTreeSet::new();
+    let mut coverage = FixtureCoverage::default();
     let mut failures = Vec::new();
-    for line in csv.lines().skip(1) {
+
+    for (row_idx, line) in lines.enumerate() {
+        if line.trim().is_empty() {
+            failures.push(format!("row {}: unexpected blank line", row_idx + 2));
+            continue;
+        }
         let fields: Vec<_> = line.split(';').collect();
+        if fields.len() != 15 {
+            failures.push(format!(
+                "row {}: expected 15 columns, found {}",
+                row_idx + 2,
+                fields.len()
+            ));
+            continue;
+        }
+        let key_refs: [&str; 12] = fields[..12].try_into().unwrap();
+        let key_owned: [String; 12] = std::array::from_fn(|i| fields[i].to_string());
+        if !expected_keys.contains(&key_refs) {
+            failures.push(format!(
+                "row {}: unexpected fixture case {:?}",
+                row_idx + 2,
+                key_refs
+            ));
+        }
+        if !seen_keys.insert(key_owned) {
+            failures.push(format!(
+                "row {}: duplicate fixture case {:?}",
+                row_idx + 2,
+                key_refs
+            ));
+        }
+        let kind_idx: usize = match fields[7].parse() {
+            Ok(k) if k < 8 => k,
+            _ => {
+                failures.push(format!("row {}: unknown kind {}", row_idx + 2, fields[7]));
+                continue;
+            }
+        };
+        coverage.total_cases += 1;
+        coverage.per_kind[kind_idx] += 1;
+
         let comps: Vec<_> = fields[0].split(',').collect();
         let order = fields[2].parse::<i32>().unwrap();
         let mut model = if order < 0 {
@@ -271,6 +806,12 @@ fn exact_source_tvn() {
             "geometric" => opts.geometric_epsilon = true,
             "arithmetic-cross" => opts.exact_cross_potential = false,
             "linear" => opts.packing = PackingRule::Linear,
+            "linear-then-nonadd" => {
+                opts.packing = PackingRule::Linear;
+                model.set_options(opts).unwrap();
+                model.set_hard_sphere_reference(Hs::NonAdditive);
+                opts = model.options();
+            }
             "bmcsl" => opts.bmcsl_compressibility = true,
             "kolafa" => opts.kolafa_pure_reference = true,
             "pair-a3" => opts.pair_prefactor_a3 = true,
@@ -285,10 +826,22 @@ fn exact_source_tvn() {
         if cutoff > 0. {
             model.set_cutoff(Some((cutoff, fields[6] == "1"))).unwrap();
         }
-        let t = fields[8].parse().unwrap();
-        let v = fields[9].parse().unwrap();
-        let n = numbers(fields[10]);
-        let mut expected = numbers(fields[12]);
+        let t = fields[8].parse::<f64>().unwrap();
+        let v = fields[9].parse::<f64>().unwrap();
+        let n = match parse_numbers(fields[10]) {
+            Ok(vals) => vals,
+            Err(err) => {
+                failures.push(format!("{:?}: {err}", key_refs));
+                continue;
+            }
+        };
+        let mut expected = match parse_ref_slots(fields[12]) {
+            Ok(vals) => vals,
+            Err(err) => {
+                failures.push(format!("{:?}: {err}", key_refs));
+                continue;
+            }
+        };
         let values = match fields[7] {
             "4" => {
                 let phase = match fields[6] {
@@ -322,11 +875,7 @@ fn exact_source_tvn() {
                 let (seff, _, _) = model.effective_sigma_ij(0, n.len() - 1, t).unwrap();
                 let (eeff, _, _) = model.effective_epsilon_ij(0, n.len() - 1, t).unwrap();
                 let amat = model.alpha_vdw(t).unwrap();
-                let lam_db = if order >= 0 {
-                    model.de_broglie_wavelength(0, t).unwrap()
-                } else {
-                    0.0
-                };
+                let lam_db = model.de_broglie_wavelength(0, t).unwrap();
                 let mut vals = Vec::new();
                 vals.extend(d_diag);
                 vals.extend(dt_diag);
@@ -335,6 +884,33 @@ fn exact_source_tvn() {
                 vals.extend(amat);
                 vals.push(lam_db);
                 vals
+            }
+            "6" => {
+                let prep = model.prepare(t, &n).unwrap();
+                let sat = prep.saturation_pressure(t).unwrap();
+                let clapeyron_err =
+                    (sat.enthalpy_vaporization - t * sat.entropy_vaporization).abs();
+                if !clapeyron_err.is_finite()
+                    || clapeyron_err > 1e-7 * sat.enthalpy_vaporization.abs().max(1.0)
+                {
+                    failures.push(format!(
+                        "{:?}: Delta H != T Delta S ({:.8e} vs {:.8e})",
+                        key_refs,
+                        sat.enthalpy_vaporization,
+                        t * sat.entropy_vaporization
+                    ));
+                }
+                vec![sat.pressure, sat.liquid_volume, sat.vapor_volume]
+            }
+            "7" => {
+                let nc = n.len();
+                let comp0 = model.components()[0];
+                let comp_last = model.components()[nc - 1];
+                let sigma_ij =
+                    0.5 * (comp0.sigma + comp_last.sigma) * (1.0 - model.get_lij(0, nc - 1));
+                let r = v * sigma_ij;
+                let (u, force) = model.pair_potential(0, nc - 1, r, t).unwrap();
+                vec![u, force]
             }
             kind => {
                 let f = if kind == "2" {
@@ -376,30 +952,117 @@ fn exact_source_tvn() {
                     && matches!(kind, "0" | "3")
                     && opts.extra_hard_sphere
                 {
-                    expected[5 + 2 * n.len()] = fields[13].parse().unwrap();
+                    let dv_fv: f64 = fields[13].parse().unwrap();
+                    expected[5 + 2 * n.len()] = RefSlot::Value(dv_fv);
                     if kind == "3" {
-                        expected[4 + n.len()] = fields[14].parse().unwrap();
+                        let dt_fv: f64 = fields[14].parse().unwrap();
+                        expected[4 + n.len()] = RefSlot::Value(dt_fv);
                     }
                 }
                 vals
             }
         };
-        assert_eq!(expected.len(), values.len());
-        let (atol, rtol) = if fields[7] == "4" {
-            (1e-10, 1e-7)
-        } else {
-            (2e-11, 3e-8)
-        };
-        for (index, (value, reference)) in values.iter().zip(expected).enumerate() {
-            if !value.is_finite() || (value - reference).abs() > atol + rtol * reference.abs() {
-                failures.push(format!(
-                    "{:?} block {index}: {value:.8e} vs {reference:.8e}",
-                    &fields[..12]
-                ));
+        let tols = slot_tolerances(fields[7], n.len());
+        if expected.len() != values.len() || tols.len() != values.len() {
+            failures.push(format!(
+                "{:?}: length mismatch expected={} values={} tols={}",
+                key_refs,
+                expected.len(),
+                values.len(),
+                tols.len()
+            ));
+            continue;
+        }
+        for (index, ((&value, slot), (atol, rtol))) in
+            values.iter().zip(expected).zip(tols).enumerate()
+        {
+            match slot {
+                RefSlot::UnsupportedSource => {
+                    // Only the classical `de_Broglie_wavelength` slot on kind=5 (upstream
+                    // zero-mass divide-by-zero in src/saft_interface.f90:860) is permitted
+                    // to be marked UNSUPPORTED_SOURCE.
+                    if fields[7] == "5" && order < 0 && index + 1 == values.len() {
+                        coverage.unsupported_source_slots += 1;
+                        let comp0 = model.components()[0];
+                        let mass = 1.0e-3 * comp0.molar_mass / 6.02214076e23;
+                        let closed = 6.626069311e-34
+                            / (2.0 * std::f64::consts::PI * mass * 1.380649e-23 * t).sqrt();
+                        if !value.is_finite() || (value - closed).abs() > 1e-13 * closed {
+                            failures.push(format!(
+                                "{:?} block {index} (classical de Broglie closed form): {value:.8e} vs {closed:.8e}",
+                                key_refs
+                            ));
+                        }
+                    } else {
+                        failures.push(format!(
+                            "{:?} block {index}: unexpected UNSUPPORTED_SOURCE marker",
+                            key_refs
+                        ));
+                    }
+                }
+                RefSlot::Value(reference) => {
+                    coverage.scalar_comparisons += 1;
+                    if !value.is_finite()
+                        || !reference.is_finite()
+                        || (value - reference).abs() > atol + rtol * reference.abs()
+                    {
+                        failures.push(format!(
+                            "{:?} block {index}: {value:.8e} vs {reference:.8e} (atol={atol:.1e}, rtol={rtol:.1e})",
+                            key_refs
+                        ));
+                    }
+                }
             }
         }
     }
-    assert!(failures.is_empty(), "{}", failures.join("\n"));
+
+    for expected_key in &expected_keys {
+        let owned: [String; 12] = std::array::from_fn(|i| expected_key[i].to_string());
+        if !seen_keys.contains(&owned) {
+            failures.push(format!("missing expected fixture case {:?}", expected_key));
+        }
+    }
+    if coverage.total_cases != EXPECTED_FIXTURE_CASES.len() {
+        failures.push(format!(
+            "case count mismatch: got {}, expected {}",
+            coverage.total_cases,
+            EXPECTED_FIXTURE_CASES.len()
+        ));
+    }
+    if coverage.per_kind != EXPECTED_PER_KIND {
+        failures.push(format!(
+            "per-kind count mismatch: got {:?}, expected {:?}",
+            coverage.per_kind, EXPECTED_PER_KIND
+        ));
+    }
+    if coverage.unsupported_source_slots != 2 {
+        failures.push(format!(
+            "unsupported source slot count mismatch: got {}, expected 2",
+            coverage.unsupported_source_slots
+        ));
+    }
+
+    if failures.is_empty() {
+        Ok(coverage)
+    } else {
+        Err(failures)
+    }
+}
+
+#[test]
+fn exact_source_tvn() {
+    let path = std::env::var_os("SAFTVRMIE_FIXTURE")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| {
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("tests/fixtures/saftvrmie_tvn.csv")
+        });
+    let csv = std::fs::read_to_string(path).unwrap();
+    let coverage =
+        verify_saftvrmie_fixture(&csv).unwrap_or_else(|errs| panic!("{}", errs.join("\n")));
+    assert_eq!(coverage.total_cases, EXPECTED_FIXTURE_CASES.len());
+    assert_eq!(coverage.per_kind, EXPECTED_PER_KIND);
+    assert_eq!(coverage.unsupported_source_slots, 2);
 }
 
 #[test]
@@ -717,4 +1380,352 @@ fn test_saft_vrmie_fmt_compatibility_and_model_hooks() {
     assert!((q.de_boer_parameter(0).unwrap() - lam0 * 1.1).abs() < 1e-12);
     let ldb = q.de_broglie_wavelength(0, 40.0).unwrap();
     assert!(ldb > 0.0 && ldb.is_finite());
+}
+
+#[test]
+fn test_saft_vrmie_tv_tp_entropy_and_saturation_clapeyron() {
+    // CO2/C1 = 0.4/0.6 at 280 K and 5 MPa: prepared TV state total entropy must
+    // match state_tp total entropy (no extra R*ln(Z)).
+    let mix = SaftVrMie::new(&["CO2", "C1"]).unwrap();
+    let tp = mix
+        .state_tp(280.0, 5.0e6, &[0.4, 0.6], Phase::Vapor)
+        .unwrap();
+    let tv = mix
+        .prepare(280.0, &[0.4, 0.6])
+        .unwrap()
+        .state(1.0 / tp.volume)
+        .unwrap();
+    assert!(
+        (tv.s_total - tp.entropy.value).abs() < 1e-10,
+        "TV/TP s_total mismatch: tv={} vs tp={}",
+        tv.s_total,
+        tp.entropy.value
+    );
+    assert!((tv.s_residual - tp.residual_entropy.value).abs() < 1e-10);
+    assert!((tv.h_total - tp.enthalpy.value).abs() < 1e-9);
+    assert!((tv.g_residual - tp.residual_gibbs.value).abs() < 1e-9);
+    for (a, b) in tv.ln_phi.iter().zip(&tp.ln_fugacity.ln_phi) {
+        assert!((a - b).abs() < 1e-11);
+    }
+
+    // Pure CO2 saturation at 260 K must satisfy Delta H = T * Delta S.
+    let co2 = SaftVrMie::new(&["CO2"]).unwrap();
+    let sat = co2
+        .prepare(260.0, &[1.0])
+        .unwrap()
+        .saturation_pressure(260.0)
+        .unwrap();
+    let tds = 260.0 * sat.entropy_vaporization;
+    assert!(
+        (sat.enthalpy_vaporization - tds).abs() < 1e-7 * sat.enthalpy_vaporization.abs(),
+        "CO2 260 K Delta H ({}) != T Delta S ({})",
+        sat.enthalpy_vaporization,
+        tds
+    );
+}
+
+#[test]
+fn test_saft_vrmie_cold_associating_saturation() {
+    // Water at 300 K and 325 K must converge cleanly using the common-pressure
+    // Gibbs residual and match exact Fortran safe_bubP and Delta H = T Delta S.
+    let h2o = SaftVrMie::new(&["H2O"]).unwrap();
+    for &(t, ref_p) in &[(300.0, 3583.558125_f64), (325.0, 13503.845912_f64)] {
+        let prep = h2o.prepare(t, &[1.0]).unwrap();
+        let sat = prep.saturation_pressure(t).unwrap();
+        assert!(
+            (sat.pressure - ref_p).abs() < 1e-6 * ref_p,
+            "H2O {t} K P_sat={} vs Fortran {}",
+            sat.pressure,
+            ref_p
+        );
+        assert!(sat.liquid_volume < sat.vapor_volume);
+        let jl = prep
+            .pressure_and_derivatives(1.0 / sat.liquid_volume)
+            .unwrap();
+        let jv = prep
+            .pressure_and_derivatives(1.0 / sat.vapor_volume)
+            .unwrap();
+        assert!((jl.pressure - sat.pressure).abs() < 1e-6 * sat.pressure);
+        assert!((jv.pressure - sat.pressure).abs() < 1e-6 * sat.pressure);
+        let tds = t * sat.entropy_vaporization;
+        assert!(
+            (sat.enthalpy_vaporization - tds).abs() < 1e-7 * sat.enthalpy_vaporization.abs(),
+            "H2O {t} K Delta H ({}) != T Delta S ({})",
+            sat.enthalpy_vaporization,
+            tds
+        );
+    }
+}
+
+#[test]
+fn test_saft_vrmie_tp_mole_derivative_contract() {
+    // Verify the explicit partial-molar vs intensive raw-mole derivative contract
+    // on CO2/C1 at 280 K, 5 MPa, n = [0.8, 1.2].
+    let eos = SaftVrMie::new(&["CO2", "C1"]).unwrap();
+    let t = 280.0;
+    let p = 5.0e6;
+    let n = [0.8, 1.2];
+    let total = n[0] + n[1];
+    let x = [n[0] / total, n[1] / total];
+    let tp = eos.state_tp(t, p, &n, Phase::Vapor).unwrap();
+
+    // 1. Euler identity for all partial molar fields: sum_i x_i * q_bar_i = q.
+    for block in [
+        &tp.specific_volume,
+        &tp.residual_enthalpy,
+        &tp.enthalpy,
+        &tp.residual_entropy,
+        &tp.entropy,
+        &tp.residual_gibbs,
+    ] {
+        let euler = x[0] * block.dn[0] + x[1] * block.dn[1];
+        assert!(
+            (euler - block.value).abs() < 1e-11 * (1.0 + block.value.abs()),
+            "Euler identity failed: {euler} vs {}",
+            block.value
+        );
+        // Zero-degree intensive derivative satisfies sum_i n_i * (dq/dn_i) = 0.
+        let idn = block.intensive_dn(total).unwrap();
+        assert!((n[0] * idn[0] + n[1] * idn[1]).abs() < 1e-11 * (1.0 + block.value.abs()));
+    }
+
+    // 2. Central finite differences wrt n[0]:
+    //    - block.dn[0] matches d(N * q)/dn[0] (partial molar)
+    //    - block.intensive_dn(N)[0] matches dq/dn[0] (intensive raw-mole)
+    //    - compressibility_factor.dn[0] and ln_fugacity.dn match intensive raw-mole directly.
+    let h = 2.0e-6;
+    let np = [n[0] + h, n[1]];
+    let nm = [n[0] - h, n[1]];
+    let tp_p = eos.state_tp(t, p, &np, Phase::Vapor).unwrap();
+    let tp_m = eos.state_tp(t, p, &nm, Phase::Vapor).unwrap();
+
+    let fd_v_extensive = ((np[0] + np[1]) * tp_p.specific_volume.value
+        - (nm[0] + nm[1]) * tp_m.specific_volume.value)
+        / (2.0 * h);
+    let fd_v_intensive = (tp_p.specific_volume.value - tp_m.specific_volume.value) / (2.0 * h);
+    assert!(
+        (tp.specific_volume.dn[0] - fd_v_extensive).abs() < 1e-8 * fd_v_extensive.abs(),
+        "partial molar v mismatch: {} vs {}",
+        tp.specific_volume.dn[0],
+        fd_v_extensive
+    );
+    let v_idn = tp.specific_volume.intensive_dn(total).unwrap();
+    assert!(
+        (v_idn[0] - fd_v_intensive).abs() < 1e-8 * fd_v_intensive.abs(),
+        "intensive dv/dn mismatch: {} vs {}",
+        v_idn[0],
+        fd_v_intensive
+    );
+
+    let fd_h_intensive = (tp_p.enthalpy.value - tp_m.enthalpy.value) / (2.0 * h);
+    let h_idn = tp.enthalpy.intensive_dn(total).unwrap();
+    assert!((h_idn[0] - fd_h_intensive).abs() < 1e-7 * (1.0 + fd_h_intensive.abs()));
+
+    let fd_s_intensive = (tp_p.entropy.value - tp_m.entropy.value) / (2.0 * h);
+    let s_idn = tp.entropy.intensive_dn(total).unwrap();
+    assert!((s_idn[0] - fd_s_intensive).abs() < 1e-7 * (1.0 + fd_s_intensive.abs()));
+
+    let fd_z = (tp_p.compressibility_factor.value - tp_m.compressibility_factor.value) / (2.0 * h);
+    assert!((tp.compressibility_factor.dn[0] - fd_z).abs() < 1e-8 * (1.0 + fd_z.abs()));
+    for i in 0..2 {
+        let fd_lnphi = (tp_p.ln_fugacity.ln_phi[i] - tp_m.ln_fugacity.ln_phi[i]) / (2.0 * h);
+        assert!(
+            (tp.ln_fugacity.dn[i * 2] - fd_lnphi).abs() < 1e-8 * (1.0 + fd_lnphi.abs()),
+            "d(ln phi[{i}])/dn[0] mismatch"
+        );
+    }
+
+    assert!(tp.specific_volume.intensive_dn(0.0).is_err());
+    assert!(tp.specific_volume.intensive_dn(-1.0).is_err());
+}
+
+#[test]
+fn test_saft_vrmie_nonadditive_preserves_packing_rule() {
+    use thermopack_rs::saft_vrmie::{HardSphereReference, PackingRule};
+
+    let mut q = SaftVrMie::new_quantum(&["H2", "NE"], 2, None).unwrap();
+    let mut opts = q.options();
+    opts.packing = PackingRule::Linear;
+    q.set_options(opts).unwrap();
+    // Reselecting NonAdditive must preserve the active Linear packing rule (Fortran behavior).
+    q.set_hard_sphere_reference(HardSphereReference::NonAdditive);
+    assert_eq!(q.options().packing, PackingRule::Linear);
+    let f = q
+        .residual_helmholtz_tvn(54.0, 2.5e-4, &[0.65, 0.35])
+        .unwrap();
+    assert!(
+        (f.f - -0.0911097035476).abs() < 1e-10,
+        "NonAdditive after Linear F mismatch: {}",
+        f.f
+    );
+
+    // Other presets must still set their Fortran-specified packing rules.
+    q.set_hard_sphere_reference(HardSphereReference::SingleComponent);
+    assert_eq!(q.options().packing, PackingRule::Leonard);
+    q.set_hard_sphere_reference(HardSphereReference::Lafitte);
+    assert_eq!(q.options().packing, PackingRule::Lafitte);
+    q.set_hard_sphere_reference(HardSphereReference::Additive);
+    assert_eq!(q.options().packing, PackingRule::Lafitte);
+    q.set_hard_sphere_reference(HardSphereReference::AdditiveExact);
+    assert_eq!(q.options().packing, PackingRule::Lafitte);
+}
+
+#[test]
+fn test_saft_vrmie_dilute_volume_closure_and_rejection() {
+    let eos = SaftVrMie::new(&["CO2", "C1"]).unwrap();
+    let t = 280.0;
+    let x = [0.4, 0.6];
+    let prep = eos.prepare(t, &x).unwrap();
+
+    // At 1e-24 Pa, the ideal-gas root is representable in f64 and must close P tightly.
+    let p_dilute = 1.0e-24;
+    let v = eos.volume_tp(t, p_dilute, &x, Phase::Vapor).unwrap();
+    let jet = prep.pressure_and_derivatives(1.0 / v).unwrap();
+    assert!(
+        (jet.pressure - p_dilute).abs() <= 1e-10 * p_dilute,
+        "dilute root pressure miss: P(v)={} vs target={}",
+        jet.pressure,
+        p_dilute
+    );
+
+    // At an unrepresentable ultra-low pressure where packing underflows the solver floor,
+    // volume_tp must return an error rather than a volume whose pressure misses the target.
+    assert!(eos.volume_tp(t, 1.0e-250, &x, Phase::Vapor).is_err());
+}
+
+#[test]
+fn test_saft_vrmie_shifted_alpha_vdw_invalid_cutoff() {
+    let mut co2 = SaftVrMie::new(&["CO2"]).unwrap();
+    co2.set_cutoff(Some((0.9, true))).unwrap();
+    assert!(
+        co2.alpha_vdw(260.0).is_err(),
+        "shifted alpha_vdw at r_cut=0.9 must return Err, not Ok([NaN])"
+    );
+
+    // Cutoff at sigma (1.0) or at the Mie minimum r_min has no attractive shifted well.
+    let comp = co2.components()[0];
+    let r_min = (comp.lambda_r / comp.lambda_a).powf(1.0 / (comp.lambda_r - comp.lambda_a));
+    for r_bad in [1.0, r_min] {
+        co2.set_cutoff(Some((r_bad, true))).unwrap();
+        assert!(co2.alpha_vdw(260.0).is_err());
+    }
+
+    // Valid cutoff above r_min succeeds with finite positive alpha.
+    co2.set_cutoff(Some((3.5, true))).unwrap();
+    let a = co2.alpha_vdw(300.0).unwrap();
+    assert_eq!(a.len(), 1);
+    assert!(a[0].is_finite() && a[0] > 0.0);
+}
+
+#[test]
+fn test_saft_vrmie_pair_potential_cap_and_raw() {
+    let co2 = SaftVrMie::new(&["CO2"]).unwrap();
+    let comp = co2.components()[0];
+    let r_core = 0.5 * comp.sigma;
+    let t = 260.0;
+
+    // Default pair_potential matches Fortran saft_interface::potential: caps u at 500*eps/kB
+    // while keeping force uncapped.
+    let (u_capped, f_capped) = co2.pair_potential(0, 0, r_core, t).unwrap();
+    let expected_cap = 500.0 * comp.eps_depth_divk;
+    assert!((u_capped - expected_cap).abs() < 1e-12 * expected_cap);
+
+    // Raw uncapped helper returns the full repulsive potential whose -du/dr matches force.
+    let (u_raw, f_raw) = co2.pair_potential_with_cap(0, 0, r_core, t, None).unwrap();
+    assert!(u_raw > 1.0e10);
+    assert_eq!(f_capped, f_raw);
+    let dr = r_core * 1.0e-6;
+    let (up, _) = co2
+        .pair_potential_with_cap(0, 0, r_core + dr, t, None)
+        .unwrap();
+    let (um, _) = co2
+        .pair_potential_with_cap(0, 0, r_core - dr, t, None)
+        .unwrap();
+    let fd_force = -(up - um) / (2.0 * dr);
+    assert!((f_raw - fd_force).abs() < 1e-6 * fd_force.abs());
+
+    // Custom cap mirrors max_pot_val_in; non-finite cap is rejected.
+    let (u_custom, _) = co2
+        .pair_potential_with_cap(0, 0, r_core, t, Some(100.0))
+        .unwrap();
+    assert!((u_custom - 100.0 * comp.eps_depth_divk).abs() < 1e-12);
+    assert!(
+        co2.pair_potential_with_cap(0, 0, r_core, t, Some(f64::NAN))
+            .is_err()
+    );
+}
+
+#[test]
+fn test_saft_vrmie_oracle_tamper_detection() {
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/saftvrmie_tvn.csv");
+    let csv = std::fs::read_to_string(path).unwrap();
+    let lines: Vec<&str> = csv.lines().collect();
+
+    // 1. Header-only fixture must fail.
+    let header_only = format!("{}\n", lines[0]);
+    assert!(verify_saftvrmie_fixture(&header_only).is_err());
+
+    // 2. Dropping any row must fail.
+    let dropped = format!("{}\n", lines[..lines.len() - 1].join("\n"));
+    assert!(verify_saftvrmie_fixture(&dropped).is_err());
+
+    // 3. Zeroing d_T, d_TT, and d_ij_T on a HOOKS row (kind=5) must fail.
+    let zeroed_hooks = lines
+        .iter()
+        .map(|&line| {
+            let mut fields: Vec<String> = line.split(';').map(String::from).collect();
+            if fields.len() == 15 && fields[7] == "5" && fields[0] == "CO2,C1" {
+                let mut blocks: Vec<String> = fields[12].split(',').map(String::from).collect();
+                // For nc=2: indices 2,3 = d_T; 4,5 = d_TT; 7 = d_ij_T.
+                for idx in [2, 3, 4, 5, 7] {
+                    blocks[idx] = "0.0".to_string();
+                }
+                fields[12] = blocks.join(",");
+                fields.join(";")
+            } else {
+                line.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(verify_saftvrmie_fixture(&zeroed_hooks).is_err());
+
+    // 4. Non-finite (NaN) reference value must fail.
+    let nan_ref = lines
+        .iter()
+        .enumerate()
+        .map(|(idx, &line)| {
+            if idx == 1 {
+                let mut fields: Vec<String> = line.split(';').map(String::from).collect();
+                let mut blocks: Vec<String> = fields[12].split(',').map(String::from).collect();
+                blocks[0] = "NaN".to_string();
+                fields[12] = blocks.join(",");
+                fields.join(";")
+            } else {
+                line.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(verify_saftvrmie_fixture(&nan_ref).is_err());
+
+    // 5. UNSUPPORTED_SOURCE on a quantum hook slot (where Fortran supports de Broglie) must fail.
+    let bad_unsupported = lines
+        .iter()
+        .map(|&line| {
+            let mut fields: Vec<String> = line.split(';').map(String::from).collect();
+            if fields.len() == 15 && fields[7] == "5" && fields[2] == "2" && fields[11] == "default"
+            {
+                let mut blocks: Vec<String> = fields[12].split(',').map(String::from).collect();
+                *blocks.last_mut().unwrap() = "UNSUPPORTED_SOURCE".to_string();
+                fields[12] = blocks.join(",");
+                fields.join(";")
+            } else {
+                line.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(verify_saftvrmie_fixture(&bad_unsupported).is_err());
 }

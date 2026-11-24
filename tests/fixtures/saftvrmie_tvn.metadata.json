@@ -1,7 +1,7 @@
 {
-  "cases": 34,
-  "fixture_sha256": "85328ff4a3fb4ddf5b8d47e3357f23593310e0776df621d86a0ee84ec5606ab1",
-  "probe_sha256": "11ed5038193588fb3cfd163c95cb4ebfe264b9e5ddbf5d64b5157866307f2ec8",
+  "cases": 54,
+  "fixture_sha256": "ca449c606048f06b17b27f58667a94576864b77ebdbd18f990aea6832cb8a0ef",
+  "probe_sha256": "353adc1aab08ce25ef19cffda6160b8d2640cb37c50bfe8271cc9738832cc670",
   "build": {
     "baseline": "d68c794",
     "compiler": "GNU Fortran (MinGW-W64 x86_64-ucrt-posix-seh, built by Brecht Sanders) 14.3.0",

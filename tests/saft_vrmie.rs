@@ -218,7 +218,10 @@ fn test_saft_vrmie_quantum_h2() {
 
 #[test]
 fn exact_source_tvn() {
-    use thermopack_rs::saft_vrmie::{HardSphereReference as Hs, MieTerms};
+    use thermopack_rs::association::DeltaCombRule;
+    use thermopack_rs::saft_vrmie::{
+        HardSphereReference as Hs, MieTerms, PackingRule, QuantumVariant, SaftVrMieHelmholtz,
+    };
     let path = std::env::var_os("SAFTVRMIE_FIXTURE")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| {
@@ -238,18 +241,22 @@ fn exact_source_tvn() {
         let order = fields[2].parse::<i32>().unwrap();
         let mut model = if order < 0 {
             SaftVrMie::new_with_options(&comps, fields[1])
+        } else if fields[11] == "additive-exact-quantum" {
+            SaftVrMie::new_quantum_with_hs_ref(&comps, order as u8, true, Some(fields[1]))
         } else {
             SaftVrMie::new_quantum(&comps, order as u8, Some(fields[1]))
         }
         .unwrap();
-        model.set_hard_sphere_reference(match fields[3] {
-            "1" => Hs::Lafitte,
-            "2" => Hs::SingleComponent,
-            "3" => Hs::Additive,
-            "4" => Hs::NonAdditive,
-            "5" => Hs::AdditiveExact,
-            _ => panic!("unknown reference"),
-        });
+        if fields[11] != "additive-exact-quantum" {
+            model.set_hard_sphere_reference(match fields[3] {
+                "1" => Hs::Lafitte,
+                "2" => Hs::SingleComponent,
+                "3" => Hs::Additive,
+                "4" => Hs::NonAdditive,
+                "5" => Hs::AdditiveExact,
+                _ => panic!("unknown reference"),
+            });
+        }
         let mask = fields[4].parse::<u8>().unwrap();
         model.set_terms(MieTerms {
             hard_sphere: mask & 1 != 0,
@@ -258,7 +265,6 @@ fn exact_source_tvn() {
             third: mask & 8 != 0,
             chain: mask & 16 != 0,
         });
-        use thermopack_rs::saft_vrmie::{PackingRule, QuantumVariant, SaftVrMieHelmholtz};
         let mut opts = model.options();
         match fields[11] {
             "jaen-kahn" => opts.quantum_variant = QuantumVariant::JaenKahn,
@@ -270,8 +276,9 @@ fn exact_source_tvn() {
             "pair-a3" => opts.pair_prefactor_a3 = true,
             "classical-a2" => opts.quantum_correct_a2 = false,
             "no-extra" => opts.extra_hard_sphere = false,
-            "default" => {}
-            _ => panic!("unknown options"),
+            "elliot" => model.set_delta_comb_rule(DeltaCombRule::Elliot).unwrap(),
+            "additive-exact-quantum" | "default" => {}
+            _ => panic!("unknown options: {}", fields[11]),
         }
         model.set_options(opts).unwrap();
         let cutoff: f64 = fields[5].parse().unwrap();
@@ -281,47 +288,110 @@ fn exact_source_tvn() {
         let t = fields[8].parse().unwrap();
         let v = fields[9].parse().unwrap();
         let n = numbers(fields[10]);
-        let f = if fields[7] == "2" {
-            let g = model.association_rdf_tvn(0, n.len() - 1, t, v, &n).unwrap();
-            Ok(SaftVrMieHelmholtz {
-                f: g.g,
-                f_t: g.temperature,
-                f_v: g.volume,
-                f_n: g.moles,
-                f_tt: g.temperature_second,
-                f_tv: g.temperature_volume,
-                f_tn: g.temperature_moles,
-                f_vv: g.volume_second,
-                f_vn: g.volume_moles,
-                f_nn: g.moles_second,
-                x_k: vec![],
-            })
-        } else if fields[7] == "1" {
-            model.dispersion_tvn(t, v, &n)
-        } else {
-            model.residual_helmholtz_tvn(t, v, &n)
-        }
-        .unwrap();
-        let mut values = vec![f.f, f.f_t, f.f_v];
-        values.extend(f.f_n);
-        values.extend([f.f_tt, f.f_tv]);
-        values.extend(f.f_tn);
-        values.push(f.f_vv);
-        values.extend(f.f_vn);
-        values.extend(f.f_nn);
         let mut expected = numbers(fields[12]);
-        // The extra hard-sphere term in the Fortran VV routine includes
-        // g/V^2 in place of g_V/V^2. Qualify using the Fortran V gradient.
-        if n.len() > 1
-            && matches!(fields[3], "3" | "5")
-            && fields[7] == "0"
-            && opts.extra_hard_sphere
-        {
-            expected[5 + 2 * n.len()] = fields[13].parse().unwrap();
-        }
+        let values = match fields[7] {
+            "4" => {
+                let phase = match fields[6] {
+                    "1" => Phase::Liquid,
+                    "2" => Phase::Vapor,
+                    "3" => Phase::MinimumGibbs,
+                    _ => panic!("unknown TP phase"),
+                };
+                let tp = model.state_tp(t, v, &n, phase).unwrap();
+                let mut vals = Vec::new();
+                for block in [
+                    &tp.compressibility_factor,
+                    &tp.residual_enthalpy,
+                    &tp.enthalpy,
+                    &tp.residual_entropy,
+                    &tp.entropy,
+                ] {
+                    vals.extend([block.value, block.dt, block.dp]);
+                    vals.extend(&block.dn);
+                }
+                vals.extend(&tp.ln_fugacity.ln_phi);
+                vals.extend(&tp.ln_fugacity.dt);
+                vals.extend(&tp.ln_fugacity.dp);
+                vals.extend(&tp.ln_fugacity.dn);
+                vals.push(tp.speed_of_sound);
+                vals
+            }
+            "5" => {
+                let (d_diag, dt_diag, dtt_diag) = model.hard_sphere_diameters(t).unwrap();
+                let (dij, dijt, _) = model.hard_sphere_diameter_ij(0, n.len() - 1, t).unwrap();
+                let (seff, _, _) = model.effective_sigma_ij(0, n.len() - 1, t).unwrap();
+                let (eeff, _, _) = model.effective_epsilon_ij(0, n.len() - 1, t).unwrap();
+                let amat = model.alpha_vdw(t).unwrap();
+                let lam_db = if order >= 0 {
+                    model.de_broglie_wavelength(0, t).unwrap()
+                } else {
+                    0.0
+                };
+                let mut vals = Vec::new();
+                vals.extend(d_diag);
+                vals.extend(dt_diag);
+                vals.extend(dtt_diag);
+                vals.extend([dij, dijt, seff, eeff]);
+                vals.extend(amat);
+                vals.push(lam_db);
+                vals
+            }
+            kind => {
+                let f = if kind == "2" {
+                    let g = model.association_rdf_tvn(0, n.len() - 1, t, v, &n).unwrap();
+                    Ok(SaftVrMieHelmholtz {
+                        f: g.g,
+                        f_t: g.temperature,
+                        f_v: g.volume,
+                        f_n: g.moles,
+                        f_tt: g.temperature_second,
+                        f_tv: g.temperature_volume,
+                        f_tn: g.temperature_moles,
+                        f_vv: g.volume_second,
+                        f_vn: g.volume_moles,
+                        f_nn: g.moles_second,
+                        x_k: vec![],
+                    })
+                } else if kind == "3" {
+                    model.hard_sphere_tvn(t, v, &n)
+                } else if kind == "1" {
+                    model.dispersion_tvn(t, v, &n)
+                } else {
+                    model.residual_helmholtz_tvn(t, v, &n)
+                }
+                .unwrap();
+                let mut vals = vec![f.f, f.f_t, f.f_v];
+                vals.extend(f.f_n);
+                vals.extend([f.f_tt, f.f_tv]);
+                vals.extend(f.f_tn);
+                vals.push(f.f_vv);
+                vals.extend(f.f_vn);
+                vals.extend(f.f_nn);
+                // Upstream Fortran defects for extra hard-sphere mixtures (hs=3,5):
+                // - saftvrmie_hardsphere.f90:235 has an extraneous term in a_VV;
+                // - saftvrmie_interface.f90:898 subtracts Fhse_TV instead of adding it.
+                // Qualify those entries against central finite differences of Fortran F_V.
+                if n.len() > 1
+                    && matches!(fields[3], "3" | "5")
+                    && matches!(kind, "0" | "3")
+                    && opts.extra_hard_sphere
+                {
+                    expected[5 + 2 * n.len()] = fields[13].parse().unwrap();
+                    if kind == "3" {
+                        expected[4 + n.len()] = fields[14].parse().unwrap();
+                    }
+                }
+                vals
+            }
+        };
         assert_eq!(expected.len(), values.len());
+        let (atol, rtol) = if fields[7] == "4" {
+            (1e-10, 1e-7)
+        } else {
+            (2e-11, 3e-8)
+        };
         for (index, (value, reference)) in values.iter().zip(expected).enumerate() {
-            if !value.is_finite() || (value - reference).abs() > 2e-11 + 3e-8 * reference.abs() {
+            if !value.is_finite() || (value - reference).abs() > atol + rtol * reference.abs() {
                 failures.push(format!(
                     "{:?} block {index}: {value:.8e} vs {reference:.8e}",
                     &fields[..12]
@@ -330,4 +400,321 @@ fn exact_source_tvn() {
         }
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+#[test]
+fn test_saft_vrmie_raw_mole_scaling_and_overflow() {
+    let eos = SaftVrMie::new(&["H2O", "MEOH"]).unwrap();
+    let t = 380.0;
+    let v_unit = 1.5e-4;
+    let x = [0.4, 0.6];
+
+    let f1 = eos.residual_helmholtz_tvn(t, v_unit, &x).unwrap();
+    let d1 = eos.dispersion_tvn(t, v_unit, &x).unwrap();
+    let h1 = eos.hard_sphere_tvn(t, v_unit, &x).unwrap();
+    let g1 = eos.association_rdf_tvn(0, 1, t, v_unit, &x).unwrap();
+    let tp1 = eos.state_tp(t, 5.0e6, &x, Phase::Liquid).unwrap();
+
+    for &scale in &[0.01_f64, 10.0, 1.0e-140] {
+        let n = [x[0] * scale, x[1] * scale];
+        let v = v_unit * scale;
+
+        let fs = eos.residual_helmholtz_tvn(t, v, &n).unwrap();
+        assert!((fs.f / scale - f1.f).abs() < 1e-11 * (1.0 + f1.f.abs()));
+        assert!((fs.f_t / scale - f1.f_t).abs() < 1e-11 * (1.0 + f1.f_t.abs()));
+        assert!((fs.f_v - f1.f_v).abs() < 1e-11 * (1.0 + f1.f_v.abs()));
+        assert!((fs.f_tt / scale - f1.f_tt).abs() < 1e-11 * (1.0 + f1.f_tt.abs()));
+        assert!((fs.f_tv - f1.f_tv).abs() < 1e-11 * (1.0 + f1.f_tv.abs()));
+        assert!((fs.f_vv * scale - f1.f_vv).abs() < 1e-10 * (1.0 + f1.f_vv.abs()));
+        for i in 0..2 {
+            assert!((fs.f_n[i] - f1.f_n[i]).abs() < 1e-11 * (1.0 + f1.f_n[i].abs()));
+            assert!((fs.f_tn[i] - f1.f_tn[i]).abs() < 1e-11 * (1.0 + f1.f_tn[i].abs()));
+            assert!((fs.f_vn[i] * scale - f1.f_vn[i]).abs() < 1e-10 * (1.0 + f1.f_vn[i].abs()));
+            for j in 0..2 {
+                let k = i * 2 + j;
+                assert!((fs.f_nn[k] * scale - f1.f_nn[k]).abs() < 1e-10 * (1.0 + f1.f_nn[k].abs()));
+            }
+        }
+        assert_eq!(fs.x_k.len(), f1.x_k.len());
+        for (a, b) in fs.x_k.iter().zip(&f1.x_k) {
+            assert!((a - b).abs() < 1e-12);
+        }
+
+        // Intensive molar quantities scale as degree 0 in (V, n).
+        if scale >= 1.0e-100 {
+            let ds = eos.dispersion_tvn(t, v, &n).unwrap();
+            assert!((ds.f - d1.f).abs() < 1e-11 * (1.0 + d1.f.abs()));
+            assert!((ds.f_v * scale - d1.f_v).abs() < 1e-11 * (1.0 + d1.f_v.abs()));
+            assert!((ds.f_vv * scale * scale - d1.f_vv).abs() < 1e-10 * (1.0 + d1.f_vv.abs()));
+
+            let hs = eos.hard_sphere_tvn(t, v, &n).unwrap();
+            assert!((hs.f - h1.f).abs() < 1e-11 * (1.0 + h1.f.abs()));
+            assert!((hs.f_v * scale - h1.f_v).abs() < 1e-11 * (1.0 + h1.f_v.abs()));
+
+            let gs = eos.association_rdf_tvn(0, 1, t, v, &n).unwrap();
+            assert!((gs.g - g1.g).abs() < 1e-11 * (1.0 + g1.g.abs()));
+            assert!((gs.volume * scale - g1.volume).abs() < 1e-11 * (1.0 + g1.volume.abs()));
+        }
+
+        let tps = eos.state_tp(t, 5.0e6, &n, Phase::Liquid).unwrap();
+        assert!((tps.volume - tp1.volume).abs() < 1e-12 * tp1.volume);
+        assert!(
+            (tps.compressibility_factor.value - tp1.compressibility_factor.value).abs() < 1e-12
+        );
+        assert!(
+            (tps.enthalpy.value - tp1.enthalpy.value).abs()
+                < 1e-10 * (1.0 + tp1.enthalpy.value.abs())
+        );
+        for i in 0..2 {
+            assert!((tps.ln_fugacity.ln_phi[i] - tp1.ln_fugacity.ln_phi[i]).abs() < 1e-11);
+            assert!(
+                (tps.compressibility_factor.dn[i] * scale - tp1.compressibility_factor.dn[i]).abs()
+                    < 1e-10 * (1.0 + tp1.compressibility_factor.dn[i].abs())
+            );
+            for j in 0..2 {
+                let k = i * 2 + j;
+                assert!(
+                    (tps.ln_fugacity.dn[k] * scale - tp1.ln_fugacity.dn[k]).abs()
+                        < 1e-10 * (1.0 + tp1.ln_fugacity.dn[k].abs())
+                );
+            }
+        }
+    }
+
+    // Extreme underflow must return an explicit error instead of Inf/NaN.
+    let tiny = [0.4e-310, 0.6e-310];
+    assert!(
+        eos.residual_helmholtz_tvn(t, v_unit * 1e-310, &tiny)
+            .is_err()
+    );
+    assert!(eos.dispersion_tvn(t, v_unit * 1e-310, &tiny).is_err());
+    assert!(eos.hard_sphere_tvn(t, v_unit * 1e-310, &tiny).is_err());
+    assert!(
+        eos.association_rdf_tvn(0, 1, t, v_unit * 1e-310, &tiny)
+            .is_err()
+    );
+    assert!(eos.state_tp(t, 5.0e6, &tiny, Phase::Liquid).is_err());
+}
+
+#[test]
+fn test_saft_vrmie_zero_mole_infinite_dilution() {
+    // Cross-associating mixture at zero mole for MEOH: analytic F_n(MEOH) must
+    // match forward finite difference of F, proving exact infinite-dilution X_k.
+    let eos = SaftVrMie::new(&["H2O", "MEOH"]).unwrap();
+    let t = 380.0;
+    let v = 1.5e-4;
+    let n0 = [1.0, 0.0];
+    let f0 = eos.residual_helmholtz_tvn(t, v, &n0).unwrap();
+    let h = 1.0e-7;
+    let fp = eos.residual_helmholtz_tvn(t, v, &[1.0, h]).unwrap();
+    let fd_fn1 = (fp.f - f0.f) / h;
+    assert!(
+        (f0.f_n[1] - fd_fn1).abs() < 1e-5 * (1.0 + fd_fn1.abs()),
+        "infinite-dilution F_n[1] mismatch: analytic={} vs fd={}",
+        f0.f_n[1],
+        fd_fn1
+    );
+    // Infinite-dilution MEOH site fractions must be strictly below 1 (bound by H2O).
+    assert!(f0.x_k.iter().all(|&x| x > 0.0 && x < 1.0));
+
+    // Non-associating binary at zero mole via TP path must stay finite and satisfy
+    // pure-component limit for component 0.
+    let eos_mix = SaftVrMie::new(&["CO2", "C1"]).unwrap();
+    let eos_pure = SaftVrMie::new(&["CO2"]).unwrap();
+    let tp_mix = eos_mix
+        .state_tp(280.0, 5.0e6, &[1.0, 0.0], Phase::Liquid)
+        .unwrap();
+    let tp_pure = eos_pure
+        .state_tp(280.0, 5.0e6, &[1.0], Phase::Liquid)
+        .unwrap();
+    assert!((tp_mix.volume - tp_pure.volume).abs() < 1e-12 * tp_pure.volume);
+    assert!((tp_mix.ln_fugacity.ln_phi[0] - tp_pure.ln_fugacity.ln_phi[0]).abs() < 1e-11);
+    assert!(tp_mix.ln_fugacity.ln_phi[1].is_finite());
+}
+
+#[test]
+fn test_saft_vrmie_finite_differences_tvn_and_tp() {
+    use thermopack_rs::saft_vrmie::HardSphereReference;
+
+    // 1. Verify exact analytic F_VV and F_TV on AdditiveExact where Fortran has defects.
+    let mut eos = SaftVrMie::new(&["CO2", "C1"]).unwrap();
+    eos.set_hard_sphere_reference(HardSphereReference::AdditiveExact);
+    let t = 280.0;
+    let v = 4.0e-4;
+    let n = [0.8, 1.2];
+    let f = eos.residual_helmholtz_tvn(t, v, &n).unwrap();
+    let hv = v * 1e-6;
+    let fvp = eos.residual_helmholtz_tvn(t, v + hv, &n).unwrap();
+    let fvm = eos.residual_helmholtz_tvn(t, v - hv, &n).unwrap();
+    let fd_fvv = (fvp.f_v - fvm.f_v) / (2.0 * hv);
+    assert!((f.f_vv - fd_fvv).abs() < 1e-7 * (1.0 + fd_fvv.abs()));
+
+    let hs = eos.hard_sphere_tvn(t, v, &n).unwrap();
+    let ht = t * 1e-6;
+    let htp = eos.hard_sphere_tvn(t + ht, v, &n).unwrap();
+    let htm = eos.hard_sphere_tvn(t - ht, v, &n).unwrap();
+    let fd_hs_tv = (htp.f_v - htm.f_v) / (2.0 * ht);
+    assert!((hs.f_tv - fd_hs_tv).abs() < 1e-7 * (1.0 + fd_hs_tv.abs()));
+    let hvp = eos.hard_sphere_tvn(t, v + hv, &n).unwrap();
+    let hvm = eos.hard_sphere_tvn(t, v - hv, &n).unwrap();
+    let fd_hs_vv = (hvp.f_v - hvm.f_v) / (2.0 * hv);
+    assert!((hs.f_vv - fd_hs_vv).abs() < 1e-7 * (1.0 + fd_hs_vv.abs()));
+
+    // 2. Verify TP derivatives (Gibbs-Duhem, symmetry, d/dT, d/dP, d/dn) on associating mixture.
+    let assoc = SaftVrMie::new(&["H2O", "MEOH"]).unwrap();
+    let p = 5.0e6;
+    let t_a = 380.0;
+    let n_a = [0.8, 1.2];
+    let tp = assoc.state_tp(t_a, p, &n_a, Phase::Liquid).unwrap();
+    // Symmetry of d(ln phi_i)/dn_j
+    assert!((tp.ln_fugacity.dn[1] - tp.ln_fugacity.dn[2]).abs() < 1e-11);
+    // Gibbs-Duhem: sum_i n_i d(ln phi_i)/dn_j = 0
+    for j in 0..2 {
+        let gd = n_a[0] * tp.ln_fugacity.dn[j] + n_a[1] * tp.ln_fugacity.dn[2 + j];
+        assert!(gd.abs() < 1e-10, "Gibbs-Duhem violated for j={j}: {gd}");
+    }
+    // Central FD in T and P
+    let d_t = 1e-4;
+    let tp_tp = assoc.state_tp(t_a + d_t, p, &n_a, Phase::Liquid).unwrap();
+    let tp_tm = assoc.state_tp(t_a - d_t, p, &n_a, Phase::Liquid).unwrap();
+    let fd_h_t = (tp_tp.enthalpy.value - tp_tm.enthalpy.value) / (2.0 * d_t);
+    assert!((tp.cp - fd_h_t).abs() < 1e-6 * fd_h_t.abs());
+    for i in 0..2 {
+        let fd_lnphi_t = (tp_tp.ln_fugacity.ln_phi[i] - tp_tm.ln_fugacity.ln_phi[i]) / (2.0 * d_t);
+        assert!((tp.ln_fugacity.dt[i] - fd_lnphi_t).abs() < 1e-7 * (1.0 + fd_lnphi_t.abs()));
+    }
+    let d_p = p * 1e-6;
+    let tp_pp = assoc.state_tp(t_a, p + d_p, &n_a, Phase::Liquid).unwrap();
+    let tp_pm = assoc.state_tp(t_a, p - d_p, &n_a, Phase::Liquid).unwrap();
+    for i in 0..2 {
+        let fd_lnphi_p = (tp_pp.ln_fugacity.ln_phi[i] - tp_pm.ln_fugacity.ln_phi[i]) / (2.0 * d_p);
+        assert!((tp.ln_fugacity.dp[i] - fd_lnphi_p).abs() < 1e-7 * (1.0 + fd_lnphi_p.abs()));
+    }
+}
+
+#[test]
+fn test_saft_vrmie_association_controls_and_saturation() {
+    use thermopack_rs::association::{AssocScheme, DeltaCombRule};
+    use thermopack_rs::rdf::saftvrmie_rdf;
+
+    let mut eos = SaftVrMie::new(&["H2O", "MEOH"]).unwrap();
+    assert!(eos.has_association());
+
+    let t = 380.0;
+    let v = 3.0e-4;
+    let n = [0.8, 1.2];
+    let xk_std = eos.solve_assoc_x_k(t, v, &n).unwrap();
+    assert_eq!(xk_std.len(), 7); // 4 sites on H2O (4C) + 3 sites on MEOH (3B)
+    let f_std = eos.residual_helmholtz_tvn(t, v, &n).unwrap();
+    for (a, b) in xk_std.iter().zip(&f_std.x_k) {
+        assert!((a - b).abs() < 1e-13);
+    }
+
+    // Switching to Elliot combining rule changes cross-association consistently.
+    eos.set_delta_comb_rule(DeltaCombRule::Elliot).unwrap();
+    let f_ell = eos.residual_helmholtz_tvn(t, v, &n).unwrap();
+    assert!((f_ell.f - f_std.f).abs() > 1e-4);
+
+    // Public rdf::saftvrmie_rdf dispatcher matches association_rdf_tvn.
+    let g_direct = eos.association_rdf_tvn(0, 1, t, v, &n).unwrap();
+    let g_dispatch = saftvrmie_rdf(&eos, t, v, &n, 0, 1).unwrap();
+    assert!((g_direct.g - g_dispatch.g).abs() < 1e-15);
+    assert!((g_direct.volume - g_dispatch.volume).abs() < 1e-15);
+
+    // Disabling association via set_assoc_params removes association contribution.
+    let mut h2o = SaftVrMie::new(&["H2O"]).unwrap();
+    assert!(h2o.has_association());
+    let prep_h2o = h2o.prepare(373.15, &[1.0]).unwrap();
+    let sat = prep_h2o.saturation_pressure(373.15).unwrap();
+    assert!(sat.pressure > 5.0e4 && sat.pressure < 2.0e5);
+    assert!(sat.liquid_volume < sat.vapor_volume);
+
+    // MinimumGibbs selects vapor at low pressure and liquid at high pressure.
+    let v_low = prep_h2o
+        .volume(0.5 * sat.pressure, Phase::MinimumGibbs)
+        .unwrap();
+    let v_vap = prep_h2o.volume(0.5 * sat.pressure, Phase::Vapor).unwrap();
+    assert!((v_low - v_vap).abs() < 1e-10 * v_vap);
+    let v_high = prep_h2o
+        .volume(2.0 * sat.pressure, Phase::MinimumGibbs)
+        .unwrap();
+    let v_liq = prep_h2o.volume(2.0 * sat.pressure, Phase::Liquid).unwrap();
+    assert!((v_high - v_liq).abs() < 1e-10 * v_liq);
+
+    h2o.set_assoc_params(0, AssocScheme::NoAssoc, 0.0, 0.0)
+        .unwrap();
+    assert!(!h2o.has_association());
+    assert!(
+        h2o.solve_assoc_x_k(373.15, 1.0e-4, &[1.0])
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[test]
+fn test_saft_vrmie_fmt_compatibility_and_model_hooks() {
+    use thermopack_rs::saft_vrmie::HardSphereReference;
+
+    // Single component is always FMT compatible.
+    let pure = SaftVrMie::new(&["CO2"]).unwrap();
+    assert_eq!(pure.fmt_compatibility(), (true, false));
+
+    // Mixtures depend on hard-sphere reference, packing rule, and extra_hard_sphere.
+    let mut mix = SaftVrMie::new(&["CO2", "C1"]).unwrap();
+    assert_eq!(mix.fmt_compatibility(), (true, false)); // Lafitte (additive, no extra)
+    mix.set_hard_sphere_reference(HardSphereReference::NonAdditive);
+    assert_eq!(mix.fmt_compatibility(), (false, false));
+    mix.set_hard_sphere_reference(HardSphereReference::SingleComponent);
+    assert_eq!(mix.fmt_compatibility(), (false, false));
+    mix.set_hard_sphere_reference(HardSphereReference::Additive);
+    assert_eq!(mix.fmt_compatibility(), (false, true)); // extra enabled, non-exact binary dhs
+    let mut opts = mix.options();
+    opts.extra_hard_sphere = false;
+    mix.set_options(opts).unwrap();
+    assert_eq!(mix.fmt_compatibility(), (true, false)); // fixes upstream uninitialized bug
+    mix.set_hard_sphere_reference(HardSphereReference::AdditiveExact);
+    assert_eq!(mix.fmt_compatibility(), (true, true)); // exact binary dhs + extra enabled
+    opts = mix.options();
+    opts.extra_hard_sphere = false;
+    mix.set_options(opts).unwrap();
+    assert_eq!(mix.fmt_compatibility(), (true, false));
+    opts.packing = thermopack_rs::saft_vrmie::PackingRule::Linear;
+    mix.set_options(opts).unwrap();
+    assert_eq!(mix.fmt_compatibility(), (false, false));
+
+    // Binary gammaij setter/getter round-trip.
+    mix.set_gammaij(0, 1, 0.05);
+    assert!((mix.get_gammaij(0, 1) - 0.05).abs() < 1e-15);
+
+    // Pair potential force matches -du/dr via central FD (both untruncated and truncated/shifted).
+    let r = 4.2e-10;
+    let dr = 1e-14;
+    let (u, f) = pure.pair_potential(0, 0, r, 300.0).unwrap();
+    let (up, _) = pure.pair_potential(0, 0, r + dr, 300.0).unwrap();
+    let (um, _) = pure.pair_potential(0, 0, r - dr, 300.0).unwrap();
+    assert!(u.is_finite());
+    assert!((f - (-(up - um) / (2.0 * dr))).abs() < 1e-7 * (1.0 + f.abs()));
+
+    let mut cut_pure = SaftVrMie::new(&["CO2"]).unwrap();
+    cut_pure.set_cutoff(Some((3.5, true))).unwrap();
+    assert_eq!(cut_pure.cutoff(), Some((3.5, true)));
+    let sigma = cut_pure.components()[0].sigma;
+    let (u_beyond, f_beyond) = cut_pure.pair_potential(0, 0, 3.6 * sigma, 300.0).unwrap();
+    assert_eq!(u_beyond, 0.0);
+    assert_eq!(f_beyond, 0.0);
+    let (u_at_cut, _) = cut_pure.pair_potential(0, 0, 3.5 * sigma, 300.0).unwrap();
+    assert!(u_at_cut.abs() < 1e-15);
+
+    // Quantum de Boer parameter setter/getter round-trip and FH1 additive-exact constructor.
+    let mut q = SaftVrMie::new_quantum_with_hs_ref(&["H2", "NE"], 1, true, None).unwrap();
+    assert_eq!(
+        q.hard_sphere_reference(),
+        HardSphereReference::AdditiveExact
+    );
+    let lam0 = q.de_boer_parameter(0).unwrap();
+    assert!(lam0 > 0.0);
+    q.set_de_boer_parameter(0, lam0 * 1.1).unwrap();
+    assert!((q.de_boer_parameter(0).unwrap() - lam0 * 1.1).abs() < 1e-12);
+    let ldb = q.de_broglie_wavelength(0, 40.0).unwrap();
+    assert!(ldb > 0.0 && ldb.is_finite());
 }

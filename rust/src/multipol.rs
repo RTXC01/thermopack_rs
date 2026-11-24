@@ -628,50 +628,83 @@ impl MultipolParams {
         sum
     }
 
-    /// Compute a*b*c/denominator without losing a finite result to intermediate
-    /// overflow or underflow. The denominator is finite and nonzero.
+    /// Compute a*b*c/denominator. The denominator is finite and nonzero.
     #[inline]
     fn pade_product_quotient(a: f64, b: f64, c: f64, denominator: f64) -> f64 {
         let ratio = a / denominator;
         let pair = ratio * b;
-        if ratio.is_normal() && pair.is_normal() {
-            return pair * c;
+        let result = pair * c;
+        // The usual path needs no extra precision. Near either end of the
+        // range, even rounding normal intermediates can misclassify a result.
+        if (2.0 * f64::MIN_POSITIVE..0.5 * f64::MAX).contains(&result.abs())
+            && ratio.is_normal()
+            && pair.is_normal()
+        {
+            return result;
         }
         if !a.is_finite() || !b.is_finite() || !c.is_finite() {
-            return pair * c;
+            return result;
         }
+        let sign = (a.to_bits() ^ b.to_bits() ^ c.to_bits() ^ denominator.to_bits()) & (1 << 63);
         if a == 0.0 || b == 0.0 || c == 0.0 {
-            return 0.0;
+            return f64::from_bits(sign);
         }
+        f64::from_bits(sign | Self::rounded_pade_quotient_bits(a, b, c, denominator))
+    }
 
-        // Split each nonzero operand into a signed significand and a base-2
-        // exponent. Products of the significands stay near one.
-        fn parts(x: f64) -> (f64, i32) {
-            const EXPONENT_MASK: u64 = 0x7ff << 52;
-            let (bits, adjustment) = if x.is_normal() {
-                (x.to_bits(), 0)
+    /// Round the magnitude once, using the exact significand product and division remainder.
+    #[cold]
+    fn rounded_pade_quotient_bits(a: f64, b: f64, c: f64, denominator: f64) -> u64 {
+        // x = significand * 2^exponent, with 53 bits even for subnormal x.
+        fn parts(x: f64) -> (u128, i32) {
+            const IMPLICIT_BIT: u64 = 1 << 52;
+            let bits = x.to_bits();
+            let mantissa = bits & (IMPLICIT_BIT - 1);
+            let biased_exponent = ((bits >> 52) & 0x7ff) as i32;
+            if biased_exponent == 0 {
+                let shift = mantissa.leading_zeros() - IMPLICIT_BIT.leading_zeros();
+                (u128::from(mantissa << shift), -1074 - shift as i32)
             } else {
-                ((x * (1_u64 << 54) as f64).to_bits(), 54)
-            };
-            let exponent = ((bits & EXPONENT_MASK) >> 52) as i32 - 1023 - adjustment;
-            let significand = f64::from_bits((bits & !EXPONENT_MASK) | (1023 << 52));
-            (significand, exponent)
+                (u128::from(mantissa | IMPLICIT_BIT), biased_exponent - 1075)
+            }
         }
 
         let (a, ae) = parts(a);
         let (b, be) = parts(b);
         let (c, ce) = parts(c);
-        let (denominator, de) = parts(denominator);
-        let (significand, adjust) = parts(a * b * c / denominator);
-        let exponent = ae + be + ce - de + adjust;
-        let scale = match exponent {
-            ..=-1076 => 0.0,
-            -1075 => return (significand * 0.5) * f64::from_bits(1),
-            -1074..=-1023 => f64::from_bits(1_u64 << (exponent + 1074)),
-            -1022..=1023 => f64::from_bits(((exponent + 1023) as u64) << 52),
-            _ => f64::INFINITY,
-        };
-        significand * scale
+        let (divisor, de) = parts(denominator);
+        let exponent = ae + be + ce - de;
+
+        // The exact numerator spans at most 159 bits. Divide it in two limbs;
+        // the 53-bit divisor ensures the quotient fits in a u128.
+        let ab = a * b;
+        let low_product = u128::from(ab as u64) * c;
+        let high = (ab >> 64) * c + (low_product >> 64);
+        let low = ((high % divisor) << 64) | u128::from(low_product as u64);
+        let quotient = ((high / divisor) << 64) | (low / divisor);
+        let remainder = low % divisor;
+
+        let leading_exponent = exponent + 127 - quotient.leading_zeros() as i32;
+        if leading_exponent < -1075 {
+            return 0;
+        }
+        if leading_exponent > 1023 {
+            return f64::INFINITY.to_bits();
+        }
+
+        let unit_exponent = (leading_exponent - 52).max(-1074);
+        let shift = unit_exponent - exponent;
+        let halfway = 1_u128 << (shift - 1);
+        let discarded = quotient & ((halfway << 1) - 1);
+        let significand = (quotient >> shift) as u64;
+        let round_up = discarded > halfway
+            || (discarded == halfway && (remainder != 0 || significand & 1 != 0));
+
+        // The stored significand omits its leading bit for normal values.
+        // Adding the full significand to the exponent field one binade below
+        // also propagates a rounding carry, including at overflow.
+        let exponent_bits = ((leading_exponent.max(-1022) + 1022) as u64) << 52;
+        exponent_bits + significand + u64::from(round_up)
     }
 
     /// Evaluate u^2/(u-v). The Hessian needs (u dv - v du)/(u-v)
@@ -1444,4 +1477,70 @@ fn validate_state(t: f64, v: f64, n: &[f64], expected_nc: usize) -> Result<f64> 
         return Err(Error::InvalidInput("positive total moles required"));
     }
     Ok(sumn)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::MultipolParams;
+
+    #[test]
+    fn pade_product_quotient_rounds_subnormal_neighbors_and_ties() {
+        let least = f64::from_bits(1);
+        let below = 1.0_f64.next_down();
+        let above = 1.0_f64.next_up();
+        let cases = [
+            (least, 1.0, below, 0.0),
+            (least, 1.0, 1.0, 0.0),
+            (least, above, below, least),
+            (-least, 1.0, 1.0, -0.0),
+            (-least, above, below, -least),
+            (3.0 * least, 1.0, 1.0, 2.0 * least),
+        ];
+        for (a, b, c, expected) in cases {
+            let actual = MultipolParams::pade_product_quotient(a, b, c, 2.0);
+            assert_eq!(
+                actual.to_bits(),
+                expected.to_bits(),
+                "{a:e} * {b:e} * {c:e}"
+            );
+        }
+    }
+
+    #[test]
+    fn pade_product_quotient_distinguishes_finite_from_overflow() {
+        let finite = f64::from_bits(0x3ff4_2ad8_2ebb_e65c);
+        let overflow = f64::from_bits(0x3ff4_2b38_aac4_cecc);
+        let cases = [
+            (
+                finite,
+                finite,
+                f64::from_bits(0x000c_b5c7_979a_045d),
+                f64::MAX,
+            ),
+            (
+                overflow,
+                overflow,
+                f64::from_bits(0x000c_b641_3625_4cab),
+                f64::INFINITY,
+            ),
+            (
+                f64::from_bits(0x7fe0_0000_0000_0001),
+                0.375,
+                f64::from_bits(0.375_f64.to_bits() + 2),
+                f64::MAX,
+            ),
+            (f64::MAX, 1.0, 2.0, f64::MAX),
+            // (2^27 - 1)(2^27 + 1) * 2^970 is exactly the overflow tie.
+            (
+                f64::from((1 << 27) - 1),
+                f64::from((1 << 27) + 1),
+                f64::from_bits(54_u64 << 52), // 2^-969
+                f64::INFINITY,
+            ),
+        ];
+        for (a, b, denominator, expected) in cases {
+            let actual = MultipolParams::pade_product_quotient(a, b, 2.0, denominator);
+            assert_eq!(actual, expected, "{a:e} * {b:e} / {denominator:e}");
+        }
+    }
 }

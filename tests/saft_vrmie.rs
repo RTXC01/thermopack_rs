@@ -215,3 +215,84 @@ fn test_saft_vrmie_quantum_h2() {
     let st = prep.state(8000.0).unwrap();
     assert!((st.ln_phi[0] - 3.2124502130409543e-02).abs() < 1e-5);
 }
+
+#[test]
+fn exact_source_tvn() {
+    use thermopack_rs::saft_vrmie::{HardSphereReference as Hs, MieTerms};
+    let path = std::env::var_os("SAFTVRMIE_FIXTURE")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| {
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("tests/fixtures/saftvrmie_tvn.csv")
+        });
+    let csv = std::fs::read_to_string(path).unwrap();
+    let numbers = |s: &str| {
+        s.split(',')
+            .map(|v| v.parse::<f64>().unwrap())
+            .collect::<Vec<_>>()
+    };
+    let mut failures = Vec::new();
+    for line in csv.lines().skip(1) {
+        let fields: Vec<_> = line.split(';').collect();
+        let comps: Vec<_> = fields[0].split(',').collect();
+        let order = fields[2].parse::<i32>().unwrap();
+        let mut model = if order < 0 {
+            SaftVrMie::new_with_options(&comps, fields[1])
+        } else {
+            SaftVrMie::new_quantum(&comps, order as u8, Some(fields[1]))
+        }
+        .unwrap();
+        model.set_hard_sphere_reference(match fields[3] {
+            "1" => Hs::Lafitte,
+            "2" => Hs::SingleComponent,
+            "3" => Hs::Additive,
+            "4" => Hs::NonAdditive,
+            "5" => Hs::AdditiveExact,
+            _ => panic!("unknown reference"),
+        });
+        let mask = fields[4].parse::<u8>().unwrap();
+        model.set_terms(MieTerms {
+            hard_sphere: mask & 1 != 0,
+            first: mask & 2 != 0,
+            second: mask & 4 != 0,
+            third: mask & 8 != 0,
+            chain: mask & 16 != 0,
+        });
+        let cutoff: f64 = fields[5].parse().unwrap();
+        if cutoff > 0. {
+            model.set_cutoff(Some((cutoff, fields[6] == "1"))).unwrap();
+        }
+        let t = fields[8].parse().unwrap();
+        let v = fields[9].parse().unwrap();
+        let n = numbers(fields[10]);
+        let f = if fields[7] == "1" {
+            model.dispersion_tvn(t, v, &n)
+        } else {
+            model.residual_helmholtz_tvn(t, v, &n)
+        }
+        .unwrap();
+        let mut values = vec![f.f, f.f_t, f.f_v];
+        values.extend(f.f_n);
+        values.extend([f.f_tt, f.f_tv]);
+        values.extend(f.f_tn);
+        values.push(f.f_vv);
+        values.extend(f.f_vn);
+        values.extend(f.f_nn);
+        let mut expected = numbers(fields[11]);
+        // The extra hard-sphere term in the Fortran VV routine includes
+        // g/V^2 in place of g_V/V^2. Qualify using the Fortran V gradient.
+        if n.len() > 1 && matches!(fields[3], "3" | "5") && fields[7] == "0" {
+            expected[5 + 2 * n.len()] = fields[12].parse().unwrap();
+        }
+        assert_eq!(expected.len(), values.len());
+        for (index, (value, reference)) in values.iter().zip(expected).enumerate() {
+            if !((value - reference).abs() <= 2e-11 + 2e-7 * reference.abs()) {
+                failures.push(format!(
+                    "{:?} block {index}: {value:.8e} vs {reference:.8e}",
+                    &fields[..8]
+                ));
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}

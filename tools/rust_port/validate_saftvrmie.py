@@ -1,98 +1,84 @@
-"""Validate SAFT-VR Mie and SAFT-VRQ Mie implementation against exact-source reference DLL."""
+"""Compare Rust with a fresh executable linked to the exact-source Fortran build."""
+import argparse
+import csv
+import hashlib
+import json
+import math
 import os
-import sys
 from pathlib import Path
+import shutil
+import subprocess
+import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "tools/rust_port"))
-from reference import load
+FIXTURE = ROOT / "tests/fixtures/saftvrmie_tvn.csv"
+PROBE = Path(__file__).with_name("saftvrmie_probe.f90")
 
-# Load reference library
-load(str(ROOT / ".toolchains/gcc14/mingw64/bin"))
-from thermopack.saftvrmie import saftvrmie
 
-def probe_pure(ident, temperatures, densities, ref="Default"):
-    eos = saftvrmie(ident, parameter_reference=ref)
-    results = []
-    for T in temperatures:
-        for rho in densities:
-            V = 1.0 / rho
-            n = [1.0]
-            P, dpdt, dpdv, dpdn = eos.pressure_tv(T, V, n, dpdt=True, dpdv=True, dpdn=True)
-            u, = eos.internal_energy_tv(T, V, n)
-            h, = eos.enthalpy_tv(T, V, n)
-            s, = eos.entropy_tv(T, V, n)
-            a, = eos.helmholtz_tv(T, V, n)
-            mu, = eos.chemical_potential_tv(T, V, n)
-            lnphi, = eos.thermo_tvp(T, V, n)
-            c = eos.speed_of_sound_tv(T, V, n)
-            a_hs = eos.a_hs(T, V, n)
-            a1 = eos.a1(T, V, n)
-            a2 = eos.a2(T, V, n)
-            a3 = eos.a3(T, V, n)
-            results.append({
-                "fluid": ident,
-                "ref": ref,
-                "T": T,
-                "rho": rho,
-                "P": P,
-                "dpdt": dpdt,
-                "dpdv": dpdv,
-                "dpdn": float(dpdn[0]),
-                "u": u,
-                "h": h,
-                "s": s,
-                "a": a,
-                "mu": float(mu[0]),
-                "lnphi": float(lnphi[0]),
-                "c": c,
-                "a_hs": a_hs,
-                "a1": a1,
-                "a2": a2,
-                "a3": a3,
-            })
-    return results
+def cases():
+    def case(comps, t, v, amounts, order=-1, hs=1, terms=31, cutoff=0, shift=0, kind=0, ref="DEFAULT"):
+        return [comps, ref, order, hs, terms, cutoff, shift, kind, t, v, amounts]
+    yield case("CO2,C1", 280, 0.0004, "0.8,1.2")
+    yield case("NH3", 320, 0.0003, "2")
+    yield case("H2O,MEOH", 380, 0.0003, "0.8,1.2")
+    yield case("ETOH,C1", 350, 0.0004, "1.2,0.8")
+    for hs in range(2, 6):
+        yield case("CO2,C1", 280, 0.0004, "0.8,1.2", hs=hs)
+    for terms in (1,2,4,8,16):
+        yield case("CO2,C1", 280, 0.0004, "0.8,1.2", terms=terms)
+    for shift in (0,1):
+        yield case("CO2", 300, 0.0004, "2", cutoff=3.5, shift=shift)
+    for order in (0,1,2):
+        yield case("H2", 40, 0.0005, "2", order=order, hs=4)
+        yield case("H2,NE", 54, 0.0005, "1.3,0.7", order=order, hs=5)
+    yield case("H2O,MEOH", 380, 0.0003, "0.8,1.2", kind=1)
+    yield case("H2,HE", 65, 0.0007, "0.7,1.3", order=2, hs=4, kind=1)
 
-def probe_mixture(comps, T, V, n, ref="Default"):
-    eos = saftvrmie(comps, parameter_reference=ref)
-    P, dpdt, dpdv, dpdn = eos.pressure_tv(T, V, n, dpdt=True, dpdv=True, dpdn=True)
-    lnphi, = eos.thermo_tvp(T, V, n)
-    h, = eos.enthalpy_tv(T, V, n)
-    s, = eos.entropy_tv(T, V, n)
-    c = eos.speed_of_sound_tv(T, V, n)
-    return {
-        "comps": comps,
-        "ref": ref,
-        "T": T,
-        "V": V,
-        "n": n,
-        "P": P,
-        "dpdt": dpdt,
-        "dpdv": dpdv,
-        "dpdn": [float(x) for x in dpdn],
-        "lnphi": [float(x) for x in lnphi],
-        "h": h,
-        "s": s,
-        "c": c,
-    }
+
+def sha(path):
+    return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--compiler", default="gfortran")
+    parser.add_argument("--write-fixture", action="store_true")
+    args = parser.parse_args()
+    ref = ROOT / ".reference"
+    compiler = Path(shutil.which(args.compiler) or args.compiler).resolve()
+    env = dict(os.environ)
+    env["PATH"] = os.pathsep.join([str(ref), str(compiler.parent), env["PATH"]])
+    lib = ref / ("thermopack.dll" if os.name == "nt" else "libthermopack.so")
+    flags = [] if os.name == "nt" else ["-Wl,-rpath," + str(ref)]
+    with tempfile.TemporaryDirectory(dir=ref) as tmp:
+        exe = Path(tmp) / ("mie.exe" if os.name == "nt" else "mie")
+        subprocess.run([compiler, "-fdefault-real-8", "-fdefault-double-8", "-I", ref,
+                        PROBE, lib, *flags, "-o", exe], check=True, env=env)
+        live = Path(tmp) / "live.csv"
+        with live.open("w", newline="", encoding="utf-8") as file:
+            writer = csv.writer(file, delimiter=";", lineterminator="\n")
+            writer.writerow("components ref order hs terms cutoff shift dispersion T V n blocks dv_fv".split())
+            for c in cases():
+                comps, param, order, hs, terms, cutoff, shift, kind, t, v, amounts = c
+                nc = len(comps.split(","))
+                stdin = f"{comps}\n{param}\n{nc} {order} {hs} {terms} {cutoff} {shift} {kind}\n{t} {v}\n{amounts}\n"
+                proc = subprocess.run([exe], input=stdin, text=True, env=env, capture_output=True,
+                                      timeout=30)
+                if proc.returncode:
+                    raise RuntimeError((c,proc.stdout,proc.stderr))
+                blocks, = [s.split()[1:] for s in proc.stdout.splitlines() if s.startswith("TVN ")]
+                if len(blocks) != 7+3*nc+nc*nc or not all(math.isfinite(float(v)) for v in blocks):
+                    raise ValueError((c, blocks))
+                writer.writerow([*c, ",".join(blocks[:-1]), blocks[-1]])
+        env["SAFTVRMIE_FIXTURE"] = str(live)
+        subprocess.run(["cargo", "test", "--test", "saft_vrmie", "exact_source_tvn"], cwd=ROOT, env=env, check=True)
+        if args.write_fixture:
+            FIXTURE.write_bytes(live.read_bytes())
+            metadata = {"cases": len(list(cases())), "fixture_sha256": sha(FIXTURE),
+                        "probe_sha256": sha(PROBE), "build": json.loads((ref/"metadata.json").read_text())}
+            FIXTURE.with_suffix(".metadata.json").write_text(json.dumps(metadata,indent=2)+"\n", encoding="utf-8")
+    print(f"{len(list(cases()))} live Mie TVN cases passed")
+
 
 if __name__ == "__main__":
-    print("Probing pure CO2...")
-    res_co2 = probe_pure("CO2", [250.0, 300.0, 350.0], [50.0, 500.0, 5000.0, 15000.0])
-    print(f"Generated {len(res_co2)} points for CO2")
-    print("CO2 point 0:", res_co2[0])
-    print("CO2 dense liquid point:", res_co2[-1])
-
-    print("\nProbing pure C1...")
-    res_c1 = probe_pure("C1", [150.0, 200.0, 300.0], [50.0, 2000.0, 12000.0])
-    print(f"Generated {len(res_c1)} points for C1")
-    print("C1 point 0:", res_c1[0])
-
-    print("\nProbing mixture CO2,C1...")
-    mix1 = probe_mixture("CO2,C1", 280.0, 0.0002, [0.4, 0.6])
-    print("CO2,C1 mix:", mix1)
-
-    print("\nProbing quantum fluid H2 (FH0/Default)...")
-    res_h2 = probe_pure("H2", [30.0, 50.0, 100.0], [100.0, 2000.0, 10000.0])
-    print(f"Generated {len(res_h2)} points for H2")
-    print("H2 point 0:", res_h2[0])
+    main()

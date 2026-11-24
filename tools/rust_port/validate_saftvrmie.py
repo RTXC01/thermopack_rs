@@ -67,6 +67,7 @@ def cases():
     # Model-side diameters, effective parameters, alpha, de Broglie (kind=5)
     yield case("CO2,C1", 280, 0.0004, "0.4,0.6", kind=5)
     yield case("CO2", 300, 0.0004, "1", cutoff=3.5, shift=1, kind=5)
+    yield case("CO2", 300, 0.0004, "1", cutoff=1000, shift=1, kind=5)
     yield case("H2,NE", 54, 0.0005, "0.65,0.35", order=2, hs=4, kind=5)
     yield case("H2,NE", 54, 0.0005, "0.65,0.35", order=2, hs=4, kind=5, variant="arithmetic-cross")
     # Pure-fluid saturation pressure and coexisting roots (kind=6)

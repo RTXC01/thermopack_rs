@@ -104,6 +104,20 @@ fn mie_well_left_deriv(d: f64, r_min: f64, la: f64, lr: f64) -> f64 {
     pref * (-la * ln_t).exp() * (-(lr - la) * ln_t).exp_m1()
 }
 
+/// Evaluate `u*(1 + delta)` for `delta >= 0` without cancellation near `r = 1`.
+#[inline]
+fn mie_shifted_unit_value(delta: f64, c: f64, la: f64, lr: f64) -> f64 {
+    let s = delta.ln_1p();
+    c * (-la * s).exp() * (-(lr - la) * s).exp_m1()
+}
+
+/// Evaluate `du*(1 + delta)/d(delta)` for `delta >= 0`.
+#[inline]
+fn mie_shifted_unit_slope(delta: f64, c: f64, la: f64, lr: f64) -> f64 {
+    let s = delta.ln_1p();
+    (c / (1.0 + delta)) * (-lr * (-lr * s).exp() + la * (-la * s).exp())
+}
+
 /// Fast positive-exponent power avoiding `libm::pow` for exact small integers
 /// and sharing a single `ln(base)` across `(base^n, base^m)` when both are non-integer.
 #[inline(always)]
@@ -1266,12 +1280,15 @@ impl SaftVrMie {
     /// Dimensionless van der Waals attractive energy matrix `alpha_ij(T)` (`nc x nc`),
     /// matching `saft_interface::alpha` (including truncated/shifted classical potentials).
     ///
-    /// For shifted cutoffs, the inner shifted zero `sigma_eff` is certified
-    /// relative to the shifted well depth `eps_eff = u*(r_cut) + 1`, and shallow
-    /// wells (`eps_eff < 0.25`) integrate `1 - (u*(r) + 1) / eps_eff` directly
-    /// with 21-point Gauss-Kronrod quadrature on each side of `r_min` to avoid
-    /// catastrophic cancellation. Cutoffs at, below, or unresolvably close to
-    /// `r_min` (`r_cut - r_min <= 1e-12 * r_min`) return `Error::NotConverged`.
+    /// For shifted cutoffs, cutoffs at, below, or unresolvably close to `r_min`
+    /// (`r_cut - r_min <= 1e-12 * r_min`) return `Error::NotConverged`. Near `r_min`
+    /// (`r_cut <= 2 * r_min`), the shifted well depth `eps_eff = u*(r_cut) + 1` and
+    /// inner zero offset `r_min - sigma_eff` are solved relative to `r_min`, using
+    /// 21-point Gauss-Kronrod quadrature on shallow wells (`eps_eff < 0.25`). For
+    /// deep wells and large finite cutoffs (`r_cut > 2 * r_min`), `u_cut = -u*(r_cut)`
+    /// is evaluated directly, the inner zero offset `sigma_eff - 1` is solved near
+    /// `sigma = 1`, and the tail uses `r_cut^(3 - lambda)` to avoid `1 - eps_eff`
+    /// cancellation and `r_cut^3` overflow.
     pub fn alpha_vdw(&self, temperature: f64) -> Result<Vec<f64>> {
         positive(temperature, "temperature")?;
         let nc = self.num_components();
@@ -1297,84 +1314,160 @@ impl SaftVrMie {
                                 "cannot resolve shifted potential well for cutoff radius",
                             ));
                         }
-                        let eps_eff = mie_well_excess_tau(delta_c / r_min, la, lr);
-                        if !eps_eff.is_finite() || eps_eff <= 0.0 || eps_eff >= 1.0 {
-                            return Err(Error::NotConverged(
-                                "cannot resolve shifted potential well depth for cutoff radius",
-                            ));
-                        }
-                        // Solve g(d) = (u*(r_min - d) + 1) - eps_eff = 0 for the positive
-                        // offset d = r_min - sigma_eff in (0, r_min - 1), avoiding catastrophic
-                        // subtraction of rs - r_min for shallow wells.
-                        let d_max = r_min - 1.0;
-                        let mut lo = 0.0_f64;
-                        let mut hi = d_max;
-                        let mut d_s = delta_c.min(0.5 * d_max);
-                        let mut converged = false;
-                        for _ in 0..60 {
-                            let f = mie_well_excess_tau(-d_s / r_min, la, lr) - eps_eff;
-                            if f.abs() <= 1.0e-13 * eps_eff {
-                                converged = true;
-                                break;
+                        if r_cut <= 2.0 * r_min {
+                            let eps_eff = mie_well_excess_tau(delta_c / r_min, la, lr);
+                            if !eps_eff.is_finite() || eps_eff <= 0.0 || eps_eff >= 1.0 {
+                                return Err(Error::NotConverged(
+                                    "cannot resolve shifted potential well depth for cutoff radius",
+                                ));
                             }
-                            if f < 0.0 {
-                                lo = d_s;
-                            } else {
-                                hi = d_s;
-                            }
-                            let df = mie_well_left_deriv(d_s, r_min, la, lr);
-                            let mut next = if df.is_finite() && df > 0.0 {
-                                d_s - f / df
-                            } else {
-                                0.5 * (lo + hi)
-                            };
-                            if !next.is_finite() || next <= lo || next >= hi {
-                                next = 0.5 * (lo + hi);
-                            }
-                            let step = (next - d_s).abs();
-                            d_s = next;
-                            if step <= 1.0e-14 * d_s || (hi - lo) <= 1.0e-14 * d_s {
-                                let f_chk = mie_well_excess_tau(-d_s / r_min, la, lr) - eps_eff;
-                                converged = f_chk.is_finite() && f_chk.abs() <= 1.0e-11 * eps_eff;
-                                break;
-                            }
-                        }
-                        if !converged || !d_s.is_finite() || d_s <= 0.0 || d_s >= d_max {
-                            return Err(Error::NotConverged(
-                                "cannot solve shifted potential zero for cutoff radius",
-                            ));
-                        }
-                        let sigma_eff = r_min - d_s;
-                        if eps_eff < 0.25 {
-                            // Integrate the strictly positive integrand
-                            // (1 - (u*(r_min + x) + 1) / eps_eff) * (r_min + x)^2 over
-                            // x in [-d_s, 0] and [0, delta_c] with 21-point Gauss-Kronrod.
-                            let quad_x = |x_lo: f64, x_hi: f64| -> f64 {
-                                let mid = 0.5 * (x_lo + x_hi);
-                                let half = 0.5 * (x_hi - x_lo);
-                                let mut acc = 0.0;
-                                for k in 0..21 {
-                                    let x = mid + half * X_NODES_21[k];
-                                    let r = r_min + x;
-                                    let excess = mie_well_excess_tau(x / r_min, la, lr);
-                                    let depth = (1.0 - excess / eps_eff).max(0.0);
-                                    acc += W_NODES_21[k] * depth * r * r;
+                            // Solve g(d) = (u*(r_min - d) + 1) - eps_eff = 0 for the positive
+                            // offset d = r_min - sigma_eff in (0, r_min - 1), avoiding catastrophic
+                            // subtraction of rs - r_min for shallow wells.
+                            let d_max = r_min - 1.0;
+                            let mut lo = 0.0_f64;
+                            let mut hi = d_max;
+                            let mut d_s = delta_c.min(0.5 * d_max);
+                            let mut converged = false;
+                            for _ in 0..60 {
+                                let f = mie_well_excess_tau(-d_s / r_min, la, lr) - eps_eff;
+                                if f.abs() <= 1.0e-13 * eps_eff {
+                                    converged = true;
+                                    break;
                                 }
-                                half * acc
-                            };
-                            (quad_x(-d_s, 0.0) + quad_x(0.0, delta_c)) / sigma_eff.powi(3)
+                                if f < 0.0 {
+                                    lo = d_s;
+                                } else {
+                                    hi = d_s;
+                                }
+                                let df = mie_well_left_deriv(d_s, r_min, la, lr);
+                                let mut next = if df.is_finite() && df > 0.0 {
+                                    d_s - f / df
+                                } else {
+                                    0.5 * (lo + hi)
+                                };
+                                if !next.is_finite() || next <= lo || next >= hi {
+                                    next = 0.5 * (lo + hi);
+                                }
+                                let step = (next - d_s).abs();
+                                d_s = next;
+                                if step <= 1.0e-14 * d_s || (hi - lo) <= 1.0e-14 * d_s {
+                                    let f_chk = mie_well_excess_tau(-d_s / r_min, la, lr) - eps_eff;
+                                    converged =
+                                        f_chk.is_finite() && f_chk.abs() <= 1.0e-11 * eps_eff;
+                                    break;
+                                }
+                            }
+                            if !converged || !d_s.is_finite() || d_s <= 0.0 || d_s >= d_max {
+                                return Err(Error::NotConverged(
+                                    "cannot solve shifted potential zero for cutoff radius",
+                                ));
+                            }
+                            let sigma_eff = r_min - d_s;
+                            if eps_eff < 0.25 {
+                                // Integrate the strictly positive integrand
+                                // (1 - (u*(r_min + x) + 1) / eps_eff) * (r_min + x)^2 over
+                                // x in [-d_s, 0] and [0, delta_c] with 21-point Gauss-Kronrod.
+                                let quad_x = |x_lo: f64, x_hi: f64| -> f64 {
+                                    let mid = 0.5 * (x_lo + x_hi);
+                                    let half = 0.5 * (x_hi - x_lo);
+                                    let mut acc = 0.0;
+                                    for k in 0..21 {
+                                        let x = mid + half * X_NODES_21[k];
+                                        let r = r_min + x;
+                                        let excess = mie_well_excess_tau(x / r_min, la, lr);
+                                        let depth = (1.0 - excess / eps_eff).max(0.0);
+                                        acc += W_NODES_21[k] * depth * r * r;
+                                    }
+                                    half * acc
+                                };
+                                (quad_x(-d_s, 0.0) + quad_x(0.0, delta_c)) / sigma_eff.powi(3)
+                            } else {
+                                let u_cut = c * (r_cut.powf(-la) - r_cut.powf(-lr));
+                                let rc_a = r_cut.powf(3.0 - la);
+                                let rc_r = r_cut.powf(3.0 - lr);
+                                let sigma3 = sigma_eff.powi(3);
+                                let num = c / (sigma_eff.powf(la - 3.0) * (la - 3.0))
+                                    - c / (sigma_eff.powf(lr - 3.0) * (lr - 3.0))
+                                    + c * (lr / (3.0 * (lr - 3.0))) * rc_r
+                                    - c * (la / (3.0 * (la - 3.0))) * rc_a
+                                    + u_cut * sigma3 / 3.0;
+                                num / (eps_eff * sigma3)
+                            }
                         } else {
-                            let u_cut = 1.0 - eps_eff;
+                            // Deep-well / large-cutoff path (r_cut > 2 * r_min): evaluate
+                            // u_cut = -u*(r_cut) directly, solve u*(1 + ds) + u_cut = 0 for
+                            // ds = sigma_eff - 1 >= 0, and evaluate the cutoff tail via
+                            // r_cut^(3 - lambda) without 1 - eps_eff cancellation or r_cut^3 overflow.
+                            let u_cut = c * (r_cut.powf(-la) - r_cut.powf(-lr));
+                            if !u_cut.is_finite() || u_cut < 0.0 || u_cut >= 1.0 {
+                                return Err(Error::NotConverged(
+                                    "cannot resolve shifted potential well depth for cutoff radius",
+                                ));
+                            }
+                            let eps_eff = 1.0 - u_cut;
+                            let init_slope = c * (lr - la);
+                            let d_max = r_min - 1.0;
+                            let delta_s = if u_cut <= 1.0e-30 * init_slope {
+                                0.0
+                            } else {
+                                let mut lo = 0.0_f64;
+                                let mut hi = d_max;
+                                let mut ds = (u_cut / init_slope).min(0.5 * d_max);
+                                if !ds.is_finite() || ds <= 0.0 {
+                                    ds = 0.5 * d_max;
+                                }
+                                let mut converged = false;
+                                for _ in 0..60 {
+                                    let f = mie_shifted_unit_value(ds, c, la, lr) + u_cut;
+                                    if f.abs() <= 1.0e-13 * u_cut {
+                                        converged = true;
+                                        break;
+                                    }
+                                    if f > 0.0 {
+                                        lo = ds;
+                                    } else {
+                                        hi = ds;
+                                    }
+                                    let df = mie_shifted_unit_slope(ds, c, la, lr);
+                                    let mut next = if df.is_finite() && df < 0.0 {
+                                        ds - f / df
+                                    } else {
+                                        0.5 * (lo + hi)
+                                    };
+                                    if !next.is_finite() || next <= lo || next >= hi {
+                                        next = 0.5 * (lo + hi);
+                                    }
+                                    let step = (next - ds).abs();
+                                    ds = next;
+                                    if step <= 1.0e-14 * ds || (hi - lo) <= 1.0e-14 * ds {
+                                        let f_chk = mie_shifted_unit_value(ds, c, la, lr) + u_cut;
+                                        converged =
+                                            f_chk.is_finite() && f_chk.abs() <= 1.0e-11 * u_cut;
+                                        break;
+                                    }
+                                }
+                                if !converged || !ds.is_finite() || ds < 0.0 || ds >= d_max {
+                                    return Err(Error::NotConverged(
+                                        "cannot solve shifted potential zero for cutoff radius",
+                                    ));
+                                }
+                                ds
+                            };
+                            let sigma_eff = 1.0 + delta_s;
+                            let rc_a = r_cut.powf(3.0 - la);
+                            let rc_r = r_cut.powf(3.0 - lr);
+                            let sigma3 = sigma_eff.powi(3);
                             let num = c / (sigma_eff.powf(la - 3.0) * (la - 3.0))
                                 - c / (sigma_eff.powf(lr - 3.0) * (lr - 3.0))
-                                + c / (r_cut.powf(lr - 3.0) * (lr - 3.0))
-                                - c / (r_cut.powf(la - 3.0) * (la - 3.0))
-                                - u_cut * (r_cut.powi(3) - sigma_eff.powi(3)) / 3.0;
-                            num / (eps_eff * sigma_eff.powi(3))
+                                + c * (lr / (3.0 * (lr - 3.0))) * rc_r
+                                - c * (la / (3.0 * (la - 3.0))) * rc_a
+                                + u_cut * sigma3 / 3.0;
+                            num / (eps_eff * sigma3)
                         }
                     } else {
-                        c / (la - 3.0) - c / (lr - 3.0) + c / (r_cut.powf(lr - 3.0) * (lr - 3.0))
-                            - c / (r_cut.powf(la - 3.0) * (la - 3.0))
+                        c / (la - 3.0) - c / (lr - 3.0) + c * r_cut.powf(3.0 - lr) / (lr - 3.0)
+                            - c * r_cut.powf(3.0 - la) / (la - 3.0)
                     };
                     if !a.is_finite() || (shift && a <= 0.0) {
                         return Err(Error::NotConverged(
@@ -2339,7 +2432,8 @@ impl<'a> PreparedSaftVrMie<'a> {
 
             let v_converged = (v - v_old).abs() <= 1e2 * MACHINE_PREC * v_old;
             let p_tol = (1e5 * MACHINE_PREC * pressure_target)
-                .max(1e2 * MACHINE_PREC * (jet.dp_dv * v).abs());
+                .max(1e2 * MACHINE_PREC * (jet.dp_dv * v).abs())
+                .min(1.0e-6 * pressure_target);
             let p_converged =
                 jet.pressure.is_finite() && (jet.pressure - pressure_target).abs() <= p_tol;
 
@@ -2376,6 +2470,18 @@ impl<'a> PreparedSaftVrMie<'a> {
         mut zeta_max: f64,
         zeta_init: f64,
     ) -> Result<f64> {
+        if !pressure_target.is_finite()
+            || pressure_target <= 0.0
+            || !zeta_min.is_finite()
+            || !zeta_max.is_finite()
+            || zeta_min <= 0.0
+            || zeta_min >= zeta_max
+            || zeta_max >= 1.0
+        {
+            return Err(Error::NotConverged(
+                "SAFT-VR Mie volume solver received invalid packing bracket",
+            ));
+        }
         let conv_eta = self.conv_eta;
         let mut zeta = zeta_init.clamp(zeta_min, zeta_max);
         let mut v = conv_eta / zeta;
@@ -2414,7 +2520,8 @@ impl<'a> PreparedSaftVrMie<'a> {
 
             let v_converged = (v - v_old).abs() <= 1e2 * MACHINE_PREC * v_old;
             let p_tol = (1e5 * MACHINE_PREC * pressure_target)
-                .max(1e2 * MACHINE_PREC * (jet.dp_dv * v).abs());
+                .max(1e2 * MACHINE_PREC * (jet.dp_dv * v).abs())
+                .min(1.0e-6 * pressure_target);
             let p_converged =
                 jet.pressure.is_finite() && (jet.pressure - pressure_target).abs() <= p_tol;
 
@@ -2535,6 +2642,9 @@ impl<'a> PreparedSaftVrMie<'a> {
         while dp_drho_at(lo_v)? <= 0.0 && lo_v > 1.0e-30 {
             lo_v *= 0.1;
         }
+        if dp_drho_at(lo_v)? <= 0.0 {
+            return Ok(None);
+        }
         let mut hi_v = eta_unstable;
         for _ in 0..64 {
             if (hi_v - lo_v) <= 1.0e-12 * hi_v {
@@ -2553,7 +2663,9 @@ impl<'a> PreparedSaftVrMie<'a> {
             .pressure;
 
         // Liquid spinodal (local P minimum): find the first positive-dP/drho grid point
-        // strictly above eta_unstable, staying below any unphysical high-packing pole.
+        // strictly above eta_unstable, bounded strictly by ETA_LIQUID_CAP so the liquid
+        // bracket never inverts or steps into unphysical high-packing poles.
+        const ETA_LIQUID_CAP: f64 = 0.72;
         let mut lo_l = eta_unstable;
         let mut hi_l = None;
         for k in 0..N_GRID {
@@ -2565,9 +2677,12 @@ impl<'a> PreparedSaftVrMie<'a> {
         let mut hi_l = match hi_l {
             Some(eta) => eta,
             None => {
-                let mut probe = (eta_unstable + 0.02).min(0.58);
-                while probe < 0.72 && dp_drho_at(probe)? <= 0.0 {
-                    probe += 0.02;
+                if eta_unstable >= ETA_LIQUID_CAP {
+                    return Ok(None);
+                }
+                let mut probe = (eta_unstable + 0.02).min(ETA_LIQUID_CAP);
+                while probe < ETA_LIQUID_CAP && dp_drho_at(probe)? <= 0.0 {
+                    probe = (probe + 0.02).min(ETA_LIQUID_CAP);
                 }
                 if dp_drho_at(probe)? <= 0.0 {
                     return Ok(None);
@@ -2587,11 +2702,15 @@ impl<'a> PreparedSaftVrMie<'a> {
             }
         }
         let eta_spin_l = hi_l;
+        if eta_spin_l >= ETA_LIQUID_CAP {
+            return Ok(None);
+        }
         let p_min = self
             .pressure_and_derivatives(eta_spin_l / conv_eta)?
             .pressure;
 
-        // Choose a safe upper liquid-branch packing bound where dP/drho > 0 and P > p_max.
+        // Choose a safe upper liquid-branch packing bound strictly above eta_spin_l
+        // and at or below ETA_LIQUID_CAP where dP/drho > 0.
         let mut eta_l_max = eta_spin_l;
         for k in 0..N_GRID {
             if grid_eta[k] > eta_spin_l {
@@ -2602,10 +2721,21 @@ impl<'a> PreparedSaftVrMie<'a> {
             }
         }
         if eta_l_max <= eta_spin_l {
-            eta_l_max = (eta_spin_l + 0.05).min(0.72);
+            eta_l_max = (eta_spin_l + 0.05).min(ETA_LIQUID_CAP);
         }
 
-        if !p_max.is_finite() || !p_min.is_finite() || p_max <= 0.0 || p_max <= p_min {
+        if !eta_spin_v.is_finite()
+            || !eta_spin_l.is_finite()
+            || !eta_l_max.is_finite()
+            || eta_spin_v <= 0.0
+            || eta_spin_v >= eta_spin_l
+            || eta_spin_l >= eta_l_max
+            || eta_l_max > ETA_LIQUID_CAP
+            || !p_max.is_finite()
+            || !p_min.is_finite()
+            || p_max <= 0.0
+            || p_max <= p_min
+        {
             return Ok(None);
         }
         Ok(Some(IsothermSpinodals {
@@ -2661,12 +2791,12 @@ impl<'a> PreparedSaftVrMie<'a> {
                     sp.eta_l_max,
                     0.5 * (sp.eta_l + sp.eta_l_max),
                 )?;
-                let vv = prep.volume_in_zeta_bracket(
-                    p,
-                    zeta_min_v,
-                    sp.eta_v,
-                    zeta_ideal.clamp(zeta_min_v, 0.9 * sp.eta_v),
-                )?;
+                let zeta_v_init = if zeta_min_v < 0.9 * sp.eta_v {
+                    zeta_ideal.clamp(zeta_min_v, 0.9 * sp.eta_v)
+                } else {
+                    0.5 * (zeta_min_v + sp.eta_v)
+                };
+                let vv = prep.volume_in_zeta_bracket(p, zeta_min_v, sp.eta_v, zeta_v_init)?;
                 (vl, vv)
             } else {
                 let vl_res = prep.volume(p, Phase::Liquid);
@@ -2712,7 +2842,11 @@ impl<'a> PreparedSaftVrMie<'a> {
             if (dg.abs() < 1e-13 && d_ln_p.abs() < 1e-12) || (bracket_tight && dg.abs() < 1e-10) {
                 let state_l = prep.state(1.0 / vl)?;
                 let state_v = prep.state(1.0 / vv)?;
-                if vl < vv && state_l.dp_drho > 0.0 && state_v.dp_drho > 0.0 {
+                let p_closed = state_l.pressure.is_finite()
+                    && state_v.pressure.is_finite()
+                    && (state_l.pressure - p).abs() <= 1.0e-6 * p
+                    && (state_v.pressure - p).abs() <= 1.0e-6 * p;
+                if vl < vv && state_l.dp_drho > 0.0 && state_v.dp_drho > 0.0 && p_closed {
                     return Ok(SaftVrMieSaturation {
                         pressure: p,
                         temperature,
@@ -2723,7 +2857,7 @@ impl<'a> PreparedSaftVrMie<'a> {
                     });
                 }
                 return Err(Error::NotConverged(
-                    "saturation roots failed mechanical stability check",
+                    "saturation roots failed mechanical stability or pressure closure check",
                 ));
             }
 

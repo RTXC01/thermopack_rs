@@ -34,12 +34,18 @@ mole.
   `extra_hard_sphere`.
 - **Potential truncation and shift**: pure-fluid `set_cutoff(Some((r_cut, shift)))`
   for truncated and truncated-shifted Mie/quantum-Mie dispersion and pair
-  potentials (shifted `alpha_vdw` solves for the inner shifted zero in offset
-  coordinates $d_s = r_{\min} - \sigma_{\text{eff}}$ scaled to the shifted
-  well depth $\varepsilon_{\text{eff}} = u^*(r_{\text{cut}}) + 1$, uses
-  cancellation-free 21-point Gauss-Kronrod quadrature on each side of
-  $r_{\min}$ for shallow wells $\varepsilon_{\text{eff}} < 0.25$, and rejects
-  cutoffs at, below, or within $10^{-12} r_{\min}$ of $r_{\min}$).
+  potentials (shifted `alpha_vdw` rejects cutoffs at, below, or within
+  $10^{-12} r_{\min}$ of $r_{\min}$; near $r_{\min}$ ($r_{\text{cut}} \le 2 r_{\min}$),
+  it solves for the inner shifted zero in offset coordinates
+  $d_s = r_{\min} - \sigma_{\text{eff}}$ scaled to
+  $\varepsilon_{\text{eff}} = u^*(r_{\text{cut}}) + 1$ and uses
+  cancellation-free 21-point Gauss-Kronrod quadrature on each side of $r_{\min}$
+  for shallow wells $\varepsilon_{\text{eff}} < 0.25$; for deep wells and large
+  finite cutoffs ($r_{\text{cut}} > 2 r_{\min}$), it evaluates
+  $u_{\text{cut}} = -u^*(r_{\text{cut}})$ directly, solves for
+  $\delta_s = \sigma_{\text{eff}} - 1 \ge 0$, and writes the tail via
+  $r_{\text{cut}}^{3 - \lambda}$ to avoid $1 - \varepsilon_{\text{eff}}$
+  cancellation and $r_{\text{cut}}^3$ overflow).
 - **Association (`rust/src/association.rs`, `rust/src/saft_vrmie/association.rs`)**:
   reuses the shared Wertheim TPT1 site solver (`AssocScheme`, `Standard` and
   `Elliot` $\Delta$ combining rules, exact infinite-dilution zero-mole site
@@ -99,11 +105,12 @@ into `rust/src/saft_vrmie_data.rs`:
   effective quantum parameters for fast repeated TV evaluations
   (`helmholtz_terms` via zero-overhead `f64`, analytic `pressure_and_derivatives`
   and `state` via stack-buffered `Dual1`/`Dual2` without re-preparing
-  temperature caches, `volume` with condition-aware stopping, strict relative
-  pressure closure, and common-pressure `MinimumGibbs`, and pure
-  `saturation_pressure` using the stabilized common-pressure Gibbs difference
-  $(F_l - F_v) + P(v_l - v_v)/(RT) - \ln(v_l/v_v)$ with mechanical-spinodal
-  branch bracketing near the model critical point and guaranteed supercritical
+  temperature caches, `volume` with a strict $\le 10^{-6} P_{\text{target}}$
+  relative pressure closure cap on every success path and common-pressure
+  `MinimumGibbs`, and pure `saturation_pressure` using the stabilized
+  common-pressure Gibbs difference $(F_l - F_v) + P(v_l - v_v)/(RT) - \ln(v_l/v_v)$
+  with guarded mechanical-spinodal branch bracketing ($\eta \le 0.72$),
+  verified liquid and vapor pressure closure, and guaranteed supercritical
   rejection). `SaftVrMieState::s_total` combines ideal TV entropy with TV
   residual entropy so it agrees with `state_tp.entropy.value` and satisfies
   $\Delta H = T\Delta S$ at coexistence.
@@ -112,12 +119,12 @@ into `rust/src/saft_vrmie_data.rs`:
 
 `tools/rust_port/validate_saftvrmie.py` compiles an isolated exact-source
 Fortran probe (`tools/rust_port/saftvrmie_probe.f90`) linked against
-`.reference` and qualifies **66 live cases** (**980 scalar comparisons** plus
-**2 explicitly marked `UNSUPPORTED_SOURCE` slots** for classical
+`.reference` and qualifies **67 live cases** (**988 scalar comparisons** plus
+**3 explicitly marked `UNSUPPORTED_SOURCE` slots** for classical
 `de_Broglie_wavelength`), persisted in `tests/fixtures/saftvrmie_tvn.csv` and
 verified in `tests/saft_vrmie.rs` with unit-aware per-slot tolerances,
 non-finite rejection, tamper-detection tests, and an independently pinned
-66-case roster:
+67-case roster:
 
 - **TVN residual, dispersion, hard-sphere, and Dufal RDF** (43 cases covering
   classical, associating `NH3`/`H2O,MEOH`/`ETOH,C1`, Elliot rule, non-unit mole
@@ -128,7 +135,8 @@ non-finite rejection, tamper-detection tests, and an independently pinned
   `H2O,MEOH` standard and Elliot, `ETOH,C1`, `H2` FH1, `H2,NE` FH2 across
   $Z, H^{\text{res}}, H, S^{\text{res}}, S, \ln\boldsymbol{\phi}$, all
   $(T, P, n)$ derivatives, and speed of sound).
-- **Model-side FMT/DFT hooks** (4 cases covering classical, truncated-shifted,
+- **Model-side FMT/DFT hooks** (5 cases covering classical, truncated-shifted
+  at $r_{\text{cut}} = 3.5$ and $r_{\text{cut}} = 1000$,
   and quantum exact/arithmetic-cross diameters, $d_T$, $d_{TT}$, $d_{ij}$,
   $d_{ij,T}$, effective $\sigma_{ij}/\epsilon_{ij}$, $\alpha_{ij}$, and de
   Broglie wavelength with unit-resolved tolerances down to $10^{-29}$).

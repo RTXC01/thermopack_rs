@@ -551,12 +551,15 @@ const EXPECTED_FIXTURE_CASES: &[FixtureKey<'static>] = &[
         "0.65,0.35",
         "default",
     ],
-    // kind=5: Model-side FMT/DFT hooks (4 cases)
+    // kind=5: Model-side FMT/DFT hooks (5 cases)
     [
         "CO2,C1", "DEFAULT", "-1", "1", "31", "0", "0", "5", "280", "0.0004", "0.4,0.6", "default",
     ],
     [
         "CO2", "DEFAULT", "-1", "1", "31", "3.5", "1", "5", "300", "0.0004", "1", "default",
+    ],
+    [
+        "CO2", "DEFAULT", "-1", "1", "31", "1000", "1", "5", "300", "0.0004", "1", "default",
     ],
     [
         "H2,NE",
@@ -634,7 +637,7 @@ const EXPECTED_FIXTURE_CASES: &[FixtureKey<'static>] = &[
     ],
 ];
 
-const EXPECTED_PER_KIND: [usize; 8] = [34, 4, 1, 4, 8, 4, 6, 5];
+const EXPECTED_PER_KIND: [usize; 8] = [34, 4, 1, 4, 8, 5, 6, 5];
 
 fn slot_tolerances(kind: &str, nc: usize) -> Vec<(f64, f64)> {
     match kind {
@@ -1065,9 +1068,9 @@ fn verify_saftvrmie_fixture(csv: &str) -> Result<FixtureCoverage, Vec<String>> {
             coverage.per_kind, EXPECTED_PER_KIND
         ));
     }
-    if coverage.unsupported_source_slots != 2 {
+    if coverage.unsupported_source_slots != 3 {
         failures.push(format!(
-            "unsupported source slot count mismatch: got {}, expected 2",
+            "unsupported source slot count mismatch: got {}, expected 3",
             coverage.unsupported_source_slots
         ));
     }
@@ -1092,7 +1095,7 @@ fn exact_source_tvn() {
         verify_saftvrmie_fixture(&csv).unwrap_or_else(|errs| panic!("{}", errs.join("\n")));
     assert_eq!(coverage.total_cases, EXPECTED_FIXTURE_CASES.len());
     assert_eq!(coverage.per_kind, EXPECTED_PER_KIND);
-    assert_eq!(coverage.unsupported_source_slots, 2);
+    assert_eq!(coverage.unsupported_source_slots, 3);
 }
 
 #[test]
@@ -1656,11 +1659,111 @@ fn test_saft_vrmie_shifted_alpha_vdw_invalid_cutoff() {
         );
     }
 
-    // Valid deep cutoff above r_min succeeds with finite positive alpha.
-    co2.set_cutoff(Some((3.5, true))).unwrap();
-    let a = co2.alpha_vdw(300.0).unwrap();
-    assert_eq!(a.len(), 1);
-    assert!(a[0].is_finite() && a[0] > 0.0);
+    // Valid deep and large finite cutoffs above r_min must preserve full precision
+    // without 1 - eps_eff cancellation or r_cut^3 overflow (80-digit references).
+    let alpha_inf = {
+        let mut untrunc = SaftVrMie::new(&["CO2"]).unwrap();
+        untrunc.set_cutoff(None).unwrap();
+        untrunc.alpha_vdw(300.0).unwrap()[0]
+    };
+    for &(r_cut, ref_alpha) in &[
+        (2.0 * r_min, 0.5174975228640601_f64),
+        (3.5_f64, 0.6698028323490535_f64),
+        (900.0_f64, 0.76278035683822295_f64),
+        (1000.0_f64, 0.7627804751722388_f64),
+        (1.0e12_f64, alpha_inf),
+        (1.0e100_f64, alpha_inf),
+    ] {
+        co2.set_cutoff(Some((r_cut, true))).unwrap();
+        let a = co2.alpha_vdw(300.0).unwrap();
+        assert_eq!(a.len(), 1);
+        assert!(
+            a[0].is_finite() && a[0] > 0.0 && (a[0] - ref_alpha).abs() <= 1e-13 * ref_alpha,
+            "deep shifted alpha_vdw at r_cut={r_cut}: got {:.16e}, expected {ref_alpha:.16e}",
+            a[0]
+        );
+    }
+
+    // Continuity across the r_cut = 2 * r_min shallow/deep branch handoff.
+    co2.set_cutoff(Some((2.0 * r_min * (1.0 - 1.0e-12), true)))
+        .unwrap();
+    let a_left = co2.alpha_vdw(300.0).unwrap()[0];
+    co2.set_cutoff(Some((2.0 * r_min * (1.0 + 1.0e-12), true)))
+        .unwrap();
+    let a_right = co2.alpha_vdw(300.0).unwrap()[0];
+    assert!(
+        (a_right - a_left).abs() <= 1e-11 * a_left,
+        "discontinuity across 2*r_min handoff: left={a_left:.16e}, right={a_right:.16e}"
+    );
+
+    // Unshifted large finite cutoff must also converge smoothly without overflow.
+    co2.set_cutoff(Some((1.0e100, false))).unwrap();
+    let a_unshifted = co2.alpha_vdw(300.0).unwrap()[0];
+    assert!((a_unshifted - alpha_inf).abs() <= 1e-14 * alpha_inf);
+}
+
+#[test]
+fn test_saft_vrmie_low_temp_liquid_bracket_no_panic() {
+    // Ultra-cold heavy alkane states where dP/drho remains negative past eta=0.72
+    // must return an error instead of panicking in f64::clamp on an inverted bracket.
+    let nc20 = SaftVrMie::new(&["NC20"]).unwrap();
+    for &t in &[30.0_f64, 35.0, 40.0, 50.0, 80.0, 150.0] {
+        let prep = nc20.prepare(t, &[1.0]).unwrap();
+        if let Ok(sat) = prep.saturation_pressure(t) {
+            assert!(sat.liquid_volume < sat.vapor_volume);
+            let st_l = prep.state(1.0 / sat.liquid_volume).unwrap();
+            let st_v = prep.state(1.0 / sat.vapor_volume).unwrap();
+            assert!(st_l.dp_drho > 0.0 && st_v.dp_drho > 0.0);
+            assert!((st_l.pressure - sat.pressure).abs() <= 1e-6 * sat.pressure);
+            assert!((st_v.pressure - sat.pressure).abs() <= 1e-6 * sat.pressure);
+        }
+    }
+}
+
+#[test]
+fn test_saft_vrmie_strict_pressure_closure_rejection() {
+    // Stiff dense liquid at ultra-low target pressure cannot close P(v) = P_target
+    // within 1e-6 relative in f64 and must return Err(NotConverged), not a 2.6% miss.
+    let h2o = SaftVrMie::new(&["H2O"]).unwrap();
+    let prep_h2o = h2o.prepare(300.0, &[1.0]).unwrap();
+    assert!(
+        h2o.volume_tp(300.0, 1.0e-3, &[1.0], Phase::Liquid).is_err(),
+        "H2O liquid at 300 K, 1e-3 Pa must fail pressure closure"
+    );
+    assert!(
+        prep_h2o.volume(1.0e-3, Phase::Liquid).is_err(),
+        "prepared H2O liquid at 300 K, 1e-3 Pa must fail pressure closure"
+    );
+
+    // Cold NH3 at 100 K has a vapor pressure too small for f64 liquid pressure closure
+    // and must return Err(NotConverged) instead of returning a ~7.7% liquid pressure miss.
+    let nh3 = SaftVrMie::new(&["NH3"]).unwrap();
+    let prep_nh3 = nh3.prepare(100.0, &[1.0]).unwrap();
+    assert!(
+        prep_nh3.saturation_pressure(100.0).is_err(),
+        "NH3 saturation at 100 K must fail pressure closure"
+    );
+
+    // Normal cold-water saturation (300 K, 325 K) must continue to succeed with tight
+    // relative pressure closure on both liquid and vapor roots.
+    for &t in &[300.0_f64, 325.0] {
+        let prep = h2o.prepare(t, &[1.0]).unwrap();
+        let sat = prep.saturation_pressure(t).unwrap();
+        let st_l = prep.state(1.0 / sat.liquid_volume).unwrap();
+        let st_v = prep.state(1.0 / sat.vapor_volume).unwrap();
+        assert!(
+            (st_l.pressure - sat.pressure).abs() <= 1e-6 * sat.pressure,
+            "H2O {t} K liquid pressure miss: {} vs {}",
+            st_l.pressure,
+            sat.pressure
+        );
+        assert!(
+            (st_v.pressure - sat.pressure).abs() <= 1e-6 * sat.pressure,
+            "H2O {t} K vapor pressure miss: {} vs {}",
+            st_v.pressure,
+            sat.pressure
+        );
+    }
 }
 
 #[test]

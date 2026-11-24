@@ -10,6 +10,7 @@ pub(super) struct Terms {
     pub a3: H,
     pub chain: H,
     pub total: H,
+    pub dispersion: H,
 }
 
 impl PreparedSaftVrMie<'_> {
@@ -52,6 +53,10 @@ impl PreparedSaftVrMie<'_> {
         let d: Vec<_> = (0..nc * nc)
             .map(|k| self.d[k] + dt * (self.d_t[k] + dt * (0.5 * self.d_tt[k])))
             .collect();
+        let lift = |p: [f64; 3]| p[0] + dt * (p[1] + dt * (0.5 * p[2]));
+        let single = self.model.reference == HardSphereReference::SingleComponent;
+        let mut mean_d = zero;
+        let mut mean_sigma = zero;
         let mut eta = zero;
         let mut zeta_bar = zero;
         for i in 0..nc {
@@ -59,8 +64,17 @@ impl PreparedSaftVrMie<'_> {
                 let k = i * nc + j;
                 let w = xs[i] * xs[j] * (PI * N_A / 6.) * rho * segments;
                 eta += w * d[k] * d[k] * d[k];
-                zeta_bar += w * self.model.sigma_ij[k].powi(3);
+                let sigma = lift(self.effective[k].0);
+                zeta_bar += w * sigma * sigma * sigma;
+                if single {
+                    mean_d += xs[i] * xs[j] * d[k];
+                    mean_sigma += xs[i] * xs[j] * sigma;
+                }
             }
+        }
+        if single {
+            eta = segments * rho * (PI * N_A / 6.) * mean_d.pow_int(3);
+            zeta_bar = segments * rho * (PI * N_A / 6.) * mean_sigma.pow_int(3);
         }
         if !(0.0..1.0).contains(&eta.f0) {
             return Err(Error::InvalidInput(
@@ -69,7 +83,10 @@ impl PreparedSaftVrMie<'_> {
         }
         let beta = 1. / t;
         // 1. Hard-sphere term (BMCSL for mixture, Carnahan-Starling for pure fluid)
-        let a_hs = if nc == 1 {
+        let mut extra = zero;
+        let mut a_hs = if self.model.reference == HardSphereReference::NonAdditive {
+            santos(&x, &d, rho, segments)
+        } else if nc == 1 || single {
             let om = 1.0 - eta;
             (4.0 * eta - 3.0 * eta * eta) / (om * om)
         } else {
@@ -87,6 +104,31 @@ impl PreparedSaftVrMie<'_> {
                 z3 += factor * (di2 * di);
             }
             let em3 = 1.0 - z3;
+            if matches!(
+                self.model.reference,
+                HardSphereReference::Additive | HardSphereReference::AdditiveExact
+            ) {
+                for i in 0..nc {
+                    for j in i + 1..nc {
+                        let di = d[i * nc + i];
+                        let dj = d[j * nc + j];
+                        let additive = 0.5 * (di + dj);
+                        let mu = di * dj / (di + dj);
+                        let h = z2 * mu / em3;
+                        let g = (1. + 3. * h + 2. * h * h) / em3;
+                        extra += 4.
+                            * PI
+                            * N_A
+                            * rho
+                            * x[i]
+                            * x[j]
+                            * g
+                            * additive
+                            * additive
+                            * (lift(self.exact_d[i * nc + j]) - additive);
+                    }
+                }
+            }
             let pref = 1.0 / z0;
             let z2_3 = z2 * z2 * z2;
             pref * (3.0 * z1 * z2 / em3
@@ -115,52 +157,58 @@ impl PreparedSaftVrMie<'_> {
                 let lr = self.model.lambda_r_ij[idx];
                 let eps = self.model.eps_divk_ij[idx];
                 let c_fac = self.model.c_ij[idx];
-                let x0 = self.model.sigma_ij[idx] / d[idx];
-                let f_alpha = &self.model.f_alpha_ij[idx];
-
-                // a1_ij
-                let asr = calc_a1_sutherland(eta, lr, eps);
-                let asa = calc_a1_sutherland(eta, la, eps);
-                let (br, ba) = if x0.f0 > 1.0 {
-                    (
-                        calc_b_tilde(x0, eta, lr, eps),
-                        calc_b_tilde(x0, eta, la, eps),
-                    )
-                } else {
-                    (zero, zero)
+                let dij = if single { mean_d } else { d[idx] };
+                let sigma = self.model.sigma_ij[idx];
+                let x0 = sigma / dij;
+                let sigma_eff = lift(self.effective[idx].0);
+                let eps_eff = lift(self.effective[idx].1);
+                let y = sigma_eff / dij;
+                let integrate = |lambda| {
+                    let b = if y.f0 > 1. {
+                        calc_b_tilde(y, eta, lambda, eps)
+                    } else {
+                        zero
+                    };
+                    x0.pow_real(lambda) * (calc_a1_sutherland(eta, lambda, eps) + b)
                 };
-                let a1_tilde =
-                    c_fac * (x0.pow_real(la) * (asa + ba) - x0.pow_real(lr) * (asr + br));
-                let dij = d[idx];
-                let eta_ij = (PI * N_A / 6.0) * segments * rho * (dij * dij * dij);
+                let order = self.model.components[i].fh_order as usize;
+                let dfh = self.model.d_feynhibbs_param_ij[idx] / (sigma * sigma) / t;
+                let qa = quantum_factors(la, dfh);
+                let qr = quantum_factors(lr, dfh);
+                let mut a1_tilde = zero;
+                let mut a22_tilde = zero;
+                let mut alpha = zero;
+                let ratio = sigma / sigma_eff;
+                // Integrate each inverse power of the FH potential and of its square.
+                for k in 0..=order {
+                    let a = la + 2. * k as f64;
+                    let r = lr + 2. * k as f64;
+                    a1_tilde += c_fac * (qa[k] * integrate(a) - qr[k] * integrate(r));
+                    if order > 0 {
+                        alpha += qa[k] * ratio.pow_real(a) / (a - 3.)
+                            - qr[k] * ratio.pow_real(r) / (r - 3.);
+                    }
+                    for l in 0..=order {
+                        let offset = 2. * l as f64;
+                        a22_tilde += qa[k] * qa[l] * integrate(a + la + offset)
+                            + qr[k] * qr[l] * integrate(r + lr + offset)
+                            - 2. * qa[k] * qr[l] * integrate(a + lr + offset);
+                    }
+                }
+                let f_alpha = if order == 0 {
+                    self.model.f_alpha_ij[idx].map(|v| zero + v)
+                } else {
+                    alpha_functions(alpha * (c_fac * eps) / eps_eff)
+                };
+                let eta_ij = (PI * N_A / 6.) * segments * rho * dij * dij * dij;
                 let a1_ij = eta_ij * a1_tilde;
-
-                // a2_ij
-                let lam_2r = 2.0 * lr;
-                let lam_2a = 2.0 * la;
-                let lam_ar = la + lr;
-                let as_2r = calc_a1_sutherland(eta, lam_2r, eps);
-                let as_2a = calc_a1_sutherland(eta, lam_2a, eps);
-                let as_ar = calc_a1_sutherland(eta, lam_ar, eps);
-                let (b_2r, b_2a, b_ar) = if x0.f0 > 1.0 {
-                    (
-                        calc_b_tilde(x0, eta, lam_2r, eps),
-                        calc_b_tilde(x0, eta, lam_2a, eps),
-                        calc_b_tilde(x0, eta, lam_ar, eps),
-                    )
-                } else {
-                    (zero, zero, zero)
-                };
-                let a22_tilde = x0.pow_real(lam_2a) * (as_2a + b_2a)
-                    - 2.0 * x0.pow_real(lam_ar) * (as_ar + b_ar)
-                    + x0.pow_real(lam_2r) * (as_2r + b_2r);
                 let zb2 = zeta_bar * zeta_bar;
                 let chi = zeta_bar
                     * (f_alpha[0] + f_alpha[1] * (zb2 * zb2) + f_alpha[2] * zeta_bar.pow_int(7));
                 let a2_ij = 0.5 * eps * (c_fac * c_fac) * khs * (1.0 + chi) * eta_ij * a22_tilde;
 
                 // a3_ij
-                let a3_ij = -(eps * eps * eps)
+                let a3_ij = -(eps_eff * eps_eff * eps_eff)
                     * f_alpha[3]
                     * zeta_bar
                     * (f_alpha[4] * zeta_bar + f_alpha[5] * zb2).exp();
@@ -176,13 +224,13 @@ impl PreparedSaftVrMie<'_> {
         let mut a_chain = zero;
         for i in 0..nc {
             let mi = self.model.components[i].m;
-            if (mi - 1.0).abs() > 1e-12 {
+            if self.model.terms.chain && (mi - 1.0).abs() > 1e-12 {
                 let idx = i * nc + i;
                 let la = self.model.lambda_a_ij[idx];
                 let lr = self.model.lambda_r_ij[idx];
                 let eps = self.model.eps_divk_ij[idx];
                 let c_fac = self.model.c_ij[idx];
-                let x0 = self.model.sigma_ij[idx] / d[idx];
+                let x0 = self.model.sigma_ij[idx] / if single { mean_d } else { d[idx] };
                 let alpha = self.model.alpha_ij[idx];
 
                 // gd
@@ -215,7 +263,11 @@ impl PreparedSaftVrMie<'_> {
                 let g11 = (1.0 / (4.0 * eps)) * (a1_tilde + eta * a1_tilde_e);
                 let g12 = (c_fac / (12.0 * eps))
                     * (-la * x0.pow_real(la) * (asa + ba) + lr * x0.pow_real(lr) * (asr + br));
-                let g1 = g11 + g12;
+                let g1 = if self.model.terms.first {
+                    g11 + g12
+                } else {
+                    zero
+                };
 
                 // g2
                 let lam_2r = 2.0 * lr;
@@ -257,7 +309,11 @@ impl PreparedSaftVrMie<'_> {
                     * (1.0 - (10.0 * (0.57 - alpha)).tanh())
                     * zeta_bar
                     * (-6.7 * zeta_bar - 8.0 * (zeta_bar * zeta_bar)).exp();
-                let g2 = (1.0 + gam_c) * (g21 + g22);
+                let g2 = if self.model.terms.second {
+                    (1.0 + gam_c) * (g21 + g22)
+                } else {
+                    zero
+                };
 
                 let beta_eps = eps / t;
                 let w = (beta_eps * g1 + (beta_eps * beta_eps) * g2) / gd;
@@ -267,14 +323,55 @@ impl PreparedSaftVrMie<'_> {
             }
         }
 
-        let am = a_hs + beta * a1_mix + beta * beta * a2_mix + (beta * beta * beta) * a3_mix;
+        let terms = self.model.terms;
+        if !terms.hard_sphere {
+            a_hs = zero;
+        }
+        if !terms.first {
+            a1_mix = zero;
+        }
+        if !terms.second {
+            a2_mix = zero;
+        }
+        if !terms.third {
+            a3_mix = zero;
+        }
+        let mut dispersion = segments * beta * (a1_mix + beta * (a2_mix + beta * a3_mix));
+        if let Some((rc, shift)) = self.model.cutoff {
+            let la = self.model.lambda_a_ij[0];
+            let lr = self.model.lambda_r_ij[0];
+            let sigma = self.model.sigma_ij[0];
+            let dfh = self.model.d_feynhibbs_param_ij[0] / sigma.powi(2) / t;
+            let tail = |lambda: f64| {
+                quantum_factors(lambda, dfh)
+                    .iter()
+                    .take(1 + self.model.components[0].fh_order as usize)
+                    .enumerate()
+                    .fold(zero, |sum, (k, &q)| {
+                        let exponent = lambda + 2. * k as f64 - 3.;
+                        sum + q
+                            * rc.powf(-exponent)
+                            * (1. / exponent + if shift { 1. / 3. } else { 0. })
+                    })
+            };
+            dispersion -= 2.
+                * PI
+                * N_A
+                * self.model.c_ij[0]
+                * sigma.powi(3)
+                * self.model.eps_divk_ij[0]
+                * rho
+                * beta
+                * (tail(lr) - tail(la));
+        }
         Ok(Terms {
             hs: a_hs,
             a1: a1_mix,
             a2: a2_mix,
             a3: a3_mix,
             chain: a_chain,
-            total: sum * (segments * am + a_chain),
+            dispersion,
+            total: sum * (segments * a_hs + dispersion + a_chain + extra),
         })
     }
 }
@@ -349,4 +446,57 @@ fn calc_b_tilde_with_deriv(x0: H, eta: H, lam: f64, eps_val: f64) -> (H, H) {
     let b_val = 6.0 * eps_val * (keta10 * i_term + keta20 * j_term);
     let b_e = 6.0 * eps_val * (keta11 * i_term + keta21 * j_term);
     (b_val, b_e)
+}
+
+fn quantum_factors(lambda: f64, dfh: H) -> [H; 3] {
+    let first = lambda * (lambda - 1.) * dfh;
+    [
+        H::with_order(1., dfh.order),
+        first,
+        0.5 * (lambda + 1.) * (lambda + 2.) * dfh * first,
+    ]
+}
+
+fn alpha_functions(alpha: H) -> [H; 6] {
+    std::array::from_fn(|k| {
+        let num = PHI_MAT[0][k]
+            + alpha * (PHI_MAT[1][k] + alpha * (PHI_MAT[2][k] + alpha * PHI_MAT[3][k]));
+        let den = 1. + alpha * (PHI_MAT[4][k] + alpha * (PHI_MAT[5][k] + alpha * PHI_MAT[6][k]));
+        num / den
+    })
+}
+
+// Santos second and third virial coefficients in units of angstrom^3
+// and angstrom^6. The cyclic B_ijk terms give identical sums over x_i x_j x_k.
+fn santos(x: &[H], d: &[H], rho: H, segments: H) -> H {
+    let nc = x.len();
+    let zero = H::with_order(0., rho.order);
+    let diameter = |i: usize, j: usize| d[i * nc + j] * 1e10;
+    let mut moment = zero;
+    let mut b2 = zero;
+    let mut b3 = zero;
+    for i in 0..nc {
+        moment += x[i] * diameter(i, i).pow_int(3);
+        for j in 0..nc {
+            let dij = diameter(i, j);
+            let w = x[i] * x[j] * dij.pow_int(3) * 4.;
+            b2 += w;
+            for k in 0..nc {
+                let dik = diameter(i, k);
+                let djk = diameter(j, k);
+                let clip = |v: H| if v.f0 > 0. { v } else { zero };
+                let dkij = clip(dik + djk - dij);
+                let ckij = dkij
+                    * dkij
+                    * (dkij + 1.5 * clip(dij + dik - djk) * clip(dij + djk - dik) / dij);
+                b3 += w * x[k] * ckij;
+            }
+        }
+    }
+    let eta = (PI * N_A * 1e-30 / 6.) * rho * moment;
+    let om = 1. - eta;
+    let b2 = b2 / moment;
+    let b3 = b3 / (moment * moment);
+    (-(10. * b2 - 4. * b3) * om.ln() + (b3 - b2) * (4. - 3. * eta) * eta / (om * om))
+        / (6. * segments)
 }

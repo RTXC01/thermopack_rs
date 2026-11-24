@@ -146,6 +146,37 @@ pub struct SaftVrMieSaturation {
     pub entropy_vaporization: f64,
 }
 
+/// Reference presets from saftvrmie_options::set_hs_reference.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum HardSphereReference {
+    #[default]
+    Lafitte,
+    SingleComponent,
+    Additive,
+    NonAdditive,
+    AdditiveExact,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct MieTerms {
+    pub hard_sphere: bool,
+    pub first: bool,
+    pub second: bool,
+    pub third: bool,
+    pub chain: bool,
+}
+impl Default for MieTerms {
+    fn default() -> Self {
+        Self {
+            hard_sphere: true,
+            first: true,
+            second: true,
+            third: true,
+            chain: true,
+        }
+    }
+}
+
 /// SAFT-VR Mie and SAFT-VRQ Mie model instance.
 #[derive(Debug, Clone)]
 pub struct SaftVrMie {
@@ -165,6 +196,9 @@ pub struct SaftVrMie {
     d_feynhibbs_param_ij: Vec<f64>,
     ideal: Vec<IdealGas>,
     exact_binary_dhs: bool,
+    reference: HardSphereReference,
+    terms: MieTerms,
+    cutoff: Option<(f64, bool)>,
 }
 
 impl SaftVrMie {
@@ -241,6 +275,9 @@ impl SaftVrMie {
             d_feynhibbs_param_ij: vec![0.0; nc * nc],
             ideal,
             exact_binary_dhs: false,
+            reference: HardSphereReference::Lafitte,
+            terms: MieTerms::default(),
+            cutoff: None,
         };
 
         // Initialize interaction parameters from database
@@ -266,6 +303,74 @@ impl SaftVrMie {
         Ok(s)
     }
 
+    /// Initialize the Aasen FH0, FH1 or FH2 model with the Santos reference.
+    pub fn new_quantum(comps: &[&str], order: u8, reference: Option<&str>) -> Result<Self> {
+        let default_ref = match order {
+            0 => "AASEN2019-FH0",
+            1 => "AASEN2019-FH1",
+            2 => "AASEN2019-FH2",
+            _ => return Err(Error::InvalidInput("FH order must be 0, 1 or 2")),
+        };
+        let mut model = Self::new_with_options(
+            comps,
+            reference
+                .filter(|r| !r.eq_ignore_ascii_case("default"))
+                .unwrap_or(default_ref),
+        )?;
+        if model
+            .components
+            .iter()
+            .any(|c| c.fh_order != i32::from(order) || (order > 0 && (c.mass <= 0. || c.m != 1.)))
+        {
+            return Err(Error::InvalidInput(
+                "component parameter set incompatible with quantum order",
+            ));
+        }
+        model.set_hard_sphere_reference(HardSphereReference::NonAdditive);
+        Ok(model)
+    }
+
+    pub fn set_hard_sphere_reference(&mut self, reference: HardSphereReference) {
+        self.reference = reference;
+        self.exact_binary_dhs = matches!(
+            reference,
+            HardSphereReference::SingleComponent
+                | HardSphereReference::NonAdditive
+                | HardSphereReference::AdditiveExact
+        );
+    }
+
+    pub fn set_terms(&mut self, terms: MieTerms) {
+        self.terms = terms;
+    }
+
+    /// Reduced cutoff distance in sigma units. None restores the infinite-range potential.
+    pub fn set_cutoff(&mut self, cutoff: Option<(f64, bool)>) -> Result<()> {
+        if let Some((r, _)) = cutoff
+            && (self.num_components() != 1 || !r.is_finite() || r <= 0.)
+        {
+            return Err(Error::InvalidInput(
+                "truncation requires a pure fluid and positive finite cutoff",
+            ));
+        }
+        self.cutoff = cutoff;
+        Ok(())
+    }
+
+    /// (FMT compatible, extra nonadditivity correction enabled).
+    pub fn fmt_compatibility(&self) -> (bool, bool) {
+        if self.num_components() == 1 {
+            return (true, false);
+        }
+        match self.reference {
+            HardSphereReference::Lafitte => (true, false),
+            HardSphereReference::Additive | HardSphereReference::AdditiveExact => {
+                (self.exact_binary_dhs, true)
+            }
+            _ => (false, false),
+        }
+    }
+
     /// Extensive residual F=Ares/(RT) and its ten TVN blocks at raw mole amounts.
     pub fn residual_helmholtz_tvn(
         &self,
@@ -273,20 +378,46 @@ impl SaftVrMie {
         volume: f64,
         moles: &[f64],
     ) -> Result<SaftVrMieHelmholtz> {
+        self.derivatives(temperature, volume, moles, false)
+    }
+
+    /// Reduced molar dispersion energy and its TVN derivatives, as used by DFT.
+    pub fn dispersion_tvn(
+        &self,
+        temperature: f64,
+        volume: f64,
+        moles: &[f64],
+    ) -> Result<SaftVrMieHelmholtz> {
+        self.derivatives(temperature, volume, moles, true)
+    }
+
+    fn derivatives(
+        &self,
+        temperature: f64,
+        volume: f64,
+        moles: &[f64],
+        dispersion: bool,
+    ) -> Result<SaftVrMieHelmholtz> {
         crate::error::positive(volume, "total volume")?;
         let state = self.prepare(temperature, moles)?;
         let total: f64 = moles.iter().sum();
         let rho = total / volume;
-        let mut out = assoc_helmholtz_all(
-            &self.association,
-            &MieRdf::new(&state, rho),
-            temperature,
-            volume,
-            moles,
-        )?;
+        let empty = AssociationParams::empty(moles.len());
+        let model = if dispersion {
+            &empty
+        } else {
+            &self.association
+        };
+        let mut out =
+            assoc_helmholtz_all(model, &MieRdf::new(&state, rho), temperature, volume, moles)?;
         for i in 0..moles.len() + 2 {
             for j in i..moles.len() + 2 {
-                let f = state.kernel(rho, Some(i), Some(j))?.total;
+                let terms = state.kernel(rho, Some(i), Some(j))?;
+                let f = if dispersion {
+                    terms.dispersion / total
+                } else {
+                    terms.total
+                };
                 if i == j {
                     match i {
                         0 => {
@@ -324,6 +455,14 @@ impl SaftVrMie {
     /// Access component parameters.
     pub fn components(&self) -> &[SaftVrMieComponent] {
         &self.components
+    }
+
+    /// Repulsive-exponent binary interaction in the Mie combining rule.
+    pub fn set_gammaij(&mut self, i: usize, j: usize, value: f64) {
+        let nc = self.num_components();
+        self.gamma_ij[i * nc + j] = value;
+        self.gamma_ij[j * nc + i] = value;
+        self.recompute_cross_parameters();
     }
 
     /// Set binary interaction parameter kij.
@@ -433,6 +572,11 @@ impl SaftVrMie {
         if temperature <= 0.0 || !temperature.is_finite() {
             return Err(Error::InvalidInput("temperature must be strictly positive"));
         }
+        if self.reference == HardSphereReference::SingleComponent && !self.exact_binary_dhs {
+            return Err(Error::InvalidInput(
+                "single component reference requires exact pair diameters",
+            ));
+        }
         let nc = self.num_components();
         if mole_fractions.len() != nc {
             return Err(Error::InvalidInput("mole fractions length mismatch"));
@@ -458,6 +602,8 @@ pub struct PreparedSaftVrMie<'a> {
     model: &'a SaftVrMie,
     temperature: f64,
     mole_fractions: Vec<f64>,
+    exact_d: Vec<[f64; 3]>,
+    effective: Vec<([f64; 3], [f64; 3])>,
     d: Vec<f64>,    // nc * nc
     d_t: Vec<f64>,  // nc * nc
     d_tt: Vec<f64>, // nc * nc
@@ -475,38 +621,65 @@ impl<'a> PreparedSaftVrMie<'a> {
         let mut d_t = vec![0.0; nc * nc];
         let mut d_tt = vec![0.0; nc * nc];
 
-        // 1. Solve pure Barker-Henderson hard-sphere diameters
+        let extra = matches!(
+            model.reference,
+            HardSphereReference::Additive | HardSphereReference::AdditiveExact
+        );
+        let mut exact_d = vec![[0.; 3]; nc * nc];
+        let mut effective = vec![([0.; 3], [0.; 3]); nc * nc];
         for i in 0..nc {
-            let idx = i * nc + i;
-            let comp = &model.components[i];
-            let c_fac = model.c_ij[idx];
-            let d_param = model.d_feynhibbs_param_ij[idx];
-            let (di, di_t, di_tt) = calc_hardsphere_diameter_pure(
-                temperature,
-                comp.sigma,
-                comp.eps_depth_divk,
-                comp.lambda_a,
-                comp.lambda_r,
-                c_fac,
-                d_param,
-                comp.fh_order,
-            )?;
-            d[idx] = di;
-            d_t[idx] = di_t;
-            d_tt[idx] = di_tt;
+            for j in i..nc {
+                let k = i * nc + j;
+                let sigma = model.sigma_ij[k];
+                let eps = model.eps_divk_ij[k];
+                let la = model.lambda_a_ij[k];
+                let lr = model.lambda_r_ij[k];
+                let c = model.c_ij[k];
+                let dp = model.d_feynhibbs_param_ij[k];
+                let fh = model.components[i].fh_order;
+                if fh != model.components[j].fh_order {
+                    return Err(Error::InvalidInput("inconsistent FH orders in mixture"));
+                }
+                let se = effective_sigma(temperature, sigma, eps, la, lr, c, dp, fh);
+                let ee = if fh == 0 {
+                    [eps, 0., 0.]
+                } else {
+                    let potential =
+                        |r| calc_mie_potential_full(r, temperature, sigma, eps, la, lr, c, dp, fh);
+                    let mut r = se.0 * (lr / la).powf(1. / (lr - la));
+                    for _ in 0..35 {
+                        let u = potential(r);
+                        let step = u.u_divk_r / u.u_divk_rr;
+                        r -= step;
+                        if step.abs() < 1e-14 * sigma {
+                            break;
+                        }
+                    }
+                    let u = potential(r);
+                    [
+                        -u.u_divk,
+                        -u.u_divk_t,
+                        -u.u_divk_tt + u.u_divk_tr.powi(2) / u.u_divk_rr,
+                    ]
+                };
+                effective[k] = ([se.0, se.1, se.2], ee);
+                effective[j * nc + i] = effective[k];
+                if i == j || model.exact_binary_dhs || extra {
+                    let (v, vt, vtt) =
+                        calc_hardsphere_diameter_pure(temperature, sigma, eps, la, lr, c, dp, fh)?;
+                    exact_d[k] = [v, vt, vtt];
+                    exact_d[j * nc + i] = exact_d[k];
+                }
+            }
         }
-
-        // 2. Mixture diameters
         for i in 0..nc {
             for j in 0..nc {
-                if i != j {
-                    let idx = i * nc + j;
-                    let ii = i * nc + i;
-                    let jj = j * nc + j;
-                    d[idx] = 0.5 * (d[ii] + d[jj]);
-                    d_t[idx] = 0.5 * (d_t[ii] + d_t[jj]);
-                    d_tt[idx] = 0.5 * (d_tt[ii] + d_tt[jj]);
-                }
+                let k = i * nc + j;
+                [d[k], d_t[k], d_tt[k]] = if model.exact_binary_dhs || i == j {
+                    exact_d[k]
+                } else {
+                    std::array::from_fn(|a| 0.5 * (exact_d[i * nc + i][a] + exact_d[j * nc + j][a]))
+                };
             }
         }
 
@@ -531,7 +704,7 @@ impl<'a> PreparedSaftVrMie<'a> {
             for j in 0..nc {
                 let idx = i * nc + j;
                 let dij = d[idx];
-                let sij = model.sigma_ij[idx];
+                let sij = effective[idx].0[0];
                 sum_d3 += xs[i] * xs[j] * (dij * dij * dij);
                 sum_sig3 += xs[i] * xs[j] * (sij * sij * sij);
             }
@@ -547,6 +720,8 @@ impl<'a> PreparedSaftVrMie<'a> {
             d,
             d_t,
             d_tt,
+            exact_d,
+            effective,
             m_bar,
             molar_mass_mix,
             conv_eta,
@@ -1018,7 +1193,7 @@ fn calc_mie_potential_full(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn calc_hardsphere_diameter_pure(
+fn effective_sigma(
     temperature: f64,
     sigma: f64,
     eps_depth_divk: f64,
@@ -1027,9 +1202,9 @@ pub(crate) fn calc_hardsphere_diameter_pure(
     c_fac: f64,
     d_param: f64,
     fh_order: i32,
-) -> Result<(f64, f64, f64)> {
+) -> (f64, f64, f64) {
     // 1. Solve effective sigma (where U(r) = 0)
-    let (sigma_eff, sig_t, sig_tt) = if fh_order == 0 {
+    if fh_order == 0 {
         (sigma, 0.0, 0.0)
     } else {
         let mut r = sigma;
@@ -1069,7 +1244,30 @@ pub(crate) fn calc_hardsphere_diameter_pure(
         let s_tt =
             -(pot.u_divk_tt + pot.u_divk_rr * s_t * s_t + 2.0 * pot.u_divk_tr * s_t) / pot.u_divk_r;
         (r, s_t, s_tt)
-    };
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn calc_hardsphere_diameter_pure(
+    temperature: f64,
+    sigma: f64,
+    eps_depth_divk: f64,
+    lambda_a: f64,
+    lambda_r: f64,
+    c_fac: f64,
+    d_param: f64,
+    fh_order: i32,
+) -> Result<(f64, f64, f64)> {
+    let (sigma_eff, sig_t, sig_tt) = effective_sigma(
+        temperature,
+        sigma,
+        eps_depth_divk,
+        lambda_a,
+        lambda_r,
+        c_fac,
+        d_param,
+        fh_order,
+    );
 
     // 2. Solve r0 (where exp(-beta u(r0)) = machine_prec)
     let ln_eps = MACHINE_PREC.ln();

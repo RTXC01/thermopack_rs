@@ -258,6 +258,22 @@ fn exact_source_tvn() {
             third: mask & 8 != 0,
             chain: mask & 16 != 0,
         });
+        use thermopack_rs::saft_vrmie::{PackingRule, QuantumVariant, SaftVrMieHelmholtz};
+        let mut opts = model.options();
+        match fields[11] {
+            "jaen-kahn" => opts.quantum_variant = QuantumVariant::JaenKahn,
+            "geometric" => opts.geometric_epsilon = true,
+            "arithmetic-cross" => opts.exact_cross_potential = false,
+            "linear" => opts.packing = PackingRule::Linear,
+            "bmcsl" => opts.bmcsl_compressibility = true,
+            "kolafa" => opts.kolafa_pure_reference = true,
+            "pair-a3" => opts.pair_prefactor_a3 = true,
+            "classical-a2" => opts.quantum_correct_a2 = false,
+            "no-extra" => opts.extra_hard_sphere = false,
+            "default" => {}
+            _ => panic!("unknown options"),
+        }
+        model.set_options(opts).unwrap();
         let cutoff: f64 = fields[5].parse().unwrap();
         if cutoff > 0. {
             model.set_cutoff(Some((cutoff, fields[6] == "1"))).unwrap();
@@ -265,7 +281,22 @@ fn exact_source_tvn() {
         let t = fields[8].parse().unwrap();
         let v = fields[9].parse().unwrap();
         let n = numbers(fields[10]);
-        let f = if fields[7] == "1" {
+        let f = if fields[7] == "2" {
+            let g = model.association_rdf_tvn(0, n.len() - 1, t, v, &n).unwrap();
+            Ok(SaftVrMieHelmholtz {
+                f: g.g,
+                f_t: g.temperature,
+                f_v: g.volume,
+                f_n: g.moles,
+                f_tt: g.temperature_second,
+                f_tv: g.temperature_volume,
+                f_tn: g.temperature_moles,
+                f_vv: g.volume_second,
+                f_vn: g.volume_moles,
+                f_nn: g.moles_second,
+                x_k: vec![],
+            })
+        } else if fields[7] == "1" {
             model.dispersion_tvn(t, v, &n)
         } else {
             model.residual_helmholtz_tvn(t, v, &n)
@@ -278,18 +309,22 @@ fn exact_source_tvn() {
         values.push(f.f_vv);
         values.extend(f.f_vn);
         values.extend(f.f_nn);
-        let mut expected = numbers(fields[11]);
+        let mut expected = numbers(fields[12]);
         // The extra hard-sphere term in the Fortran VV routine includes
         // g/V^2 in place of g_V/V^2. Qualify using the Fortran V gradient.
-        if n.len() > 1 && matches!(fields[3], "3" | "5") && fields[7] == "0" {
-            expected[5 + 2 * n.len()] = fields[12].parse().unwrap();
+        if n.len() > 1
+            && matches!(fields[3], "3" | "5")
+            && fields[7] == "0"
+            && opts.extra_hard_sphere
+        {
+            expected[5 + 2 * n.len()] = fields[13].parse().unwrap();
         }
         assert_eq!(expected.len(), values.len());
         for (index, (value, reference)) in values.iter().zip(expected).enumerate() {
-            if !((value - reference).abs() <= 2e-11 + 2e-7 * reference.abs()) {
+            if !value.is_finite() || (value - reference).abs() > 2e-11 + 3e-8 * reference.abs() {
                 failures.push(format!(
                     "{:?} block {index}: {value:.8e} vs {reference:.8e}",
-                    &fields[..8]
+                    &fields[..12]
                 ));
             }
         }

@@ -566,47 +566,6 @@ impl Div<f64> for HyperDual {
     }
 }
 
-impl Sub<f64> for HyperDual {
-    type Output = Self;
-    fn sub(self, rhs: f64) -> Self {
-        self + (-rhs)
-    }
-}
-impl Add<HyperDual> for f64 {
-    type Output = HyperDual;
-    fn add(self, rhs: HyperDual) -> HyperDual {
-        rhs + self
-    }
-}
-impl Sub<HyperDual> for f64 {
-    type Output = HyperDual;
-    fn sub(self, rhs: HyperDual) -> HyperDual {
-        -rhs + self
-    }
-}
-impl Mul<HyperDual> for f64 {
-    type Output = HyperDual;
-    fn mul(self, rhs: HyperDual) -> HyperDual {
-        rhs * self
-    }
-}
-impl Div<HyperDual> for f64 {
-    type Output = HyperDual;
-    fn div(self, rhs: HyperDual) -> HyperDual {
-        rhs.pow_real(-1.) * self
-    }
-}
-impl std::ops::AddAssign for HyperDual {
-    fn add_assign(&mut self, rhs: Self) {
-        *self = *self + rhs;
-    }
-}
-impl std::ops::SubAssign for HyperDual {
-    fn sub_assign(&mut self, rhs: Self) {
-        *self = *self - rhs;
-    }
-}
-
 /// The sum of a slice of hyperdual numbers.
 pub fn sum(values: &[HyperDual]) -> HyperDual {
     let mut total = HyperDual::real(0.0);

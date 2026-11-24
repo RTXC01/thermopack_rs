@@ -5,6 +5,7 @@
 mod association;
 mod kernel;
 use self::association::MieRdf;
+use self::kernel::EvalMode;
 use crate::association::{AssociationParams, DeltaCombRule, assoc_helmholtz_value};
 use crate::association::{
     assoc_helmholtz_all, assoc_helmholtz_first, assoc_helmholtz_pressure_jet,
@@ -21,7 +22,7 @@ use crate::saft_vrmie_data;
 const N_A: f64 = 6.02214076e23;
 const K_B: f64 = 1.380649e-23;
 const RGAS: f64 = N_A * K_B; // 8.31446261815324 J/(mol*K)
-const H_PLANCK: f64 = 6.62607015e-34; // J*s
+const H_PLANCK: f64 = 6.626069311e-34; // J*s, thermopack_constants::h_const
 const PI: f64 = std::f64::consts::PI;
 const MACHINE_PREC: f64 = 2.220446049250313e-16;
 
@@ -177,6 +178,55 @@ impl Default for MieTerms {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PackingRule {
+    Lafitte,
+    Linear,
+    Leonard,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum QuantumVariant {
+    FeynmanHibbs,
+    JaenKahn,
+}
+impl QuantumVariant {
+    fn second_factor(self) -> f64 {
+        match self {
+            Self::FeynmanHibbs => 0.5,
+            Self::JaenKahn => 0.9,
+        }
+    }
+}
+
+/// Independent submodel selections from saftvrmie_options.
+#[derive(Debug, Clone, Copy)]
+pub struct MieOptions {
+    pub packing: PackingRule,
+    pub extra_hard_sphere: bool,
+    pub exact_cross_potential: bool,
+    pub geometric_epsilon: bool,
+    pub bmcsl_compressibility: bool,
+    pub kolafa_pure_reference: bool,
+    pub pair_prefactor_a3: bool,
+    pub quantum_variant: QuantumVariant,
+    pub quantum_correct_a2: bool,
+}
+impl Default for MieOptions {
+    fn default() -> Self {
+        Self {
+            packing: PackingRule::Lafitte,
+            extra_hard_sphere: false,
+            exact_cross_potential: true,
+            geometric_epsilon: false,
+            bmcsl_compressibility: false,
+            kolafa_pure_reference: false,
+            pair_prefactor_a3: false,
+            quantum_variant: QuantumVariant::FeynmanHibbs,
+            quantum_correct_a2: true,
+        }
+    }
+}
+
 /// SAFT-VR Mie and SAFT-VRQ Mie model instance.
 #[derive(Debug, Clone)]
 pub struct SaftVrMie {
@@ -198,6 +248,7 @@ pub struct SaftVrMie {
     exact_binary_dhs: bool,
     reference: HardSphereReference,
     terms: MieTerms,
+    options: MieOptions,
     cutoff: Option<(f64, bool)>,
 }
 
@@ -277,6 +328,7 @@ impl SaftVrMie {
             exact_binary_dhs: false,
             reference: HardSphereReference::Lafitte,
             terms: MieTerms::default(),
+            options: MieOptions::default(),
             cutoff: None,
         };
 
@@ -332,12 +384,46 @@ impl SaftVrMie {
 
     pub fn set_hard_sphere_reference(&mut self, reference: HardSphereReference) {
         self.reference = reference;
+        self.options.packing = if reference == HardSphereReference::SingleComponent {
+            PackingRule::Leonard
+        } else {
+            PackingRule::Lafitte
+        };
+        if reference == HardSphereReference::NonAdditive {
+            self.options.kolafa_pure_reference = false;
+        }
+        self.options.extra_hard_sphere = matches!(
+            reference,
+            HardSphereReference::Additive | HardSphereReference::AdditiveExact
+        );
         self.exact_binary_dhs = matches!(
             reference,
             HardSphereReference::SingleComponent
                 | HardSphereReference::NonAdditive
                 | HardSphereReference::AdditiveExact
         );
+    }
+
+    pub fn options(&self) -> MieOptions {
+        self.options
+    }
+
+    pub fn set_options(&mut self, options: MieOptions) -> Result<()> {
+        if options.bmcsl_compressibility && self.components.iter().any(|c| c.m != 1.) {
+            return Err(Error::InvalidInput(
+                "BMCSL compressibility requires spherical molecules",
+            ));
+        }
+        if self.reference == HardSphereReference::SingleComponent
+            && options.packing != PackingRule::Leonard
+        {
+            return Err(Error::InvalidInput(
+                "single component reference requires Leonard packing",
+            ));
+        }
+        self.options = options;
+        self.recompute_cross_parameters();
+        Ok(())
     }
 
     pub fn set_terms(&mut self, terms: MieTerms) {
@@ -362,13 +448,14 @@ impl SaftVrMie {
         if self.num_components() == 1 {
             return (true, false);
         }
-        match self.reference {
-            HardSphereReference::Lafitte => (true, false),
-            HardSphereReference::Additive | HardSphereReference::AdditiveExact => {
-                (self.exact_binary_dhs, true)
-            }
-            _ => (false, false),
-        }
+        let additive = matches!(
+            self.reference,
+            HardSphereReference::Lafitte
+                | HardSphereReference::Additive
+                | HardSphereReference::AdditiveExact
+        ) && self.options.packing == PackingRule::Lafitte;
+        let extra = self.options.extra_hard_sphere;
+        (additive && (!extra || self.exact_binary_dhs), extra)
     }
 
     /// Extensive residual F=Ares/(RT) and its ten TVN blocks at raw mole amounts.
@@ -378,7 +465,7 @@ impl SaftVrMie {
         volume: f64,
         moles: &[f64],
     ) -> Result<SaftVrMieHelmholtz> {
-        self.derivatives(temperature, volume, moles, false)
+        self.derivatives(temperature, volume, moles, EvalMode::Total)
     }
 
     /// Reduced molar dispersion energy and its TVN derivatives, as used by DFT.
@@ -388,7 +475,17 @@ impl SaftVrMie {
         volume: f64,
         moles: &[f64],
     ) -> Result<SaftVrMieHelmholtz> {
-        self.derivatives(temperature, volume, moles, true)
+        self.derivatives(temperature, volume, moles, EvalMode::Dispersion)
+    }
+
+    /// Reduced molar hard-sphere energy and its TVN derivatives, as used by DFT.
+    pub fn hard_sphere_tvn(
+        &self,
+        temperature: f64,
+        volume: f64,
+        moles: &[f64],
+    ) -> Result<SaftVrMieHelmholtz> {
+        self.derivatives(temperature, volume, moles, EvalMode::HardSphere)
     }
 
     fn derivatives(
@@ -396,27 +493,33 @@ impl SaftVrMie {
         temperature: f64,
         volume: f64,
         moles: &[f64],
-        dispersion: bool,
+        mode: EvalMode,
     ) -> Result<SaftVrMieHelmholtz> {
         crate::error::positive(volume, "total volume")?;
         let state = self.prepare(temperature, moles)?;
         let total: f64 = moles.iter().sum();
-        let rho = total / volume;
+        let v_unit = volume / total;
+        if !v_unit.is_finite() || v_unit <= 0.0 {
+            return Err(Error::InvalidInput(
+                "molar volume must be finite and strictly positive",
+            ));
+        }
+        let rho = 1.0 / v_unit;
         let empty = AssociationParams::empty(moles.len());
-        let model = if dispersion {
-            &empty
-        } else {
+        let model = if mode == EvalMode::Total {
             &self.association
+        } else {
+            &empty
         };
         let mut out =
             assoc_helmholtz_all(model, &MieRdf::new(&state, rho), temperature, volume, moles)?;
         for i in 0..moles.len() + 2 {
             for j in i..moles.len() + 2 {
-                let terms = state.kernel(rho, Some(i), Some(j))?;
-                let f = if dispersion {
-                    terms.dispersion / total
-                } else {
-                    terms.total
+                let terms = state.eval_second(rho, i, j, mode)?;
+                let f = match mode {
+                    EvalMode::Total => terms.total,
+                    EvalMode::Dispersion => kernel::Scalar::mul_f(terms.dispersion, 1.0 / total),
+                    EvalMode::HardSphere => kernel::Scalar::mul_f(terms.hard_sphere, 1.0 / total),
                 };
                 if i == j {
                     match i {
@@ -443,7 +546,64 @@ impl SaftVrMie {
                 }
             }
         }
+        if ![out.f, out.f_t, out.f_v, out.f_tt, out.f_tv, out.f_vv]
+            .iter()
+            .all(|v| v.is_finite())
+            || !out.f_n.iter().all(|v| v.is_finite())
+            || !out.f_tn.iter().all(|v| v.is_finite())
+            || !out.f_vn.iter().all(|v| v.is_finite())
+            || !out.f_nn.iter().all(|v| v.is_finite())
+        {
+            return Err(Error::InvalidInput(
+                "non-finite SAFT-VR Mie Helmholtz derivative",
+            ));
+        }
         Ok(out)
+    }
+
+    /// Site ownership, association energies (J/mol) and bonding volumes (m^3).
+    pub fn association_parameters(&self) -> &AssociationParams {
+        &self.association
+    }
+
+    /// The Dufal association integral for a pair of associating components
+    /// and its derivatives with respect to T, total V and raw mole amounts.
+    pub fn association_rdf_tvn(
+        &self,
+        i: usize,
+        j: usize,
+        t: f64,
+        v: f64,
+        n: &[f64],
+    ) -> Result<crate::rdf::RdfDerivatives> {
+        use crate::association::AssociationRdfProvider;
+        for index in [i, j] {
+            if self
+                .association
+                .comp_vs_sites
+                .get(index)
+                .and_then(|s| *s)
+                .is_none()
+            {
+                return Err(Error::InvalidInput(
+                    "RDF requires an associating component pair",
+                ));
+            }
+        }
+        crate::error::positive(v, "total volume")?;
+        let p = self.prepare(t, n)?;
+        let sum = n.iter().sum::<f64>();
+        let mut r = MieRdf::new(&p, sum / v).rdf_second(i, j)?.rdf;
+        r.volume /= sum;
+        r.temperature_volume /= sum;
+        r.volume_second = r.volume_second / sum / sum;
+        for val in r.moles.iter_mut().chain(&mut r.temperature_moles) {
+            *val /= sum;
+        }
+        for val in r.volume_moles.iter_mut().chain(&mut r.moles_second) {
+            *val = *val / sum / sum;
+        }
+        Ok(r)
     }
 
     /// Number of components in the mixture.
@@ -455,6 +615,20 @@ impl SaftVrMie {
     /// Access component parameters.
     pub fn components(&self) -> &[SaftVrMieComponent] {
         &self.components
+    }
+
+    fn potential(&self, i: usize, j: usize) -> PairPotential {
+        let k = i * self.num_components() + j;
+        PairPotential {
+            sigma: self.sigma_ij[k],
+            eps_depth_divk: self.eps_divk_ij[k],
+            lambda_a: self.lambda_a_ij[k],
+            lambda_r: self.lambda_r_ij[k],
+            c_fac: self.c_ij[k],
+            d_param: self.d_feynhibbs_param_ij[k],
+            fh_order: self.components[i].fh_order,
+            second_factor: self.options.quantum_variant.second_factor(),
+        }
     }
 
     /// Repulsive-exponent binary interaction in the Mie combining rule.
@@ -525,7 +699,11 @@ impl SaftVrMie {
                     * (si3 * sj3).sqrt()
                     * (c_i.eps_depth_divk * c_j.eps_depth_divk).sqrt()
                     / (sig_ij * sig_ij * sig_ij);
-                self.eps_divk_ij[idx] = eps_ij;
+                self.eps_divk_ij[idx] = if self.options.geometric_epsilon {
+                    (1. - self.kij[idx]) * (c_i.eps_depth_divk * c_j.eps_depth_divk).sqrt()
+                } else {
+                    eps_ij
+                };
 
                 // Mie prefactor C_ij
                 let exp_factor = la_ij / (lr_ij - la_ij);
@@ -621,37 +799,34 @@ impl<'a> PreparedSaftVrMie<'a> {
         let mut d_t = vec![0.0; nc * nc];
         let mut d_tt = vec![0.0; nc * nc];
 
-        let extra = matches!(
-            model.reference,
-            HardSphereReference::Additive | HardSphereReference::AdditiveExact
-        );
+        let extra = model.options.extra_hard_sphere;
         let mut exact_d = vec![[0.; 3]; nc * nc];
         let mut effective = vec![([0.; 3], [0.; 3]); nc * nc];
         for i in 0..nc {
             for j in i..nc {
                 let k = i * nc + j;
-                let sigma = model.sigma_ij[k];
                 let eps = model.eps_divk_ij[k];
                 let la = model.lambda_a_ij[k];
                 let lr = model.lambda_r_ij[k];
-                let c = model.c_ij[k];
-                let dp = model.d_feynhibbs_param_ij[k];
-                let fh = model.components[i].fh_order;
+                let pair = model.potential(i, j);
+                let fh = pair.fh_order;
                 if fh != model.components[j].fh_order {
                     return Err(Error::InvalidInput("inconsistent FH orders in mixture"));
                 }
-                let se = effective_sigma(temperature, sigma, eps, la, lr, c, dp, fh);
+                if i != j && fh > 0 && !model.options.exact_cross_potential {
+                    continue;
+                }
+                let se = pair.effective_sigma(temperature);
                 let ee = if fh == 0 {
                     [eps, 0., 0.]
                 } else {
-                    let potential =
-                        |r| calc_mie_potential_full(r, temperature, sigma, eps, la, lr, c, dp, fh);
+                    let potential = |r| pair.evaluate(r, temperature);
                     let mut r = se.0 * (lr / la).powf(1. / (lr - la));
                     for _ in 0..35 {
                         let u = potential(r);
                         let step = u.u_divk_r / u.u_divk_rr;
                         r -= step;
-                        if step.abs() < 1e-14 * sigma {
+                        if step.abs() < 1e-14 * pair.sigma {
                             break;
                         }
                     }
@@ -664,9 +839,27 @@ impl<'a> PreparedSaftVrMie<'a> {
                 };
                 effective[k] = ([se.0, se.1, se.2], ee);
                 effective[j * nc + i] = effective[k];
+            }
+        }
+        for i in 0..nc {
+            for j in i..nc {
+                let k = i * nc + j;
+                if i != j
+                    && model.components[i].fh_order > 0
+                    && !model.options.exact_cross_potential
+                {
+                    for a in 0..3 {
+                        effective[k].0[a] =
+                            0.5 * (effective[i * nc + i].0[a] + effective[j * nc + j].0[a]);
+                        effective[k].1[a] =
+                            0.5 * (effective[i * nc + i].1[a] + effective[j * nc + j].1[a]);
+                    }
+                    effective[j * nc + i] = effective[k];
+                }
                 if i == j || model.exact_binary_dhs || extra {
+                    let [se, st, stt] = effective[k].0;
                     let (v, vt, vtt) =
-                        calc_hardsphere_diameter_pure(temperature, sigma, eps, la, lr, c, dp, fh)?;
+                        model.potential(i, j).diameter(temperature, (se, st, stt))?;
                     exact_d[k] = [v, vt, vtt];
                     exact_d[j * nc + i] = exact_d[k];
                 }
@@ -705,11 +898,28 @@ impl<'a> PreparedSaftVrMie<'a> {
                 let idx = i * nc + j;
                 let dij = d[idx];
                 let sij = effective[idx].0[0];
-                sum_d3 += xs[i] * xs[j] * (dij * dij * dij);
-                sum_sig3 += xs[i] * xs[j] * (sij * sij * sij);
+                match model.options.packing {
+                    PackingRule::Lafitte => {
+                        sum_d3 += xs[i] * xs[j] * dij.powi(3);
+                        sum_sig3 += xs[i] * xs[j] * sij.powi(3);
+                    }
+                    PackingRule::Linear if i == j => {
+                        sum_d3 += xs[i] * dij.powi(3);
+                        sum_sig3 += xs[i] * sij.powi(3);
+                    }
+                    PackingRule::Leonard => {
+                        sum_d3 += xs[i] * xs[j] * dij;
+                        sum_sig3 += xs[i] * xs[j] * sij;
+                    }
+                    _ => {}
+                }
             }
         }
 
+        if model.options.packing == PackingRule::Leonard {
+            sum_d3 = sum_d3.powi(3);
+            sum_sig3 = sum_sig3.powi(3);
+        }
         let conv_eta = (PI * N_A / 6.0) * m_bar * sum_d3;
         let conv_zeta = (PI * N_A / 6.0) * m_bar * sum_sig3;
 
@@ -769,7 +979,7 @@ impl<'a> PreparedSaftVrMie<'a> {
                 a_res: 0.,
             });
         }
-        let terms = self.kernel(rho, None, None)?;
+        let terms = self.eval_scalar(rho)?;
         let t = self.temperature;
         let a_assoc = if self.model.association.has_sites() && rho > 0.0 {
             assoc_helmholtz_value(
@@ -784,12 +994,12 @@ impl<'a> PreparedSaftVrMie<'a> {
             0.0
         };
         Ok(SaftVrMieHelmholtzTerms {
-            a_hs: terms.hs.f0,
-            a1: terms.a1.f0,
-            a2: terms.a2.f0,
-            a3: terms.a3.f0,
-            a_chain: terms.chain.f0,
-            a_res: terms.total.f0 + a_assoc,
+            a_hs: terms.hs,
+            a1: terms.a1,
+            a2: terms.a2,
+            a3: terms.a3,
+            a_chain: terms.chain,
+            a_res: terms.total + a_assoc,
         })
     }
 
@@ -798,8 +1008,8 @@ impl<'a> PreparedSaftVrMie<'a> {
         let v = 1.0 / rho;
         let t = self.temperature;
 
-        let vv = self.kernel(rho, Some(1), Some(1))?.total;
-        let tv = self.kernel(rho, Some(0), Some(1))?.total;
+        let vv = self.eval_second(rho, 1, 1, EvalMode::Total)?.total;
+        let tv = self.eval_second(rho, 0, 1, EvalMode::Total)?.total;
         let mut f = vv.f0;
         let mut f_v = vv.f1;
         let mut f_vv = vv.f12;
@@ -837,26 +1047,60 @@ impl<'a> PreparedSaftVrMie<'a> {
 
     /// Complete thermodynamic state properties at density rho [mol/m^3].
     pub fn state(&self, rho: f64) -> Result<SaftVrMieState> {
-        let jet = self.pressure_and_derivatives(rho)?;
         let t = self.temperature;
-        let tt = self.kernel(rho, Some(0), Some(0))?.total;
+        let v = 1.0 / rho;
+        let nc = self.model.components.len();
+
+        let vv = self.eval_second(rho, 1, 1, EvalMode::Total)?.total;
+        let tv = self.eval_second(rho, 0, 1, EvalMode::Total)?.total;
+        let tt = self.eval_second(rho, 0, 0, EvalMode::Total)?.total;
+        let mut f = vv.f0;
+        let mut f_v = vv.f1;
+        let mut f_vv = vv.f12;
+        let mut f_tv = tv.f12;
         let mut f_t = tt.f1;
         let mut f_tt = tt.f12;
+
+        let mut assoc_fn: Option<Vec<f64>> = None;
         if self.model.association.has_sites() {
-            let a = assoc_helmholtz_pressure_jet(
-                &self.model.association,
-                &MieRdf::new(self, rho),
-                t,
-                1. / rho,
-                &self.mole_fractions,
-            )?;
-            f_t += a.f_t;
-            f_tt += a.f_tt;
+            let rdf = MieRdf::new(self, rho);
+            if nc == 1 {
+                let a = assoc_helmholtz_pressure_jet(
+                    &self.model.association,
+                    &rdf,
+                    t,
+                    v,
+                    &self.mole_fractions,
+                )?;
+                f += a.f;
+                f_t += a.f_t;
+                f_v += a.f_v;
+                f_tt += a.f_tt;
+                f_tv += a.f_tv;
+                f_vv += a.f_vv;
+            } else {
+                let a =
+                    assoc_helmholtz_all(&self.model.association, &rdf, t, v, &self.mole_fractions)?;
+                f += a.f;
+                f_t += a.f_t;
+                f_v += a.f_v;
+                f_tt += a.f_tt;
+                f_tv += a.f_tv;
+                f_vv += a.f_vv;
+                assoc_fn = Some(a.f_n);
+            }
         }
+
+        let p = RGAS * t * (rho - f_v);
+        let z = 1.0 - f_v / rho;
+        let dp_dv = -RGAS * t * (rho * rho + f_vv);
+        let dp_drho = -dp_dv / (rho * rho);
+        let dp_dt = rho * RGAS - RGAS * f_v - RGAS * t * f_tv;
+
         let u_res = -RGAS * t * t * f_t;
-        let h_res = u_res + RGAS * t * (jet.compressibility - 1.0);
-        let s_res = -RGAS * (t * f_t + jet.residual_helmholtz) + RGAS * (jet.compressibility).ln();
-        let a_res_energy = RGAS * t * jet.residual_helmholtz;
+        let h_res = u_res + RGAS * t * (z - 1.0);
+        let s_res = -RGAS * (t * f_t + f) + RGAS * z.ln();
+        let a_res_energy = RGAS * t * f;
         let g_res = h_res - t * s_res;
 
         let cv_res = -RGAS * (2.0 * t * f_t + t * t * f_tt);
@@ -866,7 +1110,7 @@ impl<'a> PreparedSaftVrMie<'a> {
         let mut h_id = 0.0;
         let mut s_id = 0.0;
         let p_ref = 100_000.0;
-        for i in 0..self.model.components.len() {
+        for i in 0..nc {
             let id_props = self.model.ideal[i].properties(t, p_ref)?;
             let xi = self.mole_fractions[i];
             cp_id += xi * id_props.cp;
@@ -877,23 +1121,36 @@ impl<'a> PreparedSaftVrMie<'a> {
         s_id -= RGAS * (rho * RGAS * t / p_ref).ln();
 
         let cv_total = cp_id - RGAS + cv_res;
-        let cp_total = cv_total - t * (jet.dp_dt * jet.dp_dt) / jet.dp_dv;
+        let cp_total = cv_total - t * (dp_dt * dp_dt) / dp_dv;
 
         let gamma = cp_total / cv_total;
         let mw_kg = self.molar_mass_mix * 1e-3;
-        let sound_speed = if jet.dp_drho > 0.0 && gamma > 0.0 && mw_kg > 0.0 {
-            (gamma * jet.dp_drho / mw_kg).sqrt()
+        let sound_speed = if dp_drho > 0.0 && gamma > 0.0 && mw_kg > 0.0 {
+            (gamma * dp_drho / mw_kg).sqrt()
         } else {
             0.0
         };
 
         // Fugacity coefficients
-        let ln_phi = self.fugacity_coefficients(rho, jet.compressibility)?;
+        let ln_z = z.ln();
+        let ln_phi = if nc == 1 {
+            vec![f + (z - 1.0) - ln_z]
+        } else {
+            let mut vals = (0..nc)
+                .map(|i| Ok(self.eval_first(rho, 2 + i)?.total.f1 - ln_z))
+                .collect::<Result<Vec<_>>>()?;
+            if let Some(afn) = assoc_fn {
+                for (value, assoc) in vals.iter_mut().zip(afn) {
+                    *value += assoc;
+                }
+            }
+            vals
+        };
 
         Ok(SaftVrMieState {
-            pressure: jet.pressure,
-            compressibility: jet.compressibility,
-            residual_helmholtz: jet.residual_helmholtz,
+            pressure: p,
+            compressibility: z,
+            residual_helmholtz: f,
             u_residual: u_res,
             h_residual: h_res,
             s_residual: s_res,
@@ -904,9 +1161,9 @@ impl<'a> PreparedSaftVrMie<'a> {
             cv_residual: cv_res,
             cv_total,
             cp_total,
-            dp_drho: jet.dp_drho,
-            dp_dv: jet.dp_dv,
-            dp_dt: jet.dp_dt,
+            dp_drho,
+            dp_dv,
+            dp_dt,
             sound_speed,
             ln_phi,
         })
@@ -921,8 +1178,9 @@ impl<'a> PreparedSaftVrMie<'a> {
             return Ok(vec![ln_phi]);
         }
 
+        let ln_z = z.ln();
         let mut ln_phi = (0..nc)
-            .map(|i| Ok(self.kernel(rho, Some(2 + i), None)?.total.f1 - z.ln()))
+            .map(|i| Ok(self.eval_first(rho, 2 + i)?.total.f1 - ln_z))
             .collect::<Result<Vec<_>>>()?;
         if self.model.association.has_sites() {
             let a = assoc_helmholtz_first(
@@ -948,39 +1206,43 @@ impl<'a> PreparedSaftVrMie<'a> {
         }
 
         let conv_eta = self.conv_eta;
-        let mut zeta_max = 0.55;
-        let mut zeta_min = 1e-8;
+        if phase == Phase::MinimumGibbs {
+            let vl = self.volume(pressure_target, Phase::Liquid)?;
+            let vv = self.volume(pressure_target, Phase::Vapor)?;
+            if (vl - vv).abs() < 1e-10 * vl {
+                return Ok(vl);
+            }
+            let jet_l = self.pressure_and_derivatives(1.0 / vl)?;
+            let jet_v = self.pressure_and_derivatives(1.0 / vv)?;
+            let g_tp_l =
+                jet_l.residual_helmholtz + jet_l.compressibility - 1.0 - jet_l.compressibility.ln();
+            let g_tp_v =
+                jet_v.residual_helmholtz + jet_v.compressibility - 1.0 - jet_v.compressibility.ln();
+            return Ok(if g_tp_l < g_tp_v { vl } else { vv });
+        }
+
+        let zeta_ideal = conv_eta * pressure_target / (RGAS * self.temperature);
+        let mut zeta_min = (1.0e-10_f64).min(0.1 * zeta_ideal).max(1.0e-30);
+        let mut zeta_max = 0.75;
 
         let mut zeta = match phase {
-            Phase::Vapor => {
-                let z_ideal = conv_eta * pressure_target / (RGAS * self.temperature);
-                z_ideal.clamp(zeta_min, 0.05)
-            }
+            Phase::Vapor => zeta_ideal.clamp(zeta_min, 0.05),
             Phase::Liquid => 0.45,
-            Phase::MinimumGibbs => {
-                let vl = self.volume(pressure_target, Phase::Liquid)?;
-                let vv = self.volume(pressure_target, Phase::Vapor)?;
-                if (vl - vv).abs() < 1e-10 * vl {
-                    return Ok(vl);
-                }
-                let st_l = self.state(1.0 / vl)?;
-                let st_v = self.state(1.0 / vv)?;
-                if st_l.g_residual < st_v.g_residual {
-                    return Ok(vl);
-                } else {
-                    return Ok(vv);
-                }
-            }
+            Phase::MinimumGibbs => unreachable!(),
         };
 
         let mut v = conv_eta / zeta;
         let mut jet = self.pressure_and_derivatives(1.0 / v)?;
         let mut f = (1.0 - zeta) * (jet.pressure - pressure_target);
 
-        let max_iter = 60;
+        let max_iter = 80;
         for _ in 0..max_iter {
             let df_dzeta = pressure_target - jet.pressure - ((1.0 - zeta) / zeta) * jet.dp_dv * v;
-            let mut zeta_new = zeta - f / df_dzeta;
+            let mut zeta_new = if df_dzeta.is_finite() && df_dzeta != 0.0 {
+                zeta - f / df_dzeta
+            } else {
+                0.5 * (zeta_max + zeta_min)
+            };
 
             if zeta_new > zeta_max || zeta_new < zeta_min || !zeta_new.is_finite() {
                 zeta_new = 0.5 * (zeta_max + zeta_min);
@@ -997,7 +1259,7 @@ impl<'a> PreparedSaftVrMie<'a> {
             let p_converged =
                 (jet.pressure - pressure_target).abs() < 1e8 * MACHINE_PREC * pressure_target;
 
-            if v_converged && p_converged {
+            if v_converged && p_converged && v.is_finite() {
                 return Ok(v);
             }
 
@@ -1008,7 +1270,15 @@ impl<'a> PreparedSaftVrMie<'a> {
             }
         }
 
-        Ok(v)
+        if v.is_finite()
+            && (jet.pressure - pressure_target).abs() <= 1e-6 * pressure_target.max(1.0)
+        {
+            Ok(v)
+        } else {
+            Err(Error::NotConverged(
+                "SAFT-VR Mie volume solver did not converge",
+            ))
+        }
     }
 
     /// Pure-fluid saturation pressure at temperature T.
@@ -1103,10 +1373,8 @@ struct MiePot {
     u_divk_tr: f64,
 }
 
-#[allow(clippy::too_many_arguments)]
-fn calc_mie_potential_full(
-    r: f64,
-    temperature: f64,
+#[derive(Clone, Copy)]
+struct PairPotential {
     sigma: f64,
     eps_depth_divk: f64,
     lambda_a: f64,
@@ -1114,124 +1382,11 @@ fn calc_mie_potential_full(
     c_fac: f64,
     d_param: f64,
     fh_order: i32,
-) -> MiePot {
-    let n = lambda_r;
-    let m = lambda_a;
-    let en_r = 1.0 / r;
-    let r1 = sigma * en_r;
-
-    let r_n = r1.powf(n);
-    let r_m = r1.powf(m);
-    let dr_n = -n * r_n * en_r;
-    let dr_m = -m * r_m * en_r;
-    let d2r_n = -(n + 1.0) * dr_n * en_r;
-    let d2r_m = -(m + 1.0) * dr_m * en_r;
-
-    let mut u = r_n - r_m;
-    let mut u_t = 0.0;
-    let mut u_tt = 0.0;
-    let mut u_r = dr_n - dr_m;
-    let mut u_rr = d2r_n - d2r_m;
-    let mut u_tr = 0.0;
-
-    if fh_order > 0 && d_param > 0.0 && temperature > 0.0 {
-        let tinv = 1.0 / temperature;
-        let d = d_param * tinv;
-        let d_t = -d_param * tinv * tinv;
-        let d_tt = 2.0 * d_param * (tinv * tinv * tinv);
-
-        let q1_n = n * (n - 1.0);
-        let q1_m = m * (m - 1.0);
-        let en_r2 = en_r * en_r;
-
-        let prod_q1 = en_r2 * (q1_n * r_n - q1_m * r_m);
-        let prod_q1_r = -en_r2 * ((n + 2.0) * q1_n * r_n - (m + 2.0) * q1_m * r_m) * en_r;
-        let prod_q1_rr = en_r2
-            * ((n + 3.0) * (n + 2.0) * q1_n * r_n - (m + 3.0) * (m + 2.0) * q1_m * r_m)
-            * en_r2;
-
-        u += d * prod_q1;
-        u_t += d_t * prod_q1;
-        u_tt += d_tt * prod_q1;
-        u_r += d * prod_q1_r;
-        u_rr += d * prod_q1_rr;
-        u_tr += d_t * prod_q1_r;
-
-        if fh_order > 1 {
-            let d2 = d * d;
-            let d2_t = 2.0 * d * d_t;
-            let d2_tt = 2.0 * (d * d_tt + d_t * d_t);
-
-            let q2_n = 0.5 * n * (n - 1.0) * (n + 1.0) * (n + 2.0);
-            let q2_m = 0.5 * m * (m - 1.0) * (m + 1.0) * (m + 2.0);
-            let en_r4 = en_r2 * en_r2;
-
-            let prod_q2 = en_r4 * (q2_n * r_n - q2_m * r_m);
-            let prod_q2_r = -en_r4 * ((n + 4.0) * q2_n * r_n - (m + 4.0) * q2_m * r_m) * en_r;
-            let prod_q2_rr = en_r4
-                * ((n + 5.0) * (n + 4.0) * q2_n * r_n - (m + 5.0) * (m + 4.0) * q2_m * r_m)
-                * en_r2;
-
-            u += d2 * prod_q2;
-            u_t += d2_t * prod_q2;
-            u_tt += d2_tt * prod_q2;
-            u_r += d2 * prod_q2_r;
-            u_rr += d2 * prod_q2_rr;
-            u_tr += d2_t * prod_q2_r;
-        }
-    }
-
-    let pref = c_fac * eps_depth_divk;
-    MiePot {
-        u_divk: u * pref,
-        u_divk_t: u_t * pref,
-        u_divk_tt: u_tt * pref,
-        u_divk_r: u_r * pref,
-        u_divk_rr: u_rr * pref,
-        u_divk_tr: u_tr * pref,
-    }
+    second_factor: f64,
 }
-
-#[allow(clippy::too_many_arguments)]
-fn effective_sigma(
-    temperature: f64,
-    sigma: f64,
-    eps_depth_divk: f64,
-    lambda_a: f64,
-    lambda_r: f64,
-    c_fac: f64,
-    d_param: f64,
-    fh_order: i32,
-) -> (f64, f64, f64) {
-    // 1. Solve effective sigma (where U(r) = 0)
-    if fh_order == 0 {
-        (sigma, 0.0, 0.0)
-    } else {
-        let mut r = sigma;
-        for _ in 0..25 {
-            let pot = calc_mie_potential_full(
-                r,
-                temperature,
-                sigma,
-                eps_depth_divk,
-                lambda_a,
-                lambda_r,
-                c_fac,
-                d_param,
-                fh_order,
-            );
-            let f = pot.u_divk;
-            let df = pot.u_divk_r;
-            let d2f = pot.u_divk_rr;
-            let step = -f / df * (1.0 + f * d2f / (2.0 * df * df));
-            r += step;
-            if step.abs() < 1e-15 * sigma {
-                break;
-            }
-        }
-        let pot = calc_mie_potential_full(
-            r,
-            temperature,
+impl PairPotential {
+    fn evaluate(self, r: f64, temperature: f64) -> MiePot {
+        let Self {
             sigma,
             eps_depth_divk,
             lambda_a,
@@ -1239,11 +1394,209 @@ fn effective_sigma(
             c_fac,
             d_param,
             fh_order,
-        );
-        let s_t = -pot.u_divk_t / pot.u_divk_r;
-        let s_tt =
-            -(pot.u_divk_tt + pot.u_divk_rr * s_t * s_t + 2.0 * pot.u_divk_tr * s_t) / pot.u_divk_r;
-        (r, s_t, s_tt)
+            second_factor,
+        } = self;
+        let n = lambda_r;
+        let m = lambda_a;
+        let en_r = 1.0 / r;
+        let r1 = sigma * en_r;
+
+        let r_n = r1.powf(n);
+        let r_m = r1.powf(m);
+        let dr_n = -n * r_n * en_r;
+        let dr_m = -m * r_m * en_r;
+        let d2r_n = -(n + 1.0) * dr_n * en_r;
+        let d2r_m = -(m + 1.0) * dr_m * en_r;
+
+        let mut u = r_n - r_m;
+        let mut u_t = 0.0;
+        let mut u_tt = 0.0;
+        let mut u_r = dr_n - dr_m;
+        let mut u_rr = d2r_n - d2r_m;
+        let mut u_tr = 0.0;
+
+        if fh_order > 0 && d_param > 0.0 && temperature > 0.0 {
+            let tinv = 1.0 / temperature;
+            let d = d_param * tinv;
+            let d_t = -d_param * tinv * tinv;
+            let d_tt = 2.0 * d_param * (tinv * tinv * tinv);
+
+            let q1_n = n * (n - 1.0);
+            let q1_m = m * (m - 1.0);
+            let en_r2 = en_r * en_r;
+
+            let prod_q1 = en_r2 * (q1_n * r_n - q1_m * r_m);
+            let prod_q1_r = -en_r2 * ((n + 2.0) * q1_n * r_n - (m + 2.0) * q1_m * r_m) * en_r;
+            let prod_q1_rr = en_r2
+                * ((n + 3.0) * (n + 2.0) * q1_n * r_n - (m + 3.0) * (m + 2.0) * q1_m * r_m)
+                * en_r2;
+
+            u += d * prod_q1;
+            u_t += d_t * prod_q1;
+            u_tt += d_tt * prod_q1;
+            u_r += d * prod_q1_r;
+            u_rr += d * prod_q1_rr;
+            u_tr += d_t * prod_q1_r;
+
+            if fh_order > 1 {
+                let d2 = d * d;
+                let d2_t = 2.0 * d * d_t;
+                let d2_tt = 2.0 * (d * d_tt + d_t * d_t);
+
+                let q2_n = second_factor * n * (n - 1.0) * (n + 1.0) * (n + 2.0);
+                let q2_m = second_factor * m * (m - 1.0) * (m + 1.0) * (m + 2.0);
+                let en_r4 = en_r2 * en_r2;
+
+                let prod_q2 = en_r4 * (q2_n * r_n - q2_m * r_m);
+                let prod_q2_r = -en_r4 * ((n + 4.0) * q2_n * r_n - (m + 4.0) * q2_m * r_m) * en_r;
+                let prod_q2_rr = en_r4
+                    * ((n + 5.0) * (n + 4.0) * q2_n * r_n - (m + 5.0) * (m + 4.0) * q2_m * r_m)
+                    * en_r2;
+
+                u += d2 * prod_q2;
+                u_t += d2_t * prod_q2;
+                u_tt += d2_tt * prod_q2;
+                u_r += d2 * prod_q2_r;
+                u_rr += d2 * prod_q2_rr;
+                u_tr += d2_t * prod_q2_r;
+            }
+        }
+
+        let pref = c_fac * eps_depth_divk;
+        MiePot {
+            u_divk: u * pref,
+            u_divk_t: u_t * pref,
+            u_divk_tt: u_tt * pref,
+            u_divk_r: u_r * pref,
+            u_divk_rr: u_rr * pref,
+            u_divk_tr: u_tr * pref,
+        }
+    }
+
+    fn effective_sigma(self, temperature: f64) -> (f64, f64, f64) {
+        let sigma = self.sigma;
+        let fh_order = self.fh_order;
+        // 1. Solve effective sigma (where U(r) = 0)
+        if fh_order == 0 {
+            (sigma, 0.0, 0.0)
+        } else {
+            let mut r = sigma;
+            for _ in 0..25 {
+                let pot = self.evaluate(r, temperature);
+                let f = pot.u_divk;
+                let df = pot.u_divk_r;
+                let d2f = pot.u_divk_rr;
+                let step = -f / df * (1.0 + f * d2f / (2.0 * df * df));
+                r += step;
+                if step.abs() < 1e-15 * sigma {
+                    break;
+                }
+            }
+            let pot = self.evaluate(r, temperature);
+            let s_t = -pot.u_divk_t / pot.u_divk_r;
+            let s_tt = -(pot.u_divk_tt + pot.u_divk_rr * s_t * s_t + 2.0 * pot.u_divk_tr * s_t)
+                / pot.u_divk_r;
+            (r, s_t, s_tt)
+        }
+    }
+
+    fn diameter(
+        self,
+        temperature: f64,
+        (sigma_eff, sig_t, sig_tt): (f64, f64, f64),
+    ) -> Result<(f64, f64, f64)> {
+        // 2. Solve r0 (where exp(-beta u(r0)) = machine_prec)
+        let ln_eps = MACHINE_PREC.ln();
+        let mut rs = 0.70;
+        for _ in 0..25 {
+            let r = rs * sigma_eff;
+            let pot = self.evaluate(r, temperature);
+            let f = pot.u_divk / temperature + ln_eps;
+            let df = sigma_eff * pot.u_divk_r / temperature;
+            let d2f = sigma_eff * sigma_eff * pot.u_divk_rr / temperature;
+            let step = -f / df * (1.0 + f * d2f / (2.0 * df * df));
+            rs += step;
+            if step.abs() < 1e-15 {
+                break;
+            }
+        }
+
+        let r0 = rs * sigma_eff;
+        let pot0 = self.evaluate(r0, temperature);
+        let r0_t = -(pot0.u_divk_t + ln_eps) / pot0.u_divk_r;
+        let r0_tt = -(pot0.u_divk_tt + 2.0 * pot0.u_divk_tr * r0_t + pot0.u_divk_rr * r0_t * r0_t)
+            / pot0.u_divk_r;
+
+        // 3. Kronrod 21 Quadrature integration on [r0, sigma_eff]
+        let mut d_int = 0.0;
+        let mut d_t_int = 0.0;
+        let mut d_tt_int = 0.0;
+
+        let sigma_j2 = 0.5 * (sigma_eff - r0);
+        let sigma_j2_t = 0.5 * (sig_t - r0_t);
+        let sigma_j2_tt = 0.5 * (sig_tt - r0_tt);
+
+        // Symmetric 21 points
+        let mut x_nodes = [0.0; 21];
+        let mut w_nodes = [0.0; 21];
+        for i in 0..10 {
+            x_nodes[i] = -XK_21[i];
+            x_nodes[11 + i] = XK_21[9 - i];
+            w_nodes[i] = WK_21[i];
+            w_nodes[11 + i] = WK_21[9 - i];
+        }
+        x_nodes[10] = 0.0;
+        w_nodes[10] = WK_21[10];
+
+        let t2 = temperature * temperature;
+        let t3 = t2 * temperature;
+
+        for i in 0..21 {
+            let xk = x_nodes[i];
+            let wk = w_nodes[i];
+
+            let r = sigma_j2 * xk + sigma_j2 + r0;
+            let r_t = sigma_j2_t * xk + sigma_j2_t + r0_t;
+            let r_tt = sigma_j2_tt * xk + sigma_j2_tt + r0_tt;
+
+            let pot = self.evaluate(r, temperature);
+
+            let pref = sigma_j2 * wk;
+            let pref_t = sigma_j2_t * wk;
+            let pref_tt = sigma_j2_tt * wk;
+
+            let minus_exp = -(-pot.u_divk / temperature).exp();
+            d_int += pref * (1.0 + minus_exp);
+
+            let dt3 =
+                pot.u_divk / t2 - pot.u_divk_t / temperature - pot.u_divk_r * r_t / temperature;
+            let d_t1 = pref;
+            let d_t2 = minus_exp;
+            let d_t4 = pref_t;
+            let d_t5 = 1.0 + minus_exp;
+            d_t_int += d_t1 * d_t2 * dt3 + d_t4 * d_t5;
+
+            let d_tt1 = pref_t;
+            let d_tt2 = minus_exp * dt3;
+            let d_tt3 = pot.u_divk_t / t2 + pot.u_divk_r * r_t / t2
+                - 2.0 * pot.u_divk / t3
+                - pot.u_divk_tt / temperature
+                - pot.u_divk_tr * r_t / temperature
+                + pot.u_divk_t / t2
+                - pot.u_divk_tr * r_t / temperature
+                - pot.u_divk_rr * (r_t * r_t) / temperature
+                - pot.u_divk_r * r_tt / temperature
+                + pot.u_divk_r * r_t / t2;
+            let d_tt4 = pref_tt;
+            let d_tt5 = d_tt2;
+            d_tt_int += d_tt1 * d_t2 * dt3
+                + d_t1 * d_tt2 * dt3
+                + d_t1 * d_t2 * d_tt3
+                + d_tt4 * d_t5
+                + d_t4 * d_tt5;
+        }
+
+        Ok((r0 + d_int, r0_t + d_t_int, r0_tt + d_tt_int))
     }
 }
 
@@ -1258,8 +1611,7 @@ pub(crate) fn calc_hardsphere_diameter_pure(
     d_param: f64,
     fh_order: i32,
 ) -> Result<(f64, f64, f64)> {
-    let (sigma_eff, sig_t, sig_tt) = effective_sigma(
-        temperature,
+    let pair = PairPotential {
         sigma,
         eps_depth_divk,
         lambda_a,
@@ -1267,129 +1619,9 @@ pub(crate) fn calc_hardsphere_diameter_pure(
         c_fac,
         d_param,
         fh_order,
-    );
-
-    // 2. Solve r0 (where exp(-beta u(r0)) = machine_prec)
-    let ln_eps = MACHINE_PREC.ln();
-    let mut rs = 0.70;
-    for _ in 0..25 {
-        let r = rs * sigma_eff;
-        let pot = calc_mie_potential_full(
-            r,
-            temperature,
-            sigma,
-            eps_depth_divk,
-            lambda_a,
-            lambda_r,
-            c_fac,
-            d_param,
-            fh_order,
-        );
-        let f = pot.u_divk / temperature + ln_eps;
-        let df = sigma_eff * pot.u_divk_r / temperature;
-        let d2f = sigma_eff * sigma_eff * pot.u_divk_rr / temperature;
-        let step = -f / df * (1.0 + f * d2f / (2.0 * df * df));
-        rs += step;
-        if step.abs() < 1e-15 {
-            break;
-        }
-    }
-
-    let r0 = rs * sigma_eff;
-    let pot0 = calc_mie_potential_full(
-        r0,
-        temperature,
-        sigma,
-        eps_depth_divk,
-        lambda_a,
-        lambda_r,
-        c_fac,
-        d_param,
-        fh_order,
-    );
-    let r0_t = -(pot0.u_divk_t + ln_eps) / pot0.u_divk_r;
-    let r0_tt = -(pot0.u_divk_tt + 2.0 * pot0.u_divk_tr * r0_t + pot0.u_divk_rr * r0_t * r0_t)
-        / pot0.u_divk_r;
-
-    // 3. Kronrod 21 Quadrature integration on [r0, sigma_eff]
-    let mut d_int = 0.0;
-    let mut d_t_int = 0.0;
-    let mut d_tt_int = 0.0;
-
-    let sigma_j2 = 0.5 * (sigma_eff - r0);
-    let sigma_j2_t = 0.5 * (sig_t - r0_t);
-    let sigma_j2_tt = 0.5 * (sig_tt - r0_tt);
-
-    // Symmetric 21 points
-    let mut x_nodes = [0.0; 21];
-    let mut w_nodes = [0.0; 21];
-    for i in 0..10 {
-        x_nodes[i] = -XK_21[i];
-        x_nodes[11 + i] = XK_21[9 - i];
-        w_nodes[i] = WK_21[i];
-        w_nodes[11 + i] = WK_21[9 - i];
-    }
-    x_nodes[10] = 0.0;
-    w_nodes[10] = WK_21[10];
-
-    let t2 = temperature * temperature;
-    let t3 = t2 * temperature;
-
-    for i in 0..21 {
-        let xk = x_nodes[i];
-        let wk = w_nodes[i];
-
-        let r = sigma_j2 * xk + sigma_j2 + r0;
-        let r_t = sigma_j2_t * xk + sigma_j2_t + r0_t;
-        let r_tt = sigma_j2_tt * xk + sigma_j2_tt + r0_tt;
-
-        let pot = calc_mie_potential_full(
-            r,
-            temperature,
-            sigma,
-            eps_depth_divk,
-            lambda_a,
-            lambda_r,
-            c_fac,
-            d_param,
-            fh_order,
-        );
-
-        let pref = sigma_j2 * wk;
-        let pref_t = sigma_j2_t * wk;
-        let pref_tt = sigma_j2_tt * wk;
-
-        let minus_exp = -(-pot.u_divk / temperature).exp();
-        d_int += pref * (1.0 + minus_exp);
-
-        let dt3 = pot.u_divk / t2 - pot.u_divk_t / temperature - pot.u_divk_r * r_t / temperature;
-        let d_t1 = pref;
-        let d_t2 = minus_exp;
-        let d_t4 = pref_t;
-        let d_t5 = 1.0 + minus_exp;
-        d_t_int += d_t1 * d_t2 * dt3 + d_t4 * d_t5;
-
-        let d_tt1 = pref_t;
-        let d_tt2 = minus_exp * dt3;
-        let d_tt3 = pot.u_divk_t / t2 + pot.u_divk_r * r_t / t2
-            - 2.0 * pot.u_divk / t3
-            - pot.u_divk_tt / temperature
-            - pot.u_divk_tr * r_t / temperature
-            + pot.u_divk_t / t2
-            - pot.u_divk_tr * r_t / temperature
-            - pot.u_divk_rr * (r_t * r_t) / temperature
-            - pot.u_divk_r * r_tt / temperature
-            + pot.u_divk_r * r_t / t2;
-        let d_tt4 = pref_tt;
-        let d_tt5 = d_tt2;
-        d_tt_int += d_tt1 * d_t2 * dt3
-            + d_t1 * d_tt2 * dt3
-            + d_t1 * d_t2 * d_tt3
-            + d_tt4 * d_t5
-            + d_t4 * d_tt5;
-    }
-
-    Ok((r0 + d_int, r0_t + d_t_int, r0_tt + d_tt_int))
+        second_factor: 0.5,
+    };
+    pair.diameter(temperature, pair.effective_sigma(temperature))
 }
 
 /// The six coefficients of the polynomials of the van der Waals attractive

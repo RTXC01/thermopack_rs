@@ -16,8 +16,8 @@ PROBE = Path(__file__).with_name("saftvrmie_probe.f90")
 
 
 def cases():
-    def case(comps, t, v, amounts, order=-1, hs=1, terms=31, cutoff=0, shift=0, kind=0, ref="DEFAULT"):
-        return [comps, ref, order, hs, terms, cutoff, shift, kind, t, v, amounts]
+    def case(comps, t, v, amounts, order=-1, hs=1, terms=31, cutoff=0, shift=0, kind=0, ref="DEFAULT", variant="default"):
+        return [comps, ref, order, hs, terms, cutoff, shift, kind, t, v, amounts, variant]
     yield case("CO2,C1", 280, 0.0004, "0.8,1.2")
     yield case("NH3", 320, 0.0003, "2")
     yield case("H2O,MEOH", 380, 0.0003, "0.8,1.2")
@@ -33,6 +33,14 @@ def cases():
         yield case("H2,NE", 54, 0.0005, "1.3,0.7", order=order, hs=5)
     yield case("H2O,MEOH", 380, 0.0003, "0.8,1.2", kind=1)
     yield case("H2,HE", 65, 0.0007, "0.7,1.3", order=2, hs=4, kind=1)
+
+    yield case("H2O,MEOH", 380, 0.0003, "0.8,1.2", kind=2)
+    yield case("H2O,MEOH", 380, 0.0015, "4,6")
+    yield case("H2", 45, 0.0005, "2", order=2, hs=4, cutoff=3.5, shift=1, variant="jaen-kahn")
+    for variant in ("geometric", "arithmetic-cross", "linear", "bmcsl", "kolafa",
+                    "pair-a3", "classical-a2"):
+        yield case("H2,NE", 54, 0.0005, "1.3,0.7", order=2, hs=4, variant=variant)
+    yield case("CO2,C1", 280, 0.0004, "0.8,1.2", hs=5, variant="no-extra")
 
 
 def sha(path):
@@ -57,11 +65,11 @@ def main():
         live = Path(tmp) / "live.csv"
         with live.open("w", newline="", encoding="utf-8") as file:
             writer = csv.writer(file, delimiter=";", lineterminator="\n")
-            writer.writerow("components ref order hs terms cutoff shift dispersion T V n blocks dv_fv".split())
+            writer.writerow("components ref order hs terms cutoff shift dispersion T V n variant blocks dv_fv".split())
             for c in cases():
-                comps, param, order, hs, terms, cutoff, shift, kind, t, v, amounts = c
+                comps, param, order, hs, terms, cutoff, shift, kind, t, v, amounts, variant = c
                 nc = len(comps.split(","))
-                stdin = f"{comps}\n{param}\n{nc} {order} {hs} {terms} {cutoff} {shift} {kind}\n{t} {v}\n{amounts}\n"
+                stdin = f"{comps}\n{param}\n{variant}\n{nc} {order} {hs} {terms} {cutoff} {shift} {kind}\n{t} {v}\n{amounts}\n"
                 proc = subprocess.run([exe], input=stdin, text=True, env=env, capture_output=True,
                                       timeout=30)
                 if proc.returncode:

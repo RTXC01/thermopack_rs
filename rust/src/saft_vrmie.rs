@@ -6,15 +6,15 @@ mod association;
 mod kernel;
 use self::association::MieRdf;
 use self::kernel::EvalMode;
-use crate::association::{AssociationParams, DeltaCombRule, assoc_helmholtz_value};
 use crate::association::{
-    assoc_helmholtz_all, assoc_helmholtz_first, assoc_helmholtz_pressure_jet,
+    AssocScheme, AssociationParams, DeltaCombRule, assoc_helmholtz_all, assoc_helmholtz_first,
+    assoc_helmholtz_pressure_jet, assoc_helmholtz_value, solve_for_x_k,
 };
 /// Extensive reduced Helmholtz energy (mol), all TVN derivatives and site fractions.
 pub type SaftVrMieHelmholtz = crate::association::AssociationHelmholtz;
 use crate::component::component;
 use crate::cubic::Phase;
-use crate::error::{Error, Result};
+use crate::error::{Error, Result, positive};
 use crate::ideal::IdealGas;
 use crate::saft_vrmie_data;
 
@@ -147,23 +147,89 @@ pub struct SaftVrMieSaturation {
     pub entropy_vaporization: f64,
 }
 
-/// Reference presets from saftvrmie_options::set_hs_reference.
+/// Scalar property with exact first `(T, P, n)` derivatives.
+#[derive(Debug, Clone)]
+pub struct SaftVrMieDerivatives {
+    /// Property value (intensive molar basis).
+    pub value: f64,
+    /// Temperature derivative at constant `(P, n)`.
+    pub dt: f64,
+    /// Pressure derivative at constant `(T, n)`.
+    pub dp: f64,
+    /// Mole-number derivatives at constant `(T, P, n_{j != i})`.
+    pub dn: Vec<f64>,
+}
+
+/// Fugacity coefficients `ln(phi_i)` and exact first `(T, P, n)` derivatives.
+#[derive(Debug, Clone)]
+pub struct SaftVrMieFugacityDerivatives {
+    /// Natural logarithm of fugacity coefficients `ln(phi_i)`.
+    pub ln_phi: Vec<f64>,
+    /// Temperature derivatives `d(ln phi_i)/dT` at constant `(P, n)`.
+    pub dt: Vec<f64>,
+    /// Pressure derivatives `d(ln phi_i)/dP` at constant `(T, n)`.
+    pub dp: Vec<f64>,
+    /// Row-major `nc x nc` mole derivatives `d(ln phi_i)/dn_j` at constant `(T, P)`.
+    pub dn: Vec<f64>,
+}
+
+/// Complete TP thermodynamic state bundle with analytical `(T, P, n)` derivatives.
+#[derive(Debug, Clone)]
+pub struct SaftVrMieTpState {
+    /// Molar volume `[m^3/mol]`.
+    pub volume: f64,
+    /// Compressibility factor `Z` and `(T, P, n)` derivatives.
+    pub compressibility_factor: SaftVrMieDerivatives,
+    /// Molar volume `v` and `(T, P, n)` derivatives.
+    pub specific_volume: SaftVrMieDerivatives,
+    /// Residual molar enthalpy `[J/mol]` and `(T, P, n)` derivatives.
+    pub residual_enthalpy: SaftVrMieDerivatives,
+    /// Total molar enthalpy `[J/mol]` and `(T, P, n)` derivatives.
+    pub enthalpy: SaftVrMieDerivatives,
+    /// Residual molar entropy `[J/(mol K)]` (TP basis) and `(T, P, n)` derivatives.
+    pub residual_entropy: SaftVrMieDerivatives,
+    /// Total molar entropy `[J/(mol K)]` and `(T, P, n)` derivatives.
+    pub entropy: SaftVrMieDerivatives,
+    /// Residual molar Gibbs energy `[J/mol]` (TP basis) and `(T, P, n)` derivatives.
+    pub residual_gibbs: SaftVrMieDerivatives,
+    /// Fugacity coefficients `ln(phi_i)` and `(T, P, n)` derivatives.
+    pub ln_fugacity: SaftVrMieFugacityDerivatives,
+    /// Isobaric heat capacity `C_p` `[J/(mol K)]`.
+    pub cp: f64,
+    /// Isochoric heat capacity `C_v` `[J/(mol K)]`.
+    pub cv: f64,
+    /// Single-phase speed of sound `[m/s]`.
+    pub speed_of_sound: f64,
+}
+
+/// Reference presets from `saftvrmie_options::set_hs_reference`.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum HardSphereReference {
+    /// Default Lafitte additive hard-sphere reference (`LAFITTE_HS_REF = 1`).
     #[default]
     Lafitte,
+    /// Single-component effective hard-sphere reference (`SINGLE_COMP_HS_REF = 2`).
     SingleComponent,
+    /// Additive reference with Leonard non-additive correction (`ADDITIVE_HS_REF = 3`).
     Additive,
+    /// Non-additive Santos hard-sphere reference (`NON_ADD_HS_REF = 4`).
     NonAdditive,
+    /// Additive reference with exact cross diameters and extra term (`ADDITIVE_EXACT_HS_REF = 5`).
     AdditiveExact,
 }
 
-#[derive(Debug, Clone, Copy)]
+/// Toggle switches for individual SAFT-VR Mie Helmholtz contributions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MieTerms {
+    /// Hard-sphere reference contribution (`enable_hs`).
     pub hard_sphere: bool,
+    /// First-order dispersion contribution (`enable_A1`).
     pub first: bool,
+    /// Second-order dispersion contribution (`enable_A2`).
     pub second: bool,
+    /// Third-order dispersion contribution (`enable_A3`).
     pub third: bool,
+    /// Chain formation contribution (`enable_chain`).
     pub chain: bool,
 }
 impl Default for MieTerms {
@@ -178,15 +244,23 @@ impl Default for MieTerms {
     }
 }
 
+/// Packing-fraction mixing rule (`saftvrmie_options::zeta_mixing_rule`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PackingRule {
+    /// Lafitte quadratic packing rule (`ZETA_LAFITTE = 1`).
     Lafitte,
+    /// Linear volume-fraction mixing rule (`ZETA_LINEAR = 2`).
     Linear,
+    /// Leonard cubed mean-diameter rule (`ZETA_LEONARD = 3`).
     Leonard,
 }
+
+/// Second-order quantum correction specification (`saftvrmie_options::quantum_correction_spec`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QuantumVariant {
+    /// Standard Feynman-Hibbs prefactor 1/2 (`quantum_correction_spec = 0`).
     FeynmanHibbs,
+    /// Jaen-Kahn prefactor 9/10 (`quantum_correction_spec = 1`).
     JaenKahn,
 }
 impl QuantumVariant {
@@ -198,17 +272,26 @@ impl QuantumVariant {
     }
 }
 
-/// Independent submodel selections from saftvrmie_options.
-#[derive(Debug, Clone, Copy)]
+/// Independent submodel selections from `saftvrmie_options`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MieOptions {
+    /// Packing-fraction mixing rule.
     pub packing: PackingRule,
+    /// Leonard extra hard-sphere non-additivity correction (`enable_hs_extra`).
     pub extra_hard_sphere: bool,
+    /// Exact effective cross-potential parameters (`exact_crosspot_eff`).
     pub exact_cross_potential: bool,
+    /// Geometric epsilon combining rule (`!use_epsrule_Lafitte`).
     pub geometric_epsilon: bool,
+    /// BMCSL isothermal compressibility (`Khs_EoS = KHS_EOS_BMCSL`).
     pub bmcsl_compressibility: bool,
+    /// Kolafa-Labik-Malijevsky pure hard-sphere EoS (`pure_hs_EoS = PURE_HS_CSK`).
     pub kolafa_pure_reference: bool,
+    /// Pair-sigma prefactor in third-order dispersion (`a3_model = A3_SIJ_PREFAC`).
     pub pair_prefactor_a3: bool,
+    /// Second-order quantum correction prefactor variant.
     pub quantum_variant: QuantumVariant,
+    /// Include quantum corrections in second-order dispersion (`quantum_correct_A2`).
     pub quantum_correct_a2: bool,
 }
 impl Default for MieOptions {
@@ -231,6 +314,9 @@ impl Default for MieOptions {
 #[derive(Debug, Clone)]
 pub struct SaftVrMie {
     components: Vec<SaftVrMieComponent>,
+    assoc_schemes: Vec<AssocScheme>,
+    assoc_eps: Vec<f64>,
+    assoc_beta: Vec<f64>,
     association: AssociationParams,
     integral_coefficients: Vec<[f64; 66]>,
     kij: Vec<f64>,
@@ -310,6 +396,9 @@ impl SaftVrMie {
             Vec::new()
         };
         let mut s = Self {
+            assoc_schemes: schemes,
+            assoc_eps: eps_assoc,
+            assoc_beta: kab,
             association,
             integral_coefficients,
             components,
@@ -355,8 +444,19 @@ impl SaftVrMie {
         Ok(s)
     }
 
-    /// Initialize the Aasen FH0, FH1 or FH2 model with the Santos reference.
+    /// Initialize the Aasen FH0, FH1 or FH2 model with the Santos non-additive reference.
     pub fn new_quantum(comps: &[&str], order: u8, reference: Option<&str>) -> Result<Self> {
+        Self::new_quantum_with_hs_ref(comps, order, false, reference)
+    }
+
+    /// Initialize SAFT-VRQ Mie with explicit `additive_hs_ref` selection matching
+    /// `eoslibinit::init_quantum_saftvrmie`.
+    pub fn new_quantum_with_hs_ref(
+        comps: &[&str],
+        order: u8,
+        additive_hs_ref: bool,
+        reference: Option<&str>,
+    ) -> Result<Self> {
         let default_ref = match order {
             0 => "AASEN2019-FH0",
             1 => "AASEN2019-FH1",
@@ -378,10 +478,20 @@ impl SaftVrMie {
                 "component parameter set incompatible with quantum order",
             ));
         }
-        model.set_hard_sphere_reference(HardSphereReference::NonAdditive);
+        model.set_hard_sphere_reference(if additive_hs_ref {
+            HardSphereReference::AdditiveExact
+        } else {
+            HardSphereReference::NonAdditive
+        });
         Ok(model)
     }
 
+    /// Active hard-sphere reference preset.
+    pub fn hard_sphere_reference(&self) -> HardSphereReference {
+        self.reference
+    }
+
+    /// Select a hard-sphere reference preset matching `saftvrmie_options::set_hs_reference`.
     pub fn set_hard_sphere_reference(&mut self, reference: HardSphereReference) {
         self.reference = reference;
         self.options.packing = if reference == HardSphereReference::SingleComponent {
@@ -404,10 +514,12 @@ impl SaftVrMie {
         );
     }
 
+    /// Active independent submodel options.
     pub fn options(&self) -> MieOptions {
         self.options
     }
 
+    /// Update independent submodel options, validating model consistency.
     pub fn set_options(&mut self, options: MieOptions) -> Result<()> {
         if options.bmcsl_compressibility && self.components.iter().any(|c| c.m != 1.) {
             return Err(Error::InvalidInput(
@@ -426,11 +538,22 @@ impl SaftVrMie {
         Ok(())
     }
 
+    /// Active Helmholtz term toggles.
+    pub fn terms(&self) -> MieTerms {
+        self.terms
+    }
+
+    /// Enable or disable individual SAFT-VR Mie Helmholtz terms.
     pub fn set_terms(&mut self, terms: MieTerms) {
         self.terms = terms;
     }
 
-    /// Reduced cutoff distance in sigma units. None restores the infinite-range potential.
+    /// Active reduced potential cutoff `(r_cut, shift_enabled)`, or `None` for full Mie range.
+    pub fn cutoff(&self) -> Option<(f64, bool)> {
+        self.cutoff
+    }
+
+    /// Reduced cutoff distance in sigma units. `None` restores the infinite-range potential.
     pub fn set_cutoff(&mut self, cutoff: Option<(f64, bool)>) -> Result<()> {
         if let Some((r, _)) = cutoff
             && (self.num_components() != 1 || !r.is_finite() || r <= 0.)
@@ -443,7 +566,91 @@ impl SaftVrMie {
         Ok(())
     }
 
-    /// (FMT compatible, extra nonadditivity correction enabled).
+    /// Whether the model has any active associating sites.
+    pub fn has_association(&self) -> bool {
+        self.association.has_sites()
+    }
+
+    /// Override association parameters `(scheme, eps [J/mol], beta [m^3])` for one component.
+    pub fn set_assoc_params(
+        &mut self,
+        index: usize,
+        scheme: AssocScheme,
+        eps: f64,
+        beta: f64,
+    ) -> Result<()> {
+        if index >= self.num_components() {
+            return Err(Error::InvalidInput("component index out of bounds"));
+        }
+        let mut schemes = self.assoc_schemes.clone();
+        let mut eps_vec = self.assoc_eps.clone();
+        let mut beta_vec = self.assoc_beta.clone();
+        schemes[index] = scheme;
+        eps_vec[index] = eps;
+        beta_vec[index] = beta;
+        let association = AssociationParams::for_saft_vr_mie(
+            &schemes,
+            &eps_vec,
+            &beta_vec,
+            self.association.delta_comb_rule,
+        )?;
+        self.assoc_schemes = schemes;
+        self.assoc_eps = eps_vec;
+        self.assoc_beta = beta_vec;
+        self.association = association;
+        let nc = self.num_components();
+        if self.association.has_sites() {
+            if self.integral_coefficients.len() != nc * nc {
+                self.integral_coefficients = vec![[0.0; 66]; nc * nc];
+            }
+            self.recompute_cross_parameters();
+        } else {
+            self.integral_coefficients.clear();
+        }
+        Ok(())
+    }
+
+    /// Select the cross-association Delta combining rule (`Standard` or `Elliot`).
+    pub fn set_delta_comb_rule(&mut self, rule: DeltaCombRule) -> Result<()> {
+        self.association = AssociationParams::for_saft_vr_mie(
+            &self.assoc_schemes,
+            &self.assoc_eps,
+            &self.assoc_beta,
+            rule,
+        )?;
+        Ok(())
+    }
+
+    /// Solve for equilibrium non-bonded association site fractions `X_k` at `(T, V, n)`.
+    pub fn solve_assoc_x_k(
+        &self,
+        temperature: f64,
+        volume: f64,
+        moles: &[f64],
+    ) -> Result<Vec<f64>> {
+        positive(volume, "total volume")?;
+        let state = self.prepare(temperature, moles)?;
+        if !self.association.has_sites() {
+            return Ok(Vec::new());
+        }
+        let total: f64 = moles.iter().sum();
+        let v_unit = volume / total;
+        if !v_unit.is_finite() || v_unit <= 0.0 {
+            return Err(Error::InvalidInput(
+                "molar volume must be finite and strictly positive",
+            ));
+        }
+        solve_for_x_k(
+            &self.association,
+            &MieRdf::new(&state, 1.0 / v_unit),
+            temperature,
+            v_unit,
+            &state.mole_fractions,
+            None,
+        )
+    }
+
+    /// `(is_fmt_consistent, nonadditive_extra_enabled)` matching `test_fmt_compatibility`.
     pub fn fmt_compatibility(&self) -> (bool, bool) {
         if self.num_components() == 1 {
             return (true, false);
@@ -488,6 +695,63 @@ impl SaftVrMie {
         self.derivatives(temperature, volume, moles, EvalMode::HardSphere)
     }
 
+    fn derivatives_unit(
+        &self,
+        state: &PreparedSaftVrMie<'_>,
+        v_unit: f64,
+        mode: EvalMode,
+    ) -> Result<SaftVrMieHelmholtz> {
+        let nc = self.num_components();
+        let rho = 1.0 / v_unit;
+        let empty = AssociationParams::empty(nc);
+        let model = if mode == EvalMode::Total {
+            &self.association
+        } else {
+            &empty
+        };
+        let mut out = assoc_helmholtz_all(
+            model,
+            &MieRdf::new(state, rho),
+            state.temperature,
+            v_unit,
+            &state.mole_fractions,
+        )?;
+        for i in 0..nc + 2 {
+            for j in i..nc + 2 {
+                let terms = state.eval_second(rho, i, j, mode)?;
+                let f = match mode {
+                    EvalMode::Total => terms.total,
+                    EvalMode::Dispersion => terms.dispersion,
+                    EvalMode::HardSphere => terms.hard_sphere,
+                };
+                if i == j {
+                    match i {
+                        0 => {
+                            out.f += f.f0;
+                            out.f_t += f.f1;
+                        }
+                        1 => out.f_v += f.f1,
+                        _ => out.f_n[i - 2] += f.f1,
+                    }
+                }
+                match (i, j) {
+                    (0, 0) => out.f_tt += f.f12,
+                    (0, 1) => out.f_tv += f.f12,
+                    (0, _) => out.f_tn[j - 2] += f.f12,
+                    (1, 1) => out.f_vv += f.f12,
+                    (1, _) => out.f_vn[j - 2] += f.f12,
+                    _ => {
+                        out.f_nn[(i - 2) * nc + j - 2] += f.f12;
+                        if i != j {
+                            out.f_nn[(j - 2) * nc + i - 2] += f.f12;
+                        }
+                    }
+                }
+            }
+        }
+        Ok(out)
+    }
+
     fn derivatives(
         &self,
         temperature: f64,
@@ -495,7 +759,7 @@ impl SaftVrMie {
         moles: &[f64],
         mode: EvalMode,
     ) -> Result<SaftVrMieHelmholtz> {
-        crate::error::positive(volume, "total volume")?;
+        positive(volume, "total volume")?;
         let state = self.prepare(temperature, moles)?;
         let total: f64 = moles.iter().sum();
         let v_unit = volume / total;
@@ -504,46 +768,28 @@ impl SaftVrMie {
                 "molar volume must be finite and strictly positive",
             ));
         }
-        let rho = 1.0 / v_unit;
-        let empty = AssociationParams::empty(moles.len());
-        let model = if mode == EvalMode::Total {
-            &self.association
+        let mut out = self.derivatives_unit(&state, v_unit, mode)?;
+        if mode == EvalMode::Total {
+            out.f *= total;
+            out.f_t *= total;
+            out.f_tt *= total;
+            out.f_vv /= total;
+            for val in &mut out.f_vn {
+                *val /= total;
+            }
+            for val in &mut out.f_nn {
+                *val /= total;
+            }
         } else {
-            &empty
-        };
-        let mut out =
-            assoc_helmholtz_all(model, &MieRdf::new(&state, rho), temperature, volume, moles)?;
-        for i in 0..moles.len() + 2 {
-            for j in i..moles.len() + 2 {
-                let terms = state.eval_second(rho, i, j, mode)?;
-                let f = match mode {
-                    EvalMode::Total => terms.total,
-                    EvalMode::Dispersion => kernel::Scalar::mul_f(terms.dispersion, 1.0 / total),
-                    EvalMode::HardSphere => kernel::Scalar::mul_f(terms.hard_sphere, 1.0 / total),
-                };
-                if i == j {
-                    match i {
-                        0 => {
-                            out.f += total * f.f0;
-                            out.f_t += total * f.f1;
-                        }
-                        1 => out.f_v += f.f1,
-                        _ => out.f_n[i - 2] += f.f1,
-                    }
-                }
-                match (i, j) {
-                    (0, 0) => out.f_tt += total * f.f12,
-                    (0, 1) => out.f_tv += f.f12,
-                    (0, _) => out.f_tn[j - 2] += f.f12,
-                    (1, 1) => out.f_vv += f.f12 / total,
-                    (1, _) => out.f_vn[j - 2] += f.f12 / total,
-                    _ => {
-                        out.f_nn[(i - 2) * moles.len() + j - 2] += f.f12 / total;
-                        if i != j {
-                            out.f_nn[(j - 2) * moles.len() + i - 2] += f.f12 / total;
-                        }
-                    }
-                }
+            // Molar quantities are homogeneous of degree 0 in (V, n).
+            out.f_v /= total;
+            out.f_tv /= total;
+            out.f_vv = (out.f_vv / total) / total;
+            for val in out.f_n.iter_mut().chain(&mut out.f_tn) {
+                *val /= total;
+            }
+            for val in out.f_vn.iter_mut().chain(&mut out.f_nn) {
+                *val = (*val / total) / total;
             }
         }
         if ![out.f, out.f_t, out.f_v, out.f_tt, out.f_tv, out.f_vv]
@@ -559,6 +805,513 @@ impl SaftVrMie {
             ));
         }
         Ok(out)
+    }
+
+    /// Solve for the molar volume `[m^3/mol]` at `(T, P, n)` for the requested `phase`.
+    pub fn volume_tp(
+        &self,
+        temperature: f64,
+        pressure: f64,
+        moles: &[f64],
+        phase: Phase,
+    ) -> Result<f64> {
+        let prepared = self.prepare(temperature, moles)?;
+        prepared.volume(pressure, phase)
+    }
+
+    /// Evaluate the complete TP thermodynamic state with exact first `(T, P, n)`
+    /// derivatives from all ten TVN Helmholtz blocks at `(T, P, n)` for `phase`.
+    pub fn state_tp(
+        &self,
+        temperature: f64,
+        pressure: f64,
+        moles: &[f64],
+        phase: Phase,
+    ) -> Result<SaftVrMieTpState> {
+        positive(temperature, "temperature")?;
+        positive(pressure, "pressure")?;
+        let prepared = self.prepare(temperature, moles)?;
+        let total: f64 = moles.iter().sum();
+        let v_molar = prepared.volume(pressure, phase)?;
+        let v_total = v_molar * total;
+        if !v_total.is_finite() || v_total <= 0.0 {
+            return Err(Error::InvalidInput(
+                "total volume overflowed or underflowed",
+            ));
+        }
+
+        let nc = self.num_components();
+        let h = self.derivatives_unit(&prepared, v_molar, EvalMode::Total)?;
+        let t = temperature;
+        let v = v_molar;
+        let inv_n = 1.0 / total;
+        let p_eval = RGAS * t / v - RGAS * t * h.f_v;
+        let p_v = -RGAS * t / (v * v) - RGAS * t * h.f_vv;
+        let p_t = p_eval / t - RGAS * t * h.f_tv;
+        let p_n: Vec<f64> = h
+            .f_vn
+            .iter()
+            .map(|&fvn| RGAS * t / v - RGAS * t * fvn)
+            .collect();
+
+        let v_t = -p_t / p_v;
+        let v_p = 1.0 / p_v;
+        let v_n_partial: Vec<f64> = p_n.iter().map(|&pni| -pni / p_v).collect();
+
+        let z = p_eval * v / (RGAS * t);
+        let ln_z = z.ln();
+        let z_t = (p_eval / (RGAS * t)) * (v_t - v / t);
+        let z_p = (v + p_eval * v_p) / (RGAS * t);
+        let z_dn: Vec<f64> = v_n_partial
+            .iter()
+            .map(|&vni| (p_eval / (RGAS * t)) * (vni - v) * inv_n)
+            .collect();
+
+        let h_res = -RGAS * t * t * h.f_t + p_eval * v - RGAS * t;
+        let cv_res = -RGAS * (2.0 * t * h.f_t + t * t * h.f_tt);
+        let cp_res = cv_res - t * p_t * p_t / p_v - RGAS;
+        let h_res_t = cp_res;
+        let h_res_p = v - t * v_t;
+        let mut h_res_dn = Vec::with_capacity(nc);
+        for i in 0..nc {
+            h_res_dn.push(-RGAS * t * t * h.f_tn[i] + t * p_t * v_n_partial[i] - RGAS * t);
+        }
+
+        let s_res = -RGAS * (h.f + t * h.f_t - ln_z);
+        let s_res_t = cp_res / t;
+        let s_res_p = -v_t + RGAS / p_eval;
+        let mut s_res_dn = Vec::with_capacity(nc);
+        for i in 0..nc {
+            s_res_dn.push(-RGAS * (h.f_n[i] + t * h.f_tn[i] - ln_z) + p_t * v_n_partial[i] - RGAS);
+        }
+
+        let g_res = h_res - t * s_res;
+        let g_res_t = -s_res;
+        let g_res_p = v - RGAS * t / p_eval;
+        let g_res_dn: Vec<f64> = h.f_n.iter().map(|&fni| RGAS * t * (fni - ln_z)).collect();
+
+        let mut h_id = 0.0;
+        let mut cp_id = 0.0;
+        let mut s_id = 0.0;
+        let mut h_id_comp = Vec::with_capacity(nc);
+        let mut s_id_comp = Vec::with_capacity(nc);
+        for i in 0..nc {
+            let id = self.ideal[i].properties(t, p_eval)?;
+            let xi = prepared.mole_fractions[i];
+            h_id += xi * id.enthalpy;
+            cp_id += xi * id.cp;
+            if xi > 0.0 {
+                s_id += xi * (id.entropy - RGAS * xi.ln());
+            }
+            h_id_comp.push(id.enthalpy);
+            s_id_comp.push(id.entropy - RGAS * xi.max(1.0e-100).ln());
+        }
+        let h_tot_dn: Vec<f64> = h_res_dn
+            .iter()
+            .zip(&h_id_comp)
+            .map(|(r, id)| r + id)
+            .collect();
+        let s_tot_dn: Vec<f64> = s_res_dn
+            .iter()
+            .zip(&s_id_comp)
+            .map(|(r, id)| r + id)
+            .collect();
+
+        let mut ln_phi = Vec::with_capacity(nc);
+        let mut dlnphi_dt = Vec::with_capacity(nc);
+        let mut dlnphi_dp = Vec::with_capacity(nc);
+        let mut dlnphi_dn = vec![0.0; nc * nc];
+        for i in 0..nc {
+            ln_phi.push(h.f_n[i] - ln_z);
+            dlnphi_dt.push(h.f_tn[i] + 1.0 / t - v_n_partial[i] * p_t / (RGAS * t));
+            dlnphi_dp.push(v_n_partial[i] / (RGAS * t) - 1.0 / p_eval);
+            for j in 0..nc {
+                let d_unit = h.f_nn[i * nc + j] + 1.0 + p_n[i] * p_n[j] / (RGAS * t * p_v);
+                dlnphi_dn[i * nc + j] = d_unit * inv_n;
+            }
+        }
+
+        let cv = cp_id - RGAS + cv_res;
+        let cp = cp_id + cp_res;
+        let dp_drho = -p_v * v * v;
+        let mw_kg = prepared.molar_mass_mix * 1.0e-3;
+        let sound_speed = if dp_drho > 0.0 && cp > 0.0 && cv > 0.0 && mw_kg > 0.0 {
+            ((cp / cv) * dp_drho / mw_kg).sqrt()
+        } else {
+            0.0
+        };
+
+        let all_finite = [
+            v,
+            z,
+            z_t,
+            z_p,
+            v_t,
+            v_p,
+            h_res,
+            h_res_t,
+            h_res_p,
+            s_res,
+            s_res_t,
+            s_res_p,
+            g_res,
+            g_res_t,
+            g_res_p,
+            cp,
+            cv,
+            sound_speed,
+        ]
+        .iter()
+        .all(|q| q.is_finite())
+            && z_dn.iter().all(|q| q.is_finite())
+            && v_n_partial.iter().all(|q| q.is_finite())
+            && h_res_dn.iter().all(|q| q.is_finite())
+            && s_res_dn.iter().all(|q| q.is_finite())
+            && g_res_dn.iter().all(|q| q.is_finite())
+            && ln_phi.iter().all(|q| q.is_finite())
+            && dlnphi_dt.iter().all(|q| q.is_finite())
+            && dlnphi_dp.iter().all(|q| q.is_finite())
+            && dlnphi_dn.iter().all(|q| q.is_finite());
+        if !all_finite {
+            return Err(Error::InvalidInput(
+                "non-finite SAFT-VR Mie TP thermodynamic state",
+            ));
+        }
+
+        Ok(SaftVrMieTpState {
+            volume: v,
+            compressibility_factor: SaftVrMieDerivatives {
+                value: z,
+                dt: z_t,
+                dp: z_p,
+                dn: z_dn,
+            },
+            specific_volume: SaftVrMieDerivatives {
+                value: v,
+                dt: v_t,
+                dp: v_p,
+                dn: v_n_partial,
+            },
+            residual_enthalpy: SaftVrMieDerivatives {
+                value: h_res,
+                dt: h_res_t,
+                dp: h_res_p,
+                dn: h_res_dn,
+            },
+            enthalpy: SaftVrMieDerivatives {
+                value: h_id + h_res,
+                dt: cp,
+                dp: h_res_p,
+                dn: h_tot_dn,
+            },
+            residual_entropy: SaftVrMieDerivatives {
+                value: s_res,
+                dt: s_res_t,
+                dp: s_res_p,
+                dn: s_res_dn,
+            },
+            entropy: SaftVrMieDerivatives {
+                value: s_id + s_res,
+                dt: cp / t,
+                dp: -v_t,
+                dn: s_tot_dn,
+            },
+            residual_gibbs: SaftVrMieDerivatives {
+                value: g_res,
+                dt: g_res_t,
+                dp: g_res_p,
+                dn: g_res_dn,
+            },
+            ln_fugacity: SaftVrMieFugacityDerivatives {
+                ln_phi,
+                dt: dlnphi_dt,
+                dp: dlnphi_dp,
+                dn: dlnphi_dn,
+            },
+            cp,
+            cv,
+            speed_of_sound: sound_speed,
+        })
+    }
+
+    /// Evaluate fugacity coefficients and their exact `(T, P, n)` derivatives at `(T, P, n)`.
+    pub fn ln_fugacity_derivatives_tp(
+        &self,
+        temperature: f64,
+        pressure: f64,
+        moles: &[f64],
+        phase: Phase,
+    ) -> Result<SaftVrMieFugacityDerivatives> {
+        Ok(self
+            .state_tp(temperature, pressure, moles, phase)?
+            .ln_fugacity)
+    }
+
+    /// Pure-component Barker-Henderson hard-sphere diameters `(d, d_T, d_TT)` at `T`,
+    /// matching `saft_interface::calc_hard_sphere_diameter`.
+    pub fn hard_sphere_diameters(
+        &self,
+        temperature: f64,
+    ) -> Result<(Vec<f64>, Vec<f64>, Vec<f64>)> {
+        positive(temperature, "temperature")?;
+        let nc = self.num_components();
+        let mut d = Vec::with_capacity(nc);
+        let mut d_t = Vec::with_capacity(nc);
+        let mut d_tt = Vec::with_capacity(nc);
+        for i in 0..nc {
+            let pair = self.potential(i, i);
+            let se = pair.effective_sigma(temperature);
+            let (di, dit, ditt) = pair.diameter(temperature, se)?;
+            d.push(di);
+            d_t.push(dit);
+            d_tt.push(ditt);
+        }
+        Ok((d, d_t, d_tt))
+    }
+
+    /// Pair hard-sphere diameter `(d_ij, d_T_ij, d_TT_ij)` at `T`,
+    /// matching `saft_interface::calc_hard_sphere_diameter_ij`.
+    pub fn hard_sphere_diameter_ij(
+        &self,
+        i: usize,
+        j: usize,
+        temperature: f64,
+    ) -> Result<(f64, f64, f64)> {
+        positive(temperature, "temperature")?;
+        let nc = self.num_components();
+        if i >= nc || j >= nc {
+            return Err(Error::InvalidInput("component index out of bounds"));
+        }
+        let dummy_x = vec![1.0 / nc as f64; nc];
+        let prep = PreparedSaftVrMie::new(self, temperature, &dummy_x)?;
+        let k = i * nc + j;
+        Ok((prep.d[k], prep.d_t[k], prep.d_tt[k]))
+    }
+
+    /// Effective quantum/classical collision diameter `(sigma_eff, dT, dTT)` for pair `(i, j)`.
+    pub fn effective_sigma_ij(
+        &self,
+        i: usize,
+        j: usize,
+        temperature: f64,
+    ) -> Result<(f64, f64, f64)> {
+        positive(temperature, "temperature")?;
+        let nc = self.num_components();
+        if i >= nc || j >= nc {
+            return Err(Error::InvalidInput("component index out of bounds"));
+        }
+        let dummy_x = vec![1.0 / nc as f64; nc];
+        let prep = PreparedSaftVrMie::new(self, temperature, &dummy_x)?;
+        let [v, vt, vtt] = prep.effective[i * nc + j].0;
+        Ok((v, vt, vtt))
+    }
+
+    /// Effective quantum/classical well depth `(eps_eff/kB, dT, dTT)` for pair `(i, j)`.
+    pub fn effective_epsilon_ij(
+        &self,
+        i: usize,
+        j: usize,
+        temperature: f64,
+    ) -> Result<(f64, f64, f64)> {
+        positive(temperature, "temperature")?;
+        let nc = self.num_components();
+        if i >= nc || j >= nc {
+            return Err(Error::InvalidInput("component index out of bounds"));
+        }
+        let dummy_x = vec![1.0 / nc as f64; nc];
+        let prep = PreparedSaftVrMie::new(self, temperature, &dummy_x)?;
+        let [v, vt, vtt] = prep.effective[i * nc + j].1;
+        Ok((v, vt, vtt))
+    }
+
+    /// Dimensionless van der Waals attractive energy matrix `alpha_ij(T)` (`nc x nc`),
+    /// matching `saft_interface::alpha` (including truncated/shifted classical potentials).
+    pub fn alpha_vdw(&self, temperature: f64) -> Result<Vec<f64>> {
+        positive(temperature, "temperature")?;
+        let nc = self.num_components();
+        if let Some((r_cut, shift)) = self.cutoff {
+            if self.components.iter().any(|c| c.fh_order > 0) {
+                return Err(Error::Unsupported(
+                    "truncated alpha_vdw is not supported for quantum potentials",
+                ));
+            }
+            let mut out = vec![0.0; nc * nc];
+            for i in 0..nc {
+                for j in i..nc {
+                    let idx = i * nc + j;
+                    let la = self.lambda_a_ij[idx];
+                    let lr = self.lambda_r_ij[idx];
+                    let c = self.c_ij[idx];
+                    let (sigma_eff, eps_eff, u_cut) = if shift {
+                        let u_cut = c * (r_cut.powf(-la) - r_cut.powf(-lr));
+                        let eps_eff = 1.0 - u_cut;
+                        // Solve u(rs * sigma) / eps + u_cut = 0 near rs = 1.0.
+                        let mut rs = 1.0_f64;
+                        for _ in 0..25 {
+                            let inv = 1.0 / rs;
+                            let r_r = inv.powf(lr);
+                            let r_a = inv.powf(la);
+                            let f = c * (r_r - r_a) + u_cut;
+                            let df = c * (-lr * r_r + la * r_a) * inv;
+                            let d2f =
+                                c * (lr * (lr + 1.0) * r_r - la * (la + 1.0) * r_a) * inv * inv;
+                            let step = -f / df * (1.0 + f * d2f / (2.0 * df * df));
+                            rs += step;
+                            if step.abs() < 1e-14 {
+                                break;
+                            }
+                        }
+                        (rs, eps_eff, u_cut)
+                    } else {
+                        (1.0, 1.0, 0.0)
+                    };
+                    let mut a = c / (sigma_eff.powf(la - 3.0) * (la - 3.0))
+                        - c / (sigma_eff.powf(lr - 3.0) * (lr - 3.0))
+                        + c / (r_cut.powf(lr - 3.0) * (lr - 3.0))
+                        - c / (r_cut.powf(la - 3.0) * (la - 3.0));
+                    if shift {
+                        a -= u_cut * (r_cut.powi(3) - sigma_eff.powi(3)) / 3.0;
+                    }
+                    a /= eps_eff * sigma_eff.powi(3);
+                    out[idx] = a;
+                    out[j * nc + i] = a;
+                }
+            }
+            return Ok(out);
+        }
+
+        if self.components.iter().all(|c| c.fh_order == 0) {
+            return Ok(self.alpha_ij.clone());
+        }
+
+        let dummy_x = vec![1.0 / nc as f64; nc];
+        let prep = PreparedSaftVrMie::new(self, temperature, &dummy_x)?;
+        let mut out = vec![0.0; nc * nc];
+        for i in 0..nc {
+            for j in i..nc {
+                let idx = i * nc + j;
+                let la = self.lambda_a_ij[idx];
+                let lr = self.lambda_r_ij[idx];
+                let sigma = self.sigma_ij[idx];
+                let sigma_eff = prep.effective[idx].0[0];
+                let eps_eff = prep.effective[idx].1[0];
+                let order = self.components[i].fh_order as usize;
+                let dfh = self.d_feynhibbs_param_ij[idx] / (sigma * sigma * temperature);
+                let second_fac = self.options.quantum_variant.second_factor();
+                let qf = |lam: f64| {
+                    let q1 = lam * (lam - 1.0) * dfh;
+                    [1.0, q1, second_fac * (lam + 1.0) * (lam + 2.0) * dfh * q1]
+                };
+                let qa = qf(la);
+                let qr = qf(lr);
+                let ratio = sigma / sigma_eff;
+                let mut sum = 0.0;
+                for k in 0..=order {
+                    let a = la + 2.0 * k as f64;
+                    let r = lr + 2.0 * k as f64;
+                    sum += qa[k] * ratio.powf(a) / (a - 3.0) - qr[k] * ratio.powf(r) / (r - 3.0);
+                }
+                let val = sum * self.c_ij[idx] * self.eps_divk_ij[idx] / eps_eff;
+                out[idx] = val;
+                out[j * nc + i] = val;
+            }
+        }
+        Ok(out)
+    }
+
+    /// Pair interaction potential `u(r)/k_B [K]` and force `-du/dr / k_B [K/m]`
+    /// at separation `r [m]` and temperature `T [K]`, including Feynman-Hibbs
+    /// and truncation/shift corrections (`saft_interface::potential`).
+    pub fn pair_potential(
+        &self,
+        i: usize,
+        j: usize,
+        r: f64,
+        temperature: f64,
+    ) -> Result<(f64, f64)> {
+        positive(r, "separation")?;
+        positive(temperature, "temperature")?;
+        let nc = self.num_components();
+        if i >= nc || j >= nc {
+            return Err(Error::InvalidInput("component index out of bounds"));
+        }
+        let pair = self.potential(i, j);
+        if let Some((rc, shift)) = self.cutoff {
+            let r_cut = rc * pair.sigma;
+            if r > r_cut {
+                return Ok((0.0, 0.0));
+            }
+            let pot = pair.evaluate(r, temperature);
+            let mut u = pot.u_divk;
+            if shift {
+                u -= pair.evaluate(r_cut, temperature).u_divk;
+            }
+            return Ok((u, -pot.u_divk_r));
+        }
+        let pot = pair.evaluate(r, temperature);
+        Ok((pot.u_divk, -pot.u_divk_r))
+    }
+
+    /// Set the segment mass `[kg]` used for quantum corrections on component `index`.
+    pub fn set_mass(&mut self, index: usize, mass: f64) -> Result<()> {
+        if index >= self.num_components() {
+            return Err(Error::InvalidInput("component index out of bounds"));
+        }
+        if !mass.is_finite() || mass < 0.0 {
+            return Err(Error::InvalidInput("mass must be finite and non-negative"));
+        }
+        self.components[index].mass = mass;
+        self.recompute_cross_parameters();
+        Ok(())
+    }
+
+    /// Quantum de Boer parameter `Lambda = h / (sigma * sqrt(m * eps))` for component `index`.
+    pub fn de_boer_parameter(&self, index: usize) -> Result<f64> {
+        let comp = self
+            .components
+            .get(index)
+            .ok_or(Error::InvalidInput("component index out of bounds"))?;
+        if comp.mass <= 0.0 {
+            return Err(Error::InvalidInput(
+                "component has non-positive quantum mass",
+            ));
+        }
+        let eps = comp.eps_depth_divk * K_B;
+        Ok(H_PLANCK / (comp.sigma * (comp.mass * eps).sqrt()))
+    }
+
+    /// Adjust component `index` quantum mass to match the specified de Boer parameter `Lambda`.
+    pub fn set_de_boer_parameter(&mut self, index: usize, lambda: f64) -> Result<()> {
+        if index >= self.num_components() {
+            return Err(Error::InvalidInput("component index out of bounds"));
+        }
+        if !lambda.is_finite() || lambda < MACHINE_PREC {
+            return Err(Error::InvalidInput(
+                "de Boer parameter must be strictly positive",
+            ));
+        }
+        let comp = &self.components[index];
+        let eps = comp.eps_depth_divk * K_B;
+        let sigma = comp.sigma;
+        let mass = (H_PLANCK * H_PLANCK) / (sigma * sigma * lambda * lambda * eps);
+        self.components[index].mass = mass;
+        self.recompute_cross_parameters();
+        Ok(())
+    }
+
+    /// Thermal de Broglie wavelength `h / sqrt(2 pi m k_B T) [m]` for component `index`.
+    pub fn de_broglie_wavelength(&self, index: usize, temperature: f64) -> Result<f64> {
+        positive(temperature, "temperature")?;
+        let comp = self
+            .components
+            .get(index)
+            .ok_or(Error::InvalidInput("component index out of bounds"))?;
+        let mass = if comp.mass > 0.0 {
+            comp.mass
+        } else {
+            1.0e-3 * comp.molar_mass / N_A
+        };
+        Ok(H_PLANCK / (2.0 * PI * mass * K_B * temperature).sqrt())
     }
 
     /// Site ownership, association energies (J/mol) and bonding volumes (m^3).
@@ -590,18 +1343,43 @@ impl SaftVrMie {
                 ));
             }
         }
-        crate::error::positive(v, "total volume")?;
+        positive(v, "total volume")?;
         let p = self.prepare(t, n)?;
-        let sum = n.iter().sum::<f64>();
-        let mut r = MieRdf::new(&p, sum / v).rdf_second(i, j)?.rdf;
+        let sum: f64 = n.iter().sum();
+        let v_unit = v / sum;
+        if !v_unit.is_finite() || v_unit <= 0.0 {
+            return Err(Error::InvalidInput(
+                "molar volume must be finite and strictly positive",
+            ));
+        }
+        let mut r = MieRdf::new(&p, 1.0 / v_unit).rdf_second(i, j)?.rdf;
         r.volume /= sum;
         r.temperature_volume /= sum;
-        r.volume_second = r.volume_second / sum / sum;
+        r.volume_second = (r.volume_second / sum) / sum;
         for val in r.moles.iter_mut().chain(&mut r.temperature_moles) {
             *val /= sum;
         }
         for val in r.volume_moles.iter_mut().chain(&mut r.moles_second) {
-            *val = *val / sum / sum;
+            *val = (*val / sum) / sum;
+        }
+        let all_finite = [
+            r.g,
+            r.temperature,
+            r.volume,
+            r.temperature_second,
+            r.temperature_volume,
+            r.volume_second,
+        ]
+        .iter()
+        .all(|q| q.is_finite())
+            && r.moles.iter().all(|q| q.is_finite())
+            && r.temperature_moles.iter().all(|q| q.is_finite())
+            && r.volume_moles.iter().all(|q| q.is_finite())
+            && r.moles_second.iter().all(|q| q.is_finite());
+        if !all_finite {
+            return Err(Error::InvalidInput(
+                "non-finite SAFT-VR Mie association RDF derivative",
+            ));
         }
         Ok(r)
     }
@@ -637,6 +1415,12 @@ impl SaftVrMie {
         self.gamma_ij[i * nc + j] = value;
         self.gamma_ij[j * nc + i] = value;
         self.recompute_cross_parameters();
+    }
+
+    /// Get repulsive-exponent binary interaction parameter `gamma_ij`.
+    pub fn get_gammaij(&self, i: usize, j: usize) -> f64 {
+        let nc = self.num_components();
+        self.gamma_ij[i * nc + j]
     }
 
     /// Set binary interaction parameter kij.

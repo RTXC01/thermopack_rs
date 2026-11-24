@@ -194,8 +194,10 @@ pub use pets::{
     PetsVolumeIteration, PreparedPets, PureCriticalPoint,
 };
 pub use saft_vrmie::{
-    PreparedSaftVrMie, SaftVrMie, SaftVrMieComponent, SaftVrMieHelmholtzTerms,
-    SaftVrMiePressureJet, SaftVrMieSaturation, SaftVrMieState,
+    HardSphereReference, MieOptions, MieTerms, PackingRule, PreparedSaftVrMie, QuantumVariant,
+    SaftVrMie, SaftVrMieComponent, SaftVrMieDerivatives, SaftVrMieFugacityDerivatives,
+    SaftVrMieHelmholtz, SaftVrMieHelmholtzTerms, SaftVrMiePressureJet, SaftVrMieSaturation,
+    SaftVrMieState, SaftVrMieTpState,
 };
 pub use saft_vrmie_data::{SaftVrMieKijRecord, SaftVrMieLijRecord, SaftVrMieRecord};
 pub use solid::SolidLine;

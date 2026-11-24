@@ -4,14 +4,15 @@
 //! distribution function of a pair of components to the model of the active
 //! thermodynamic model. The native module provides the branch of the cubic
 //! association model, which needs no temperature dependence, the branch of the
-//! original PC-SAFT model (Boublik-Mansoori-Carnahan-Starling-Leland), and the
+//! original PC-SAFT model (Boublik-Mansoori-Carnahan-Starling-Leland), the
 //! branch of the simplified PC-SAFT model (Carnahan-Starling average packing
-//! fraction).
+//! fraction), and the Dufal association integral of the SAFT-VR Mie model.
 
 use crate::Result;
 use crate::bmcsl::{self, HsDiameters};
 use crate::cpa::{Cpa, PreparedCpa};
 use crate::pc_saft::{N_AVOGADRO, PcSaft, PreparedPcSaft};
+use crate::saft_vrmie::SaftVrMie;
 
 /// The radial distribution function and its derivatives.
 ///
@@ -384,4 +385,19 @@ pub fn pcsaft_rdf_for_model(
     } else {
         pcsaft_rdf(model, temperature, volume, moles, first, second)
     }
+}
+
+/// The Dufal association radial distribution integral for a pair of associating
+/// components in the SAFT-VR Mie model (`g_rdf_saftvrmie_ij_TVN`).
+///
+/// The volume is in cubic metres and `moles` holds raw component mole amounts.
+pub fn saftvrmie_rdf(
+    model: &SaftVrMie,
+    temperature: f64,
+    volume: f64,
+    moles: &[f64],
+    first: usize,
+    second: usize,
+) -> Result<RdfDerivatives> {
+    model.association_rdf_tvn(first, second, temperature, volume, moles)
 }

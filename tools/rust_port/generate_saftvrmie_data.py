@@ -226,7 +226,7 @@ pub fn lookup_lij(uid1: &str, uid2: &str, reference: Option<&str>) -> f64 {
 }
 """)
 
-    source = (ROOT / "src/saftvrmie_association.f90").read_text()
+    source = (ROOT / "src/saftvrmie_association.f90").read_text(encoding="utf-8")
     coeff = {(int(i), int(j), int(k)): float(v) for i, j, k, v in re.findall(
         r"b\((\d+),(\d+),(\d+)\) = ([-+.0-9Ee]+)", source)}
     lines.append("// Dufal association integral: triangular (rho, T) powers, then lambda_r power.")

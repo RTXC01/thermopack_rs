@@ -2,6 +2,9 @@
 // Reference: Lafitte et al. (2013) doi:10.1063/1.4819786 and Aasen et al. (2019) doi:10.1063/1.5136079.
 // Copyright thermotools and Contributors. Apache-2.0.
 
+mod association;
+use self::association::MieRdf;
+use crate::association::{AssociationParams, DeltaCombRule, assoc_helmholtz_value};
 use crate::component::component;
 use crate::cubic::Phase;
 use crate::error::{Error, Result};
@@ -141,6 +144,8 @@ pub struct SaftVrMieSaturation {
 #[derive(Debug, Clone)]
 pub struct SaftVrMie {
     components: Vec<SaftVrMieComponent>,
+    association: AssociationParams,
+    integral_coefficients: Vec<[f64; 66]>,
     kij: Vec<f64>,
     lij: Vec<f64>,
     gamma_ij: Vec<f64>,
@@ -172,11 +177,17 @@ impl SaftVrMie {
         let mut components = Vec::with_capacity(nc);
         let mut ideal = Vec::with_capacity(nc);
 
+        let mut schemes = Vec::with_capacity(nc);
+        let mut eps_assoc = Vec::with_capacity(nc);
+        let mut kab = Vec::with_capacity(nc);
         for &ident in comps {
             let record = saft_vrmie_data::lookup_pure(ident, Some(parameter_reference))
                 .ok_or_else(|| {
                     Error::UnknownComponent(format!("SAFT-VR Mie record for {ident}"))
                 })?;
+            schemes.push(record.scheme);
+            eps_assoc.push(record.eps_assoc_divk * crate::R);
+            kab.push(record.kab);
             let comp_info = component(ident)?;
             let molar_mass = comp_info.molar_mass; // g/mol
 
@@ -196,7 +207,20 @@ impl SaftVrMie {
             ideal.push(IdealGas::new(comp_info)?);
         }
 
+        let association = AssociationParams::for_saft_vr_mie(
+            &schemes,
+            &eps_assoc,
+            &kab,
+            DeltaCombRule::Standard,
+        )?;
+        let integral_coefficients = if association.has_sites() {
+            vec![[0.0; 66]; nc * nc]
+        } else {
+            Vec::new()
+        };
         let mut s = Self {
+            association,
+            integral_coefficients,
             components,
             kij: vec![0.0; nc * nc],
             lij: vec![0.0; nc * nc],
@@ -291,6 +315,10 @@ impl SaftVrMie {
                         * ((c_i.lambda_r - 3.0) * (c_j.lambda_r - 3.0)).sqrt();
                 self.lambda_a_ij[idx] = la_ij;
                 self.lambda_r_ij[idx] = lr_ij;
+                if self.association.has_sites() {
+                    self.integral_coefficients[idx] = saft_vrmie_data::ASSOCIATION_B
+                        .map(|row| row.into_iter().rev().fold(0.0, |acc, b| acc * lr_ij + b));
+                }
 
                 // Segment diameter
                 let sig_ij = 0.5 * (c_i.sigma + c_j.sigma) * (1.0 - self.lij[idx]);
@@ -353,6 +381,9 @@ impl SaftVrMie {
         let nc = self.num_components();
         if mole_fractions.len() != nc {
             return Err(Error::InvalidInput("mole fractions length mismatch"));
+        }
+        if mole_fractions.iter().any(|&n| n < 0.0) {
+            return Err(Error::InvalidInput("nonnegative mole amounts required"));
         }
         let sum_x: f64 = mole_fractions.iter().sum();
         if sum_x <= 0.0 || !sum_x.is_finite() {
@@ -710,7 +741,19 @@ impl<'a> PreparedSaftVrMie<'a> {
         }
 
         let am = a_hs + beta * a1_mix + beta * beta * a2_mix + (beta * beta * beta) * a3_mix;
-        let a_res = self.m_bar * am + a_chain;
+        let a_assoc = if self.model.association.has_sites() && rho > 0.0 {
+            assoc_helmholtz_value(
+                &self.model.association,
+                &MieRdf::new(self, rho),
+                t,
+                1.0 / rho,
+                &self.mole_fractions,
+            )?
+            .0
+        } else {
+            0.0
+        };
+        let a_res = self.m_bar * am + a_chain + a_assoc;
 
         Ok(SaftVrMieHelmholtzTerms {
             a_hs,

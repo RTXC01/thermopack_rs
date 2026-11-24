@@ -45,6 +45,10 @@ def parse_db():
             "lambda_r": lambda_r_val,
             "mass": mass_val,
             "fh_order": fh_order_val,
+            "scheme": "NoAssoc" if fields["assoc_scheme"] == "no_assoc" else
+                      "Scheme" + fields["assoc_scheme"].split("_")[-1],
+            "eps_assoc": float(fields["eps"]),
+            "kab": float(fields["beta"]),
             "ref": ref_val,
         })
 
@@ -107,6 +111,9 @@ def generate():
         "    pub lambda_r: f64,",
         "    pub mass: f64,",
         "    pub fh_order: i32,",
+        "    pub scheme: crate::association::AssocScheme,",
+        "    pub eps_assoc_divk: f64,",
+        "    pub kab: f64,",
         "    pub reference: &'static str,",
         "}",
         "",
@@ -134,6 +141,8 @@ def generate():
             f"sigma: {number(r['sigma'])}, eps_depth_divk: {number(r['eps_depth_divk'])}, "
             f"lambda_a: {number(r['lambda_a'])}, lambda_r: {number(r['lambda_r'])}, "
             f"mass: {number(r['mass'])}, fh_order: {r['fh_order']}, "
+            f"scheme: crate::association::AssocScheme::{r['scheme']}, "
+            f"eps_assoc_divk: {number(r['eps_assoc'])}, kab: {number(r['kab'])}, "
             f"reference: {string(r['ref'])} }},"
         )
     lines.append("];")
@@ -217,6 +226,17 @@ pub fn lookup_lij(uid1: &str, uid2: &str, reference: Option<&str>) -> f64 {
 }
 """)
 
+    source = (ROOT / "src/saftvrmie_association.f90").read_text()
+    coeff = {(int(i), int(j), int(k)): float(v) for i, j, k, v in re.findall(
+        r"b\((\d+),(\d+),(\d+)\) = ([-+.0-9Ee]+)", source)}
+    lines.append("// Dufal association integral: triangular (rho, T) powers, then lambda_r power.")
+    lines.append("#[rustfmt::skip]")
+    lines.append("pub(crate) const ASSOCIATION_B: [[f64; 7]; 66] = [")
+    for i in range(11):
+        for j in range(11 - i):
+            row = ", ".join(number(coeff[i, j, k]) for k in range(7))
+            lines.append(f"    [{row}],")
+    lines.append("];")
     out_file = ROOT / "rust/src/saft_vrmie_data.rs"
     out_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"Wrote {len(pure)} pure, {len(kij)} kij, and {len(lij)} lij records to {out_file}")

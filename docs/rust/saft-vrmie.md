@@ -49,12 +49,17 @@ mole.
 - **Association (`rust/src/association.rs`, `rust/src/saft_vrmie/association.rs`)**:
   reuses the shared Wertheim TPT1 site solver (`AssocScheme`, `Standard` and
   `Elliot` $\Delta$ combining rules, exact infinite-dilution zero-mole site
-  fractions, and strictly-improving machine-precision Newton polish on
-  converged $X_k$) paired with the Dufal et al. (2015) polynomial Mie
-  association integral evaluated via double-double compensated Horner to avoid
-  degree-10 polynomial cancellation (`association_rdf_tvn` and
-  `rdf::saftvrmie_rdf`). Controls include `has_association`,
-  `set_assoc_params`, `set_delta_comb_rule`, and `solve_assoc_x_k`.
+  fractions, and fallback-only machine-precision Newton polish so routine
+  SAFT-VR Mie, PC-SAFT, and CPA calls incur zero extra residual/Jacobian work)
+  paired with the Dufal et al. (2015) polynomial Mie association integral
+  (`association_rdf_tvn` and `rdf::saftvrmie_rdf`). `PreparedSaftVrMie`
+  precomputes the 11 temperature-dependent Dufal outer coefficients per
+  associating pair in Veltkamp-Dekker double-double precision, then evaluates
+  the 11-step density polynomial via a fast standard `f64` Horner path with a
+  running cancellation monitor (`abs_sum > 1024 * |val|`) that falls back to
+  11-step Dekker double-double arithmetic only on cancellation-sensitive dense
+  states. Controls include `has_association`, `set_assoc_params`,
+  `set_delta_comb_rule`, and `solve_assoc_x_k`.
 - **Quantum extensions**: `new_quantum` and `new_quantum_with_hs_ref`
   (FH0/FH1/FH2, `FeynmanHibbs` and `JaenKahn` variants, `H_PLANCK = 6.626069311e-34`),
   plus `set_mass`, `de_boer_parameter`, `set_de_boer_parameter`, and
@@ -109,14 +114,28 @@ into `rust/src/saft_vrmie_data.rs`:
   and `state` via stack-buffered `Dual1`/`Dual2` without re-preparing
   temperature caches, `volume` with a strict $\le 10^{-6} P_{\text{target}}$
   relative pressure closure cap on every returned root, noise-guarded bracketing
-  with local representable-`f64` ULP recovery near steep liquid roots, and
-  common-pressure `MinimumGibbs` that preserves a pressure-closed vapor winner
-  when a bounded liquid candidate establishes the Gibbs ordering; and pure
-  `saturation_pressure` using the stabilized common-pressure Gibbs difference
-  $(F_l - F_v) + P(v_l - v_v)/(RT) - \ln(v_l/v_v)$ with guarded
-  mechanical-spinodal branch bracketing ($\eta \le 0.72$), verified liquid and
-  vapor pressure closure, and distinct errors for supercritical isotherms versus
-  liquid packing-cap exhaustion). `SaftVrMieState::s_total` combines ideal TV entropy with TV
+  with spacing-bounded representable-`f64` ULP recovery (`<= 14` evaluations in
+  deeply sub-ULP rejected dense regimes, `<= 50` otherwise, stopping as soon as
+  the $10^{-6}$ cap is met), and common-pressure `MinimumGibbs` that checks for
+  a clear vapor win against the bounded liquid candidate before paying for dense
+  ULP recovery; and pure `saturation_pressure` using the stabilized
+  common-pressure Gibbs difference $(F_l - F_v) + P(v_l - v_v)/(RT) - \ln(v_l/v_v)$
+  with guarded mechanical-spinodal branch bracketing ($\eta \le 0.72$), verified
+  liquid and vapor pressure closure ($\le 10^{-6}$ relative), ordinary Gibbs
+  convergence $|\Delta G/(RT)| < 10^{-13}$ (or $< 10^{-10}$ on a tight bracket),
+  a documented cold-liquid pressure-snap branch (when 1 ULP of liquid volume
+  exceeds $10^{-6} P_{\text{sat}}$ yet $|P_l - p_{\text{eq}}| \le 5\times 10^{-6} p_{\text{eq}}$,
+  reporting $P_l$ with a re-solved vapor root so both pressures close within
+  $10^{-6}$ while $|\Delta G/(RT)| \le 5\times 10^{-6}$), and distinct errors
+  for supercritical isotherms versus liquid packing-cap exhaustion). For fixed
+  ultra-low liquid pressure targets where the physical 1-ULP pressure spacing
+  $|\partial P/\partial v|\,\mathrm{ulp}(v_l)$ exceeds $2\times 10^{-6} P_{\text{target}}$
+  (e.g., $\text{NH}_3$ at $120\text{ K}$ where $\Delta P_{\text{ulp}} \approx 1.18\times 10^{-6}\text{ Pa}$
+  versus $\pm 3.05\times 10^{-7}\text{ Pa}$ at $0.305\text{ Pa}$ and
+  $\pm 2.76\times 10^{-7}\text{ Pa}$ at $0.275800421086915\text{ Pa}$),
+  `volume` returns `Ok` when a representable stable root lies inside the $10^{-6}$
+  window and `Error::NotConverged` when the straddling `f64` volumes contain no
+  closing root. `SaftVrMieState::s_total` combines ideal TV entropy with TV
   residual entropy so it agrees with `state_tp.entropy.value` and satisfies
   $\Delta H = T\Delta S$ at coexistence.
 

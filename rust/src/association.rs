@@ -1285,6 +1285,7 @@ fn solve_x_k_from_delta(
         // g_a = (1 / X_a - 1) - sum_b C_{ab} X_b = 0 so trace active components
         // (e.g. x_i = 1e-12) converge to full relative precision too!
         let mut converged = false;
+        let mut final_err = f64::INFINITY;
         for _ in 0..40 {
             let mut max_rel_err = 0.0_f64;
             for a in 0..na {
@@ -1310,6 +1311,7 @@ fn solve_x_k_from_delta(
             }
             if max_rel_err <= tol {
                 converged = true;
+                final_err = max_rel_err;
                 break;
             }
 
@@ -1347,7 +1349,9 @@ fn solve_x_k_from_delta(
         }
 
         // Damped successive substitution fallback (`saft_association::succ_subs`) + Newton polish.
+        let mut used_fallback = false;
         if !converged {
+            used_fallback = true;
             xa.fill(0.2);
             let omega = 0.2;
             for _ in 0..400 {
@@ -1384,6 +1388,7 @@ fn solve_x_k_from_delta(
                 }
                 if max_rel_err.is_finite() && max_rel_err <= tol.max(1e-10) {
                     converged = true;
+                    final_err = max_rel_err;
                     break;
                 }
                 let rhs: Vec<f64> = resid.iter().map(|&v| -v).collect();
@@ -1411,61 +1416,61 @@ fn solve_x_k_from_delta(
             ));
         }
 
-        // Polish converged site fractions (from either Newton or the fallback path)
-        // to near machine precision via up to 4 strictly-improving Newton steps so
-        // truncation error in X_k does not inject artificial pressure jitter into
-        // stiff low-pressure liquid association derivatives.
+        // Only run extra Newton polish when the fallback path converged with a relaxed
+        // residual (> 16 * EPSILON), keeping the common main-Newton path completely free
+        // of extra residual/Jacobian rebuilds and allocations for SAFT-VR Mie, PC-SAFT, and CPA.
         let polish_tol = (16.0 * f64::EPSILON).min(tol);
-        let eval_resid_jac = |x_vec: &[f64], resid: &mut [f64], jac: &mut [f64]| -> f64 {
-            let mut err = 0.0_f64;
-            for a in 0..na {
-                let mut sum_cx = 0.0;
-                for b in 0..na {
-                    sum_cx += c_mat[a * na + b] * x_vec[b];
-                }
-                let inv_x = 1.0 / x_vec[a];
-                let g_a = (inv_x - 1.0) - sum_cx;
-                resid[a] = g_a;
-                err = err.max(g_a.abs() / inv_x.max(1.0));
-                for b in 0..na {
-                    jac[a * na + b] = -c_mat[a * na + b];
-                }
-                jac[a * na + a] -= (1.0 + sum_cx) / x_vec[a];
-            }
-            err
-        };
-        let mut best_err = eval_resid_jac(&xa, &mut resid, &mut jac);
-        for _ in 0..4 {
-            if !best_err.is_finite() || best_err <= polish_tol {
-                break;
-            }
-            let rhs: Vec<f64> = resid.iter().map(|&v| -v).collect();
-            let Ok(dx) = solve_linear_system(na, &jac, &rhs) else {
-                break;
-            };
+        if used_fallback && final_err.is_finite() && final_err > polish_tol {
+            let mut best_err = final_err;
+            let mut rhs = vec![0.0; na];
             let mut cand = vec![0.0; na];
-            let mut valid = true;
-            for a in 0..na {
-                let x_next = xa[a] + dx[a];
-                if !x_next.is_finite() || x_next <= 0.0 || x_next > 1.0 + 1e-14 {
-                    valid = false;
-                    break;
-                }
-                cand[a] = x_next.min(1.0);
-            }
-            if !valid {
-                break;
-            }
             let mut next_resid = vec![0.0; na];
             let mut next_jac = vec![0.0; na * na];
-            let cand_err = eval_resid_jac(&cand, &mut next_resid, &mut next_jac);
-            if cand_err.is_finite() && cand_err < best_err {
-                xa = cand;
-                resid = next_resid;
-                jac = next_jac;
-                best_err = cand_err;
-            } else {
-                break;
+            for _ in 0..4 {
+                if best_err <= polish_tol {
+                    break;
+                }
+                for a in 0..na {
+                    rhs[a] = -resid[a];
+                }
+                let Ok(dx) = solve_linear_system(na, &jac, &rhs) else {
+                    break;
+                };
+                let mut valid = true;
+                for a in 0..na {
+                    let x_next = xa[a] + dx[a];
+                    if !x_next.is_finite() || x_next <= 0.0 || x_next > 1.0 + 1e-14 {
+                        valid = false;
+                        break;
+                    }
+                    cand[a] = x_next.min(1.0);
+                }
+                if !valid {
+                    break;
+                }
+                let mut cand_err = 0.0_f64;
+                for a in 0..na {
+                    let mut sum_cx = 0.0;
+                    for b in 0..na {
+                        sum_cx += c_mat[a * na + b] * cand[b];
+                    }
+                    let inv_x = 1.0 / cand[a];
+                    let g_a = (inv_x - 1.0) - sum_cx;
+                    next_resid[a] = g_a;
+                    cand_err = cand_err.max(g_a.abs() / inv_x.max(1.0));
+                    for b in 0..na {
+                        next_jac[a * na + b] = -c_mat[a * na + b];
+                    }
+                    next_jac[a * na + a] -= (1.0 + sum_cx) / cand[a];
+                }
+                if cand_err.is_finite() && cand_err < best_err {
+                    std::mem::swap(&mut xa, &mut cand);
+                    std::mem::swap(&mut resid, &mut next_resid);
+                    std::mem::swap(&mut jac, &mut next_jac);
+                    best_err = cand_err;
+                } else {
+                    break;
+                }
             }
         }
 

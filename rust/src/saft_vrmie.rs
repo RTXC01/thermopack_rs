@@ -4,7 +4,7 @@
 
 mod association;
 mod kernel;
-use self::association::MieRdf;
+use self::association::{AssocTempCoeffs, MieRdf};
 use self::kernel::EvalMode;
 use crate::association::{
     AssocScheme, AssociationParams, DeltaCombRule, assoc_helmholtz_all, assoc_helmholtz_first,
@@ -1919,6 +1919,8 @@ pub struct PreparedSaftVrMie<'a> {
     conv_eta: f64,  // eta = conv_eta * rho
     conv_zeta: f64, // zeta_bar = conv_zeta * rho
     xs: Vec<f64>,   // segment mole fractions xs_i = x_i * m_i / m_bar
+    assoc_reduced_factor: f64,
+    assoc_t_coeffs: Vec<Option<AssocTempCoeffs>>,
 }
 
 impl<'a> PreparedSaftVrMie<'a> {
@@ -2074,6 +2076,33 @@ impl<'a> PreparedSaftVrMie<'a> {
         let conv_eta = (PI * N_A / 6.0) * m_bar * sum_d3;
         let conv_zeta = (PI * N_A / 6.0) * m_bar * sum_sig3;
 
+        let (assoc_reduced_factor, assoc_t_coeffs) = if model.association.has_sites() {
+            let mut sum_assoc_sig3 = 0.0;
+            for i in 0..nc {
+                for j in 0..nc {
+                    sum_assoc_sig3 += xs[i] * xs[j] * model.sigma_ij[i * nc + j].powi(3);
+                }
+            }
+            let mut t_coeffs = vec![None; nc * nc];
+            for i in 0..nc {
+                if model.association.comp_vs_sites[i].is_none() {
+                    continue;
+                }
+                for j in i..nc {
+                    if model.association.comp_vs_sites[j].is_none() {
+                        continue;
+                    }
+                    let idx = i * nc + j;
+                    let c = AssocTempCoeffs::compute(model, idx, temperature);
+                    t_coeffs[idx] = Some(c);
+                    t_coeffs[j * nc + i] = Some(c);
+                }
+            }
+            (sum_assoc_sig3 * N_A * m_bar, t_coeffs)
+        } else {
+            (0.0, Vec::new())
+        };
+
         Ok(Self {
             model,
             temperature,
@@ -2088,6 +2117,8 @@ impl<'a> PreparedSaftVrMie<'a> {
             conv_eta,
             conv_zeta,
             xs,
+            assoc_reduced_factor,
+            assoc_t_coeffs,
         })
     }
 
@@ -2371,57 +2402,10 @@ impl<'a> PreparedSaftVrMie<'a> {
         }
 
         if phase == Phase::MinimumGibbs {
-            let liq = self.solve_single_phase_attempt(pressure_target, Phase::Liquid);
-            let vap = self.solve_single_phase_attempt(pressure_target, Phase::Vapor);
-            return match (liq, vap) {
-                (Ok(l), Ok(v)) if l.closed && v.closed => {
-                    if (l.volume - v.volume).abs() < 1e-10 * l.volume {
-                        return Ok(l.volume);
-                    }
-                    let dg =
-                        self.imposed_pressure_gibbs_diff(pressure_target, l.volume, v.volume)?;
-                    Ok(if dg < 0.0 { l.volume } else { v.volume })
-                }
-                (Ok(l), Ok(v)) if !l.closed && v.closed => {
-                    // The stiff dense liquid branch failed the strict 1e-6 relative
-                    // pressure cap, while the vapor root closed cleanly. Allow the
-                    // pressure-closed vapor root to win only when the liquid candidate
-                    // is tightly localized on the stable liquid branch and the Gibbs
-                    // ordering strictly favors vapor beyond a conservative error bound.
-                    let dp = (l.pressure - pressure_target).abs();
-                    let dv_est = if l.dp_dv.is_finite() && l.dp_dv < 0.0 {
-                        dp / l.dp_dv.abs()
-                    } else {
-                        f64::INFINITY
-                    };
-                    if l.volume.is_finite()
-                        && l.volume > 0.0
-                        && l.volume < v.volume
-                        && l.pressure.is_finite()
-                        && l.dp_drho > 0.0
-                        && dv_est.is_finite()
-                        && dv_est <= 1.0e-6 * l.volume
-                    {
-                        let dg_err_bound = dp * dv_est / (RGAS * self.temperature);
-                        let margin = (10.0 * dg_err_bound).max(1.0e-3);
-                        let dg =
-                            self.imposed_pressure_gibbs_diff(pressure_target, l.volume, v.volume)?;
-                        if dg.is_finite() && dg > margin {
-                            return Ok(v.volume);
-                        }
-                    }
-                    Err(Error::NotConverged(
-                        "SAFT-VR Mie minimum-Gibbs volume solver did not converge",
-                    ))
-                }
-                (Err(err), _) | (_, Err(err)) => Err(err),
-                _ => Err(Error::NotConverged(
-                    "SAFT-VR Mie volume solver did not converge",
-                )),
-            };
+            return Ok(self.solve_minimum_gibbs(pressure_target)?.0);
         }
 
-        let attempt = self.solve_single_phase_attempt(pressure_target, phase)?;
+        let attempt = self.solve_single_phase_attempt(pressure_target, phase, true)?;
         if attempt.closed {
             Ok(attempt.volume)
         } else {
@@ -2431,11 +2415,69 @@ impl<'a> PreparedSaftVrMie<'a> {
         }
     }
 
-    fn solve_single_phase_attempt(
-        &self,
-        pressure_target: f64,
-        phase: Phase,
-    ) -> Result<VolumeAttempt> {
+    /// Solve `Phase::MinimumGibbs` while avoiding dense ULP recovery whenever the
+    /// bounded liquid candidate already establishes a clear vapor win.
+    /// Returns `(volume, liquid_recovery_evals)`.
+    fn solve_minimum_gibbs(&self, pressure_target: f64) -> Result<(f64, usize)> {
+        let vap = self.solve_single_phase_attempt(pressure_target, Phase::Vapor, true);
+        let liq = self.solve_single_phase_attempt(pressure_target, Phase::Liquid, false);
+        match (liq, vap) {
+            (Ok(l), Ok(v)) if l.closed && v.closed => {
+                if (l.volume - v.volume).abs() < 1e-10 * l.volume {
+                    return Ok((l.volume, 0));
+                }
+                let dg = self.imposed_pressure_gibbs_diff(pressure_target, l.volume, v.volume)?;
+                Ok((if dg < 0.0 { l.volume } else { v.volume }, 0))
+            }
+            (Ok(mut l), Ok(v)) if !l.closed && v.closed => {
+                // First check whether the bounded dense liquid candidate already proves
+                // a clear vapor win before paying for dense ULP pressure recovery.
+                let dp = (l.pressure - pressure_target).abs();
+                let dv_est = if l.dp_dv.is_finite() && l.dp_dv < 0.0 {
+                    dp / l.dp_dv.abs()
+                } else {
+                    f64::INFINITY
+                };
+                if l.volume.is_finite()
+                    && l.volume > 0.0
+                    && l.volume < v.volume
+                    && l.pressure.is_finite()
+                    && l.dp_drho > 0.0
+                    && dv_est.is_finite()
+                    && dv_est <= 1.0e-6 * l.volume
+                {
+                    let dg_err_bound = dp * dv_est / (RGAS * self.temperature);
+                    let margin = (10.0 * dg_err_bound).max(1.0e-3);
+                    let dg =
+                        self.imposed_pressure_gibbs_diff(pressure_target, l.volume, v.volume)?;
+                    if dg.is_finite() && dg > margin {
+                        return Ok((v.volume, 0));
+                    }
+                }
+                // Liquid may win or Gibbs ordering is too close to call: run bounded
+                // dense ULP recovery on the liquid candidate and enforce strict closure.
+                let (zeta_min, zeta_max) = self.single_phase_zeta_bounds(pressure_target)?;
+                l = self.recover_volume_ulps(pressure_target, zeta_min, zeta_max, l)?;
+                if l.closed {
+                    if (l.volume - v.volume).abs() < 1e-10 * l.volume {
+                        return Ok((l.volume, l.recovery_evals));
+                    }
+                    let dg =
+                        self.imposed_pressure_gibbs_diff(pressure_target, l.volume, v.volume)?;
+                    return Ok((if dg < 0.0 { l.volume } else { v.volume }, l.recovery_evals));
+                }
+                Err(Error::NotConverged(
+                    "SAFT-VR Mie minimum-Gibbs volume solver did not converge",
+                ))
+            }
+            (Err(err), _) | (_, Err(err)) => Err(err),
+            _ => Err(Error::NotConverged(
+                "SAFT-VR Mie volume solver did not converge",
+            )),
+        }
+    }
+
+    fn single_phase_zeta_bounds(&self, pressure_target: f64) -> Result<(f64, f64)> {
         let zeta_ideal = self.conv_eta * pressure_target / (RGAS * self.temperature);
         if !zeta_ideal.is_finite() || zeta_ideal <= 0.0 {
             return Err(Error::NotConverged(
@@ -2443,13 +2485,23 @@ impl<'a> PreparedSaftVrMie<'a> {
             ));
         }
         let zeta_min = (1.0e-10_f64).min(0.1 * zeta_ideal).max(1.0e-140);
-        let zeta_max = 0.75;
+        Ok((zeta_min, 0.75))
+    }
+
+    fn solve_single_phase_attempt(
+        &self,
+        pressure_target: f64,
+        phase: Phase,
+        recover: bool,
+    ) -> Result<VolumeAttempt> {
+        let (zeta_min, zeta_max) = self.single_phase_zeta_bounds(pressure_target)?;
+        let zeta_ideal = self.conv_eta * pressure_target / (RGAS * self.temperature);
         let zeta_init = match phase {
             Phase::Vapor => zeta_ideal.clamp(zeta_min, 0.05),
             Phase::Liquid => 0.45,
             Phase::MinimumGibbs => unreachable!(),
         };
-        self.solve_volume_in_zeta_bracket(pressure_target, zeta_min, zeta_max, zeta_init)
+        self.solve_volume_in_zeta_bracket(pressure_target, zeta_min, zeta_max, zeta_init, recover)
     }
 
     /// Solve `P(conv_eta / zeta) = pressure_target` strictly within a monotone
@@ -2462,8 +2514,13 @@ impl<'a> PreparedSaftVrMie<'a> {
         zeta_max: f64,
         zeta_init: f64,
     ) -> Result<f64> {
-        let attempt =
-            self.solve_volume_in_zeta_bracket(pressure_target, zeta_min, zeta_max, zeta_init)?;
+        let attempt = self.solve_volume_in_zeta_bracket(
+            pressure_target,
+            zeta_min,
+            zeta_max,
+            zeta_init,
+            true,
+        )?;
         if attempt.closed {
             Ok(attempt.volume)
         } else {
@@ -2474,15 +2531,16 @@ impl<'a> PreparedSaftVrMie<'a> {
     }
 
     /// Core safeguarded Newton-bisection volume solver with noise-guarded bracket
-    /// updates and local representable-`f64` ULP neighborhood recovery near steep
-    /// liquid roots. Returns the best candidate along with whether it satisfied
-    /// strict `<= 1e-6 * pressure_target` relative pressure closure.
+    /// updates and optional bounded local representable-`f64` ULP recovery near
+    /// steep liquid roots. Returns the best candidate along with whether it
+    /// satisfied strict `<= 1e-6 * pressure_target` relative pressure closure.
     fn solve_volume_in_zeta_bracket(
         &self,
         pressure_target: f64,
         mut zeta_min: f64,
         mut zeta_max: f64,
         zeta_init: f64,
+        recover: bool,
     ) -> Result<VolumeAttempt> {
         if !pressure_target.is_finite()
             || pressure_target <= 0.0
@@ -2517,6 +2575,7 @@ impl<'a> PreparedSaftVrMie<'a> {
                     dp_dv: jet.dp_dv,
                     dp_drho: jet.dp_drho,
                     closed: false,
+                    recovery_evals: 0,
                 })
             } else {
                 None
@@ -2561,6 +2620,7 @@ impl<'a> PreparedSaftVrMie<'a> {
                     dp_dv: jet.dp_dv,
                     dp_drho: jet.dp_drho,
                     closed: false,
+                    recovery_evals: 0,
                 });
             }
 
@@ -2577,6 +2637,7 @@ impl<'a> PreparedSaftVrMie<'a> {
                     dp_dv: jet.dp_dv,
                     dp_drho: jet.dp_drho,
                     closed: true,
+                    recovery_evals: 0,
                 });
             }
 
@@ -2602,100 +2663,236 @@ impl<'a> PreparedSaftVrMie<'a> {
             dp_dv: jet.dp_dv,
             dp_drho: jet.dp_drho,
             closed: false,
+            recovery_evals: 0,
         });
+        let p_cap = 1.0e-6 * pressure_target;
+        let best_err = if best.pressure.is_finite() {
+            (best.pressure - pressure_target).abs()
+        } else {
+            f64::INFINITY
+        };
+        best.closed = best.volume.is_finite()
+            && best.volume > 0.0
+            && best.pressure.is_finite()
+            && best.dp_drho > 0.0
+            && best_err <= p_cap;
+        if recover && !best.closed {
+            best = self.recover_volume_ulps(pressure_target, orig_zeta_min, orig_zeta_max, best)?;
+        }
+        Ok(best)
+    }
+
+    /// Bounded representable-`f64` ULP neighborhood recovery around a tightly
+    /// localized stable root candidate. Bounds search radius by residual and local
+    /// 1-ULP pressure spacing (`<= 14` evaluations when `dp_ulp > 64 * p_cap`,
+    /// `<= 50` evaluations otherwise), stops immediately once `<= 1e-6 * P` is met,
+    /// and stops each direction once it crosses and moves monotonically away from
+    /// `pressure_target`.
+    fn recover_volume_ulps(
+        &self,
+        pressure_target: f64,
+        orig_zeta_min: f64,
+        orig_zeta_max: f64,
+        mut best: VolumeAttempt,
+    ) -> Result<VolumeAttempt> {
         let p_cap = 1.0e-6 * pressure_target;
         let mut best_err = if best.pressure.is_finite() {
             (best.pressure - pressure_target).abs()
         } else {
             f64::INFINITY
         };
-
-        // If Newton-bisection stalled in the ULP noise floor of a steep root,
-        // inspect adjacent representable volumes strictly inside the original bracket
-        // before declaring non-convergence.
-        if best_err > p_cap
-            && best.volume.is_finite()
-            && best.volume > 0.0
-            && best.pressure.is_finite()
-            && best.dp_drho > 0.0
-            && best.dp_dv.is_finite()
-            && best.dp_dv < 0.0
+        if best_err <= p_cap
+            || !best.volume.is_finite()
+            || best.volume <= 0.0
+            || !best.pressure.is_finite()
+            || best.dp_drho <= 0.0
+            || !best.dp_dv.is_finite()
+            || best.dp_dv >= 0.0
         {
-            let dv_est = (best.pressure - pressure_target) / best.dp_dv;
-            if dv_est.is_finite() && dv_est.abs() <= 1.0e-8 * best.volume {
-                let v_lo = (conv_eta / orig_zeta_max).max(f64::MIN_POSITIVE);
-                let v_hi = {
-                    let hi = conv_eta / orig_zeta_min;
-                    if hi.is_finite() && hi > v_lo {
-                        hi
-                    } else {
-                        f64::MAX
-                    }
-                };
-                if v_lo < v_hi {
-                    let early_stop = 1.0e-7 * pressure_target;
-                    let v_anchor = best.volume;
-                    let v_pred = (v_anchor - dv_est).clamp(v_lo, v_hi);
-                    let scan_around = |center: f64,
-                                       radius: usize,
-                                       best: &mut VolumeAttempt,
-                                       best_err: &mut f64|
-                     -> Result<()> {
-                        let mut try_volume = |cand_v: f64| -> Result<bool> {
-                            if cand_v < v_lo || cand_v > v_hi || !(1.0 / cand_v).is_finite() {
-                                return Ok(*best_err <= early_stop);
-                            }
-                            let cand_jet = self.pressure_and_derivatives(1.0 / cand_v)?;
-                            if cand_jet.pressure.is_finite() && cand_jet.dp_drho > 0.0 {
-                                let err = (cand_jet.pressure - pressure_target).abs();
-                                if err < *best_err {
-                                    *best_err = err;
-                                    *best = VolumeAttempt {
-                                        volume: cand_v,
-                                        pressure: cand_jet.pressure,
-                                        dp_dv: cand_jet.dp_dv,
-                                        dp_drho: cand_jet.dp_drho,
-                                        closed: false,
-                                    };
-                                }
-                            }
-                            Ok(*best_err <= early_stop)
-                        };
-                        let c = center.clamp(v_lo, v_hi);
-                        if try_volume(c)? {
-                            return Ok(());
-                        }
-                        let mut v_up = c;
-                        let mut v_dn = c;
-                        for _ in 0..radius {
-                            let next_u = v_up.next_up();
-                            if next_u <= v_hi && next_u > v_up {
-                                v_up = next_u;
-                                if try_volume(v_up)? {
-                                    break;
-                                }
-                            }
-                            let next_d = v_dn.next_down();
-                            if next_d >= v_lo && next_d < v_dn {
-                                v_dn = next_d;
-                                if try_volume(v_dn)? {
-                                    break;
-                                }
-                            }
-                        }
-                        Ok(())
-                    };
+            best.closed = best.volume.is_finite()
+                && best.volume > 0.0
+                && best.pressure.is_finite()
+                && best.dp_drho > 0.0
+                && best_err <= p_cap;
+            return Ok(best);
+        }
 
-                    scan_around(v_pred, 256, &mut best, &mut best_err)?;
-                    if best_err > p_cap
-                        && (v_pred - v_anchor).abs() > 256.0 * MACHINE_PREC * v_anchor
-                    {
-                        scan_around(v_anchor, 128, &mut best, &mut best_err)?;
+        let dv_est = (best.pressure - pressure_target) / best.dp_dv;
+        if !dv_est.is_finite() || dv_est.abs() > 1.0e-8 * best.volume {
+            return Ok(best);
+        }
+
+        let conv_eta = self.conv_eta;
+        let v_lo = (conv_eta / orig_zeta_max).max(f64::MIN_POSITIVE);
+        let v_hi = {
+            let hi = conv_eta / orig_zeta_min;
+            if hi.is_finite() && hi > v_lo {
+                hi
+            } else {
+                f64::MAX
+            }
+        };
+        if v_lo >= v_hi {
+            return Ok(best);
+        }
+
+        let ulp_v = (best.volume.next_up() - best.volume)
+            .abs()
+            .max(f64::MIN_POSITIVE);
+        let dp_ulp = best.dp_dv.abs() * ulp_v;
+        // Bound the scan radius by local pressure spacing: when 1 ULP already jumps
+        // by > 64x the allowed tolerance (e.g. H2O 300 K 0.001 Pa or NH3 100 K 0.01 Pa),
+        // only inspect the immediate +-6 ULP crossing bracket (<= 14 evaluations).
+        // When 1 ULP is <= 64x p_cap, allow a bounded +-12..24 ULP window with a wider
+        // away_cutoff so non-monotone multi-segment chain jitter (e.g. NC20 near
+        // 302-325 K) does not terminate prematurely or fail round-trip recovery.
+        let (radius, away_cutoff): (usize, f64) = if dp_ulp > 64.0 * p_cap {
+            (6, (4.0 * dp_ulp).max(4.0 * p_cap))
+        } else {
+            let est_ulps = (dv_est.abs() / ulp_v).ceil().min(16.0) as usize;
+            (
+                (est_ulps + 8).clamp(12, 24),
+                (16.0 * dp_ulp).max(16.0 * p_cap),
+            )
+        };
+
+        let mut v_center = (best.volume - dv_est).clamp(v_lo, v_hi);
+        let mut evals = best.recovery_evals;
+        let mut seen_above = best.pressure > pressure_target;
+        let mut seen_below = best.pressure < pressure_target;
+
+        let eval_cand = |cand_v: f64,
+                         best: &mut VolumeAttempt,
+                         best_err: &mut f64,
+                         seen_above: &mut bool,
+                         seen_below: &mut bool,
+                         evals: &mut usize|
+         -> Result<Option<f64>> {
+            if cand_v < v_lo || cand_v > v_hi || !(1.0 / cand_v).is_finite() {
+                return Ok(None);
+            }
+            *evals += 1;
+            let cand_jet = self.pressure_and_derivatives(1.0 / cand_v)?;
+            if !cand_jet.pressure.is_finite() || cand_jet.dp_drho <= 0.0 {
+                return Ok(None);
+            }
+            let diff = cand_jet.pressure - pressure_target;
+            if diff > 0.0 {
+                *seen_above = true;
+            } else if diff < 0.0 {
+                *seen_below = true;
+            }
+            let err = diff.abs();
+            if err < *best_err {
+                *best_err = err;
+                *best = VolumeAttempt {
+                    volume: cand_v,
+                    pressure: cand_jet.pressure,
+                    dp_dv: cand_jet.dp_dv,
+                    dp_drho: cand_jet.dp_drho,
+                    closed: false,
+                    recovery_evals: *evals,
+                };
+            }
+            Ok(Some(diff))
+        };
+
+        if let Some(diff0) = eval_cand(
+            v_center,
+            &mut best,
+            &mut best_err,
+            &mut seen_above,
+            &mut seen_below,
+            &mut evals,
+        )? && best_err > p_cap
+            && diff0.abs() > 4.0 * dp_ulp
+        {
+            // One cheap linear re-centering step when the initial prediction still
+            // sits more than 4 ULPs from the crossing; only adopt the refined center
+            // if it strictly reduces |P - P_target| so ULP jitter cannot push the
+            // scan center away from the crossing.
+            let step = diff0 / best.dp_dv;
+            if step.is_finite() && step.abs() <= 1.0e-8 * v_center {
+                let v_refined = (v_center - step).clamp(v_lo, v_hi);
+                if v_refined != v_center
+                    && let Some(diff1) = eval_cand(
+                        v_refined,
+                        &mut best,
+                        &mut best_err,
+                        &mut seen_above,
+                        &mut seen_below,
+                        &mut evals,
+                    )?
+                    && diff1.abs() < diff0.abs()
+                {
+                    v_center = v_refined;
+                }
+            }
+        }
+
+        if best_err > p_cap {
+            let mut v_up = v_center;
+            let mut v_dn = v_center;
+            let mut up_active = true;
+            let mut dn_active = true;
+            for _ in 0..radius {
+                if best_err <= p_cap || (!up_active && !dn_active) {
+                    break;
+                }
+                if up_active {
+                    let next_u = v_up.next_up();
+                    if next_u <= v_hi && next_u > v_up {
+                        v_up = next_u;
+                        if let Some(diff) = eval_cand(
+                            v_up,
+                            &mut best,
+                            &mut best_err,
+                            &mut seen_above,
+                            &mut seen_below,
+                            &mut evals,
+                        )? {
+                            if best_err <= p_cap {
+                                break;
+                            }
+                            // Since dP/dv < 0, increasing v lowers P; once past target
+                            // (diff < 0) and far below target on a bracketed crossing, stop up.
+                            if seen_above && seen_below && diff < -away_cutoff {
+                                up_active = false;
+                            }
+                        }
+                    } else {
+                        up_active = false;
+                    }
+                }
+                if dn_active {
+                    let next_d = v_dn.next_down();
+                    if next_d >= v_lo && next_d < v_dn {
+                        v_dn = next_d;
+                        if let Some(diff) = eval_cand(
+                            v_dn,
+                            &mut best,
+                            &mut best_err,
+                            &mut seen_above,
+                            &mut seen_below,
+                            &mut evals,
+                        )? {
+                            if best_err <= p_cap {
+                                break;
+                            }
+                            // Since dP/dv < 0, decreasing v raises P; once past target
+                            // (diff > 0) and far above target on a bracketed crossing, stop down.
+                            if seen_above && seen_below && diff > away_cutoff {
+                                dn_active = false;
+                            }
+                        }
+                    } else {
+                        dn_active = false;
                     }
                 }
             }
         }
 
+        best.recovery_evals = evals;
         best.closed = best.volume.is_finite()
             && best.volume > 0.0
             && best.pressure.is_finite()
@@ -2904,7 +3101,28 @@ impl<'a> PreparedSaftVrMie<'a> {
         }))
     }
 
-    /// Pure-fluid saturation pressure at temperature T.
+    /// Pure-fluid saturation pressure at temperature `T`.
+    ///
+    /// # Closure and Gibbs-Equality Contract
+    ///
+    /// - **Ordinary convergence**: solves common-pressure dimensionless Gibbs
+    ///   equality `|Delta G / (R T)| < 1e-13` (or `< 1e-10` on a converged
+    ///   pressure bracket) and certifies that both liquid and vapor states are
+    ///   mechanically stable (`dP/drho > 0`, `v_l < v_v`) and reevaluate within
+    ///   `<= 1e-6 * P_sat`.
+    /// - **Snapped cold-liquid branch**: on stiff low-pressure liquids where a
+    ///   single `f64` ULP of liquid volume changes pressure by more than
+    ///   `1e-6 * P_sat`, no representable liquid volume may fall within
+    ///   `1e-6` of the exact Gibbs-equal pressure `p_eq`. When the nearest
+    ///   representable stable liquid root still satisfies
+    ///   `|P_l - p_eq| <= 5e-6 * p_eq`, this method replaces the reported
+    ///   coexistence pressure with `P_l`, re-solves the vapor root at `P_l`,
+    ///   and certifies `|P_l - p| <= 1e-6 * p`, `|P_v - p| <= 1e-6 * p`, and
+    ///   common-pressure Gibbs residual `|Delta G / (R T)| <= 5e-6`.
+    /// - **Rejection**: returns distinct `Error::NotConverged` diagnostics for
+    ///   supercritical isotherms, subcritical isotherms whose liquid branch
+    ///   exhausts the packing cap (`eta = 0.72`), and cold states whose nearest
+    ///   liquid root cannot satisfy the pressure and Gibbs closure caps.
     pub fn saturation_pressure(&self, temperature: f64) -> Result<SaftVrMieSaturation> {
         if self.model.num_components() != 1 {
             return Err(Error::Unsupported(
@@ -2936,17 +3154,20 @@ impl<'a> PreparedSaftVrMie<'a> {
         let max_iter = 60;
 
         for _ in 0..max_iter {
-            let (vl, vv) = if let Some(sp) = spinodals {
+            let (vl_attempt, vl, vv) = if let Some(sp) = spinodals {
                 let zeta_ideal = prep.conv_eta * p / (RGAS * temperature);
                 let zeta_min_v = (1.0e-10_f64)
                     .min(0.1 * zeta_ideal)
                     .max(1.0e-140)
                     .min(0.5 * sp.eta_v);
+                // Defer ULP pressure recovery until convergence: bounded liquid candidates
+                // evaluate imposed_pressure_gibbs_diff to second-order accuracy (~1e-15).
                 let vl_att = prep.solve_volume_in_zeta_bracket(
                     p,
                     sp.eta_l,
                     sp.eta_l_max,
                     0.5 * (sp.eta_l + sp.eta_l_max),
+                    false,
                 )?;
                 let vl_bounded = vl_att.closed
                     || (vl_att.volume.is_finite()
@@ -2968,12 +3189,12 @@ impl<'a> PreparedSaftVrMie<'a> {
                     0.5 * (zeta_min_v + sp.eta_v)
                 };
                 let vv = prep.volume_in_zeta_bracket(p, zeta_min_v, sp.eta_v, zeta_v_init)?;
-                (vl_att.volume, vv)
+                (Some(vl_att), vl_att.volume, vv)
             } else {
                 let vl_res = prep.volume(p, Phase::Liquid);
                 let vv_res = prep.volume(p, Phase::Vapor);
                 match (vl_res, vv_res) {
-                    (Ok(vl), Ok(vv)) if vv > vl && (vv - vl) > 1e-10 * vl => (vl, vv),
+                    (Ok(vl), Ok(vv)) if vv > vl && (vv - vl) > 1e-10 * vl => (None, vl, vv),
                     _ => {
                         // Switch to exact mechanical spinodal bounds so near-critical
                         // coexistence is preserved, supercritical isotherms are rejected,
@@ -3025,6 +3246,14 @@ impl<'a> PreparedSaftVrMie<'a> {
             let bracket_tight =
                 matches!((p_lo, p_hi), (Some(lo), Some(hi)) if (hi - lo) <= 1e-13 * hi);
             if (dg.abs() < 1e-13 && d_ln_p.abs() < 1e-12) || (bracket_tight && dg.abs() < 1e-10) {
+                let vl = if let (Some(sp), Some(att)) = (spinodals, vl_attempt)
+                    && !att.closed
+                {
+                    prep.recover_volume_ulps(p, sp.eta_l, sp.eta_l_max, att)?
+                        .volume
+                } else {
+                    vl
+                };
                 let state_l = prep.state(1.0 / vl)?;
                 let state_v = prep.state(1.0 / vv)?;
                 let p_closed = state_l.pressure.is_finite()
@@ -3132,6 +3361,7 @@ struct VolumeAttempt {
     dp_dv: f64,
     dp_drho: f64,
     closed: bool,
+    recovery_evals: usize,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -3503,4 +3733,104 @@ pub(crate) fn alpha_coefficients(alpha: f64) -> [f64; 6] {
         f_alpha[k] = num / den;
     }
     f_alpha
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn recovery_eval_count_is_strictly_bounded_on_rejected_minimum_gibbs_and_recovered_cases() {
+        // 1. Rejected stiff dense liquids must bound ULP recovery to <= 16 evaluations.
+        let h2o = SaftVrMie::new(&["H2O"]).unwrap();
+        let prep_w = h2o.prepare(300.0, &[1.0]).unwrap();
+        let att_w = prep_w
+            .solve_single_phase_attempt(0.001, Phase::Liquid, true)
+            .unwrap();
+        assert!(!att_w.closed);
+        assert!(
+            att_w.recovery_evals <= 16,
+            "H2O 300 K 0.001 Pa Liquid recovery evals = {} (> 16)",
+            att_w.recovery_evals
+        );
+
+        let nh3 = SaftVrMie::new(&["NH3"]).unwrap();
+        let prep_n100 = nh3.prepare(100.0, &[1.0]).unwrap();
+        let att_n100 = prep_n100
+            .solve_single_phase_attempt(0.01, Phase::Liquid, true)
+            .unwrap();
+        assert!(!att_n100.closed);
+        assert!(
+            att_n100.recovery_evals <= 16,
+            "NH3 100 K 0.01 Pa Liquid recovery evals = {} (> 16)",
+            att_n100.recovery_evals
+        );
+
+        // 2. MinimumGibbs at low pressure where vapor clearly wins must pay 0 liquid
+        // recovery evaluations and return the pressure-closed vapor root.
+        let (v_min, liq_rec_evals) = prep_w.solve_minimum_gibbs(0.001).unwrap();
+        assert_eq!(
+            liq_rec_evals, 0,
+            "H2O 300 K 0.001 Pa MinimumGibbs should not run liquid recovery before vapor wins"
+        );
+        let j_min = prep_w.pressure_and_derivatives(1.0 / v_min).unwrap();
+        assert!((j_min.pressure - 0.001).abs() <= 1.0e-6 * 0.001);
+
+        // 3. Successful steep liquid recovery (NH3 130 K at P = 2.20945469250487 Pa)
+        // must close within 1e-6 using a small bounded evaluation count.
+        let prep_n130 = nh3.prepare(130.0, &[1.0]).unwrap();
+        let p_130 = 2.20945469250487_f64;
+        let att_n130 = prep_n130
+            .solve_single_phase_attempt(p_130, Phase::Liquid, true)
+            .unwrap();
+        assert!(att_n130.closed);
+        assert!((att_n130.pressure - p_130).abs() <= 1.0e-6 * p_130);
+        assert!(
+            att_n130.recovery_evals <= 50,
+            "NH3 130 K Liquid recovery evals = {} (> 50)",
+            att_n130.recovery_evals
+        );
+    }
+
+    #[test]
+    fn assoc_dufal_fast_path_matches_high_precision_reference() {
+        type DufalCase = (&'static [&'static str], f64, &'static [f64], f64, f64);
+        let cases: &[DufalCase] = &[
+            // Routine vapor and moderate/high-density states
+            (&["H2O"], 300.0, &[1.0], 4.0e-7, 1e-13),
+            (&["H2O"], 300.0, &[1.0], 55_500.0, 1e-13),
+            (&["NH3"], 320.0, &[1.0], 30_000.0, 1e-13),
+            (&["H2O", "MEOH"], 370.0, &[0.4, 0.6], 14_000.0, 1e-13),
+            // Cancellation-sensitive cold dense liquid states
+            (&["NH3"], 120.0, &[1.0], 1.0 / 2.140022878775016e-5, 1e-14),
+            (&["NH3"], 130.0, &[1.0], 1.0 / 2.163165264149184e-5, 1e-14),
+        ];
+        for &(comps, t, x, rho, rtol) in cases {
+            let eos = SaftVrMie::new(comps).unwrap();
+            let prep = eos.prepare(t, x).unwrap();
+            let rdf = MieRdf::new(&prep, rho);
+            for i in 0..comps.len() {
+                for j in i..comps.len() {
+                    let fast0 = rdf.integral::<0>(i, j);
+                    let ref0 = rdf.integral_high_precision::<0>(i, j);
+                    assert!(
+                        (fast0[0] - ref0[0]).abs() <= 1e-15 + rtol * ref0[0].abs(),
+                        "{comps:?} T={t} rho={rho} ({i},{j}) ORDER=0: {} vs {}",
+                        fast0[0],
+                        ref0[0]
+                    );
+                    let fast2 = rdf.integral::<2>(i, j);
+                    let ref2 = rdf.integral_high_precision::<2>(i, j);
+                    for k in 0..6 {
+                        assert!(
+                            (fast2[k] - ref2[k]).abs() <= 1e-14 + rtol * ref2[k].abs(),
+                            "{comps:?} T={t} rho={rho} ({i},{j}) ORDER=2 slot {k}: {} vs {}",
+                            fast2[k],
+                            ref2[k]
+                        );
+                    }
+                }
+            }
+        }
+    }
 }

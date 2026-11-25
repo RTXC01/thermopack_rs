@@ -1,5 +1,6 @@
 //! Directional evaluation of the non-associating residual terms.
 //! All extensive coordinates are seeded at unit total moles before scaling.
+use super::dd::{Dd, PI_NA_DIV6_DD};
 use super::*;
 use std::ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign};
 
@@ -258,8 +259,21 @@ pub(super) trait Scalar:
     + Mul<Output = Self>
     + Div<Output = Self>
 {
+    const HIGH_PRECISION: bool = false;
     fn real(v: f64) -> Self;
     fn seed(v: f64, d1: bool, d2: bool) -> Self;
+    #[inline(always)]
+    fn seed_inv(rho: f64, d1: bool, d2: bool) -> Self {
+        Self::seed(1.0 / rho, d1, d2)
+    }
+    #[inline(always)]
+    fn mul_pi_na_div6(self) -> Self {
+        self.mul_f(PI * N_A / 6.0)
+    }
+    #[inline(always)]
+    fn real_tanh(x: f64) -> Self {
+        Self::real(x.tanh())
+    }
     fn val(self) -> f64;
     fn add_f(self, rhs: f64) -> Self;
     fn mul_f(self, rhs: f64) -> Self;
@@ -553,6 +567,206 @@ impl Scalar for Dual2 {
     }
 }
 
+/// First-order double-double dual number for cancellation-sensitive pressure evaluation.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct Dual1Dd {
+    pub f0: Dd,
+    pub f1: Dd,
+}
+
+impl Add for Dual1Dd {
+    type Output = Self;
+    #[inline(always)]
+    fn add(self, rhs: Self) -> Self {
+        Self {
+            f0: self.f0.add(rhs.f0),
+            f1: self.f1.add(rhs.f1),
+        }
+    }
+}
+
+impl AddAssign for Dual1Dd {
+    #[inline(always)]
+    fn add_assign(&mut self, rhs: Self) {
+        self.f0 = self.f0.add(rhs.f0);
+        self.f1 = self.f1.add(rhs.f1);
+    }
+}
+
+impl Sub for Dual1Dd {
+    type Output = Self;
+    #[inline(always)]
+    fn sub(self, rhs: Self) -> Self {
+        Self {
+            f0: self.f0.sub(rhs.f0),
+            f1: self.f1.sub(rhs.f1),
+        }
+    }
+}
+
+impl SubAssign for Dual1Dd {
+    #[inline(always)]
+    fn sub_assign(&mut self, rhs: Self) {
+        self.f0 = self.f0.sub(rhs.f0);
+        self.f1 = self.f1.sub(rhs.f1);
+    }
+}
+
+impl Neg for Dual1Dd {
+    type Output = Self;
+    #[inline(always)]
+    fn neg(self) -> Self {
+        Self {
+            f0: self.f0.neg(),
+            f1: self.f1.neg(),
+        }
+    }
+}
+
+impl Mul for Dual1Dd {
+    type Output = Self;
+    #[inline(always)]
+    fn mul(self, rhs: Self) -> Self {
+        Self {
+            f0: self.f0.mul(rhs.f0),
+            f1: self.f0.mul(rhs.f1).add(self.f1.mul(rhs.f0)),
+        }
+    }
+}
+
+impl Div for Dual1Dd {
+    type Output = Self;
+    #[inline(always)]
+    fn div(self, rhs: Self) -> Self {
+        let inv = Dd::ONE.div(rhs.f0);
+        let q = self.f0.mul(inv);
+        Self {
+            f0: q,
+            f1: self.f1.sub(q.mul(rhs.f1)).mul(inv),
+        }
+    }
+}
+
+impl Scalar for Dual1Dd {
+    const HIGH_PRECISION: bool = true;
+    #[inline(always)]
+    fn real(v: f64) -> Self {
+        Self {
+            f0: Dd::from_f64(v),
+            f1: Dd::ZERO,
+        }
+    }
+    #[inline(always)]
+    fn seed(v: f64, d1: bool, _d2: bool) -> Self {
+        Self {
+            f0: Dd::from_f64(v),
+            f1: if d1 { Dd::ONE } else { Dd::ZERO },
+        }
+    }
+    #[inline(always)]
+    fn seed_inv(rho: f64, d1: bool, _d2: bool) -> Self {
+        Self {
+            f0: Dd::ONE.div(Dd::from_f64(rho)),
+            f1: if d1 { Dd::ONE } else { Dd::ZERO },
+        }
+    }
+    #[inline(always)]
+    fn mul_pi_na_div6(self) -> Self {
+        Self {
+            f0: self.f0.mul(PI_NA_DIV6_DD),
+            f1: self.f1.mul(PI_NA_DIV6_DD),
+        }
+    }
+    #[inline(always)]
+    fn real_tanh(x: f64) -> Self {
+        Self {
+            f0: Dd::from_f64(x).tanh(),
+            f1: Dd::ZERO,
+        }
+    }
+    #[inline(always)]
+    fn val(self) -> f64 {
+        self.f0.0
+    }
+    #[inline(always)]
+    fn add_f(self, rhs: f64) -> Self {
+        Self {
+            f0: self.f0.add_f64(rhs),
+            f1: self.f1,
+        }
+    }
+    #[inline(always)]
+    fn mul_f(self, rhs: f64) -> Self {
+        Self {
+            f0: self.f0.mul_f64(rhs),
+            f1: self.f1.mul_f64(rhs),
+        }
+    }
+    #[inline(always)]
+    fn sub_from_f(lhs: f64, rhs: Self) -> Self {
+        Self {
+            f0: Dd::from_f64(lhs).sub(rhs.f0),
+            f1: rhs.f1.neg(),
+        }
+    }
+    #[inline(always)]
+    fn div_from_f(lhs: f64, rhs: Self) -> Self {
+        let inv = Dd::ONE.div(rhs.f0);
+        let q = inv.mul_f64(lhs);
+        Self {
+            f0: q,
+            f1: q.mul(rhs.f1).mul(inv).neg(),
+        }
+    }
+    #[inline(always)]
+    fn pow2(self) -> Self {
+        self * self
+    }
+    #[inline(always)]
+    fn pow3(self) -> Self {
+        self * self * self
+    }
+    #[inline(always)]
+    fn pow4(self) -> Self {
+        let s2 = self * self;
+        s2 * s2
+    }
+    #[inline(always)]
+    fn pow7(self) -> Self {
+        let s2 = self * self;
+        let s4 = s2 * s2;
+        s4 * s2 * self
+    }
+    #[inline(always)]
+    fn pow_real(self, exp: f64) -> Self {
+        let p0 = self.f0.pow_real(exp);
+        let d1 = if self.f0.0 != 0.0 {
+            p0.mul_f64(exp).div(self.f0)
+        } else {
+            Dd::ZERO
+        };
+        Self {
+            f0: p0,
+            f1: self.f1.mul(d1),
+        }
+    }
+    #[inline(always)]
+    fn exp(self) -> Self {
+        let v = self.f0.exp();
+        Self {
+            f0: v,
+            f1: v.mul(self.f1),
+        }
+    }
+    #[inline(always)]
+    fn ln(self) -> Self {
+        Self {
+            f0: self.f0.ln(),
+            f1: self.f1.div(self.f0),
+        }
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum EvalMode {
     Total,
@@ -593,6 +807,14 @@ impl PreparedSaftVrMie<'_> {
         self.kernel_typed::<Dual2>(rho_value, Some(dir1), Some(dir2), mode)
     }
 
+    #[inline(never)]
+    pub(super) fn eval_first_v_dd(&self, rho_value: f64) -> Result<Dd> {
+        Ok(self
+            .kernel_typed::<Dual1Dd>(rho_value, Some(1), None, EvalMode::Total)?
+            .total
+            .f1)
+    }
+
     fn kernel_typed<T: Scalar>(
         &self,
         rho_value: f64,
@@ -604,7 +826,7 @@ impl PreparedSaftVrMie<'_> {
         let seed = |value, index| T::seed(value, dir1 == Some(index), dir2 == Some(index));
         let zero = T::real(0.0);
         let t = seed(self.temperature, 0);
-        let v = seed(1.0 / rho_value, 1);
+        let v = T::seed_inv(rho_value, dir1 == Some(1), dir2 == Some(1));
 
         let has_mole_dir = dir1.is_some_and(|d| d >= 2) || dir2.is_some_and(|d| d >= 2);
         let mut x_buf = SmallBuf::from_elem(zero, nc);
@@ -667,9 +889,9 @@ impl PreparedSaftVrMie<'_> {
         let single = self.model.reference == HardSphereReference::SingleComponent;
         let options = self.model.options;
         let terms_cfg = self.model.terms;
-        let packing_prefactor = (rho * segments).mul_f(PI * N_A / 6.0);
+        let packing_prefactor = (rho * segments).mul_pi_na_div6();
 
-        let (eta, zeta_bar, mean_d) = if !has_temp_dir && !has_mole_dir {
+        let (eta, zeta_bar, mean_d) = if !has_temp_dir && !has_mole_dir && !T::HIGH_PRECISION {
             let eta = rho.mul_f(self.conv_eta);
             let zeta_bar = rho.mul_f(self.conv_zeta);
             let mean_d = if single {
@@ -1068,8 +1290,9 @@ impl PreparedSaftVrMie<'_> {
                         .mul_f(c_fac2 / (12.0 * eps));
 
                         let theta = beta.mul_f(eps).exp().add_f(-1.0);
-                        let tanh_factor = 10.0 * (1.0 - (10.0 * (0.57 - alpha)).tanh());
-                        let gam_c = (theta * zeta_bar * gam_exp).mul_f(tanh_factor);
+                        let tanh_factor =
+                            T::sub_from_f(1.0, T::real_tanh(10.0 * (0.57 - alpha))).mul_f(10.0);
+                        let gam_c = theta * zeta_bar * gam_exp * tanh_factor;
                         gam_c.add_f(1.0) * (g21 + g22)
                     } else {
                         zero

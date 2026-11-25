@@ -1854,12 +1854,11 @@ fn test_saft_vrmie_steep_liquid_ulp_recovery_nh3() {
 
 #[test]
 fn test_saft_vrmie_fixed_pressure_nh3_120k_quantization_and_representable_targets() {
-    // Independently probe fixed-pressure liquid requests at NH3 120 K beyond saturation
-    // round-trips. At T = 120 K, |dP/dv| * ulp(v_l) ~= 1.181e-6 Pa, which is wider than
-    // the full +-1e-6 * P window around 0.2758..0.305 Pa (5.5e-7..6.1e-7 Pa).
-    // For each explicit target, scan the exact local representable f64 volume neighborhood
-    // and assert that volume(P, Liquid) returns Ok (within 1e-6 relative) iff a
-    // representable stable root exists in tolerance, and Err otherwise.
+    // Independently qualify NH3 120 K fixed-pressure liquid closure beyond saturation
+    // round-trips. At T = 120 K, |dP/dv| * ulp(v_l) ~= 1.181e-6 Pa (~1.162e-6 Pa per
+    // 1.0/v density ULP), while the cancellation-gated 106-bit double-double pressure
+    // evaluator eliminates multi-term f64 jitter and CRT pow/exp drift so P(1/v) is
+    // strictly monotone across adjacent representable volumes.
     let nh3 = SaftVrMie::new(&["NH3"]).unwrap();
     let prep = nh3.prepare(120.0, &[1.0]).unwrap();
     let v_anchor = 2.140022878775016e-5_f64;
@@ -1871,71 +1870,190 @@ fn test_saft_vrmie_fixed_pressure_nh3_120k_quantization_and_representable_target
         "unexpected NH3 120 K 1-ULP pressure spacing: {dp_ulp:.6e}"
     );
 
-    for &target in &[0.305_f64, 0.275800421086915_f64] {
-        // Locate the exact volume center via Newton on smooth P(1/v) = target.
-        let mut vc = v_anchor;
-        for _ in 0..8 {
-            let j = prep.pressure_and_derivatives(1.0 / vc).unwrap();
-            let step = (j.pressure - target) / j.dp_dv;
-            vc -= step;
-            if step.abs() <= ulp_v {
-                break;
-            }
-        }
-        // Scan +-128 representable f64 volumes around the smooth crossing.
-        let mut v_lo = vc;
-        for _ in 0..128 {
-            v_lo = v_lo.next_down();
-        }
-        let mut v_cur = v_lo;
-        let mut best_rel = f64::INFINITY;
-        let mut closing_count = 0usize;
-        for _ in 0..=256 {
-            let j = prep.pressure_and_derivatives(1.0 / v_cur).unwrap();
-            if j.pressure.is_finite() && j.dp_drho > 0.0 {
-                let rel = (j.pressure - target).abs() / target;
-                if rel < best_rel {
-                    best_rel = rel;
-                }
-                if rel <= 1.0e-6 {
-                    closing_count += 1;
-                }
-            }
-            v_cur = v_cur.next_up();
-        }
-        match prep.volume(target, Phase::Liquid) {
-            Ok(v) => {
-                assert!(
-                    closing_count > 0,
-                    "NH3 120 K P={target} returned Ok({v}) when no representable root closed (best_rel={best_rel:.3e})"
-                );
-                let j = prep.pressure_and_derivatives(1.0 / v).unwrap();
-                assert!(j.dp_drho > 0.0);
-                assert!(
-                    (j.pressure - target).abs() <= 1.0e-6 * target,
-                    "NH3 120 K P={target} returned unclosed pressure {}",
-                    j.pressure
-                );
-            }
-            Err(_) => {
-                assert_eq!(
-                    closing_count, 0,
-                    "NH3 120 K P={target} returned Err despite {closing_count} closing representable roots (best_rel={best_rel:.3e})"
-                );
-            }
-        }
+    // 1. Verify strict monotonicity (zero inversions) and exact slope-matched reciprocal-
+    // density stepping across +-64 ULPs (zero multi-ULP cancellation jitter).
+    let mut v_scan = v_anchor;
+    for _ in 0..64 {
+        v_scan = v_scan.next_down();
+    }
+    let mut prev_v = v_scan;
+    let mut prev_p = prep
+        .pressure_and_derivatives(1.0 / prev_v)
+        .unwrap()
+        .pressure;
+    for _ in 0..128 {
+        v_scan = v_scan.next_up();
+        let j = prep.pressure_and_derivatives(1.0 / v_scan).unwrap();
+        assert!(j.dp_drho > 0.0);
+        assert!(
+            j.pressure < prev_p,
+            "NH3 120 K dense liquid P(1/v) must decrease monotonically with v: prev={prev_p:.12e}, cur={:.12e}",
+            j.pressure
+        );
+        let jump = prev_p - j.pressure;
+        let expected_jump = j.dp_drho * (1.0 / prev_v - 1.0 / v_scan);
+        assert!(
+            (jump - expected_jump).abs() <= 1.0e-4 * dp_ulp,
+            "NH3 120 K adjacent ULP jump {jump:.6e} deviated from exact reciprocal-density step {expected_jump:.6e}"
+        );
+        prev_v = v_scan;
+        prev_p = j.pressure;
     }
 
-    // Representable fixed-pressure targets where 2 * 1e-6 * P > dp_ulp (~1.18e-6 Pa)
-    // must unconditionally converge on every CRT and close strictly within 1e-6.
-    for &p_rep in &[2.0_f64, 5.0, 100.0] {
-        let vl = prep.volume(p_rep, Phase::Liquid).unwrap();
+    // 2. Fixed targets with verified representable roots under the production f64
+    // model constants + 106-bit pressure evaluator (0.275800421086915 Pa, 0.65 Pa,
+    // and >= 2 Pa where 2e-6 * P > dp_ulp) must close unconditionally within 1e-6
+    // across all CRTs and debug/release builds.
+    for &p_rep in &[0.275800421086915_f64, 0.65, 2.0, 5.0, 100.0] {
+        let vl = prep.volume(p_rep, Phase::Liquid).unwrap_or_else(|e| {
+            panic!("NH3 120 K fixed P={p_rep} failed unexpectedly: {e}");
+        });
         let j = prep.pressure_and_derivatives(1.0 / vl).unwrap();
         assert!(j.dp_drho > 0.0);
         assert!(
             (j.pressure - p_rep).abs() <= 1.0e-6 * p_rep,
-            "NH3 120 K fixed P={p_rep} pressure miss: {}",
+            "NH3 120 K fixed P={p_rep} pressure miss: {} (rel={:.3e})",
+            j.pressure,
+            (j.pressure - p_rep).abs() / p_rep
+        );
+    }
+    // 0.65 Pa lies above P_sat (~0.2758 Pa), so MinimumGibbs must also return the closed liquid root.
+    let v_min_065 = prep.volume(0.65, Phase::MinimumGibbs).unwrap();
+    let j_min_065 = prep.pressure_and_derivatives(1.0 / v_min_065).unwrap();
+    assert!(j_min_065.dp_drho > 0.0 && v_min_065 < 1.0e-4);
+    assert!((j_min_065.pressure - 0.65).abs() <= 1.0e-6 * 0.65);
+
+    // 3. For 0.305 Pa (where 2e-6 * P = 6.10e-7 Pa < 1.162e-6 Pa per reciprocal-density
+    // ULP), verify the exact local representable bracket and confirm volume() agrees with
+    // whether a representable root exists within 1e-6 under the noise-free evaluator.
+    let target = 0.305_f64;
+    let mut vc = v_anchor;
+    for _ in 0..8 {
+        let j = prep.pressure_and_derivatives(1.0 / vc).unwrap();
+        let step = (j.pressure - target) / j.dp_dv;
+        vc -= step;
+        if step.abs() <= ulp_v {
+            break;
+        }
+    }
+    let mut v_lo = vc;
+    for _ in 0..16 {
+        v_lo = v_lo.next_down();
+    }
+    let mut v_cur = v_lo;
+    let mut closing_count = 0usize;
+    let mut best_rel = f64::INFINITY;
+    for _ in 0..=32 {
+        let j = prep.pressure_and_derivatives(1.0 / v_cur).unwrap();
+        if j.pressure.is_finite() && j.dp_drho > 0.0 {
+            let rel = (j.pressure - target).abs() / target;
+            best_rel = best_rel.min(rel);
+            if rel <= 1.0e-6 {
+                closing_count += 1;
+            }
+        }
+        v_cur = v_cur.next_up();
+    }
+    match prep.volume(target, Phase::Liquid) {
+        Ok(v) => {
+            assert!(closing_count > 0);
+            let j = prep.pressure_and_derivatives(1.0 / v).unwrap();
+            assert!(j.dp_drho > 0.0 && (j.pressure - target).abs() <= 1.0e-6 * target);
+        }
+        Err(_) => {
+            assert_eq!(
+                closing_count, 0,
+                "NH3 120 K P={target} returned Err despite {closing_count} closing roots (best_rel={best_rel:.3e})"
+            );
+        }
+    }
+}
+
+#[test]
+fn test_saft_vrmie_nc20_dense_liquid_recovery_and_round_trip() {
+    // Regression for NC20 dense cold-liquid fixed-pressure recovery and saturation
+    // round-trips (302.5 K, 315.5 K, 328.5 K).
+    let eos = SaftVrMie::new(&["NC20"]).unwrap();
+
+    // 1. At 302.5 K around v = 3.58908447398568185e-4 m^3/mol, P(1/v) must be monotone
+    // (non-increasing with v; adjacent volumes that map to the same f64 1/v stay equal),
+    // and prep.volume(j.pressure, Liquid) must recover the strict <= 1e-6 root.
+    let prep302 = eos.prepare(302.5, &[1.0]).unwrap();
+    let v_ref = 3.589_084_473_985_682e-4_f64;
+    let j_ref = prep302.pressure_and_derivatives(1.0 / v_ref).unwrap();
+    assert!(j_ref.dp_drho > 0.0 && j_ref.pressure > 0.0);
+    let mut v_cur = v_ref;
+    for _ in 0..20 {
+        v_cur = v_cur.next_down();
+    }
+    let mut prev_p = prep302
+        .pressure_and_derivatives(1.0 / v_cur)
+        .unwrap()
+        .pressure;
+    for _ in 0..40 {
+        v_cur = v_cur.next_up();
+        let j = prep302.pressure_and_derivatives(1.0 / v_cur).unwrap();
+        assert!(
+            j.pressure <= prev_p,
+            "NC20 302.5 K dense liquid P(1/v) inverted: prev={prev_p:.12e}, cur={:.12e}",
             j.pressure
+        );
+        prev_p = j.pressure;
+    }
+    let v_rec = prep302.volume(j_ref.pressure, Phase::Liquid).unwrap();
+    let j_rec = prep302.pressure_and_derivatives(1.0 / v_rec).unwrap();
+    assert!(j_rec.dp_drho > 0.0);
+    assert!(
+        (j_rec.pressure - j_ref.pressure).abs() <= 1.0e-6 * j_ref.pressure,
+        "NC20 302.5 K fixed-pressure recovery miss: {} vs {}",
+        j_rec.pressure,
+        j_ref.pressure
+    );
+    // Exact fixed target 1.00555667643224106e-3 Pa from Round 6 review must also recover
+    // strictly within 1e-6 across all CRTs and debug/release builds.
+    let p_r6 = 1.005_556_676_432_241e-3_f64;
+    let v_r6 = prep302.volume(p_r6, Phase::Liquid).unwrap();
+    let j_r6 = prep302.pressure_and_derivatives(1.0 / v_r6).unwrap();
+    assert!(j_r6.dp_drho > 0.0);
+    assert!(
+        (j_r6.pressure - p_r6).abs() <= 1.0e-6 * p_r6,
+        "NC20 302.5 K fixed P={p_r6} recovery miss: {} (rel={:.3e})",
+        j_r6.pressure,
+        (j_r6.pressure - p_r6).abs() / p_r6
+    );
+    // Representable fixed pressures above the 1-ULP spacing (~2e-7 Pa -> P >= 0.25 Pa).
+    for &p_fix in &[0.25_f64, 1.0] {
+        let vl = prep302.volume(p_fix, Phase::Liquid).unwrap();
+        let j = prep302.pressure_and_derivatives(1.0 / vl).unwrap();
+        assert!(j.dp_drho > 0.0 && (j.pressure - p_fix).abs() <= 1.0e-6 * p_fix);
+    }
+
+    // 2. Direct saturation-liquid round-trips at 315.5 K and 328.5 K.
+    for &t in &[315.5_f64, 328.5] {
+        let prep = eos.prepare(t, &[1.0]).unwrap();
+        let sat = prep.saturation_pressure(t).unwrap();
+        let jl = prep
+            .pressure_and_derivatives(1.0 / sat.liquid_volume)
+            .unwrap();
+        assert!(jl.dp_drho > 0.0);
+        assert!(
+            (jl.pressure - sat.pressure).abs() <= 1.0e-6 * sat.pressure,
+            "NC20 {t} K sat liquid pressure miss: {} vs {}",
+            jl.pressure,
+            sat.pressure
+        );
+        let vl_rt = prep
+            .volume(sat.pressure, Phase::Liquid)
+            .unwrap_or_else(|e| {
+                panic!("NC20 {t} K saturation liquid round-trip failed: {e}");
+            });
+        let j_rt = prep.pressure_and_derivatives(1.0 / vl_rt).unwrap();
+        assert!(j_rt.dp_drho > 0.0);
+        assert!(
+            (j_rt.pressure - sat.pressure).abs() <= 1.0e-6 * sat.pressure,
+            "NC20 {t} K round-trip pressure miss: {} vs {}",
+            j_rt.pressure,
+            sat.pressure
         );
     }
 }
@@ -1977,11 +2095,16 @@ fn test_saft_vrmie_snapped_saturation_gibbs_and_pressure_contract() {
         );
     }
 
-    // 2. Stiff cold-liquid states that exercise the snapped branch (NH3 115 K,
-    // NH3 120 K, and NC20 321.25 K): certify both pressure residuals <= 1e-6 and
-    // common-pressure |Delta G/(RT)| <= 5e-6, and confirm the snapped branch is hit.
+    // 2. Stiff cold-liquid states that exercise the snapped branch (NH3 118.75 K,
+    // NC20 317.5 K, and NC20 321.25 K) plus NH3 120 K: certify both pressure residuals
+    // <= 1e-6 and common-pressure |Delta G/(RT)| <= 5e-6, and confirm the snapped branch is hit.
     let mut saw_snapped = false;
-    for &(fluid, t) in &[("NH3", 115.0_f64), ("NH3", 120.0), ("NC20", 321.25)] {
+    for &(fluid, t) in &[
+        ("NH3", 118.75_f64),
+        ("NH3", 120.0),
+        ("NC20", 317.5),
+        ("NC20", 321.25),
+    ] {
         let eos = SaftVrMie::new(&[fluid]).unwrap();
         let prep = eos.prepare(t, &[1.0]).unwrap();
         let sat = prep.saturation_pressure(t).unwrap();
@@ -2029,10 +2152,11 @@ fn test_saft_vrmie_minimum_gibbs_preserves_closed_vapor_phase() {
     let prep = h2o.prepare(300.0, &[1.0]).unwrap();
     for &p in &[0.001_f64, 0.1, 1.0, 2.0] {
         // Any returned liquid root must itself close within 1e-6 relative pressure;
-        // at 0.001 and 0.1 Pa no representable liquid root closes, so Liquid must fail.
+        // at 0.001 Pa the acceptance window (+-1e-9 Pa) is ~630x narrower than 1 ULP
+        // so no representable liquid root closes and Phase::Liquid must fail.
         if let Ok(vl) = h2o.volume_tp(300.0, p, &[1.0], Phase::Liquid) {
             assert!(
-                p >= 1.0,
+                p >= 0.1,
                 "H2O liquid at 300 K, {p} Pa should not close in f64"
             );
             let jet_l = prep.pressure_and_derivatives(1.0 / vl).unwrap();

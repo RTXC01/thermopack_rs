@@ -112,32 +112,44 @@ into `rust/src/saft_vrmie_data.rs`:
   effective quantum parameters for fast repeated TV evaluations
   (`helmholtz_terms` via zero-overhead `f64`, analytic `pressure_and_derivatives`
   and `state` via stack-buffered `Dual1`/`Dual2` without re-preparing
-  temperature caches, `volume` with a strict $\le 10^{-6} P_{\text{target}}$
+  temperature caches, plus a cancellation-gated 106-bit double-double pressure
+  path (`Dual1Dd` + double-double association $F_V$) triggered only when
+  $|\rho - F_V| < 10^{-5}(\rho + |F_V|)$ so ultra-low-pressure dense liquids
+  avoid multi-term `f64` rounding jitter and CRT `pow`/`exp` divergence without
+  slowing ordinary states; `volume` with a strict $\le 10^{-6} P_{\text{target}}$
   relative pressure closure cap on every returned root, noise-guarded bracketing
-  with spacing-bounded representable-`f64` ULP recovery (`<= 14` evaluations in
-  deeply sub-ULP rejected dense regimes, `<= 50` otherwise, stopping as soon as
-  the $10^{-6}$ cap is met), and common-pressure `MinimumGibbs` that checks for
-  a clear vapor win against the bounded liquid candidate before paying for dense
-  ULP recovery; and pure `saturation_pressure` using the stabilized
-  common-pressure Gibbs difference $(F_l - F_v) + P(v_l - v_v)/(RT) - \ln(v_l/v_v)$
-  with guarded mechanical-spinodal branch bracketing ($\eta \le 0.72$), verified
-  liquid and vapor pressure closure ($\le 10^{-6}$ relative), ordinary Gibbs
-  convergence $|\Delta G/(RT)| < 10^{-13}$ (or $< 10^{-10}$ on a tight bracket),
-  a documented cold-liquid pressure-snap branch (when 1 ULP of liquid volume
+  with jitter-aware spacing-bounded representable-`f64` ULP recovery (`<= 14`
+  evaluations in deeply sub-ULP rejected dense regimes, `<= 50` otherwise,
+  stopping as soon as the $10^{-6}$ cap is met), and common-pressure
+  `MinimumGibbs` that checks for a clear vapor win against the bounded liquid
+  candidate before paying for dense ULP recovery; and pure `saturation_pressure`
+  using the stabilized common-pressure Gibbs difference
+  $(F_l - F_v) + P(v_l - v_v)/(RT) - \ln(v_l/v_v)$ with guarded
+  mechanical-spinodal branch bracketing ($\eta \le 0.72$), verified liquid and
+  vapor pressure closure ($\le 10^{-6}$ relative), ordinary Gibbs convergence
+  $|\Delta G/(RT)| < 10^{-13}$ (or $< 10^{-10}$ on a tight bracket), a
+  documented cold-liquid pressure-snap branch (when 1 ULP of liquid volume
   exceeds $10^{-6} P_{\text{sat}}$ yet $|P_l - p_{\text{eq}}| \le 5\times 10^{-6} p_{\text{eq}}$,
   reporting $P_l$ with a re-solved vapor root so both pressures close within
   $10^{-6}$ while $|\Delta G/(RT)| \le 5\times 10^{-6}$), and distinct errors
   for supercritical isotherms versus liquid packing-cap exhaustion). For fixed
-  ultra-low liquid pressure targets where the physical 1-ULP pressure spacing
-  $|\partial P/\partial v|\,\mathrm{ulp}(v_l)$ exceeds $2\times 10^{-6} P_{\text{target}}$
-  (e.g., $\text{NH}_3$ at $120\text{ K}$ where $\Delta P_{\text{ulp}} \approx 1.18\times 10^{-6}\text{ Pa}$
+  ultra-low liquid pressure targets where the 1-ULP reciprocal-density pressure
+  step $|\partial P/\partial v|\,\Delta v_{\rho}$ exceeds
+  $2\times 10^{-6} P_{\text{target}}$ (e.g., $\text{NH}_3$ at $120\text{ K}$ where
+  each representable $\rho = 1/v$ step shifts pressure by $\approx 1.162\times 10^{-6}\text{ Pa}$
   versus $\pm 3.05\times 10^{-7}\text{ Pa}$ at $0.305\text{ Pa}$ and
-  $\pm 2.76\times 10^{-7}\text{ Pa}$ at $0.275800421086915\text{ Pa}$),
-  `volume` returns `Ok` when a representable stable root lies inside the $10^{-6}$
-  window and `Error::NotConverged` when the straddling `f64` volumes contain no
-  closing root. `SaftVrMieState::s_total` combines ideal TV entropy with TV
-  residual entropy so it agrees with `state_tp.entropy.value` and satisfies
-  $\Delta H = T\Delta S$ at coexistence.
+  $\pm 2.76\times 10^{-7}\text{ Pa}$ at $0.275800421086915\text{ Pa}$), whether a
+  specific target closes depends on both the exact volume/reciprocal-density ULP
+  grid and the `f64`-rounded model constants (`d`, `c_fac`, `f_alpha`, and
+  Fortran-parity `integral_coefficients`): with the 106-bit pressure path,
+  $0.275800421086915\text{ Pa}$ (`8.06e-7` relative) and $0.65\text{ Pa}$
+  (`2.48e-7` relative) close strictly within $10^{-6}$ across all CRTs and
+  debug/release builds, while $0.305\text{ Pa}$ straddles adjacent monotone
+  reciprocal-density ULPs under `1.0_f64 / v` with zero evaluation jitter and
+  returns `Error::NotConverged`.
+  `SaftVrMieState::s_total` combines ideal TV entropy with TV residual entropy
+  so it agrees with `state_tp.entropy.value` and satisfies $\Delta H = T\Delta S$
+  at coexistence.
 
 ## Exact-Source Qualification
 

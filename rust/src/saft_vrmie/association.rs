@@ -1,75 +1,11 @@
 //! Dufal association integral and its TVN derivatives at unit total moles.
-use super::{N_A, PreparedSaftVrMie, SaftVrMie};
-use crate::Result;
-use crate::association::{AssocRdfFirst, AssocRdfSecond, AssocRdfValue, AssociationRdfProvider};
+use super::dd::Dd;
+use super::{N_A, PreparedSaftVrMie, RGAS, SaftVrMie};
+use crate::association::{
+    AssocRdfFirst, AssocRdfSecond, AssocRdfValue, AssociationRdfProvider, DeltaCombRule,
+};
 use crate::rdf::RdfDerivatives;
-
-/// Double-double (`hi + lo`) error-free arithmetic using pure IEEE-754
-/// Veltkamp-Dekker splitting (avoiding external software `fma` calls on
-/// baseline `x86_64` targets) for cancellation-sensitive evaluations of the
-/// degree-10 Dufal association polynomial.
-#[derive(Debug, Clone, Copy)]
-pub(super) struct Dd(pub(super) f64, pub(super) f64);
-
-impl Dd {
-    const ZERO: Self = Self(0.0, 0.0);
-
-    #[inline(always)]
-    fn quick_two_sum(a: f64, b: f64) -> Self {
-        let s = a + b;
-        let e = b - (s - a);
-        Self(s, e)
-    }
-
-    #[inline(always)]
-    fn two_sum(a: f64, b: f64) -> Self {
-        let s = a + b;
-        let v = s - a;
-        let e = (a - (s - v)) + (b - v);
-        Self(s, e)
-    }
-
-    #[inline(always)]
-    fn two_prod(a: f64, b: f64) -> Self {
-        const SPLIT: f64 = 134_217_729.0; // 2^27 + 1
-        let p = a * b;
-        let ca = SPLIT * a;
-        let cb = SPLIT * b;
-        if p.is_finite() && ca.is_finite() && cb.is_finite() {
-            let a_hi = ca - (ca - a);
-            let a_lo = a - a_hi;
-            let b_hi = cb - (cb - b);
-            let b_lo = b - b_hi;
-            let err = ((a_hi * b_hi - p) + a_hi * b_lo + a_lo * b_hi) + a_lo * b_lo;
-            Self(p, err)
-        } else {
-            Self(p, 0.0)
-        }
-    }
-
-    #[inline(always)]
-    fn add(self, rhs: Self) -> Self {
-        let s = Self::two_sum(self.0, rhs.0);
-        Self::quick_two_sum(s.0, s.1 + self.1 + rhs.1)
-    }
-
-    #[inline(always)]
-    fn add_f64(self, rhs: f64) -> Self {
-        let s = Self::two_sum(self.0, rhs);
-        Self::quick_two_sum(s.0, s.1 + self.1)
-    }
-
-    #[inline(always)]
-    fn mul_f64(self, rhs: f64) -> Self {
-        let p = Self::two_prod(self.0, rhs);
-        Self::quick_two_sum(p.0, p.1 + self.1 * rhs)
-    }
-
-    #[inline(always)]
-    fn scale2(self) -> Self {
-        Self(2.0 * self.0, 2.0 * self.1)
-    }
-}
+use crate::{Error, Result};
 
 /// Temperature-dependent outer coefficients `b_d(T)`, `db_d/dt`, `d^2b_d/dt^2`
 /// (`d = 0..=10`, stored in Horner order `d = 10` down to `0`) precomputed once
@@ -84,7 +20,7 @@ pub(super) struct AssocTempCoeffs {
 impl AssocTempCoeffs {
     pub(super) fn compute(model: &SaftVrMie, pair_idx: usize, temperature: f64) -> Self {
         let eps = model.eps_divk_ij[pair_idx];
-        let t = temperature / eps;
+        let t = Dd::from_f64(temperature).div(Dd::from_f64(eps));
         let mut coef = model.integral_coefficients[pair_idx].iter().rev();
         let mut b_out = [Dd::ZERO; 11];
         let mut bt_out = [Dd::ZERO; 11];
@@ -92,9 +28,9 @@ impl AssocTempCoeffs {
         for degree in 0..=10 {
             let (mut b, mut bt, mut btt) = (Dd::ZERO, Dd::ZERO, Dd::ZERO);
             for _ in 0..=degree {
-                btt = btt.mul_f64(t).add(bt.scale2());
-                bt = bt.mul_f64(t).add(b);
-                b = b.mul_f64(t).add_f64(*coef.next().unwrap());
+                btt = btt.mul(t).add(bt.scale2());
+                bt = bt.mul(t).add(b);
+                b = b.mul(t).add_f64(*coef.next().unwrap());
             }
             b_out[degree] = b;
             bt_out[degree] = bt;
@@ -175,24 +111,25 @@ impl<'a> MieRdf<'a> {
             return [g, gr, gt / eps, grr, grt / eps, gtt / (eps * eps)];
         }
 
-        self.integral_dd::<ORDER>(coeffs, eps, r)
+        let r_dd = Dd::two_prod(self.state.assoc_reduced_factor, self.density);
+        self.integral_dd::<ORDER>(coeffs, eps, r_dd)
     }
 
     #[inline(never)]
-    fn integral_dd<const ORDER: u8>(&self, coeffs: &AssocTempCoeffs, eps: f64, r: f64) -> [f64; 6] {
+    fn integral_dd<const ORDER: u8>(&self, coeffs: &AssocTempCoeffs, eps: f64, r: Dd) -> [f64; 6] {
         let (mut g, mut gr, mut gt, mut grr, mut grt, mut gtt) =
             (Dd::ZERO, Dd::ZERO, Dd::ZERO, Dd::ZERO, Dd::ZERO, Dd::ZERO);
         for d in 0..=10 {
             if ORDER >= 2 {
-                grr = grr.mul_f64(r).add(gr.scale2());
-                grt = grt.mul_f64(r).add(gt);
-                gtt = gtt.mul_f64(r).add(coeffs.btt[d]);
+                grr = grr.mul(r).add(gr.scale2());
+                grt = grt.mul(r).add(gt);
+                gtt = gtt.mul(r).add(coeffs.btt[d]);
             }
             if ORDER >= 1 {
-                gr = gr.mul_f64(r).add(g);
-                gt = gt.mul_f64(r).add(coeffs.bt[d]);
+                gr = gr.mul(r).add(g);
+                gt = gt.mul(r).add(coeffs.bt[d]);
             }
-            g = g.mul_f64(r).add(coeffs.b[d]);
+            g = g.mul(r).add(coeffs.b[d]);
         }
         [
             g.0,
@@ -204,13 +141,24 @@ impl<'a> MieRdf<'a> {
         ]
     }
 
+    #[inline]
+    fn integral_g_gr_dd(coeffs: &AssocTempCoeffs, r: Dd) -> (Dd, Dd) {
+        let (mut g, mut gr) = (Dd::ZERO, Dd::ZERO);
+        for &bd in &coeffs.b {
+            gr = gr.mul(r).add(g);
+            g = g.mul(r).add(bd);
+        }
+        (g, gr)
+    }
+
     #[cfg(test)]
     pub(super) fn integral_high_precision<const ORDER: u8>(&self, i: usize, j: usize) -> [f64; 6] {
         let model = self.state.model;
         let idx = i * model.num_components() + j;
         let eps = model.eps_divk_ij[idx];
         let coeffs = AssocTempCoeffs::compute(model, idx, self.state.temperature);
-        self.integral_dd::<ORDER>(&coeffs, eps, self.reduced)
+        let r_dd = Dd::two_prod(self.state.assoc_reduced_factor, self.density);
+        self.integral_dd::<ORDER>(&coeffs, eps, r_dd)
     }
 
     fn reduced_moles(&self) -> Vec<f64> {
@@ -227,6 +175,257 @@ impl<'a> MieRdf<'a> {
             })
             .collect()
     }
+}
+
+/// Evaluate the unit-mole association volume derivative `dF_assoc / dV` in
+/// 106-bit double-double precision using the Wertheim/Michelsen envelope
+/// theorem (`dF_assoc/dV = (dQ/dV)_X`), eliminating `r = factor * rho`
+/// quantization and `f64` site-fraction/summation rounding on cancellation-
+/// sensitive dense liquid states.
+#[inline(never)]
+pub(super) fn assoc_f_v_dd(
+    state: &PreparedSaftVrMie<'_>,
+    rho: f64,
+    x_k_hint: &[f64],
+) -> Result<Dd> {
+    let assoc = &state.model.association;
+    let ns = assoc.num_sites;
+    if ns == 0 {
+        return Ok(Dd::ZERO);
+    }
+    let nc = state.model.num_components();
+    let rho_dd = Dd::from_f64(rho);
+    let mut sum_sig3 = Dd::ZERO;
+    for i in 0..nc {
+        let xsi = Dd::from_f64(state.xs[i]);
+        for j in 0..nc {
+            let s = Dd::from_f64(state.model.sigma_ij[i * nc + j]);
+            let s3 = s.mul(s).mul(s);
+            sum_sig3 = sum_sig3.add(xsi.mul_f64(state.xs[j]).mul(s3));
+        }
+    }
+    let r_dd = sum_sig3.mul_f64(N_A).mul_f64(state.m_bar).mul(rho_dd);
+    let rt_dd = Dd::two_prod(RGAS, state.temperature);
+
+    // Precompute pair (g, gr) in double-double precision for active associating pairs.
+    let mut g_pair = vec![(Dd::ZERO, Dd::ZERO); nc * nc];
+    for i in 0..nc {
+        if assoc.comp_vs_sites[i].is_none() {
+            continue;
+        }
+        for j in i..nc {
+            if assoc.comp_vs_sites[j].is_none() {
+                continue;
+            }
+            let idx = i * nc + j;
+            let owned;
+            let coeffs = match state.assoc_t_coeffs.get(idx).and_then(|c| c.as_ref()) {
+                Some(c) => c,
+                None => {
+                    owned = AssocTempCoeffs::compute(state.model, idx, state.temperature);
+                    &owned
+                }
+            };
+            let pair_val = MieRdf::integral_g_gr_dd(coeffs, r_dd);
+            g_pair[idx] = pair_val;
+            g_pair[j * nc + i] = pair_val;
+        }
+    }
+
+    let mut delta = vec![Dd::ZERO; ns * ns];
+    // delta_rho_minus_v[kl] = Delta_kl * rho - d(Delta_kl)/dV
+    // For Standard: (g + r * gr) * rho * beta * N_A * (exp(eps/(RT)) - 1)
+    let mut delta_v = vec![Dd::ZERO; ns * ns];
+
+    for k in 0..ns {
+        let ic = assoc.site_to_comp[k];
+        for l in k..ns {
+            let jc = assoc.site_to_comp[l];
+            if assoc.delta_comb_rule == DeltaCombRule::Elliot && ic != jc {
+                continue;
+            }
+            let kl = k * ns + l;
+            let lk = l * ns + k;
+            let beta = assoc.beta_kl[kl];
+            if beta == 0.0 {
+                continue;
+            }
+            let eps = assoc.eps_kl[kl];
+            let expo_m1 = if eps > 0.0 {
+                Dd::from_f64(eps).div(rt_dd).exp_m1()
+            } else {
+                Dd::ZERO
+            };
+            let h = Dd::two_prod(beta, N_A).mul(expo_m1);
+            let (g, gr) = g_pair[ic * nc + jc];
+            let d = g.mul(h);
+            let dv = gr.mul(r_dd).mul(rho_dd).mul(h).neg();
+            delta[kl] = d;
+            delta[lk] = d;
+            delta_v[kl] = dv;
+            delta_v[lk] = dv;
+        }
+    }
+
+    if assoc.delta_comb_rule == DeltaCombRule::Elliot {
+        for ic in 0..nc {
+            let Some((k1, k2)) = assoc.comp_vs_sites[ic] else {
+                continue;
+            };
+            for jc in (ic + 1)..nc {
+                let Some((l1, l2)) = assoc.comp_vs_sites[jc] else {
+                    continue;
+                };
+                let ka = k1 * ns + k2;
+                let lb = l1 * ns + l2;
+                let da = delta[ka];
+                let db = delta[lb];
+                if da.0 < 0.0 || db.0 < 0.0 {
+                    return Err(Error::InvalidInput("negative Delta in Elliot rule"));
+                }
+                let d_ab = da.sqrt().mul(db.sqrt());
+                let dv_ab = if d_ab.0 != 0.0 && da.0 > 0.0 && db.0 > 0.0 {
+                    d_ab.mul(delta_v[ka].div(da).add(delta_v[lb].div(db)))
+                        .mul_f64(0.5)
+                } else {
+                    Dd::ZERO
+                };
+                for k in k1..=k2 {
+                    for l in l1..=l2 {
+                        let kl = k * ns + l;
+                        let lk = l * ns + k;
+                        if assoc.beta_kl[kl] <= 0.0 {
+                            continue;
+                        }
+                        delta[kl] = d_ab;
+                        delta[lk] = d_ab;
+                        delta_v[kl] = dv_ab;
+                        delta_v[lk] = dv_ab;
+                    }
+                }
+            }
+        }
+    }
+
+    // Refine X_k from the 53-bit f64 hint to 106-bit double-double via 2 Newton steps
+    // on g_k(X) = 1/X_k - 1 - rho * sum_l m_l * Delta_kl * X_l = 0.
+    let m_u: Vec<Dd> = assoc
+        .site_to_comp
+        .iter()
+        .map(|&ic| Dd::from_f64(state.mole_fractions[ic]))
+        .collect();
+    let mut x_k: Vec<Dd> = x_k_hint.iter().map(|&v| Dd::from_f64(v)).collect();
+    if x_k.len() != ns {
+        return Err(Error::InvalidInput(
+            "association site fraction hint mismatch",
+        ));
+    }
+
+    let mut jac = vec![Dd::ZERO; ns * ns];
+    let mut rhs = vec![Dd::ZERO; ns];
+    for _ in 0..2 {
+        let mut max_res = 0.0_f64;
+        for k in 0..ns {
+            let xk = x_k[k];
+            if xk.0 <= 0.0 {
+                break;
+            }
+            let mut sum = Dd::ZERO;
+            for l in 0..ns {
+                let k_kl = rho_dd.mul(m_u[l]).mul(delta[k * ns + l]);
+                sum = sum.add(k_kl.mul(x_k[l]));
+                jac[k * ns + l] = k_kl.neg();
+            }
+            let inv_xk = Dd::ONE.div(xk);
+            let res = inv_xk.sub(Dd::ONE).sub(sum);
+            max_res = max_res.max(res.0.abs());
+            rhs[k] = res.neg();
+            jac[k * ns + k] = jac[k * ns + k].sub(inv_xk.mul(inv_xk));
+        }
+        if max_res <= 1.0e-30 {
+            break;
+        }
+        if let Some(dx) = solve_linear_dd(ns, &mut jac, &mut rhs) {
+            let mut ok = true;
+            for k in 0..ns {
+                let next = x_k[k].add(dx[k]);
+                if !next.0.is_finite() || next.0 <= 0.0 || next.0 > 1.000_001 {
+                    ok = false;
+                    break;
+                }
+            }
+            if ok {
+                for k in 0..ns {
+                    x_k[k] = x_k[k].add(dx[k]);
+                }
+            } else {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+
+    let mut f_v = Dd::ZERO;
+    for k in 0..ns {
+        let mk_xk = m_u[k].mul(x_k[k]);
+        if mk_xk.0 == 0.0 {
+            continue;
+        }
+        for l in 0..ns {
+            let kl = k * ns + l;
+            if delta[kl].0 == 0.0 && delta_v[kl].0 == 0.0 {
+                continue;
+            }
+            let qty = mk_xk.mul(m_u[l]).mul(x_k[l]).mul(rho_dd).mul_f64(0.5);
+            let term = delta[kl].mul(rho_dd).sub(delta_v[kl]);
+            f_v = f_v.add(qty.mul(term));
+        }
+    }
+    Ok(f_v)
+}
+
+fn solve_linear_dd(n: usize, a: &mut [Dd], b: &mut [Dd]) -> Option<Vec<Dd>> {
+    for col in 0..n {
+        let mut piv = col;
+        let mut max_val = a[col * n + col].0.abs();
+        for row in (col + 1)..n {
+            let v = a[row * n + col].0.abs();
+            if v > max_val {
+                max_val = v;
+                piv = row;
+            }
+        }
+        if max_val == 0.0 || !max_val.is_finite() {
+            return None;
+        }
+        if piv != col {
+            for j in col..n {
+                a.swap(col * n + j, piv * n + j);
+            }
+            b.swap(col, piv);
+        }
+        let diag = a[col * n + col];
+        for row in (col + 1)..n {
+            let fac = a[row * n + col].div(diag);
+            if fac.0 == 0.0 && fac.1 == 0.0 {
+                continue;
+            }
+            for j in (col + 1)..n {
+                a[row * n + j] = a[row * n + j].sub(fac.mul(a[col * n + j]));
+            }
+            b[row] = b[row].sub(fac.mul(b[col]));
+        }
+    }
+    let mut x = vec![Dd::ZERO; n];
+    for row in (0..n).rev() {
+        let mut s = b[row];
+        for j in (row + 1)..n {
+            s = s.sub(a[row * n + j].mul(x[j]));
+        }
+        x[row] = s.div(a[row * n + row]);
+    }
+    Some(x)
 }
 
 impl AssociationRdfProvider for MieRdf<'_> {

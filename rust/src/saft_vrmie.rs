@@ -3,8 +3,10 @@
 // Copyright thermotools and Contributors. Apache-2.0.
 
 mod association;
+mod dd;
 mod kernel;
-use self::association::{AssocTempCoeffs, MieRdf};
+use self::association::{AssocTempCoeffs, MieRdf, assoc_f_v_dd};
+use self::dd::Dd;
 use self::kernel::EvalMode;
 use crate::association::{
     AssocScheme, AssociationParams, DeltaCombRule, assoc_helmholtz_all, assoc_helmholtz_first,
@@ -998,7 +1000,17 @@ impl SaftVrMie {
         let t = temperature;
         let v = v_molar;
         let inv_n = 1.0 / total;
-        let p_eval = RGAS * t / v - RGAS * t * h.f_v;
+        let rho_u = 1.0 / v;
+        let p_eval = if (rho_u - h.f_v).abs() < 1.0e-5 * (rho_u + h.f_v.abs()) {
+            let hint = if self.association.has_sites() {
+                Some(h.x_k.as_slice())
+            } else {
+                None
+            };
+            prepared.eval_high_precision_pressure_and_z(rho_u, hint)?.0
+        } else {
+            RGAS * t / v - RGAS * t * h.f_v
+        };
         let p_v = -RGAS * t / (v * v) - RGAS * t * h.f_vv;
         let p_t = p_eval / t - RGAS * t * h.f_tv;
         let p_n: Vec<f64> = h
@@ -2053,12 +2065,12 @@ impl<'a> PreparedSaftVrMie<'a> {
                 let sij = effective[idx].0[0];
                 match model.options.packing {
                     PackingRule::Lafitte => {
-                        sum_d3 += xs[i] * xs[j] * dij.powi(3);
-                        sum_sig3 += xs[i] * xs[j] * sij.powi(3);
+                        sum_d3 += xs[i] * xs[j] * (dij * dij * dij);
+                        sum_sig3 += xs[i] * xs[j] * (sij * sij * sij);
                     }
                     PackingRule::Linear if i == j => {
-                        sum_d3 += xs[i] * dij.powi(3);
-                        sum_sig3 += xs[i] * sij.powi(3);
+                        sum_d3 += xs[i] * (dij * dij * dij);
+                        sum_sig3 += xs[i] * (sij * sij * sij);
                     }
                     PackingRule::Leonard => {
                         sum_d3 += xs[i] * xs[j] * dij;
@@ -2070,8 +2082,8 @@ impl<'a> PreparedSaftVrMie<'a> {
         }
 
         if model.options.packing == PackingRule::Leonard {
-            sum_d3 = sum_d3.powi(3);
-            sum_sig3 = sum_sig3.powi(3);
+            sum_d3 = sum_d3 * sum_d3 * sum_d3;
+            sum_sig3 = sum_sig3 * sum_sig3 * sum_sig3;
         }
         let conv_eta = (PI * N_A / 6.0) * m_bar * sum_d3;
         let conv_zeta = (PI * N_A / 6.0) * m_bar * sum_sig3;
@@ -2080,7 +2092,8 @@ impl<'a> PreparedSaftVrMie<'a> {
             let mut sum_assoc_sig3 = 0.0;
             for i in 0..nc {
                 for j in 0..nc {
-                    sum_assoc_sig3 += xs[i] * xs[j] * model.sigma_ij[i * nc + j].powi(3);
+                    let s = model.sigma_ij[i * nc + j];
+                    sum_assoc_sig3 += xs[i] * xs[j] * (s * s * s);
                 }
             }
             let mut t_coeffs = vec![None; nc * nc];
@@ -2185,6 +2198,44 @@ impl<'a> PreparedSaftVrMie<'a> {
         })
     }
 
+    /// Evaluate `P = R*T*(rho - f_v)` and `Z = 1 - f_v/rho` in 106-bit double-double
+    /// precision when catastrophic cancellation occurs (`|rho - f_v| < 1e-5 * (rho + |f_v|)`),
+    /// eliminating multi-term `f64` rounding jitter and CRT `pow`/`exp` divergence on
+    /// ultra-low-pressure dense liquids without adding overhead on ordinary states.
+    #[inline(never)]
+    fn eval_high_precision_pressure_and_z(
+        &self,
+        rho: f64,
+        x_k_hint: Option<&[f64]>,
+    ) -> Result<(f64, f64)> {
+        let mut f_v_dd = self.eval_first_v_dd(rho)?;
+        if self.model.association.has_sites() {
+            let owned_hint;
+            let hint = match x_k_hint {
+                Some(h) if !h.is_empty() => h,
+                _ => {
+                    owned_hint = solve_for_x_k(
+                        &self.model.association,
+                        &MieRdf::new(self, rho),
+                        self.temperature,
+                        1.0 / rho,
+                        &self.mole_fractions,
+                        None,
+                    )?;
+                    owned_hint.as_slice()
+                }
+            };
+            let f_v_assoc = assoc_f_v_dd(self, rho, hint)?;
+            f_v_dd = f_v_dd.add(f_v_assoc);
+        }
+        let rho_dd = Dd::from_f64(rho);
+        let diff_dd = rho_dd.sub(f_v_dd);
+        let rt_dd = Dd::two_prod(RGAS, self.temperature);
+        let p = rt_dd.mul(diff_dd).0;
+        let z = diff_dd.div(rho_dd).0;
+        Ok((p, z))
+    }
+
     /// Pressure and derivatives at density rho [mol/m^3].
     pub fn pressure_and_derivatives(&self, rho: f64) -> Result<SaftVrMiePressureJet> {
         let v = 1.0 / rho;
@@ -2196,6 +2247,7 @@ impl<'a> PreparedSaftVrMie<'a> {
         let mut f_v = vv.f1;
         let mut f_vv = vv.f12;
         let mut f_tv = tv.f12;
+        let mut assoc_x_k = Vec::new();
         if self.model.association.has_sites() {
             let a = assoc_helmholtz_pressure_jet(
                 &self.model.association,
@@ -2208,9 +2260,18 @@ impl<'a> PreparedSaftVrMie<'a> {
             f_v += a.f_v;
             f_vv += a.f_vv;
             f_tv += a.f_tv;
+            assoc_x_k = a.x_k;
         }
-        let p = RGAS * t * (rho - f_v);
-        let z = 1. - f_v / rho;
+        let (p, z) = if (rho - f_v).abs() < 1.0e-5 * (rho + f_v.abs()) {
+            let hint = if assoc_x_k.is_empty() {
+                None
+            } else {
+                Some(assoc_x_k.as_slice())
+            };
+            self.eval_high_precision_pressure_and_z(rho, hint)?
+        } else {
+            (RGAS * t * (rho - f_v), 1. - f_v / rho)
+        };
         let dp_dv = -RGAS * t * (rho * rho + f_vv);
         let dp_drho = -dp_dv / (rho * rho);
 
@@ -2244,6 +2305,7 @@ impl<'a> PreparedSaftVrMie<'a> {
         let mut f_tt = tt.f12;
 
         let mut assoc_fn: Option<Vec<f64>> = None;
+        let mut assoc_x_k = Vec::new();
         if self.model.association.has_sites() {
             let rdf = MieRdf::new(self, rho);
             if nc == 1 {
@@ -2260,6 +2322,7 @@ impl<'a> PreparedSaftVrMie<'a> {
                 f_tt += a.f_tt;
                 f_tv += a.f_tv;
                 f_vv += a.f_vv;
+                assoc_x_k = a.x_k;
             } else {
                 let a =
                     assoc_helmholtz_all(&self.model.association, &rdf, t, v, &self.mole_fractions)?;
@@ -2270,11 +2333,20 @@ impl<'a> PreparedSaftVrMie<'a> {
                 f_tv += a.f_tv;
                 f_vv += a.f_vv;
                 assoc_fn = Some(a.f_n);
+                assoc_x_k = a.x_k;
             }
         }
 
-        let p = RGAS * t * (rho - f_v);
-        let z = 1.0 - f_v / rho;
+        let (p, z) = if (rho - f_v).abs() < 1.0e-5 * (rho + f_v.abs()) {
+            let hint = if assoc_x_k.is_empty() {
+                None
+            } else {
+                Some(assoc_x_k.as_slice())
+            };
+            self.eval_high_precision_pressure_and_z(rho, hint)?
+        } else {
+            (RGAS * t * (rho - f_v), 1.0 - f_v / rho)
+        };
         let dp_dv = -RGAS * t * (rho * rho + f_vv);
         let dp_drho = -dp_dv / (rho * rho);
         let dp_dt = rho * RGAS - RGAS * f_v - RGAS * t * f_tv;
@@ -2756,7 +2828,7 @@ impl<'a> PreparedSaftVrMie<'a> {
             )
         };
 
-        let mut v_center = (best.volume - dv_est).clamp(v_lo, v_hi);
+        let v_center = (best.volume - dv_est).clamp(v_lo, v_hi);
         let mut evals = best.recovery_evals;
         let mut seen_above = best.pressure > pressure_target;
         let mut seen_below = best.pressure < pressure_target;
@@ -2808,31 +2880,32 @@ impl<'a> PreparedSaftVrMie<'a> {
             && diff0.abs() > 4.0 * dp_ulp
         {
             // One cheap linear re-centering step when the initial prediction still
-            // sits more than 4 ULPs from the crossing; only adopt the refined center
-            // if it strictly reduces |P - P_target| so ULP jitter cannot push the
-            // scan center away from the crossing.
+            // sits more than 4 ULPs from the crossing.
             let step = diff0 / best.dp_dv;
             if step.is_finite() && step.abs() <= 1.0e-8 * v_center {
                 let v_refined = (v_center - step).clamp(v_lo, v_hi);
-                if v_refined != v_center
-                    && let Some(diff1) = eval_cand(
+                if v_refined != v_center {
+                    let _ = eval_cand(
                         v_refined,
                         &mut best,
                         &mut best_err,
                         &mut seen_above,
                         &mut seen_below,
                         &mut evals,
-                    )?
-                    && diff1.abs() < diff0.abs()
-                {
-                    v_center = v_refined;
+                    )?;
                 }
             }
         }
 
+        // Always center the bounded ULP sweep on the strictly closest candidate
+        // found so far (never on a noisier re-centered point), and adapt the
+        // directional cutoff to any observed local jump deviation.
         if best_err > p_cap {
-            let mut v_up = v_center;
-            let mut v_dn = v_center;
+            let mut v_up = best.volume;
+            let mut v_dn = best.volume;
+            let mut prev_up_p = best.pressure;
+            let mut prev_dn_p = best.pressure;
+            let mut observed_jitter = 0.0_f64;
             let mut up_active = true;
             let mut dn_active = true;
             for _ in 0..radius {
@@ -2851,12 +2924,22 @@ impl<'a> PreparedSaftVrMie<'a> {
                             &mut seen_below,
                             &mut evals,
                         )? {
+                            let cur_p = pressure_target + diff;
+                            observed_jitter =
+                                observed_jitter.max(((cur_p - prev_up_p) + dp_ulp).abs());
+                            prev_up_p = cur_p;
                             if best_err <= p_cap {
                                 break;
                             }
+                            let eff_cutoff =
+                                if observed_jitter <= 0.25 * dp_ulp && dp_ulp > 64.0 * p_cap {
+                                    (1.5 * dp_ulp).max(4.0 * p_cap)
+                                } else {
+                                    away_cutoff.max(4.0 * observed_jitter)
+                                };
                             // Since dP/dv < 0, increasing v lowers P; once past target
                             // (diff < 0) and far below target on a bracketed crossing, stop up.
-                            if seen_above && seen_below && diff < -away_cutoff {
+                            if seen_above && seen_below && diff < -eff_cutoff {
                                 up_active = false;
                             }
                         }
@@ -2876,12 +2959,22 @@ impl<'a> PreparedSaftVrMie<'a> {
                             &mut seen_below,
                             &mut evals,
                         )? {
+                            let cur_p = pressure_target + diff;
+                            observed_jitter =
+                                observed_jitter.max(((cur_p - prev_dn_p) - dp_ulp).abs());
+                            prev_dn_p = cur_p;
                             if best_err <= p_cap {
                                 break;
                             }
+                            let eff_cutoff =
+                                if observed_jitter <= 0.25 * dp_ulp && dp_ulp > 64.0 * p_cap {
+                                    (1.5 * dp_ulp).max(4.0 * p_cap)
+                                } else {
+                                    away_cutoff.max(4.0 * observed_jitter)
+                                };
                             // Since dP/dv < 0, decreasing v raises P; once past target
                             // (diff > 0) and far above target on a bracketed crossing, stop down.
-                            if seen_above && seen_below && diff > away_cutoff {
+                            if seen_above && seen_below && diff > eff_cutoff {
                                 dn_active = false;
                             }
                         }
@@ -3789,6 +3882,38 @@ mod tests {
             att_n130.recovery_evals <= 50,
             "NH3 130 K Liquid recovery evals = {} (> 50)",
             att_n130.recovery_evals
+        );
+
+        // 4. NH3 120 K (0.275800421086915 Pa, 0.65 Pa) and NC20 302.5 K dense liquid
+        // recovery must close strictly within 1e-6 with small bounded evaluation counts.
+        let prep_n120 = nh3.prepare(120.0, &[1.0]).unwrap();
+        for &p_t in &[0.275800421086915_f64, 0.65] {
+            let att = prep_n120
+                .solve_single_phase_attempt(p_t, Phase::Liquid, true)
+                .unwrap();
+            assert!(att.closed, "NH3 120 K P={p_t} did not close");
+            assert!((att.pressure - p_t).abs() <= 1.0e-6 * p_t);
+            assert!(
+                att.recovery_evals <= 16,
+                "NH3 120 K P={p_t} recovery evals = {} (> 16)",
+                att.recovery_evals
+            );
+        }
+        let nc20 = SaftVrMie::new(&["NC20"]).unwrap();
+        let prep_nc20 = nc20.prepare(302.5, &[1.0]).unwrap();
+        let p_nc20 = prep_nc20
+            .pressure_and_derivatives(1.0 / 3.589_084_473_985_682e-4)
+            .unwrap()
+            .pressure;
+        let att_nc20 = prep_nc20
+            .solve_single_phase_attempt(p_nc20, Phase::Liquid, true)
+            .unwrap();
+        assert!(att_nc20.closed, "NC20 302.5 K P={p_nc20} did not close");
+        assert!((att_nc20.pressure - p_nc20).abs() <= 1.0e-6 * p_nc20);
+        assert!(
+            att_nc20.recovery_evals <= 16,
+            "NC20 302.5 K recovery evals = {} (> 16)",
+            att_nc20.recovery_evals
         );
     }
 

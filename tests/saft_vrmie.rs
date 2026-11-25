@@ -1705,8 +1705,39 @@ fn test_saft_vrmie_shifted_alpha_vdw_invalid_cutoff() {
 #[test]
 fn test_saft_vrmie_low_temp_liquid_bracket_no_panic() {
     // Ultra-cold heavy alkane states where dP/drho remains negative past eta=0.72
-    // must return an error instead of panicking in f64::clamp on an inverted bracket.
+    // must return a distinct packing-limit error (not panic and not misreport
+    // the isotherm as supercritical).
     let nc20 = SaftVrMie::new(&["NC20"]).unwrap();
+    let prep_35 = nc20.prepare(35.0, &[1.0]).unwrap();
+    let err_35 = prep_35.saturation_pressure(35.0).unwrap_err();
+    let msg_35 = err_35.to_string();
+    assert!(
+        msg_35.contains("packing limit") && !msg_35.contains("supercritical"),
+        "NC20 at 35 K should report packing-limit exhaustion, got: {msg_35}"
+    );
+
+    // Contrast with true supercritical states (including the same fluid NC20 at 900 K),
+    // which must still report supercritical.
+    let err_nc20_sup = nc20
+        .prepare(900.0, &[1.0])
+        .unwrap()
+        .saturation_pressure(900.0)
+        .unwrap_err();
+    assert!(
+        err_nc20_sup.to_string().contains("supercritical"),
+        "NC20 at 900 K should report supercritical, got: {err_nc20_sup}"
+    );
+    let h2o = SaftVrMie::new(&["H2O"]).unwrap();
+    let err_sup = h2o
+        .prepare(680.0, &[1.0])
+        .unwrap()
+        .saturation_pressure(680.0)
+        .unwrap_err();
+    assert!(
+        err_sup.to_string().contains("supercritical"),
+        "H2O at 680 K should report supercritical, got: {err_sup}"
+    );
+
     for &t in &[30.0_f64, 35.0, 40.0, 50.0, 80.0, 150.0] {
         let prep = nc20.prepare(t, &[1.0]).unwrap();
         if let Ok(sat) = prep.saturation_pressure(t) {
@@ -1764,6 +1795,127 @@ fn test_saft_vrmie_strict_pressure_closure_rejection() {
             sat.pressure
         );
     }
+}
+
+#[test]
+fn test_saft_vrmie_steep_liquid_ulp_recovery_nh3() {
+    // At 130 K and 120 K, NH3 has representable f64 liquid volumes that close within
+    // 1e-6 relative pressure despite evaluation noise near the steep liquid branch.
+    // Both volume(Phase::Liquid) and saturation_pressure must recover them cleanly.
+    let nh3 = SaftVrMie::new(&["NH3"]).unwrap();
+
+    // Direct volume check at T = 130 K, P = 2.20945469250487 Pa.
+    let prep_130 = nh3.prepare(130.0, &[1.0]).unwrap();
+    let p_130 = 2.20945469250487_f64;
+    let vl_130 = prep_130.volume(p_130, Phase::Liquid).unwrap();
+    let jet_130 = prep_130.pressure_and_derivatives(1.0 / vl_130).unwrap();
+    assert!(jet_130.dp_drho > 0.0);
+    assert!(
+        (jet_130.pressure - p_130).abs() <= 1.0e-6 * p_130,
+        "NH3 130 K liquid pressure miss: {} vs {p_130}",
+        jet_130.pressure
+    );
+
+    for &t in &[120.0_f64, 130.0] {
+        let prep = nh3.prepare(t, &[1.0]).unwrap();
+        let sat = prep.saturation_pressure(t).unwrap();
+        assert!(sat.pressure.is_finite() && sat.pressure > 0.0);
+        assert!(sat.liquid_volume < sat.vapor_volume);
+        let st_l = prep.state(1.0 / sat.liquid_volume).unwrap();
+        let st_v = prep.state(1.0 / sat.vapor_volume).unwrap();
+        assert!(st_l.dp_drho > 0.0 && st_v.dp_drho > 0.0);
+        assert!(
+            (st_l.pressure - sat.pressure).abs() <= 1.0e-6 * sat.pressure,
+            "NH3 {t} K liquid pressure miss: {} vs {}",
+            st_l.pressure,
+            sat.pressure
+        );
+        assert!(
+            (st_v.pressure - sat.pressure).abs() <= 1.0e-6 * sat.pressure,
+            "NH3 {t} K vapor pressure miss: {} vs {}",
+            st_v.pressure,
+            sat.pressure
+        );
+        let tds = t * sat.entropy_vaporization;
+        assert!(
+            (sat.enthalpy_vaporization - tds).abs() < 1e-6 * sat.enthalpy_vaporization.abs(),
+            "NH3 {t} K Delta H ({}) != T Delta S ({tds})",
+            sat.enthalpy_vaporization
+        );
+        // Round-trip both single-phase volume requests at the reported saturation pressure.
+        let vl_rt = prep.volume(sat.pressure, Phase::Liquid).unwrap();
+        let vv_rt = prep.volume(sat.pressure, Phase::Vapor).unwrap();
+        let jl_rt = prep.pressure_and_derivatives(1.0 / vl_rt).unwrap();
+        let jv_rt = prep.pressure_and_derivatives(1.0 / vv_rt).unwrap();
+        assert!((jl_rt.pressure - sat.pressure).abs() <= 1.0e-6 * sat.pressure);
+        assert!((jv_rt.pressure - sat.pressure).abs() <= 1.0e-6 * sat.pressure);
+    }
+}
+
+#[test]
+fn test_saft_vrmie_minimum_gibbs_preserves_closed_vapor_phase() {
+    // At T = 300 K and low pressures well below P_sat (~3500 Pa), the dense liquid root
+    // cannot close within 1e-6 relative pressure in f64, while vapor closes cleanly and
+    // is overwhelmingly lower in Gibbs energy. MinimumGibbs must return the closed vapor
+    // root in both volume_tp and state_tp, while Phase::Liquid still enforces the 1e-6 cap.
+    let h2o = SaftVrMie::new(&["H2O"]).unwrap();
+    let prep = h2o.prepare(300.0, &[1.0]).unwrap();
+    for &p in &[0.001_f64, 0.1, 1.0, 2.0] {
+        // Any returned liquid root must itself close within 1e-6 relative pressure;
+        // at 0.001 and 0.1 Pa no representable liquid root closes, so Liquid must fail.
+        if let Ok(vl) = h2o.volume_tp(300.0, p, &[1.0], Phase::Liquid) {
+            assert!(
+                p >= 1.0,
+                "H2O liquid at 300 K, {p} Pa should not close in f64"
+            );
+            let jet_l = prep.pressure_and_derivatives(1.0 / vl).unwrap();
+            assert!(
+                (jet_l.pressure - p).abs() <= 1.0e-6 * p,
+                "H2O liquid at 300 K, {p} Pa returned unclosed root: {}",
+                jet_l.pressure
+            );
+        }
+        let vv = h2o.volume_tp(300.0, p, &[1.0], Phase::Vapor).unwrap();
+        let v_min = h2o
+            .volume_tp(300.0, p, &[1.0], Phase::MinimumGibbs)
+            .unwrap();
+        assert!(
+            (v_min - vv).abs() <= 1e-12 * vv,
+            "H2O 300 K, {p} Pa MinimumGibbs={v_min} != Vapor={vv}"
+        );
+        let jet = prep.pressure_and_derivatives(1.0 / v_min).unwrap();
+        assert!(
+            (jet.pressure - p).abs() <= 1.0e-6 * p,
+            "H2O 300 K, {p} Pa MinimumGibbs pressure miss: {}",
+            jet.pressure
+        );
+        let st_min = h2o.state_tp(300.0, p, &[1.0], Phase::MinimumGibbs).unwrap();
+        let st_vap = h2o.state_tp(300.0, p, &[1.0], Phase::Vapor).unwrap();
+        assert!((st_min.volume - st_vap.volume).abs() <= 1e-12 * st_vap.volume);
+        assert!((st_min.enthalpy.value - st_vap.enthalpy.value).abs() <= 1e-9);
+    }
+
+    // Conservative rejection when liquid is the lower-Gibbs phase (above P_sat)
+    // yet cannot close within 1e-6 relative pressure: NH3 at 100 K, P = 0.01 Pa
+    // has P >> P_sat(100 K) so liquid wins thermodynamically, while vapor closes
+    // as a metastable root; MinimumGibbs must NOT return the metastable vapor.
+    let nh3 = SaftVrMie::new(&["NH3"]).unwrap();
+    assert!(nh3.volume_tp(100.0, 0.01, &[1.0], Phase::Vapor).is_ok());
+    assert!(nh3.volume_tp(100.0, 0.01, &[1.0], Phase::Liquid).is_err());
+    assert!(
+        nh3.volume_tp(100.0, 0.01, &[1.0], Phase::MinimumGibbs)
+            .is_err(),
+        "NH3 100 K, 0.01 Pa MinimumGibbs must reject when unclosed liquid has lower Gibbs energy"
+    );
+
+    // Conversely, at high pressure well above P_sat where liquid is the stable phase,
+    // MinimumGibbs must select the liquid root and close P tightly.
+    let p_hi = 1.0e6_f64;
+    let vl = h2o.volume_tp(300.0, p_hi, &[1.0], Phase::Liquid).unwrap();
+    let v_min_hi = h2o
+        .volume_tp(300.0, p_hi, &[1.0], Phase::MinimumGibbs)
+        .unwrap();
+    assert!((v_min_hi - vl).abs() <= 1e-12 * vl);
 }
 
 #[test]

@@ -1411,6 +1411,64 @@ fn solve_x_k_from_delta(
             ));
         }
 
+        // Polish converged site fractions (from either Newton or the fallback path)
+        // to near machine precision via up to 4 strictly-improving Newton steps so
+        // truncation error in X_k does not inject artificial pressure jitter into
+        // stiff low-pressure liquid association derivatives.
+        let polish_tol = (16.0 * f64::EPSILON).min(tol);
+        let eval_resid_jac = |x_vec: &[f64], resid: &mut [f64], jac: &mut [f64]| -> f64 {
+            let mut err = 0.0_f64;
+            for a in 0..na {
+                let mut sum_cx = 0.0;
+                for b in 0..na {
+                    sum_cx += c_mat[a * na + b] * x_vec[b];
+                }
+                let inv_x = 1.0 / x_vec[a];
+                let g_a = (inv_x - 1.0) - sum_cx;
+                resid[a] = g_a;
+                err = err.max(g_a.abs() / inv_x.max(1.0));
+                for b in 0..na {
+                    jac[a * na + b] = -c_mat[a * na + b];
+                }
+                jac[a * na + a] -= (1.0 + sum_cx) / x_vec[a];
+            }
+            err
+        };
+        let mut best_err = eval_resid_jac(&xa, &mut resid, &mut jac);
+        for _ in 0..4 {
+            if !best_err.is_finite() || best_err <= polish_tol {
+                break;
+            }
+            let rhs: Vec<f64> = resid.iter().map(|&v| -v).collect();
+            let Ok(dx) = solve_linear_system(na, &jac, &rhs) else {
+                break;
+            };
+            let mut cand = vec![0.0; na];
+            let mut valid = true;
+            for a in 0..na {
+                let x_next = xa[a] + dx[a];
+                if !x_next.is_finite() || x_next <= 0.0 || x_next > 1.0 + 1e-14 {
+                    valid = false;
+                    break;
+                }
+                cand[a] = x_next.min(1.0);
+            }
+            if !valid {
+                break;
+            }
+            let mut next_resid = vec![0.0; na];
+            let mut next_jac = vec![0.0; na * na];
+            let cand_err = eval_resid_jac(&cand, &mut next_resid, &mut next_jac);
+            if cand_err.is_finite() && cand_err < best_err {
+                xa = cand;
+                resid = next_resid;
+                jac = next_jac;
+                best_err = cand_err;
+            } else {
+                break;
+            }
+        }
+
         for (a, &ka) in active_sites.iter().enumerate() {
             if !xa[a].is_finite() || xa[a] <= 0.0 || xa[a] > 1.0 + 1e-12 {
                 return Err(Error::NotConverged(

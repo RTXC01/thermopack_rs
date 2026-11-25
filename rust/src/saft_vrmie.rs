@@ -2370,90 +2370,60 @@ impl<'a> PreparedSaftVrMie<'a> {
             ));
         }
 
-        let conv_eta = self.conv_eta;
         if phase == Phase::MinimumGibbs {
-            let vl = self.volume(pressure_target, Phase::Liquid)?;
-            let vv = self.volume(pressure_target, Phase::Vapor)?;
-            if (vl - vv).abs() < 1e-10 * vl {
-                return Ok(vl);
-            }
-            let dg = self.imposed_pressure_gibbs_diff(pressure_target, vl, vv)?;
-            return Ok(if dg < 0.0 { vl } else { vv });
-        }
-
-        let zeta_ideal = conv_eta * pressure_target / (RGAS * self.temperature);
-        if !zeta_ideal.is_finite() || zeta_ideal <= 0.0 {
-            return Err(Error::NotConverged(
-                "SAFT-VR Mie volume target underflowed representable packing range",
-            ));
-        }
-        let mut zeta_min = (1.0e-10_f64).min(0.1 * zeta_ideal).max(1.0e-140);
-        let mut zeta_max = 0.75;
-
-        let mut zeta = match phase {
-            Phase::Vapor => zeta_ideal.clamp(zeta_min, 0.05),
-            Phase::Liquid => 0.45,
-            Phase::MinimumGibbs => unreachable!(),
-        };
-
-        let mut v = conv_eta / zeta;
-        if !v.is_finite() || v <= 0.0 || !(1.0 / v).is_finite() || (1.0 / v) <= 0.0 {
-            return Err(Error::NotConverged(
-                "SAFT-VR Mie volume target exceeded representable molar volume",
-            ));
-        }
-        let mut jet = self.pressure_and_derivatives(1.0 / v)?;
-        let mut f = (1.0 - zeta) * (jet.pressure - pressure_target);
-
-        let max_iter = 80;
-        for _ in 0..max_iter {
-            let df_dzeta = pressure_target - jet.pressure - ((1.0 - zeta) / zeta) * jet.dp_dv * v;
-            let mut zeta_new = if df_dzeta.is_finite() && df_dzeta != 0.0 {
-                zeta - f / df_dzeta
-            } else {
-                0.5 * (zeta_max + zeta_min)
+            let liq = self.solve_single_phase_attempt(pressure_target, Phase::Liquid);
+            let vap = self.solve_single_phase_attempt(pressure_target, Phase::Vapor);
+            return match (liq, vap) {
+                (Ok(l), Ok(v)) if l.closed && v.closed => {
+                    if (l.volume - v.volume).abs() < 1e-10 * l.volume {
+                        return Ok(l.volume);
+                    }
+                    let dg =
+                        self.imposed_pressure_gibbs_diff(pressure_target, l.volume, v.volume)?;
+                    Ok(if dg < 0.0 { l.volume } else { v.volume })
+                }
+                (Ok(l), Ok(v)) if !l.closed && v.closed => {
+                    // The stiff dense liquid branch failed the strict 1e-6 relative
+                    // pressure cap, while the vapor root closed cleanly. Allow the
+                    // pressure-closed vapor root to win only when the liquid candidate
+                    // is tightly localized on the stable liquid branch and the Gibbs
+                    // ordering strictly favors vapor beyond a conservative error bound.
+                    let dp = (l.pressure - pressure_target).abs();
+                    let dv_est = if l.dp_dv.is_finite() && l.dp_dv < 0.0 {
+                        dp / l.dp_dv.abs()
+                    } else {
+                        f64::INFINITY
+                    };
+                    if l.volume.is_finite()
+                        && l.volume > 0.0
+                        && l.volume < v.volume
+                        && l.pressure.is_finite()
+                        && l.dp_drho > 0.0
+                        && dv_est.is_finite()
+                        && dv_est <= 1.0e-6 * l.volume
+                    {
+                        let dg_err_bound = dp * dv_est / (RGAS * self.temperature);
+                        let margin = (10.0 * dg_err_bound).max(1.0e-3);
+                        let dg =
+                            self.imposed_pressure_gibbs_diff(pressure_target, l.volume, v.volume)?;
+                        if dg.is_finite() && dg > margin {
+                            return Ok(v.volume);
+                        }
+                    }
+                    Err(Error::NotConverged(
+                        "SAFT-VR Mie minimum-Gibbs volume solver did not converge",
+                    ))
+                }
+                (Err(err), _) | (_, Err(err)) => Err(err),
+                _ => Err(Error::NotConverged(
+                    "SAFT-VR Mie volume solver did not converge",
+                )),
             };
-
-            if zeta_new > zeta_max || zeta_new < zeta_min || !zeta_new.is_finite() {
-                zeta_new = 0.5 * (zeta_max + zeta_min);
-            }
-
-            let v_old = v;
-            zeta = zeta_new;
-            v = conv_eta / zeta;
-            if !v.is_finite() || v <= 0.0 || !(1.0 / v).is_finite() || (1.0 / v) <= 0.0 {
-                return Err(Error::NotConverged(
-                    "SAFT-VR Mie volume solver left representable molar volume range",
-                ));
-            }
-
-            jet = self.pressure_and_derivatives(1.0 / v)?;
-            f = (1.0 - zeta) * (jet.pressure - pressure_target);
-
-            let v_converged = (v - v_old).abs() <= 1e2 * MACHINE_PREC * v_old;
-            let p_tol = (1e5 * MACHINE_PREC * pressure_target)
-                .max(1e2 * MACHINE_PREC * (jet.dp_dv * v).abs())
-                .min(1.0e-6 * pressure_target);
-            let p_converged =
-                jet.pressure.is_finite() && (jet.pressure - pressure_target).abs() <= p_tol;
-
-            if v_converged && p_converged {
-                return Ok(v);
-            }
-
-            if f > 0.0 {
-                zeta_max = zeta;
-            } else if f < 0.0 {
-                zeta_min = zeta;
-            }
         }
 
-        if v.is_finite()
-            && v > 0.0
-            && jet.pressure.is_finite()
-            && (jet.pressure - pressure_target).abs() <= 1e-6 * pressure_target
-        {
-            Ok(v)
+        let attempt = self.solve_single_phase_attempt(pressure_target, phase)?;
+        if attempt.closed {
+            Ok(attempt.volume)
         } else {
             Err(Error::NotConverged(
                 "SAFT-VR Mie volume solver did not converge",
@@ -2461,15 +2431,59 @@ impl<'a> PreparedSaftVrMie<'a> {
         }
     }
 
+    fn solve_single_phase_attempt(
+        &self,
+        pressure_target: f64,
+        phase: Phase,
+    ) -> Result<VolumeAttempt> {
+        let zeta_ideal = self.conv_eta * pressure_target / (RGAS * self.temperature);
+        if !zeta_ideal.is_finite() || zeta_ideal <= 0.0 {
+            return Err(Error::NotConverged(
+                "SAFT-VR Mie volume target underflowed representable packing range",
+            ));
+        }
+        let zeta_min = (1.0e-10_f64).min(0.1 * zeta_ideal).max(1.0e-140);
+        let zeta_max = 0.75;
+        let zeta_init = match phase {
+            Phase::Vapor => zeta_ideal.clamp(zeta_min, 0.05),
+            Phase::Liquid => 0.45,
+            Phase::MinimumGibbs => unreachable!(),
+        };
+        self.solve_volume_in_zeta_bracket(pressure_target, zeta_min, zeta_max, zeta_init)
+    }
+
     /// Solve `P(conv_eta / zeta) = pressure_target` strictly within a monotone
-    /// branch bracket `[zeta_lo, zeta_hi]`.
+    /// branch bracket `[zeta_lo, zeta_hi]`, enforcing `<= 1e-6 * pressure_target`
+    /// relative pressure closure on every returned root.
     fn volume_in_zeta_bracket(
+        &self,
+        pressure_target: f64,
+        zeta_min: f64,
+        zeta_max: f64,
+        zeta_init: f64,
+    ) -> Result<f64> {
+        let attempt =
+            self.solve_volume_in_zeta_bracket(pressure_target, zeta_min, zeta_max, zeta_init)?;
+        if attempt.closed {
+            Ok(attempt.volume)
+        } else {
+            Err(Error::NotConverged(
+                "SAFT-VR Mie volume solver did not converge",
+            ))
+        }
+    }
+
+    /// Core safeguarded Newton-bisection volume solver with noise-guarded bracket
+    /// updates and local representable-`f64` ULP neighborhood recovery near steep
+    /// liquid roots. Returns the best candidate along with whether it satisfied
+    /// strict `<= 1e-6 * pressure_target` relative pressure closure.
+    fn solve_volume_in_zeta_bracket(
         &self,
         pressure_target: f64,
         mut zeta_min: f64,
         mut zeta_max: f64,
         zeta_init: f64,
-    ) -> Result<f64> {
+    ) -> Result<VolumeAttempt> {
         if !pressure_target.is_finite()
             || pressure_target <= 0.0
             || !zeta_min.is_finite()
@@ -2483,6 +2497,8 @@ impl<'a> PreparedSaftVrMie<'a> {
             ));
         }
         let conv_eta = self.conv_eta;
+        let orig_zeta_min = zeta_min;
+        let orig_zeta_max = zeta_max;
         let mut zeta = zeta_init.clamp(zeta_min, zeta_max);
         let mut v = conv_eta / zeta;
         if !v.is_finite() || v <= 0.0 || !(1.0 / v).is_finite() || (1.0 / v) <= 0.0 {
@@ -2492,6 +2508,19 @@ impl<'a> PreparedSaftVrMie<'a> {
         }
         let mut jet = self.pressure_and_derivatives(1.0 / v)?;
         let mut f = (1.0 - zeta) * (jet.pressure - pressure_target);
+
+        let mut best_stable: Option<VolumeAttempt> =
+            if jet.pressure.is_finite() && jet.dp_drho > 0.0 {
+                Some(VolumeAttempt {
+                    volume: v,
+                    pressure: jet.pressure,
+                    dp_dv: jet.dp_dv,
+                    dp_drho: jet.dp_drho,
+                    closed: false,
+                })
+            } else {
+                None
+            };
 
         let max_iter = 80;
         for _ in 0..max_iter {
@@ -2518,44 +2547,171 @@ impl<'a> PreparedSaftVrMie<'a> {
             jet = self.pressure_and_derivatives(1.0 / v)?;
             f = (1.0 - zeta) * (jet.pressure - pressure_target);
 
+            let p_err = (jet.pressure - pressure_target).abs();
+            let noise_floor = 1e2 * MACHINE_PREC * (jet.dp_dv * v).abs();
+            if jet.pressure.is_finite()
+                && jet.dp_drho > 0.0
+                && best_stable
+                    .as_ref()
+                    .is_none_or(|b| p_err < (b.pressure - pressure_target).abs())
+            {
+                best_stable = Some(VolumeAttempt {
+                    volume: v,
+                    pressure: jet.pressure,
+                    dp_dv: jet.dp_dv,
+                    dp_drho: jet.dp_drho,
+                    closed: false,
+                });
+            }
+
             let v_converged = (v - v_old).abs() <= 1e2 * MACHINE_PREC * v_old;
             let p_tol = (1e5 * MACHINE_PREC * pressure_target)
-                .max(1e2 * MACHINE_PREC * (jet.dp_dv * v).abs())
+                .max(noise_floor)
                 .min(1.0e-6 * pressure_target);
-            let p_converged =
-                jet.pressure.is_finite() && (jet.pressure - pressure_target).abs() <= p_tol;
+            let p_converged = jet.pressure.is_finite() && p_err <= p_tol;
 
             if v_converged && p_converged {
-                return Ok(v);
+                return Ok(VolumeAttempt {
+                    volume: v,
+                    pressure: jet.pressure,
+                    dp_dv: jet.dp_dv,
+                    dp_drho: jet.dp_drho,
+                    closed: true,
+                });
             }
 
-            if f > 0.0 {
-                zeta_max = zeta;
-            } else if f < 0.0 {
-                zeta_min = zeta;
+            // Guard bracket updates against evaluation noise near steep liquid roots
+            // so a noisy residual sign cannot exclude an adjacent representable root.
+            if p_err > noise_floor {
+                if f > 0.0 {
+                    zeta_max = zeta;
+                } else if f < 0.0 {
+                    zeta_min = zeta;
+                }
+            } else if jet.dp_drho > 0.0 && (v - v_old).abs() <= 1e3 * MACHINE_PREC * v_old {
+                break;
+            }
+            if (zeta_max - zeta_min) <= 8.0 * MACHINE_PREC * zeta {
+                break;
             }
         }
 
-        if v.is_finite()
-            && v > 0.0
-            && jet.pressure.is_finite()
-            && (jet.pressure - pressure_target).abs() <= 1e-6 * pressure_target
-        {
-            Ok(v)
+        let mut best = best_stable.unwrap_or(VolumeAttempt {
+            volume: v,
+            pressure: jet.pressure,
+            dp_dv: jet.dp_dv,
+            dp_drho: jet.dp_drho,
+            closed: false,
+        });
+        let p_cap = 1.0e-6 * pressure_target;
+        let mut best_err = if best.pressure.is_finite() {
+            (best.pressure - pressure_target).abs()
         } else {
-            Err(Error::NotConverged(
-                "SAFT-VR Mie volume solver did not converge",
-            ))
+            f64::INFINITY
+        };
+
+        // If Newton-bisection stalled in the ULP noise floor of a steep root,
+        // inspect adjacent representable volumes strictly inside the original bracket
+        // before declaring non-convergence.
+        if best_err > p_cap
+            && best.volume.is_finite()
+            && best.volume > 0.0
+            && best.pressure.is_finite()
+            && best.dp_drho > 0.0
+            && best.dp_dv.is_finite()
+            && best.dp_dv < 0.0
+        {
+            let dv_est = (best.pressure - pressure_target) / best.dp_dv;
+            if dv_est.is_finite() && dv_est.abs() <= 1.0e-8 * best.volume {
+                let v_lo = (conv_eta / orig_zeta_max).max(f64::MIN_POSITIVE);
+                let v_hi = {
+                    let hi = conv_eta / orig_zeta_min;
+                    if hi.is_finite() && hi > v_lo {
+                        hi
+                    } else {
+                        f64::MAX
+                    }
+                };
+                if v_lo < v_hi {
+                    let early_stop = 1.0e-7 * pressure_target;
+                    let v_anchor = best.volume;
+                    let v_pred = (v_anchor - dv_est).clamp(v_lo, v_hi);
+                    let scan_around = |center: f64,
+                                       radius: usize,
+                                       best: &mut VolumeAttempt,
+                                       best_err: &mut f64|
+                     -> Result<()> {
+                        let mut try_volume = |cand_v: f64| -> Result<bool> {
+                            if cand_v < v_lo || cand_v > v_hi || !(1.0 / cand_v).is_finite() {
+                                return Ok(*best_err <= early_stop);
+                            }
+                            let cand_jet = self.pressure_and_derivatives(1.0 / cand_v)?;
+                            if cand_jet.pressure.is_finite() && cand_jet.dp_drho > 0.0 {
+                                let err = (cand_jet.pressure - pressure_target).abs();
+                                if err < *best_err {
+                                    *best_err = err;
+                                    *best = VolumeAttempt {
+                                        volume: cand_v,
+                                        pressure: cand_jet.pressure,
+                                        dp_dv: cand_jet.dp_dv,
+                                        dp_drho: cand_jet.dp_drho,
+                                        closed: false,
+                                    };
+                                }
+                            }
+                            Ok(*best_err <= early_stop)
+                        };
+                        let c = center.clamp(v_lo, v_hi);
+                        if try_volume(c)? {
+                            return Ok(());
+                        }
+                        let mut v_up = c;
+                        let mut v_dn = c;
+                        for _ in 0..radius {
+                            let next_u = v_up.next_up();
+                            if next_u <= v_hi && next_u > v_up {
+                                v_up = next_u;
+                                if try_volume(v_up)? {
+                                    break;
+                                }
+                            }
+                            let next_d = v_dn.next_down();
+                            if next_d >= v_lo && next_d < v_dn {
+                                v_dn = next_d;
+                                if try_volume(v_dn)? {
+                                    break;
+                                }
+                            }
+                        }
+                        Ok(())
+                    };
+
+                    scan_around(v_pred, 256, &mut best, &mut best_err)?;
+                    if best_err > p_cap
+                        && (v_pred - v_anchor).abs() > 256.0 * MACHINE_PREC * v_anchor
+                    {
+                        scan_around(v_anchor, 128, &mut best, &mut best_err)?;
+                    }
+                }
+            }
         }
+
+        best.closed = best.volume.is_finite()
+            && best.volume > 0.0
+            && best.pressure.is_finite()
+            && best.dp_drho > 0.0
+            && best_err <= p_cap;
+        Ok(best)
     }
 
     /// Locate the mechanical spinodals on this pure-fluid isotherm by searching
     /// for `dP/drho < 0` in the physical fluid packing range (`eta <= 0.56`,
     /// staying below unphysical high-packing association/dispersion polynomial poles).
     ///
-    /// Returns `Ok(None)` when `dP/drho >= 0` everywhere (supercritical state,
-    /// where vapor-liquid coexistence does not exist).
-    fn locate_spinodals(&self) -> Result<Option<IsothermSpinodals>> {
+    /// Distinguishes true supercritical isotherms (`dP/drho >= 0` across the
+    /// physical fluid range) from subcritical isotherms whose dense liquid branch
+    /// exhausts the packing cap (`eta = 0.72`) before reaching a stable endpoint.
+    fn locate_spinodals(&self) -> Result<SpinodalSearch> {
         let conv_eta = self.conv_eta;
         let dp_drho_at = |eta: f64| -> Result<f64> {
             Ok(self.pressure_and_derivatives(eta / conv_eta)?.dp_drho)
@@ -2634,7 +2790,7 @@ impl<'a> PreparedSaftVrMie<'a> {
         }
 
         let Some(eta_unstable) = eta_mid else {
-            return Ok(None);
+            return Ok(SpinodalSearch::Supercritical);
         };
 
         // Vapor spinodal (local P maximum): dP/drho crosses + -> - on (0, eta_unstable).
@@ -2643,7 +2799,7 @@ impl<'a> PreparedSaftVrMie<'a> {
             lo_v *= 0.1;
         }
         if dp_drho_at(lo_v)? <= 0.0 {
-            return Ok(None);
+            return Ok(SpinodalSearch::InvalidBracket);
         }
         let mut hi_v = eta_unstable;
         for _ in 0..64 {
@@ -2678,14 +2834,14 @@ impl<'a> PreparedSaftVrMie<'a> {
             Some(eta) => eta,
             None => {
                 if eta_unstable >= ETA_LIQUID_CAP {
-                    return Ok(None);
+                    return Ok(SpinodalSearch::LiquidPackingCapReached);
                 }
                 let mut probe = (eta_unstable + 0.02).min(ETA_LIQUID_CAP);
                 while probe < ETA_LIQUID_CAP && dp_drho_at(probe)? <= 0.0 {
                     probe = (probe + 0.02).min(ETA_LIQUID_CAP);
                 }
                 if dp_drho_at(probe)? <= 0.0 {
-                    return Ok(None);
+                    return Ok(SpinodalSearch::LiquidPackingCapReached);
                 }
                 probe
             }
@@ -2703,7 +2859,7 @@ impl<'a> PreparedSaftVrMie<'a> {
         }
         let eta_spin_l = hi_l;
         if eta_spin_l >= ETA_LIQUID_CAP {
-            return Ok(None);
+            return Ok(SpinodalSearch::LiquidPackingCapReached);
         }
         let p_min = self
             .pressure_and_derivatives(eta_spin_l / conv_eta)?
@@ -2724,21 +2880,22 @@ impl<'a> PreparedSaftVrMie<'a> {
             eta_l_max = (eta_spin_l + 0.05).min(ETA_LIQUID_CAP);
         }
 
+        if eta_spin_l >= eta_l_max || eta_l_max > ETA_LIQUID_CAP {
+            return Ok(SpinodalSearch::LiquidPackingCapReached);
+        }
         if !eta_spin_v.is_finite()
             || !eta_spin_l.is_finite()
             || !eta_l_max.is_finite()
             || eta_spin_v <= 0.0
             || eta_spin_v >= eta_spin_l
-            || eta_spin_l >= eta_l_max
-            || eta_l_max > ETA_LIQUID_CAP
             || !p_max.is_finite()
             || !p_min.is_finite()
             || p_max <= 0.0
             || p_max <= p_min
         {
-            return Ok(None);
+            return Ok(SpinodalSearch::InvalidBracket);
         }
-        Ok(Some(IsothermSpinodals {
+        Ok(SpinodalSearch::Found(IsothermSpinodals {
             eta_v: eta_spin_v,
             p_max,
             eta_l: eta_spin_l,
@@ -2785,19 +2942,33 @@ impl<'a> PreparedSaftVrMie<'a> {
                     .min(0.1 * zeta_ideal)
                     .max(1.0e-140)
                     .min(0.5 * sp.eta_v);
-                let vl = prep.volume_in_zeta_bracket(
+                let vl_att = prep.solve_volume_in_zeta_bracket(
                     p,
                     sp.eta_l,
                     sp.eta_l_max,
                     0.5 * (sp.eta_l + sp.eta_l_max),
                 )?;
+                let vl_bounded = vl_att.closed
+                    || (vl_att.volume.is_finite()
+                        && vl_att.volume > 0.0
+                        && vl_att.pressure.is_finite()
+                        && vl_att.dp_drho > 0.0
+                        && vl_att.dp_dv.is_finite()
+                        && vl_att.dp_dv < 0.0
+                        && (vl_att.pressure - p).abs() / vl_att.dp_dv.abs()
+                            <= 1.0e-6 * vl_att.volume);
+                if !vl_bounded {
+                    return Err(Error::NotConverged(
+                        "SAFT-VR Mie liquid volume solver did not converge during saturation",
+                    ));
+                }
                 let zeta_v_init = if zeta_min_v < 0.9 * sp.eta_v {
                     zeta_ideal.clamp(zeta_min_v, 0.9 * sp.eta_v)
                 } else {
                     0.5 * (zeta_min_v + sp.eta_v)
                 };
                 let vv = prep.volume_in_zeta_bracket(p, zeta_min_v, sp.eta_v, zeta_v_init)?;
-                (vl, vv)
+                (vl_att.volume, vv)
             } else {
                 let vl_res = prep.volume(p, Phase::Liquid);
                 let vv_res = prep.volume(p, Phase::Vapor);
@@ -2805,11 +2976,25 @@ impl<'a> PreparedSaftVrMie<'a> {
                     (Ok(vl), Ok(vv)) if vv > vl && (vv - vl) > 1e-10 * vl => (vl, vv),
                     _ => {
                         // Switch to exact mechanical spinodal bounds so near-critical
-                        // coexistence is preserved and supercritical states are rejected.
-                        let Some(sp) = prep.locate_spinodals()? else {
-                            return Err(Error::NotConverged(
-                                "supercritical temperature: no vapor-liquid coexistence",
-                            ));
+                        // coexistence is preserved, supercritical isotherms are rejected,
+                        // and liquid packing-cap exhaustion reports a distinct error.
+                        let sp = match prep.locate_spinodals()? {
+                            SpinodalSearch::Found(sp) => sp,
+                            SpinodalSearch::Supercritical => {
+                                return Err(Error::NotConverged(
+                                    "supercritical temperature: no vapor-liquid coexistence",
+                                ));
+                            }
+                            SpinodalSearch::LiquidPackingCapReached => {
+                                return Err(Error::NotConverged(
+                                    "liquid branch reached packing limit (eta = 0.72) before establishing a stable dense endpoint",
+                                ));
+                            }
+                            SpinodalSearch::InvalidBracket => {
+                                return Err(Error::NotConverged(
+                                    "failed to bracket mechanical spinodals on subcritical isotherm",
+                                ));
+                            }
                         };
                         spinodals = Some(sp);
                         if sp.p_min > 0.0 {
@@ -2856,6 +3041,56 @@ impl<'a> PreparedSaftVrMie<'a> {
                         entropy_vaporization: state_v.s_total - state_l.s_total,
                     });
                 }
+                // On stiff cold liquids where a single f64 ULP of liquid volume shifts P
+                // by more than 1e-6 * P_sat (e.g. NH3 at 120 K), the nearest representable
+                // liquid volume can sit just outside 1e-6 * p_eq solely from IEEE-754
+                // quantization. When state_l.pressure still agrees with p_eq to <= 5e-6,
+                // snap the reported coexistence pressure to state_l.pressure and re-solve
+                // the vapor root so both phases close within 1e-6 relative pressure while
+                // keeping Gibbs equality within 5e-6 RT.
+                let p_l = state_l.pressure;
+                if state_l.dp_drho > 0.0
+                    && p_l.is_finite()
+                    && p_l > 0.0
+                    && (p_l - p).abs() <= 5.0e-6 * p
+                {
+                    let vv_snap = if let Some(sp) = spinodals {
+                        let zeta_ideal = prep.conv_eta * p_l / (RGAS * temperature);
+                        let zeta_min_v = (1.0e-10_f64)
+                            .min(0.1 * zeta_ideal)
+                            .max(1.0e-140)
+                            .min(0.5 * sp.eta_v);
+                        let zeta_v_init = if zeta_min_v < 0.9 * sp.eta_v {
+                            zeta_ideal.clamp(zeta_min_v, 0.9 * sp.eta_v)
+                        } else {
+                            0.5 * (zeta_min_v + sp.eta_v)
+                        };
+                        prep.volume_in_zeta_bracket(p_l, zeta_min_v, sp.eta_v, zeta_v_init)
+                    } else {
+                        prep.volume(p_l, Phase::Vapor)
+                    };
+                    if let Ok(vv_s) = vv_snap {
+                        let state_v_s = prep.state(1.0 / vv_s)?;
+                        let dg_s = prep.imposed_pressure_gibbs_diff(p_l, vl, vv_s)?;
+                        let p_v_closed = state_v_s.pressure.is_finite()
+                            && (state_v_s.pressure - p_l).abs() <= 1.0e-6 * p_l;
+                        if vl < vv_s
+                            && state_v_s.dp_drho > 0.0
+                            && p_v_closed
+                            && dg_s.is_finite()
+                            && dg_s.abs() <= 5.0e-6
+                        {
+                            return Ok(SaftVrMieSaturation {
+                                pressure: p_l,
+                                temperature,
+                                liquid_volume: vl,
+                                vapor_volume: vv_s,
+                                enthalpy_vaporization: state_v_s.h_total - state_l.h_total,
+                                entropy_vaporization: state_v_s.s_total - state_l.s_total,
+                            });
+                        }
+                    }
+                }
                 return Err(Error::NotConverged(
                     "saturation roots failed mechanical stability or pressure closure check",
                 ));
@@ -2889,6 +3124,23 @@ impl<'a> PreparedSaftVrMie<'a> {
 // ----------------------------------------------------------------------------
 // Internal numerical & potential helper routines
 // ----------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy)]
+struct VolumeAttempt {
+    volume: f64,
+    pressure: f64,
+    dp_dv: f64,
+    dp_drho: f64,
+    closed: bool,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum SpinodalSearch {
+    Found(IsothermSpinodals),
+    Supercritical,
+    LiquidPackingCapReached,
+    InvalidBracket,
+}
 
 #[derive(Debug, Clone, Copy)]
 struct IsothermSpinodals {

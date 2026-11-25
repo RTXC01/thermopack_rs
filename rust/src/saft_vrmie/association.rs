@@ -10,6 +10,54 @@ pub(super) struct MieRdf<'a> {
     reduced: f64,
 }
 
+/// Double-double (`hi + lo`) error-free arithmetic for evaluating the degree-10
+/// Dufal association polynomial without catastrophic intermediate cancellation.
+#[derive(Clone, Copy)]
+struct Dd(f64, f64);
+
+impl Dd {
+    const ZERO: Self = Self(0.0, 0.0);
+
+    #[inline(always)]
+    fn quick_two_sum(a: f64, b: f64) -> Self {
+        let s = a + b;
+        let e = b - (s - a);
+        Self(s, e)
+    }
+
+    #[inline(always)]
+    fn two_sum(a: f64, b: f64) -> Self {
+        let s = a + b;
+        let v = s - a;
+        let e = (a - (s - v)) + (b - v);
+        Self(s, e)
+    }
+
+    #[inline(always)]
+    fn add(self, rhs: Self) -> Self {
+        let s = Self::two_sum(self.0, rhs.0);
+        Self::quick_two_sum(s.0, s.1 + self.1 + rhs.1)
+    }
+
+    #[inline(always)]
+    fn add_f64(self, rhs: f64) -> Self {
+        let s = Self::two_sum(self.0, rhs);
+        Self::quick_two_sum(s.0, s.1 + self.1)
+    }
+
+    #[inline(always)]
+    fn mul_f64(self, rhs: f64) -> Self {
+        let p = self.0 * rhs;
+        let e = self.0.mul_add(rhs, -p) + self.1 * rhs;
+        Self::quick_two_sum(p, e)
+    }
+
+    #[inline(always)]
+    fn scale2(self) -> Self {
+        Self(2.0 * self.0, 2.0 * self.1)
+    }
+}
+
 impl<'a> MieRdf<'a> {
     pub(super) fn new(state: &'a PreparedSaftVrMie<'a>, density: f64) -> Self {
         let mut reduced = 0.0;
@@ -25,8 +73,10 @@ impl<'a> MieRdf<'a> {
         }
     }
 
-    // Horner evaluation of sum a_ij rho^i T^j. Differentiate the
-    // recurrences alongside the value only to the requested order.
+    // Compensated (double-double) Horner evaluation of sum a_ij rho^i T^j.
+    // Differentiate the recurrences alongside the value only to the requested order
+    // so large alternating degree-10 Dufal coefficients do not inject ULP cancellation
+    // noise into stiff low-pressure liquid pressures.
     fn integral<const ORDER: u8>(&self, i: usize, j: usize) -> [f64; 6] {
         let model = self.state.model;
         let idx = i * model.num_components() + j;
@@ -34,30 +84,38 @@ impl<'a> MieRdf<'a> {
         let t = self.state.temperature / eps;
         let r = self.reduced;
         let mut coef = model.integral_coefficients[idx].iter().rev();
-        let (mut g, mut gr, mut gt, mut grr, mut grt, mut gtt) = (0., 0., 0., 0., 0., 0.);
+        let (mut g, mut gr, mut gt, mut grr, mut grt, mut gtt) =
+            (Dd::ZERO, Dd::ZERO, Dd::ZERO, Dd::ZERO, Dd::ZERO, Dd::ZERO);
         for degree in 0..=10 {
-            let (mut b, mut bt, mut btt) = (0., 0., 0.);
+            let (mut b, mut bt, mut btt) = (Dd::ZERO, Dd::ZERO, Dd::ZERO);
             for _ in 0..=degree {
                 if ORDER >= 2 {
-                    btt = btt * t + 2. * bt;
+                    btt = btt.mul_f64(t).add(bt.scale2());
                 }
                 if ORDER >= 1 {
-                    bt = bt * t + b;
+                    bt = bt.mul_f64(t).add(b);
                 }
-                b = b * t + coef.next().unwrap();
+                b = b.mul_f64(t).add_f64(*coef.next().unwrap());
             }
             if ORDER >= 2 {
-                grr = grr * r + 2. * gr;
-                grt = grt * r + gt;
-                gtt = gtt * r + btt;
+                grr = grr.mul_f64(r).add(gr.scale2());
+                grt = grt.mul_f64(r).add(gt);
+                gtt = gtt.mul_f64(r).add(btt);
             }
             if ORDER >= 1 {
-                gr = gr * r + g;
-                gt = gt * r + bt;
+                gr = gr.mul_f64(r).add(g);
+                gt = gt.mul_f64(r).add(bt);
             }
-            g = g * r + b;
+            g = g.mul_f64(r).add(b);
         }
-        [g, gr, gt / eps, grr, grt / eps, gtt / (eps * eps)]
+        [
+            g.0,
+            gr.0,
+            gt.0 / eps,
+            grr.0,
+            grt.0 / eps,
+            gtt.0 / (eps * eps),
+        ]
     }
 
     fn reduced_moles(&self) -> Vec<f64> {

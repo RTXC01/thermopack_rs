@@ -49,10 +49,12 @@ mole.
 - **Association (`rust/src/association.rs`, `rust/src/saft_vrmie/association.rs`)**:
   reuses the shared Wertheim TPT1 site solver (`AssocScheme`, `Standard` and
   `Elliot` $\Delta$ combining rules, exact infinite-dilution zero-mole site
-  fractions) paired with the Dufal et al. (2015) polynomial Mie association
-  integral (`association_rdf_tvn` and `rdf::saftvrmie_rdf`). Controls include
-  `has_association`, `set_assoc_params`, `set_delta_comb_rule`, and
-  `solve_assoc_x_k`.
+  fractions, and strictly-improving machine-precision Newton polish on
+  converged $X_k$) paired with the Dufal et al. (2015) polynomial Mie
+  association integral evaluated via double-double compensated Horner to avoid
+  degree-10 polynomial cancellation (`association_rdf_tvn` and
+  `rdf::saftvrmie_rdf`). Controls include `has_association`,
+  `set_assoc_params`, `set_delta_comb_rule`, and `solve_assoc_x_k`.
 - **Quantum extensions**: `new_quantum` and `new_quantum_with_hs_ref`
   (FH0/FH1/FH2, `FeynmanHibbs` and `JaenKahn` variants, `H_PLANCK = 6.626069311e-34`),
   plus `set_mass`, `de_boer_parameter`, `set_de_boer_parameter`, and
@@ -106,12 +108,15 @@ into `rust/src/saft_vrmie_data.rs`:
   (`helmholtz_terms` via zero-overhead `f64`, analytic `pressure_and_derivatives`
   and `state` via stack-buffered `Dual1`/`Dual2` without re-preparing
   temperature caches, `volume` with a strict $\le 10^{-6} P_{\text{target}}$
-  relative pressure closure cap on every success path and common-pressure
-  `MinimumGibbs`, and pure `saturation_pressure` using the stabilized
-  common-pressure Gibbs difference $(F_l - F_v) + P(v_l - v_v)/(RT) - \ln(v_l/v_v)$
-  with guarded mechanical-spinodal branch bracketing ($\eta \le 0.72$),
-  verified liquid and vapor pressure closure, and guaranteed supercritical
-  rejection). `SaftVrMieState::s_total` combines ideal TV entropy with TV
+  relative pressure closure cap on every returned root, noise-guarded bracketing
+  with local representable-`f64` ULP recovery near steep liquid roots, and
+  common-pressure `MinimumGibbs` that preserves a pressure-closed vapor winner
+  when a bounded liquid candidate establishes the Gibbs ordering; and pure
+  `saturation_pressure` using the stabilized common-pressure Gibbs difference
+  $(F_l - F_v) + P(v_l - v_v)/(RT) - \ln(v_l/v_v)$ with guarded
+  mechanical-spinodal branch bracketing ($\eta \le 0.72$), verified liquid and
+  vapor pressure closure, and distinct errors for supercritical isotherms versus
+  liquid packing-cap exhaustion). `SaftVrMieState::s_total` combines ideal TV entropy with TV
   residual entropy so it agrees with `state_tp.entropy.value` and satisfies
   $\Delta H = T\Delta S$ at coexistence.
 

@@ -2000,6 +2000,61 @@ fn test_saft_vrmie_dense_4c_extreme_strength_below_overflow_and_asymmetric_mixtu
     let rho_neg = 65_544.335_760_036_41;
     assert!(prep_neg.pressure_and_derivatives(rho_neg).is_err());
     assert!(prep_neg.state(rho_neg).is_err());
+
+    // Round 10 regression (PRRT_kwDOVJkJcc68Mn4z): identical H2O parameters with
+    // Scheme4C + trace Scheme1ea (eps = 4_194_304.0, beta = 2^-300) at 1500 K and
+    // rho = 41954.94342. Positive trace [1.0, 1e-40] splits into 2 exact bipartite
+    // classes (X_- ~= 5.13e-43, X_+ ~= 5.05e-41 << 2^-106); both public evaluators
+    // must converge, match the independent 120-digit reference (~143.84995952 Pa),
+    // and remain continuous with the zero-tracer [1.0, 0.0] limit.
+    let mut eos_trace = SaftVrMie::new(&["H2O", "H2O"]).unwrap();
+    let eps_r10 = 4_194_304.0;
+    let beta_r10 = 2.0_f64.powi(-300);
+    eos_trace
+        .set_assoc_params(0, thermopack_rs::AssocScheme::Scheme4C, eps_r10, beta_r10)
+        .unwrap();
+    eos_trace
+        .set_assoc_params(1, thermopack_rs::AssocScheme::Scheme1ea, eps_r10, beta_r10)
+        .unwrap();
+    let prep_zero = eos_trace.prepare(temperature, &[1.0, 0.0]).unwrap();
+    let prep_pos = eos_trace.prepare(temperature, &[1.0, 1.0e-40]).unwrap();
+    let j_zero = prep_zero.pressure_and_derivatives(rho).unwrap();
+    let s_zero = prep_zero.state(rho).unwrap();
+    let j_pos = prep_pos.pressure_and_derivatives(rho).unwrap();
+    let s_pos = prep_pos.state(rho).unwrap();
+    for (p_val, z_val) in [
+        (j_zero.pressure, j_zero.compressibility),
+        (s_zero.pressure, s_zero.compressibility),
+        (j_pos.pressure, j_pos.compressibility),
+        (s_pos.pressure, s_pos.compressibility),
+    ] {
+        assert!(p_val.is_finite() && z_val.is_finite());
+        assert!(
+            (p_val - expected_p).abs() < 1e-4,
+            "pressure={p_val}, expected={expected_p}"
+        );
+        let expected_z = p_val / (thermopack_rs::R * temperature * rho);
+        assert!((z_val - expected_z).abs() <= 1e-12 * expected_z);
+    }
+    assert!((j_pos.pressure - s_pos.pressure).abs() <= 1e-12);
+    assert!((j_pos.pressure - j_zero.pressure).abs() <= 1e-9);
+    assert!((s_pos.pressure - s_zero.pressure).abs() <= 1e-9);
+
+    // Also verify star-bipartite ng = 3 (distinct tracer association energy, [1.0, 1e-40]).
+    eos_trace
+        .set_assoc_params(
+            1,
+            thermopack_rs::AssocScheme::Scheme1ea,
+            0.9 * eps_r10,
+            beta_r10,
+        )
+        .unwrap();
+    let prep_star = eos_trace.prepare(temperature, &[1.0, 1.0e-40]).unwrap();
+    let j_star = prep_star.pressure_and_derivatives(rho).unwrap();
+    let s_star = prep_star.state(rho).unwrap();
+    assert!((j_star.pressure - expected_p).abs() < 1e-4);
+    assert!((j_star.pressure - s_star.pressure).abs() <= 1e-12);
+    assert!((j_star.pressure - j_zero.pressure).abs() <= 1e-9);
 }
 
 #[test]

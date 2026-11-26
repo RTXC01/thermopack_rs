@@ -376,29 +376,13 @@ pub(super) fn assoc_f_v_dd(
         }
     }
 
-    let (class_of, ng, w_mat) = equitable_site_partition(ns, &c_mat)?;
+    let part = equitable_site_partition(ns, &c_mat)?;
+    let ng = part.num_classes;
+    let w_mat = &part.w_mat;
     let mut y_g = vec![Dd::ONE; ng];
     if ng == 1 {
         let w = w_mat[0];
-        if !w.is_finite() || w.0 < 0.0 || (w.0 == 0.0 && w.1 < 0.0) {
-            return Err(Error::InvalidInput(
-                "invalid reduced association strength in high-precision evaluation",
-            ));
-        }
-        let y = if w.0 == 0.0 && w.1 == 0.0 {
-            Dd::ONE
-        } else if w.0 > 1.0e100 {
-            // 1 / (4*W) < 2.5e-101 << 2^-106 so sqrt(1 + 4*W) == 2*sqrt(W) to full DD precision.
-            Dd::from_f64(2.0).div(Dd::ONE.add(w.sqrt().scale2()))
-        } else {
-            Dd::from_f64(2.0).div(Dd::ONE.add(Dd::ONE.add(w.mul_f64(4.0)).sqrt()))
-        };
-        if !y.is_finite() || y.0 <= 0.0 || y.0 > 1.0 + 1.0e-28 {
-            return Err(Error::NotConverged(
-                "out-of-domain symmetric site fraction in high-precision association solver",
-            ));
-        }
-        let y_bound = if y.0 > 1.0 { Dd::ONE } else { y };
+        let y_bound = solve_positive_quadratic_dd(Dd::ONE, w)?;
         let res = Dd::ONE.sub(y_bound).sub(w.mul(y_bound).mul(y_bound));
         if !res.is_finite() || res.0.abs() > 1.0e-12 {
             return Err(Error::NotConverged(
@@ -406,6 +390,19 @@ pub(super) fn assoc_f_v_dd(
             ));
         }
         y_g[0] = y_bound;
+    } else if ng == 2 && is_dd_zero(w_mat[0]) && is_dd_zero(w_mat[3]) {
+        // Exact 2-class bipartite reduction (`1/Y_0 = 1 + W_01 Y_1`, `1/Y_1 = 1 + W_10 Y_0`).
+        // Cancel identical terms across the two class-aggregated multisets before forming
+        // `D = W_01 - W_10` so trace couplings (e.g. `1e-40`) are retained without O(1)
+        // cancellation even when `Y_0, Y_1 << 2^-106`.
+        let (y0, y1) = solve_bipartite_two_class_dd(&part)?;
+        y_g[0] = y0;
+        y_g[1] = y1;
+    } else if let Some(hub) = find_star_bipartite_hub(ng, w_mat) {
+        // Exact star-bipartite reduction (one hub class coupled to >=2 non-interacting leaf
+        // classes, e.g. 4C + 1ea with distinct cross-association strength): eliminate all leaf
+        // classes algebraically and solve the strictly monotone 1D hub equation in DD log-space.
+        y_g = solve_star_bipartite_dd(&part, hub)?;
     } else {
         // Initialize each class from the geometric mean of its member hints
         // (preserving exact single-site hints and immediately restoring the
@@ -414,7 +411,7 @@ pub(super) fn assoc_f_v_dd(
             let mut count = 0usize;
             let mut first = 0usize;
             let mut log_sum = 0.0_f64;
-            for (k, &cls) in class_of.iter().enumerate() {
+            for (k, &cls) in part.class_of.iter().enumerate() {
                 if cls == a {
                     if count == 0 {
                         first = k;
@@ -504,7 +501,7 @@ pub(super) fn assoc_f_v_dd(
         }
     }
 
-    let x_k: Vec<Dd> = class_of.iter().map(|&a| y_g[a]).collect();
+    let x_k: Vec<Dd> = part.class_of.iter().map(|&a| y_g[a]).collect();
 
     // Certify every site fraction bound and every original ns-site Wertheim
     // residual before forming dF_assoc/dV.
@@ -552,11 +549,354 @@ pub(super) fn assoc_f_v_dd(
     Ok(f_v)
 }
 
+struct SitePartition {
+    ns: usize,
+    class_of: Vec<usize>,
+    class_rep: Vec<usize>,
+    num_classes: usize,
+    w_mat: Vec<Dd>,
+    norm_c: Vec<Dd>,
+}
+
+#[inline(always)]
+fn is_dd_zero(v: Dd) -> bool {
+    v.0 == 0.0 && v.1 == 0.0
+}
+
+#[inline(always)]
+fn canonical_f64_bits(x: f64) -> u64 {
+    if x == 0.0 { 0u64 } else { x.to_bits() }
+}
+
+/// Solve `w * y^2 + b * y - 1 = 0` for the unique positive root `y in (0, 1]`
+/// given `b >= 1` and `w >= 0` in 106-bit double-double precision, using exact
+/// binary scaling (`2^p`) so `b^2 + 4*w` never overflows `f64::MAX`.
+fn solve_positive_quadratic_dd(b: Dd, w: Dd) -> Result<Dd> {
+    if !b.is_finite()
+        || !w.is_finite()
+        || b.0 < 1.0 - 1.0e-15
+        || w.0 < 0.0
+        || (w.0 == 0.0 && w.1 < 0.0)
+    {
+        return Err(Error::InvalidInput(
+            "invalid quadratic coefficients in high-precision association solver",
+        ));
+    }
+    if is_dd_zero(w) {
+        let y = Dd::ONE.div(b);
+        if !y.is_finite() || y.0 <= 0.0 || y.0 > 1.0 + 1.0e-28 {
+            return Err(Error::NotConverged(
+                "out-of-domain linear site fraction in high-precision association solver",
+            ));
+        }
+        return Ok(if y.0 > 1.0 { Dd::ONE } else { y });
+    }
+    let scale_ref = b.0.max(w.0.sqrt());
+    let disc_sqrt = if scale_ref > 1.0e140 {
+        let p = ((scale_ref.to_bits() >> 52) as i32) - 1023;
+        let bs = b.scale_pow2(-p);
+        let ws = w.scale_pow2(-2 * p);
+        bs.mul(bs).add(ws.mul_f64(4.0)).sqrt().scale_pow2(p)
+    } else {
+        b.mul(b).add(w.mul_f64(4.0)).sqrt()
+    };
+    let y = Dd::from_f64(2.0).div(b.add(disc_sqrt));
+    if !y.is_finite() || y.0 <= 0.0 || y.0 > 1.0 + 1.0e-28 {
+        return Err(Error::NotConverged(
+            "out-of-domain quadratic site fraction in high-precision association solver",
+        ));
+    }
+    Ok(if y.0 > 1.0 { Dd::ONE } else { y })
+}
+
+/// Compute `W_{a, b} - W_{b, a}` by cancelling bitwise-identical nonzero entries
+/// across the two sorted class-row multisets before summing the remaining terms,
+/// preserving tiny positive trace couplings without subtracting rounded `O(1)` sums.
+fn class_weight_diff_dd(part: &SitePartition, a: usize, b: usize) -> Result<Dd> {
+    let collect_sorted = |row_cls: usize, col_cls: usize| -> Vec<Dd> {
+        let rep = part.class_rep[row_cls];
+        let mut terms = Vec::with_capacity(part.ns);
+        for (l, &cls) in part.class_of.iter().enumerate() {
+            if cls == col_cls {
+                let c_kl = part.norm_c[rep * part.ns + l];
+                if !is_dd_zero(c_kl) {
+                    terms.push(c_kl);
+                }
+            }
+        }
+        terms.sort_unstable_by_key(|v| (canonical_f64_bits(v.0), canonical_f64_bits(v.1)));
+        terms
+    };
+
+    let a_terms = collect_sorted(a, b);
+    let b_terms = collect_sorted(b, a);
+    let mut only_a = Vec::with_capacity(a_terms.len());
+    let mut only_b = Vec::with_capacity(b_terms.len());
+    let (mut i, mut j) = (0usize, 0usize);
+    while i < a_terms.len() && j < b_terms.len() {
+        let ka = (
+            canonical_f64_bits(a_terms[i].0),
+            canonical_f64_bits(a_terms[i].1),
+        );
+        let kb = (
+            canonical_f64_bits(b_terms[j].0),
+            canonical_f64_bits(b_terms[j].1),
+        );
+        match ka.cmp(&kb) {
+            std::cmp::Ordering::Equal => {
+                i += 1;
+                j += 1;
+            }
+            std::cmp::Ordering::Less => {
+                only_a.push(a_terms[i]);
+                i += 1;
+            }
+            std::cmp::Ordering::Greater => {
+                only_b.push(b_terms[j]);
+                j += 1;
+            }
+        }
+    }
+    only_a.extend_from_slice(&a_terms[i..]);
+    only_b.extend_from_slice(&b_terms[j..]);
+
+    let mut pos = Dd::ZERO;
+    for &v in &only_a {
+        pos = pos.add(v);
+    }
+    let mut neg = Dd::ZERO;
+    for &v in &only_b {
+        neg = neg.add(v);
+    }
+    let diff = pos.sub(neg);
+    if !diff.is_finite() {
+        return Err(Error::InvalidInput(
+            "non-finite bipartite balance difference in high-precision association solver",
+        ));
+    }
+    Ok(diff)
+}
+
+/// Solve an exact 2-class bipartite system (`W_{00} = W_{11} = 0`) via exact
+/// multiset-difference elimination into a single positive quadratic.
+fn solve_bipartite_two_class_dd(part: &SitePartition) -> Result<(Dd, Dd)> {
+    let w01 = part.w_mat[1];
+    let w10 = part.w_mat[2];
+    let diff = class_weight_diff_dd(part, 0, 1)?;
+    let (y0, y1) = if diff.0 > 0.0 || (diff.0 == 0.0 && diff.1 >= 0.0) {
+        // W_01 >= W_10: W_10 * Y_0^2 + (1 + (W_01 - W_10)) * Y_0 - 1 = 0
+        let y0 = solve_positive_quadratic_dd(Dd::ONE.add(diff), w10)?;
+        let y1 = Dd::ONE.div(Dd::ONE.add(w10.mul(y0)));
+        (y0, y1)
+    } else {
+        // W_10 > W_01: W_01 * Y_1^2 + (1 + (W_10 - W_01)) * Y_1 - 1 = 0
+        let y1 = solve_positive_quadratic_dd(Dd::ONE.add(diff.neg()), w01)?;
+        let y0 = Dd::ONE.div(Dd::ONE.add(w01.mul(y1)));
+        (y0, y1)
+    };
+    if !y0.is_finite()
+        || !y1.is_finite()
+        || y0.0 <= 0.0
+        || y1.0 <= 0.0
+        || y0.0 > 1.0 + 1.0e-28
+        || y1.0 > 1.0 + 1.0e-28
+    {
+        return Err(Error::NotConverged(
+            "out-of-domain bipartite site fraction in high-precision association solver",
+        ));
+    }
+    Ok((
+        if y0.0 > 1.0 { Dd::ONE } else { y0 },
+        if y1.0 > 1.0 { Dd::ONE } else { y1 },
+    ))
+}
+
+/// Return `Some(hub)` if the `ng x ng` reduced matrix (`ng >= 3`) is star-bipartite:
+/// `W_{hub, hub} == 0` and all leaf-leaf entries `W_{a, b} == 0` for `a != hub, b != hub`.
+fn find_star_bipartite_hub(ng: usize, w_mat: &[Dd]) -> Option<usize> {
+    if ng < 3 {
+        return None;
+    }
+    'hub: for h in 0..ng {
+        if !is_dd_zero(w_mat[h * ng + h]) {
+            continue;
+        }
+        for a in 0..ng {
+            if a == h {
+                continue;
+            }
+            for b in 0..ng {
+                if b == h {
+                    continue;
+                }
+                if !is_dd_zero(w_mat[a * ng + b]) {
+                    continue 'hub;
+                }
+            }
+        }
+        return Some(h);
+    }
+    None
+}
+
+/// Solve an exact star-bipartite system (`ng >= 3`) by eliminating all leaf classes
+/// `Y_b = 1 / (1 + W_{bh} Y_h)` and solving the strictly decreasing 1D hub equation
+/// `(1 + (W_{ph} - W_{hp}) Y_h) / (1 + W_{ph} Y_h) - Y_h - sum_{b != h, p} W_{hb} Y_h / (1 + W_{bh} Y_h) = 0`
+/// via safeguarded DD log-space Newton-bisection.
+fn solve_star_bipartite_dd(part: &SitePartition, hub: usize) -> Result<Vec<Dd>> {
+    let ng = part.num_classes;
+    let w_mat = &part.w_mat;
+    let mut dom = usize::MAX;
+    let mut max_w = -1.0_f64;
+    for b in 0..ng {
+        if b == hub {
+            continue;
+        }
+        let w = w_mat[hub * ng + b].0;
+        if w > max_w {
+            max_w = w;
+            dom = b;
+        }
+    }
+    if dom == usize::MAX {
+        return Err(Error::NotConverged(
+            "missing leaf class in star-bipartite association solver",
+        ));
+    }
+
+    let w_hp = w_mat[hub * ng + dom];
+    let w_ph = w_mat[dom * ng + hub];
+    let d_p = class_weight_diff_dd(part, dom, hub)?; // W_{ph} - W_{hp}
+
+    let eval_g_and_dg_du = |y: Dd| -> Result<(Dd, Dd, f64)> {
+        let den_p = Dd::ONE.add(w_ph.mul(y));
+        let term_p = Dd::ONE.add(d_p.mul(y)).div(den_p);
+        let mut g = term_p.sub(y);
+        let mut dg_du = w_hp.mul(y).div(den_p.mul(den_p)).add(y).neg();
+        let mut scale = term_p.0.abs().max(y.0.abs());
+        for b in 0..ng {
+            if b == hub || b == dom {
+                continue;
+            }
+            let w_hb = w_mat[hub * ng + b];
+            let w_bh = w_mat[b * ng + hub];
+            if is_dd_zero(w_hb) {
+                continue;
+            }
+            let den_b = Dd::ONE.add(w_bh.mul(y));
+            let term_b = w_hb.mul(y).div(den_b);
+            g = g.sub(term_b);
+            dg_du = dg_du.sub(term_b.div(den_b));
+            scale = scale.max(term_b.0.abs());
+        }
+        if !g.is_finite() || !dg_du.is_finite() || !scale.is_finite() {
+            return Err(Error::NotConverged(
+                "non-finite star-bipartite residual in high-precision association solver",
+            ));
+        }
+        Ok((g, dg_du, scale))
+    };
+
+    // Upper bound on y_h: strictly <= 1, and if d_p < 0 then 1 + d_p * y_h > 0 requires y_h < 1 / (-d_p).
+    let y_hi = if d_p.0 < 0.0 {
+        let cap = Dd::ONE.div(d_p.neg());
+        if cap.0 < 1.0 { cap } else { Dd::ONE }
+    } else {
+        Dd::ONE
+    };
+    let mut u_hi = y_hi.ln();
+    let (g_hi, _, _) = eval_g_and_dg_du(y_hi)?;
+    if g_hi.0 > 0.0 {
+        return Err(Error::NotConverged(
+            "failed to bracket star-bipartite hub root from above",
+        ));
+    }
+
+    // Start from the 2-class estimate against the dominant leaf, then lower u_lo until g > 0.
+    let y_est = solve_positive_quadratic_dd(
+        if d_p.0 < 0.0 {
+            Dd::ONE.add(d_p.neg())
+        } else {
+            Dd::ONE
+        },
+        Dd::from_f64(w_ph.0.max(w_hp.0)),
+    )?;
+    let mut u_lo = if y_est.0 < y_hi.0 {
+        y_est.ln()
+    } else {
+        u_hi.sub(Dd::ONE)
+    };
+    for _ in 0..80 {
+        let (g_lo, _, _) = eval_g_and_dg_du(u_lo.exp())?;
+        if g_lo.0 >= 0.0 {
+            break;
+        }
+        u_lo = u_lo.sub(Dd::from_f64(10.0));
+        if u_lo.0 < -708.0 {
+            return Err(Error::NotConverged(
+                "star-bipartite hub site fraction underflowed",
+            ));
+        }
+    }
+
+    let mut u = u_lo.add(u_hi).mul_f64(0.5);
+    for _ in 0..80 {
+        let y = u.exp();
+        let (g, dg_du, scale) = eval_g_and_dg_du(y)?;
+        if g.0.abs() <= 1.0e-28 * scale.max(1.0e-300) {
+            break;
+        }
+        if g.0 > 0.0 {
+            u_lo = u;
+        } else {
+            u_hi = u;
+        }
+        let width = u_hi.sub(u_lo);
+        if width.0 <= 1.0e-28 * u.0.abs().max(1.0) {
+            u = u_lo.add(u_hi).mul_f64(0.5);
+            break;
+        }
+        let next = if dg_du.0 < 0.0 {
+            let cand = u.sub(g.div(dg_du));
+            if cand.is_finite() && cand.0 > u_lo.0 && cand.0 < u_hi.0 {
+                cand
+            } else {
+                u_lo.add(u_hi).mul_f64(0.5)
+            }
+        } else {
+            u_lo.add(u_hi).mul_f64(0.5)
+        };
+        u = next;
+    }
+
+    let y_h = u.exp();
+    if !y_h.is_finite() || y_h.0 <= 0.0 || y_h.0 > 1.0 + 1.0e-28 {
+        return Err(Error::NotConverged(
+            "out-of-domain star-bipartite hub site fraction",
+        ));
+    }
+    let y_h = if y_h.0 > 1.0 { Dd::ONE } else { y_h };
+    let mut y_g = vec![Dd::ONE; ng];
+    y_g[hub] = y_h;
+    for (b, slot) in y_g.iter_mut().enumerate() {
+        if b == hub {
+            continue;
+        }
+        let yb = Dd::ONE.div(Dd::ONE.add(w_mat[b * ng + hub].mul(y_h)));
+        if !yb.is_finite() || yb.0 <= 0.0 || yb.0 > 1.0 + 1.0e-28 {
+            return Err(Error::NotConverged(
+                "out-of-domain star-bipartite leaf site fraction",
+            ));
+        }
+        *slot = if yb.0 > 1.0 { Dd::ONE } else { yb };
+    }
+    Ok(y_g)
+}
+
 /// Compute a conservative exact equitable partition of the `ns x ns` scaled
 /// interaction matrix `c_mat` (`C_{kl} = rho * m_l * Delta_{kl}`), returning
-/// `(class_of, num_classes, w_mat)` where `w_mat[a * ng + b]` is the
-/// class-aggregated weight `sum_{l in class b} C_{k, l}` shared identically by
-/// every site `k` in class `a`.
+/// `SitePartition` where `w_mat[a * ng + b]` is the class-aggregated weight
+/// `sum_{l in class b} C_{k, l}` shared identically by every site `k` in class `a`.
 ///
 /// Refinement keys preserve the prior class `(class_of[k], sorted_nonzero_triples)`
 /// where each triple is `(class_of[l], hi_bits, lo_bits)` of the canonicalized
@@ -566,14 +906,12 @@ pub(super) fn assoc_f_v_dd(
 /// false merges (and ensures each pass can only split existing classes), while
 /// deliberately leaving distinct-multiplicity accidental sum coincidences (such
 /// as `[2*w]` vs `[w, w]`) in separate classes for the multi-class Newton solver.
-fn equitable_site_partition(ns: usize, c_mat: &[Dd]) -> Result<(Vec<usize>, usize, Vec<Dd>)> {
+fn equitable_site_partition(ns: usize, c_mat: &[Dd]) -> Result<SitePartition> {
     type SitePartitionKey = (usize, Vec<(usize, u64, u64)>);
     let mut class_of = vec![0usize; ns];
     let mut num_classes = 1usize;
     let mut keys: Vec<SitePartitionKey> =
         (0..ns).map(|_| (0usize, Vec::with_capacity(ns))).collect();
-
-    let canonical_bits = |x: f64| if x == 0.0 { 0u64 } else { x.to_bits() };
 
     let mut norm_c = vec![Dd::ZERO; ns * ns];
     for (slot, &entry) in norm_c.iter_mut().zip(c_mat.iter()) {
@@ -597,8 +935,12 @@ fn equitable_site_partition(ns: usize, c_mat: &[Dd]) -> Result<(Vec<usize>, usiz
             triples.clear();
             for (l, &target_cls) in class_of.iter().enumerate() {
                 let c_kl = norm_c[k * ns + l];
-                if c_kl.0 != 0.0 || c_kl.1 != 0.0 {
-                    triples.push((target_cls, canonical_bits(c_kl.0), canonical_bits(c_kl.1)));
+                if !is_dd_zero(c_kl) {
+                    triples.push((
+                        target_cls,
+                        canonical_f64_bits(c_kl.0),
+                        canonical_f64_bits(c_kl.1),
+                    ));
                 }
             }
             triples.sort_unstable();
@@ -639,12 +981,12 @@ fn equitable_site_partition(ns: usize, c_mat: &[Dd]) -> Result<(Vec<usize>, usiz
             for (l, &cls) in class_of.iter().enumerate() {
                 if cls == b {
                     let c_kl = norm_c[rep * ns + l];
-                    if c_kl.0 != 0.0 || c_kl.1 != 0.0 {
+                    if !is_dd_zero(c_kl) {
                         scratch.push(c_kl);
                     }
                 }
             }
-            scratch.sort_unstable_by_key(|v| (canonical_bits(v.0), canonical_bits(v.1)));
+            scratch.sort_unstable_by_key(|v| (canonical_f64_bits(v.0), canonical_f64_bits(v.1)));
             let mut acc = Dd::ZERO;
             for &v in &scratch {
                 acc = acc.add(v);
@@ -658,7 +1000,14 @@ fn equitable_site_partition(ns: usize, c_mat: &[Dd]) -> Result<(Vec<usize>, usiz
         }
     }
 
-    Ok((class_of, num_classes, w_mat))
+    Ok(SitePartition {
+        ns,
+        class_of,
+        class_rep,
+        num_classes,
+        w_mat,
+        norm_c,
+    })
 }
 
 fn solve_linear_dd(n: usize, a: &mut [Dd], b: &mut [Dd]) -> Option<Vec<Dd>> {
@@ -807,10 +1156,10 @@ mod tests {
                 c4[l * 4 + k] = y;
             }
         }
-        let (cls, ng, w) = equitable_site_partition(4, &c4).unwrap();
-        assert_eq!(ng, 1);
-        assert_eq!(cls, vec![0, 0, 0, 0]);
-        assert!((w[0].0 - 3.6e70).abs() <= 1e55);
+        let p4 = equitable_site_partition(4, &c4).unwrap();
+        assert_eq!(p4.num_classes, 1);
+        assert_eq!(p4.class_of, vec![0, 0, 0, 0]);
+        assert!((p4.w_mat[0].0 - 3.6e70).abs() <= 1e55);
 
         // Pure 3B: 2 positive (0,1) interact with 1 negative (2) -> 2 classes.
         let mut c3 = vec![Dd::ZERO; 9];
@@ -818,10 +1167,10 @@ mod tests {
             c3[k * 3 + 2] = y;
             c3[2 * 3 + k] = y;
         }
-        let (cls3, ng3, _) = equitable_site_partition(3, &c3).unwrap();
-        assert_eq!(ng3, 2);
-        assert_eq!(cls3[0], cls3[1]);
-        assert_ne!(cls3[0], cls3[2]);
+        let p3 = equitable_site_partition(3, &c3).unwrap();
+        assert_eq!(p3.num_classes, 2);
+        assert_eq!(p3.class_of[0], p3.class_of[1]);
+        assert_ne!(p3.class_of[0], p3.class_of[2]);
 
         // Asymmetric 4C (0,1 negative; 2,3 positive) + 1ea (4 positive):
         // negative 4C sites couple to site 4 while positive 4C sites do not -> 3 classes.
@@ -836,13 +1185,13 @@ mod tests {
             c5[k * 5 + 4] = y12;
             c5[4 * 5 + k] = y21;
         }
-        let (cls5, ng5, _) = equitable_site_partition(5, &c5).unwrap();
-        assert_eq!(ng5, 3);
-        assert_eq!(cls5[0], cls5[1]);
-        assert_eq!(cls5[2], cls5[3]);
-        assert_ne!(cls5[0], cls5[2]);
-        assert_ne!(cls5[0], cls5[4]);
-        assert_ne!(cls5[2], cls5[4]);
+        let p5 = equitable_site_partition(5, &c5).unwrap();
+        assert_eq!(p5.num_classes, 3);
+        assert_eq!(p5.class_of[0], p5.class_of[1]);
+        assert_eq!(p5.class_of[2], p5.class_of[3]);
+        assert_ne!(p5.class_of[0], p5.class_of[2]);
+        assert_ne!(p5.class_of[0], p5.class_of[4]);
+        assert_ne!(p5.class_of[2], p5.class_of[4]);
 
         // Round 9 counterexample (PRRT_kwDOVJkJcc68MbDL):
         // C01 = C10 = C23 = C32 = Dd(1.0, 2^-54), C12 = C21 = Dd(2^-160, 0.0), others zero.
@@ -857,11 +1206,11 @@ mod tests {
         c_tiny[3 * 4 + 2] = w_edge;
         c_tiny[4 + 2] = w_tiny;
         c_tiny[2 * 4 + 1] = w_tiny;
-        let (cls_t, ng_t, _) = equitable_site_partition(4, &c_tiny).unwrap();
-        assert_eq!(ng_t, 2);
-        assert_eq!(cls_t[0], cls_t[3]);
-        assert_eq!(cls_t[1], cls_t[2]);
-        assert_ne!(cls_t[0], cls_t[1]);
+        let pt = equitable_site_partition(4, &c_tiny).unwrap();
+        assert_eq!(pt.num_classes, 2);
+        assert_eq!(pt.class_of[0], pt.class_of[3]);
+        assert_eq!(pt.class_of[1], pt.class_of[2]);
+        assert_ne!(pt.class_of[0], pt.class_of[1]);
 
         // Symmetric 4C (0,1-; 2,3+) + 2B (4-; 5+) merges to 2 classes (one per component).
         let c11 = Dd::from_f64(1.0e30);
@@ -883,13 +1232,34 @@ mod tests {
         }
         c6[4 * 6 + 5] = c22;
         c6[5 * 6 + 4] = c22;
-        let (cls6, ng6, _) = equitable_site_partition(6, &c6).unwrap();
-        assert_eq!(ng6, 2);
-        assert_eq!(cls6[0], cls6[1]);
-        assert_eq!(cls6[0], cls6[2]);
-        assert_eq!(cls6[0], cls6[3]);
-        assert_eq!(cls6[4], cls6[5]);
-        assert_ne!(cls6[0], cls6[4]);
+        let p6 = equitable_site_partition(6, &c6).unwrap();
+        assert_eq!(p6.num_classes, 2);
+        assert_eq!(p6.class_of[0], p6.class_of[1]);
+        assert_eq!(p6.class_of[0], p6.class_of[2]);
+        assert_eq!(p6.class_of[0], p6.class_of[3]);
+        assert_eq!(p6.class_of[4], p6.class_of[5]);
+        assert_ne!(p6.class_of[0], p6.class_of[4]);
+
+        // Round 10 trace-asymmetric bipartite 4C + 1ea (equal self/cross Delta, x_trace = 1e-40):
+        // preserves exact 2-class split ({0,1} vs {2,3,4}) and solves for X_- ~= 5.13e-43,
+        // X_+ ~= 5.05e-41 without losing the 1e-40 trace balance to O(1) sum rounding.
+        let y_r10 = Dd::from_f64(1.929_832_031_222_762e82);
+        let y_trace = y_r10.mul_f64(1.0e-40);
+        let mut c_r10 = vec![Dd::ZERO; 25];
+        for k in 0..2 {
+            for l in 2..4 {
+                c_r10[k * 5 + l] = y_r10;
+                c_r10[l * 5 + k] = y_r10;
+            }
+            c_r10[k * 5 + 4] = y_trace;
+            c_r10[4 * 5 + k] = y_r10;
+        }
+        let p_r10 = equitable_site_partition(5, &c_r10).unwrap();
+        assert_eq!(p_r10.num_classes, 2);
+        assert_eq!(p_r10.class_of, vec![0, 0, 1, 1, 1]);
+        let (x_minus, x_plus) = solve_bipartite_two_class_dd(&p_r10).unwrap();
+        assert!((x_minus.0 - 5.129_181_126_449_266e-43).abs() <= 1.0e-55);
+        assert!((x_plus.0 - 5.051_291_811_264_493e-41).abs() <= 1.0e-53);
     }
 
     #[test]

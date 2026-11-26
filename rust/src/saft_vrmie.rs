@@ -2233,6 +2233,11 @@ impl<'a> PreparedSaftVrMie<'a> {
         let rt_dd = Dd::two_prod(RGAS, self.temperature);
         let p = rt_dd.mul(diff_dd).0;
         let z = diff_dd.div(rho_dd).0;
+        if !p.is_finite() || !z.is_finite() {
+            return Err(Error::NotConverged(
+                "non-finite high-precision SAFT-VR Mie pressure or compressibility",
+            ));
+        }
         Ok((p, z))
     }
 

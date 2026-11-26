@@ -1853,6 +1853,67 @@ fn test_saft_vrmie_steep_liquid_ulp_recovery_nh3() {
 }
 
 #[test]
+fn test_saft_vrmie_dense_association_near_exponential_limit() {
+    let temperature = 1500.0;
+    let rho = 41954.94342;
+    let mut eos = SaftVrMie::new(&["H2O"]).unwrap();
+    eos.set_assoc_params(
+        0,
+        thermopack_rs::AssocScheme::Scheme4C,
+        709.781 * (thermopack_rs::R * temperature),
+        1e-300,
+    )
+    .unwrap();
+    let prepared = eos.prepare(temperature, &[1.0]).unwrap();
+    let jet = prepared.pressure_and_derivatives(rho).unwrap();
+    let state = prepared.state(rho).unwrap();
+    // Independently verified 60-digit EOS reference: P = 143.8499584938 Pa
+    // (cancelling ~2.15 GPa non-association and association contributions).
+    let expected_p = 143.849_958_493_8;
+    for (pressure, compressibility) in [
+        (jet.pressure, jet.compressibility),
+        (state.pressure, state.compressibility),
+    ] {
+        assert!(pressure.is_finite() && compressibility.is_finite());
+        assert!(
+            (pressure - expected_p).abs() < 1e-4,
+            "pressure={pressure}, expected={expected_p}"
+        );
+        let expected_z = pressure / (thermopack_rs::R * temperature * rho);
+        assert!((compressibility - expected_z).abs() <= 1e-12 * expected_z);
+    }
+    assert!((jet.pressure - state.pressure).abs() <= 1e-12);
+    assert!((jet.compressibility - state.compressibility).abs() <= 1e-18);
+
+    // Also check right up against ln(f64::MAX) (~709.78271289) where f64::exp is still finite.
+    eos.set_assoc_params(
+        0,
+        thermopack_rs::AssocScheme::Scheme4C,
+        709.782_7 * (thermopack_rs::R * temperature),
+        1e-300,
+    )
+    .unwrap();
+    let prepared_edge = eos.prepare(temperature, &[1.0]).unwrap();
+    let jet_edge = prepared_edge.pressure_and_derivatives(rho).unwrap();
+    let state_edge = prepared_edge.state(rho).unwrap();
+    assert!(jet_edge.pressure.is_finite() && jet_edge.compressibility.is_finite());
+    assert!((jet_edge.pressure - state_edge.pressure).abs() <= 1e-12);
+    assert!((jet_edge.pressure - expected_p).abs() < 1e-3);
+
+    // Above ln(f64::MAX), overflow must be rejected cleanly with Err rather than Ok(NaN).
+    eos.set_assoc_params(
+        0,
+        thermopack_rs::AssocScheme::Scheme4C,
+        710.0 * (thermopack_rs::R * temperature),
+        1e-300,
+    )
+    .unwrap();
+    let prepared_ovf = eos.prepare(temperature, &[1.0]).unwrap();
+    assert!(prepared_ovf.pressure_and_derivatives(rho).is_err());
+    assert!(prepared_ovf.state(rho).is_err());
+}
+
+#[test]
 fn test_saft_vrmie_fixed_pressure_nh3_120k_quantization_and_representable_targets() {
     // Independently qualify NH3 120 K fixed-pressure liquid closure beyond saturation
     // round-trips. At T = 120 K, |dP/dv| * ulp(v_l) ~= 1.181e-6 Pa (~1.162e-6 Pa per

@@ -251,15 +251,29 @@ pub(super) fn assoc_f_v_dd(
                 continue;
             }
             let eps = assoc.eps_kl[kl];
-            let expo_m1 = if eps > 0.0 {
-                Dd::from_f64(eps).div(rt_dd).exp_m1()
+            let h = if eps > 0.0 {
+                let arg = Dd::from_f64(eps).div(rt_dd);
+                let bn = Dd::two_prod(beta, N_A);
+                if arg.0 > 100.0 && arg.0 < 1.0e6 {
+                    // For arg > 100, exp(-arg) < 3.8e-44 << 2^-106 so exp(arg) - 1 == exp(arg)
+                    // to full 106-bit precision; multiplying `beta * N_A` by the O(1) mantissa
+                    // before binary `2^k` scaling avoids intermediate overflow near `ln(f64::MAX)`.
+                    let (mant, k) = arg.exp_mantissa_and_pow2();
+                    bn.mul(mant).scale_pow2(k)
+                } else {
+                    bn.mul(arg.exp_m1())
+                }
             } else {
                 Dd::ZERO
             };
-            let h = Dd::two_prod(beta, N_A).mul(expo_m1);
             let (g, gr) = g_pair[ic * nc + jc];
             let d = g.mul(h);
             let dv = gr.mul(r_dd).mul(rho_dd).mul(h).neg();
+            if !d.0.is_finite() || !dv.0.is_finite() {
+                return Err(Error::InvalidInput(
+                    "non-finite association strength in high-precision evaluation",
+                ));
+            }
             delta[kl] = d;
             delta[lk] = d;
             delta_v[kl] = dv;
@@ -290,6 +304,11 @@ pub(super) fn assoc_f_v_dd(
                 } else {
                     Dd::ZERO
                 };
+                if !d_ab.0.is_finite() || !dv_ab.0.is_finite() {
+                    return Err(Error::InvalidInput(
+                        "non-finite Elliot association strength in high-precision evaluation",
+                    ));
+                }
                 for k in k1..=k2 {
                     for l in l1..=l2 {
                         let kl = k * ns + l;
@@ -307,63 +326,97 @@ pub(super) fn assoc_f_v_dd(
         }
     }
 
-    // Refine X_k from the 53-bit f64 hint to 106-bit double-double via 2 Newton steps
-    // on g_k(X) = 1/X_k - 1 - rho * sum_l m_l * Delta_kl * X_l = 0.
+    // Refine X_k from the 53-bit f64 hint to 106-bit double-double via damped
+    // log-space Newton (`X_k = exp(u_k)`) on the O(1)-scaled site residual
+    //   r_k(u) = 1 - X_k - X_k * sum_l (rho * m_l * Delta_kl) * X_l = 0.
+    // Log-space steps stay strictly positive, avoid `1/X_k^2` scaling blow-up,
+    // and move along constant-product manifolds (`X_A * X_B = const`) when an
+    // extreme `f64` hint exhibits bipartite symmetry breaking.
     let m_u: Vec<Dd> = assoc
         .site_to_comp
         .iter()
         .map(|&ic| Dd::from_f64(state.mole_fractions[ic]))
         .collect();
-    let mut x_k: Vec<Dd> = x_k_hint.iter().map(|&v| Dd::from_f64(v)).collect();
-    if x_k.len() != ns {
+    if x_k_hint.len() != ns {
         return Err(Error::InvalidInput(
             "association site fraction hint mismatch",
         ));
     }
+    let mut x_k = Vec::with_capacity(ns);
+    for &v in x_k_hint {
+        if !v.is_finite() || v <= 0.0 {
+            return Err(Error::InvalidInput(
+                "invalid association site fraction hint",
+            ));
+        }
+        x_k.push(Dd::from_f64(v));
+    }
 
     let mut jac = vec![Dd::ZERO; ns * ns];
     let mut rhs = vec![Dd::ZERO; ns];
-    for _ in 0..2 {
+    let mut last_max_res = f64::INFINITY;
+    for _ in 0..24 {
         let mut max_res = 0.0_f64;
         for k in 0..ns {
             let xk = x_k[k];
-            if xk.0 <= 0.0 {
-                break;
-            }
-            let mut sum = Dd::ZERO;
+            let mut sum_cx = Dd::ZERO;
             for l in 0..ns {
-                let k_kl = rho_dd.mul(m_u[l]).mul(delta[k * ns + l]);
-                sum = sum.add(k_kl.mul(x_k[l]));
-                jac[k * ns + l] = k_kl.neg();
+                let cx_l = delta[k * ns + l].mul(x_k[l]).mul(rho_dd).mul(m_u[l]);
+                sum_cx = sum_cx.add(cx_l);
+                jac[k * ns + l] = xk.mul(cx_l).neg();
             }
-            let inv_xk = Dd::ONE.div(xk);
-            let res = inv_xk.sub(Dd::ONE).sub(sum);
+            let x_sum = xk.mul(sum_cx);
+            let res = Dd::ONE.sub(xk).sub(x_sum);
             max_res = max_res.max(res.0.abs());
             rhs[k] = res.neg();
-            jac[k * ns + k] = jac[k * ns + k].sub(inv_xk.mul(inv_xk));
+            jac[k * ns + k] = jac[k * ns + k].sub(xk.add(x_sum));
         }
-        if max_res <= 1.0e-30 {
+        last_max_res = max_res;
+        if !max_res.is_finite() {
+            return Err(Error::NotConverged(
+                "non-finite residual in high-precision association site solver",
+            ));
+        }
+        if max_res <= 1.0e-28 {
             break;
         }
-        if let Some(dx) = solve_linear_dd(ns, &mut jac, &mut rhs) {
-            let mut ok = true;
-            for k in 0..ns {
-                let next = x_k[k].add(dx[k]);
-                if !next.0.is_finite() || next.0 <= 0.0 || next.0 > 1.000_001 {
-                    ok = false;
-                    break;
-                }
+        let Some(du) = solve_linear_dd(ns, &mut jac, &mut rhs) else {
+            return Err(Error::NotConverged(
+                "singular Jacobian in high-precision association site solver",
+            ));
+        };
+        let mut max_du = 0.0_f64;
+        for d in &du {
+            if !d.0.is_finite() {
+                return Err(Error::NotConverged(
+                    "non-finite step in high-precision association site solver",
+                ));
             }
-            if ok {
-                for k in 0..ns {
-                    x_k[k] = x_k[k].add(dx[k]);
-                }
+            max_du = max_du.max(d.0.abs());
+        }
+        let scale = if max_du > 2.0 { 2.0 / max_du } else { 1.0 };
+        for k in 0..ns {
+            let step = if scale < 1.0 {
+                du[k].mul_f64(scale)
             } else {
-                break;
+                du[k]
+            };
+            let next = x_k[k].mul(step.exp());
+            if !next.0.is_finite() || next.0 <= 0.0 {
+                return Err(Error::NotConverged(
+                    "invalid site fraction update in high-precision association solver",
+                ));
             }
-        } else {
+            x_k[k] = if next.0 > 1.0 { Dd::ONE } else { next };
+        }
+        if max_du <= 1.0e-28 {
             break;
         }
+    }
+    if !last_max_res.is_finite() || last_max_res > 1.0e-12 {
+        return Err(Error::NotConverged(
+            "high-precision association site solver did not converge",
+        ));
     }
 
     let mut f_v = Dd::ZERO;
@@ -372,15 +425,21 @@ pub(super) fn assoc_f_v_dd(
         if mk_xk.0 == 0.0 {
             continue;
         }
+        let half_mk_xk_rho = mk_xk.mul(rho_dd).mul_f64(0.5);
         for l in 0..ns {
             let kl = k * ns + l;
             if delta[kl].0 == 0.0 && delta_v[kl].0 == 0.0 {
                 continue;
             }
-            let qty = mk_xk.mul(m_u[l]).mul(x_k[l]).mul(rho_dd).mul_f64(0.5);
-            let term = delta[kl].mul(rho_dd).sub(delta_v[kl]);
-            f_v = f_v.add(qty.mul(term));
+            let ml_xl = m_u[l].mul(x_k[l]);
+            let term_x = delta[kl].mul(ml_xl).mul(rho_dd).sub(delta_v[kl].mul(ml_xl));
+            f_v = f_v.add(half_mk_xk_rho.mul(term_x));
         }
+    }
+    if !f_v.0.is_finite() {
+        return Err(Error::NotConverged(
+            "non-finite high-precision association volume derivative",
+        ));
     }
     Ok(f_v)
 }

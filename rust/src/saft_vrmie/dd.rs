@@ -64,9 +64,44 @@ impl Dd {
             let b_lo = b - b_hi;
             let err = ((a_hi * b_hi - p) + a_hi * b_lo + a_lo * b_hi) + a_lo * b_lo;
             Self(p, err)
+        } else if p.is_finite() {
+            Self::two_prod_prescaled(a, b, p, ca, cb)
         } else {
             Self(p, 0.0)
         }
+    }
+
+    #[cold]
+    #[inline(never)]
+    fn two_prod_prescaled(a: f64, b: f64, p: f64, ca: f64, cb: f64) -> Self {
+        const SPLIT: f64 = 134_217_729.0; // 2^27 + 1
+        const SCALE_UP: f64 = 268_435_456.0; // 2^28
+        const SCALE_DOWN: f64 = 1.0 / SCALE_UP; // 2^-28 (exact)
+        let (sa, fa) = if ca.is_finite() {
+            (a, 1.0)
+        } else {
+            (a * SCALE_DOWN, SCALE_UP)
+        };
+        let (sb, fb) = if cb.is_finite() {
+            (b, 1.0)
+        } else {
+            (b * SCALE_DOWN, SCALE_UP)
+        };
+        let ca2 = SPLIT * sa;
+        let cb2 = SPLIT * sb;
+        if ca2.is_finite() && cb2.is_finite() {
+            let ps = sa * sb;
+            let a_hi = ca2 - (ca2 - sa);
+            let a_lo = sa - a_hi;
+            let b_hi = cb2 - (cb2 - sb);
+            let b_lo = sb - b_hi;
+            let err_s = ((a_hi * b_hi - ps) + a_hi * b_lo + a_lo * b_hi) + a_lo * b_lo;
+            let err = (err_s * fa) * fb;
+            if err.is_finite() {
+                return Self(p, err);
+            }
+        }
+        Self(p, 0.0)
     }
 
     #[inline(always)]
@@ -134,31 +169,28 @@ impl Dd {
     }
 
     #[inline]
-    fn scale_pow2(self, k: i32) -> Self {
+    pub(super) fn scale_pow2(self, k: i32) -> Self {
         if k == 0 {
             return self;
         }
         if (-1022..=1023).contains(&k) {
             let factor = f64::from_bits(((k + 1023) as u64) << 52);
-            Self(self.0 * factor, self.1 * factor)
+            let hi = self.0 * factor;
+            if hi.is_finite() {
+                Self(hi, self.1 * factor)
+            } else {
+                Self(hi, 0.0)
+            }
         } else {
             let half = k / 2;
             self.scale_pow2(half).scale_pow2(k - half)
         }
     }
 
-    /// CRT-independent 106-bit `exp(self)` via `2^k * exp(r / 16)^16` with degree-12 Taylor.
+    /// Return `(mantissa, k)` such that `exp(self) == mantissa * 2^k` with
+    /// `mantissa` in `[sqrt(0.5), sqrt(2)]`, for finite `self` with `|self| < 1e6`.
     #[inline]
-    pub(super) fn exp(self) -> Self {
-        if !self.0.is_finite() {
-            return Self::from_f64(self.0.exp());
-        }
-        if self.0 > 709.78 {
-            return Self::from_f64(f64::INFINITY);
-        }
-        if self.0 < -745.0 {
-            return Self::ZERO;
-        }
+    pub(super) fn exp_mantissa_and_pow2(self) -> (Self, i32) {
         let k_f = (self.0 * INV_LN2).round();
         let k = k_f as i32;
         let r = self.sub(LN2_DD.mul_f64(k_f));
@@ -172,6 +204,23 @@ impl Dd {
         for _ in 0..4 {
             e = e.mul(e);
         }
+        (e, k)
+    }
+
+    /// CRT-independent 106-bit `exp(self)` via `2^k * exp(r / 16)^16` with degree-12 Taylor.
+    #[inline]
+    pub(super) fn exp(self) -> Self {
+        if !self.0.is_finite() {
+            return Self::from_f64(self.0.exp());
+        }
+        // Leave the boundary near ln(f64::MAX) to the final binary scaling.
+        if self.0 >= 710.0 {
+            return Self::from_f64(f64::INFINITY);
+        }
+        if self.0 < -745.0 {
+            return Self::ZERO;
+        }
+        let (e, k) = self.exp_mantissa_and_pow2();
         e.scale_pow2(k)
     }
 
@@ -186,7 +235,12 @@ impl Dd {
             }
             s.add(s.mul(s).mul(poly))
         } else {
-            self.exp().sub(Self::ONE)
+            let exp = self.exp();
+            if exp.0.is_finite() {
+                exp.sub(Self::ONE)
+            } else {
+                exp
+            }
         }
     }
 

@@ -751,8 +751,13 @@ impl LjsWca {
     }
 
     /// Legacy-compatible summary state at `(T, V, n)`.
+    ///
+    /// Requires positive pressure; use `tv_state` to inspect nonpositive-pressure
+    /// states explicitly.
     pub fn state(&self, temperature: f64, volume: f64, moles: f64) -> Result<LjsState> {
-        Ok(self.tv_state(temperature, volume, moles)?.to_legacy_state())
+        let tv = self.tv_state(temperature, volume, moles)?;
+        positive(tv.pressure.value, "pressure")?;
+        Ok(tv.to_legacy_state())
     }
 
     /// Speed of sound (m/s) at `(T, V, n)`.
@@ -948,6 +953,11 @@ impl PreparedLjsWca {
         }
         let disp = self.dispersion_density(rho)?;
         total = total.add(disp);
+        if !total.values().iter().all(|v| v.is_finite()) {
+            return Err(Error::InvalidInput(
+                "non-finite LJS-WCA density Helmholtz evaluation",
+            ));
+        }
         Ok(total)
     }
 

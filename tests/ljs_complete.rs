@@ -15,7 +15,7 @@ use thermopack_rs::helmholtz::PureHelmholtz;
 use thermopack_rs::ljs::{
     ALPHA_LJS, LjUfPotential, LjsBh, LjsControl, LjsTpState, LjsTvState, LjsUf, LjsUfControl,
     LjsUv, LjsUvControl, a1_ljs_ex, a2_ljs_ex, a3_ljs_ex, ai_ljs_ex, calc_uf_wca, calc_uf_wca_tvn,
-    calc_uv_wca_tvn, uv_a1_u_mult_t,
+    calc_uv_wca_tvn, uv_a1_u_mult_t, uv_phi, uv_phi_temp,
 };
 use thermopack_rs::ljs_wca::{LjsWca, LjsWcaControl, wca_term_tvn};
 
@@ -1026,4 +1026,312 @@ fn edge_domains_standalone_kernels_and_invalid_inputs() {
     let tv: LjsTvState = wca.tv_state(120.0, 1.0e-4, 1.0).unwrap();
     let legacy = wca.state(120.0, 1.0e-4, 1.0).unwrap();
     assert_close("legacy h_total", tv.h_total, legacy.h_total, 1e-14, 1e-14);
+}
+
+#[test]
+fn near_critical_both_spinodals_and_phase_selections() {
+    // Sub-cell near-critical spinodal pairs where both grid endpoint derivatives
+    // stay positive must still isolate both stable liquid and vapor roots.
+    fn check_near_critical(
+        label: &str,
+        p: f64,
+        roots: &[f64],
+        v_liq: f64,
+        v_vap: f64,
+        v_min_g: f64,
+        pressure_tv: impl Fn(f64) -> thermopack_rs::PurePressure,
+    ) {
+        assert_eq!(
+            roots.len(),
+            2,
+            "{label}: expected 2 stable near-critical roots, got {roots:?}"
+        );
+        assert!(
+            roots[0] < roots[1],
+            "{label}: liquid root must be strictly smaller than vapor root ({roots:?})"
+        );
+        assert_close(&format!("{label}.liquid"), roots[0], v_liq, 1e-15, 1e-13);
+        assert_close(&format!("{label}.vapor"), roots[1], v_vap, 1e-15, 1e-13);
+        assert!(
+            (v_min_g - roots[0]).abs() <= 1e-15 * roots[0]
+                || (v_min_g - roots[1]).abs() <= 1e-15 * roots[1],
+            "{label}: MinimumGibbs root {v_min_g:e} not among {roots:?}"
+        );
+        for (tag, v) in [("liquid", v_liq), ("vapor", v_vap)] {
+            let pr = pressure_tv(v);
+            assert!(
+                pr.dv < 0.0,
+                "{label}.{tag}: expected mechanically stable root (dP/dV < 0), got {}",
+                pr.dv
+            );
+            let rel_err = (pr.value - p).abs() / p;
+            assert!(
+                rel_err < 1.0e-11,
+                "{label}.{tag}: pressure closure rel_err={rel_err:.3e} (p={p:.16e}, got={:.16e})",
+                pr.value
+            );
+        }
+    }
+
+    // WCA near critical point
+    let wca = LjsWca::new();
+    let (t, p) = (117.139920846527, 4_639_769.784019153);
+    let roots = wca.volumes(t, p).unwrap();
+    check_near_critical(
+        "WCA-near-critical",
+        p,
+        &roots,
+        wca.volume(t, p, Phase::Liquid).unwrap(),
+        wca.volume(t, p, Phase::Vapor).unwrap(),
+        wca.volume(t, p, Phase::MinimumGibbs).unwrap(),
+        |v| wca.pressure_tv(t, v, 1.0).unwrap(),
+    );
+    assert_close("WCA-liq-val", 6.83918042e-5, roots[0], 1e-11, 1e-7);
+    assert_close("WCA-vap-val", 6.86946043e-5, roots[1], 1e-11, 1e-7);
+
+    // UV near critical point
+    let uv = LjsUv::new();
+    let (t, p) = (108.884564638390, 3_165_762.679804831);
+    let roots = uv.volumes(t, p).unwrap();
+    check_near_critical(
+        "UV-near-critical",
+        p,
+        &roots,
+        uv.volume(t, p, Phase::Liquid).unwrap(),
+        uv.volume(t, p, Phase::Vapor).unwrap(),
+        uv.volume(t, p, Phase::MinimumGibbs).unwrap(),
+        |v| uv.pressure_tv(t, v, 1.0).unwrap(),
+    );
+
+    // LJS-UF near critical point
+    let ljs_uf = LjsUf::new(LjUfPotential::LennardJonesSplined);
+    let (t, p) = (114.282861338813, 4_377_015.446249527);
+    let roots = ljs_uf.volumes(t, p).unwrap();
+    check_near_critical(
+        "LJS-UF-near-critical",
+        p,
+        &roots,
+        ljs_uf.volume(t, p, Phase::Liquid).unwrap(),
+        ljs_uf.volume(t, p, Phase::Vapor).unwrap(),
+        ljs_uf.volume(t, p, Phase::MinimumGibbs).unwrap(),
+        |v| ljs_uf.pressure_tv(t, v, 1.0).unwrap(),
+    );
+
+    // LJ-UF near critical point
+    let lj_uf = LjsUf::new(LjUfPotential::LennardJones);
+    let (t, p) = (163.366546486757, 5_652_595.510867001);
+    let roots = lj_uf.volumes(t, p).unwrap();
+    check_near_critical(
+        "LJ-UF-near-critical",
+        p,
+        &roots,
+        lj_uf.volume(t, p, Phase::Liquid).unwrap(),
+        lj_uf.volume(t, p, Phase::Vapor).unwrap(),
+        lj_uf.volume(t, p, Phase::MinimumGibbs).unwrap(),
+        |v| lj_uf.pressure_tv(t, v, 1.0).unwrap(),
+    );
+}
+
+#[test]
+fn dilute_vapor_bracketing_and_pressure_relative_closure() {
+    let bh = LjsBh::new();
+    let t = 200.0;
+    for p in [1.0e-13, 1.0e-9, 1.0e-8, 1.500_000_000_000_000_2e-8] {
+        let v = bh.volume(t, p, Phase::Vapor).unwrap();
+        let pr = bh.pressure_tv(t, v, 1.0).unwrap();
+        let rel_err = (pr.value - p).abs() / p;
+        assert!(
+            rel_err < 1.0e-12,
+            "BH dilute P={p:e}: got {:.16e} (rel_err={rel_err:.3e})",
+            pr.value
+        );
+        assert!(pr.dv < 0.0);
+    }
+
+    // All remaining models close ultra-dilute vapor pressures cleanly
+    let p = 1.0e-12;
+    let wca = LjsWca::new();
+    let v = wca.volume(t, p, Phase::Vapor).unwrap();
+    assert!((wca.pressure_tv(t, v, 1.0).unwrap().value - p).abs() / p < 1.0e-12);
+
+    let uv = LjsUv::new();
+    let v = uv.volume(t, p, Phase::Vapor).unwrap();
+    assert!((uv.pressure_tv(t, v, 1.0).unwrap().value - p).abs() / p < 1.0e-12);
+
+    for pot in [
+        LjUfPotential::LennardJonesSplined,
+        LjUfPotential::LennardJones,
+    ] {
+        let uf = LjsUf::new(pot);
+        let v = uf.volume(t, p, Phase::Vapor).unwrap();
+        assert!((uf.pressure_tv(t, v, 1.0).unwrap().value - p).abs() / p < 1.0e-12);
+    }
+}
+
+#[test]
+fn extreme_tanh_second_derivatives_and_density_finiteness() {
+    let p_uv = uv_phi(124.0, 120.0, 3.0);
+    for (slot, val) in [p_uv.0, p_uv.1, p_uv.2, p_uv.3, p_uv.4, p_uv.5]
+        .iter()
+        .enumerate()
+    {
+        assert!(val.is_finite(), "uv_phi slot {slot} not finite: {val}");
+    }
+    let p_uv_t = uv_phi_temp(124.0, 120.0, 3.0);
+    for (slot, val) in [p_uv_t.0, p_uv_t.1, p_uv_t.2, p_uv_t.3, p_uv_t.4, p_uv_t.5]
+        .iter()
+        .enumerate()
+    {
+        assert!(val.is_finite(), "uv_phi_temp slot {slot} not finite: {val}");
+    }
+    for is_lj in [false, true] {
+        let uf = calc_uf_wca(10.0, 1.0, is_lj);
+        for (slot, val) in [uf.0, uf.1, uf.2, uf.3, uf.4, uf.5].iter().enumerate() {
+            assert!(
+                val.is_finite(),
+                "calc_uf_wca(is_lj={is_lj}) slot {slot} not finite: {val}"
+            );
+        }
+    }
+
+    // Extreme-temperature high-packing LJ-UF density evaluation stays finite
+    let lj_uf = LjsUf::new(LjUfPotential::LennardJones);
+    let prep = lj_uf.prepare(1.0e6).unwrap();
+    let rho = 0.85 / prep.eta_per_rho();
+    let dh = prep.residual_density(rho).unwrap();
+    for (name, val) in [
+        ("value", dh.value),
+        ("dt", dh.dt),
+        ("drho", dh.drho),
+        ("dtt", dh.dtt),
+        ("dtrho", dh.dtrho),
+        ("drhorho", dh.drhorho),
+    ] {
+        assert!(
+            val.is_finite(),
+            "LJ-UF extreme density {name} not finite: {val}"
+        );
+    }
+}
+
+#[test]
+fn legacy_nonpositive_pressure_state_error_and_unstable_sound_speed() {
+    let bh = LjsBh::new();
+
+    // Negative-pressure state: legacy state() returns Err(InvalidInput("pressure")),
+    // while tv_state() exposes the negative pressure and NaN entropies explicitly.
+    let (t_neg, v_neg) = (85.0, 7.904_664_559_912_66e-5);
+    let err = bh.state(t_neg, v_neg, 1.0).unwrap_err();
+    assert!(
+        matches!(err, thermopack_rs::Error::InvalidInput("pressure")),
+        "expected InvalidInput(\"pressure\"), got {err:?}"
+    );
+    let tv_neg = bh.tv_state(t_neg, v_neg, 1.0).unwrap();
+    assert!(tv_neg.pressure.value < -1.0e6);
+    assert!(tv_neg.s_residual.is_nan() && tv_neg.s_total.is_nan());
+
+    // Consistent positive-pressure check on WCA, UV, and UF legacy state()
+    assert!(matches!(
+        LjsWca::new().state(t_neg, v_neg, 1.0),
+        Err(thermopack_rs::Error::InvalidInput("pressure"))
+    ));
+    assert!(matches!(
+        LjsUv::new().state(t_neg, v_neg, 1.0),
+        Err(thermopack_rs::Error::InvalidInput("pressure"))
+    ));
+    assert!(matches!(
+        LjsUf::new(LjUfPotential::LennardJonesSplined).state(t_neg, v_neg, 1.0),
+        Err(thermopack_rs::Error::InvalidInput("pressure"))
+    ));
+
+    // Mechanically unstable TV state where both pressure.dv > 0 and cp_total < 0:
+    // speed_of_sound must be NaN (never sqrt of positive product of two wrong signs).
+    let prep = bh.prepare(85.0).unwrap();
+    let v_unstable = prep.eta_per_rho() / 0.10;
+    let tv_unstable = prep.tv_state(v_unstable, 1.0).unwrap();
+    assert!(tv_unstable.pressure.dv > 0.0, "expected dP/dV > 0");
+    assert!(tv_unstable.cp_total < 0.0, "expected cp_total < 0");
+    assert!(
+        tv_unstable.speed_of_sound.is_nan(),
+        "unstable TV state must report NaN speed_of_sound, got {}",
+        tv_unstable.speed_of_sound
+    );
+    assert!(
+        bh.speed_of_sound_tv(85.0, v_unstable, 1.0)
+            .unwrap()
+            .is_nan()
+    );
+}
+
+#[test]
+fn fresh_and_prepared_evaluations_agree_across_models() {
+    let (t, v, n, p) = (125.0, 1.1e-4, 1.2, 1.2e6);
+
+    let bh = LjsBh::new();
+    let bh_p = bh.prepare(t).unwrap();
+    assert_close(
+        "BH fresh vs prep F",
+        bh.residual_helmholtz_tvn(t, v, n).unwrap().value,
+        bh_p.residual_helmholtz_tvn(v, n).unwrap().value,
+        0.0,
+        1e-15,
+    );
+    assert_close(
+        "BH fresh vs prep V",
+        bh.volume(t, p, Phase::Vapor).unwrap(),
+        bh_p.volume(p, Phase::Vapor).unwrap(),
+        0.0,
+        1e-15,
+    );
+
+    let wca = LjsWca::new();
+    let wca_p = wca.prepare(t).unwrap();
+    assert_close(
+        "WCA fresh vs prep F",
+        wca.residual_helmholtz_tvn(t, v, n).unwrap().value,
+        wca_p.residual_helmholtz_tvn(v, n).unwrap().value,
+        0.0,
+        1e-15,
+    );
+    assert_close(
+        "WCA fresh vs prep V",
+        wca.volume(t, p, Phase::Vapor).unwrap(),
+        wca_p.volume(p, Phase::Vapor).unwrap(),
+        0.0,
+        1e-15,
+    );
+
+    let uv = LjsUv::new();
+    let uv_p = uv.prepare(t).unwrap();
+    assert_close(
+        "UV fresh vs prep F",
+        uv.residual_helmholtz_tvn(t, v, n).unwrap().value,
+        uv_p.residual_helmholtz_tvn(v, n).unwrap().value,
+        0.0,
+        1e-15,
+    );
+    assert_close(
+        "UV fresh vs prep V",
+        uv.volume(t, p, Phase::Vapor).unwrap(),
+        uv_p.volume(p, Phase::Vapor).unwrap(),
+        0.0,
+        1e-15,
+    );
+
+    let uf = LjsUf::new(LjUfPotential::LennardJonesSplined);
+    let uf_p = uf.prepare(t).unwrap();
+    assert_close(
+        "UF fresh vs prep F",
+        uf.residual_helmholtz_tvn(t, v, n).unwrap().value,
+        uf_p.residual_helmholtz_tvn(v, n).unwrap().value,
+        0.0,
+        1e-15,
+    );
+    assert_close(
+        "UF fresh vs prep V",
+        uf.volume(t, p, Phase::Vapor).unwrap(),
+        uf_p.volume(p, Phase::Vapor).unwrap(),
+        0.0,
+        1e-15,
+    );
 }

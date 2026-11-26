@@ -102,8 +102,8 @@ const C_FAC: f64 = 4.0;
 /// (`src/lj_splined.f90:alpha_ljs`).
 pub const ALPHA_LJS: f64 = 0.5357287350120993;
 
-/// Overflow-safe `(tanh(x), sech^2(x), d^2(tanh)/dx^2)` preserving exact
-/// `(e^(2x)-1)/(e^(2x)+1)` arithmetic on finite domains.
+/// Overflow-safe `(tanh(x), sech^2(x), d^2(tanh)/dx^2)` preserving Fortran's
+/// `(e^(2x)-1)/(e^(2x)+1)` and `1 - tanh^2` arithmetic on finite domains.
 pub(crate) fn safe_tanh_derivs(x: f64) -> (f64, f64, f64) {
     let two_x = 2.0 * x;
     if two_x >= 700.0 {
@@ -120,23 +120,24 @@ pub(crate) fn safe_tanh_derivs(x: f64) -> (f64, f64, f64) {
 }
 
 /// Overflow-safe `tanh(x(r))` and its first and second derivatives with respect
-/// to `r`, matching Fortran's `(e2x - 1)/(e2x + 1)` expression on finite domains.
+/// to `r`. Uses a scaled negative exponential `u = exp(-2|x|)` so neither
+/// `exp(2x)^2` nor `(exp(2x) + 1)^3` can overflow into `inf/inf = NaN`.
 fn safe_tanh_chain(x: f64, x_r: f64, x_rr: f64) -> (f64, f64, f64) {
-    let two_x = 2.0 * x;
-    if two_x >= 700.0 {
-        (1.0, 0.0, 0.0)
-    } else if two_x <= -700.0 {
-        (-1.0, 0.0, 0.0)
-    } else {
-        let e2x = two_x.exp();
-        let e2x_p1 = e2x + 1.0;
-        let tanh = (e2x - 1.0) / e2x_p1;
-        let denom = e2x_p1 * e2x_p1;
-        let tanh_r = 4.0 * e2x * x_r / denom;
-        let tanh_rr = 2.0 * tanh_r * x_r + 4.0 * e2x * x_rr / denom
-            - 16.0 * e2x * e2x * x_r * x_r / (denom * e2x_p1);
-        (tanh, tanh_r, tanh_rr)
+    let abs_two_x = 2.0 * x.abs();
+    if abs_two_x >= 700.0 {
+        return (if x >= 0.0 { 1.0 } else { -1.0 }, 0.0, 0.0);
     }
+    let u = (-abs_two_x).exp();
+    let one_plus = 1.0 + u;
+    let mag = (1.0 - u) / one_plus;
+    let tanh = if x >= 0.0 { mag } else { -mag };
+    let sech2 = 4.0 * u / (one_plus * one_plus);
+    if sech2 == 0.0 {
+        return (tanh, 0.0, 0.0);
+    }
+    let tanh_r = sech2 * x_r;
+    let tanh_rr = sech2 * (x_rr - 2.0 * tanh * x_r * x_r);
+    (tanh, tanh_r, tanh_rr)
 }
 
 /// Legacy summary state of the model at a temperature and a volume.
@@ -324,9 +325,14 @@ pub(crate) fn evaluate_tv_state(
     let cv_total = cv_id + cv_res;
     let cp_total = cp_id + cp_res;
     let ln_phi = if z > 0.0 { f.dn - z.ln() } else { f64::NAN };
-    let c2 = -(volume * volume / (moles * molar_mass_kg)) * (cp_total / cv_total) * pressure.dv;
-    let speed_of_sound = if c2 > 0.0 && c2.is_finite() {
-        c2.sqrt()
+    let gamma = cp_total / cv_total;
+    let speed_of_sound = if pressure.dv < 0.0 && gamma > 0.0 && gamma.is_finite() {
+        let c2 = -(volume * volume / (moles * molar_mass_kg)) * gamma * pressure.dv;
+        if c2 > 0.0 && c2.is_finite() {
+            c2.sqrt()
+        } else {
+            f64::NAN
+        }
     } else {
         f64::NAN
     };
@@ -410,8 +416,17 @@ pub(crate) fn evaluate_tp_state(
     })
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SpinodalKind {
+    /// Local maximum of `P(eta)`: `dP/drho` crosses from `+` to `-`.
+    Max,
+    /// Local minimum of `P(eta)`: `dP/drho` crosses from `-` to `+`.
+    Min,
+}
+
 /// Refine a single bracket `[lo, hi]` (in packing fraction `eta`) where
-/// `P(lo) <= p_spec <= P(hi)` using safeguarded Newton-Raphson.
+/// `P(lo) <= p_spec <= P(hi)` using safeguarded Newton-Raphson with
+/// pressure-relative tolerance and floating-point resolution guard.
 fn refine_eta_root<F>(
     mut lo: f64,
     mut hi: f64,
@@ -422,12 +437,14 @@ fn refine_eta_root<F>(
 where
     F: Fn(f64) -> Result<(f64, f64)>,
 {
+    let p_tol = 1.0e-13 * p_spec;
     let mut eta = 0.5 * (lo + hi);
     for _ in 0..80 {
         let rho = eta / eta_per_rho;
         let (p, dp_drho) = p_and_dp_drho(rho)?;
         let res = p - p_spec;
-        if res.abs() <= 1.0e-13 * p_spec.max(1.0) || (hi - lo) <= 1.0e-14 * eta.max(1.0e-16) {
+        let eta_tol = 64.0 * f64::EPSILON * eta.abs();
+        if res.abs() <= p_tol || (hi - lo) <= eta_tol {
             return Ok(Some(eta));
         }
         if res < 0.0 {
@@ -450,7 +467,7 @@ where
     }
     let rho = eta / eta_per_rho;
     let (p, _) = p_and_dp_drho(rho)?;
-    if (p - p_spec).abs() <= 1.0e-7 * p_spec.max(1.0) {
+    if (p - p_spec).abs() <= 1.0e-9 * p_spec {
         Ok(Some(eta))
     } else {
         Ok(None)
@@ -468,10 +485,10 @@ fn bisect_spinodal<F>(
 where
     F: Fn(f64) -> Result<(f64, f64)>,
 {
-    for _ in 0..48 {
+    for _ in 0..64 {
         let mid = 0.5 * (lo + hi);
         let (_, dp) = p_and_dp_drho(mid / eta_per_rho)?;
-        if dp == 0.0 || (hi - lo) <= 1.0e-13 * mid.max(1.0e-15) {
+        if dp == 0.0 || (hi - lo) <= 64.0 * f64::EPSILON * mid.abs() {
             lo = mid;
             hi = mid;
             break;
@@ -485,6 +502,71 @@ where
     let eta = 0.5 * (lo + hi);
     let (p, _) = p_and_dp_drho(eta / eta_per_rho)?;
     Ok((eta, p))
+}
+
+/// Search `[a, b]` (where `dP/drho > 0` at both endpoints) for a point where
+/// `dP/drho < 0` by golden-section minimization, returning early as soon as a
+/// negative slope is observed so both surrounding spinodals can be bisected, or
+/// once the narrowed positive bracket is strictly bounded away from zero.
+fn find_negative_dp_in_interval<F>(
+    mut a: f64,
+    mut b: f64,
+    mut dp_a: f64,
+    mut dp_b: f64,
+    eta_per_rho: f64,
+    p_and_dp_drho: &F,
+) -> Result<Option<f64>>
+where
+    F: Fn(f64) -> Result<(f64, f64)>,
+{
+    const INV_PHI: f64 = 0.618_033_988_749_894_9;
+    const INV_PHI2: f64 = 0.381_966_011_250_105_1;
+
+    let mut c = a + INV_PHI2 * (b - a);
+    let mut d = a + INV_PHI * (b - a);
+    let (_, mut dp_c) = p_and_dp_drho(c / eta_per_rho)?;
+    if dp_c < 0.0 {
+        return Ok(Some(c));
+    }
+    let (_, mut dp_d) = p_and_dp_drho(d / eta_per_rho)?;
+    if dp_d < 0.0 {
+        return Ok(Some(d));
+    }
+
+    for iter in 0..64 {
+        if (b - a) <= 1.0e-13 * (a + b) {
+            break;
+        }
+        let min_inner = dp_c.min(dp_d);
+        let max_edge = dp_a.max(dp_b);
+        if iter >= 2 && min_inner > 4.0 * (max_edge - min_inner).max(0.0) {
+            break;
+        }
+        if dp_c < dp_d {
+            b = d;
+            dp_b = dp_d;
+            d = c;
+            dp_d = dp_c;
+            c = a + INV_PHI2 * (b - a);
+            let (_, dp) = p_and_dp_drho(c / eta_per_rho)?;
+            if dp < 0.0 {
+                return Ok(Some(c));
+            }
+            dp_c = dp;
+        } else {
+            a = c;
+            dp_a = dp_c;
+            c = d;
+            dp_c = dp_d;
+            d = a + INV_PHI * (b - a);
+            let (_, dp) = p_and_dp_drho(d / eta_per_rho)?;
+            if dp < 0.0 {
+                return Ok(Some(d));
+            }
+            dp_d = dp;
+        }
+    }
+    Ok(None)
 }
 
 /// Find all mechanically stable molar volumes (m^3/mol) at `(T, P)` on the
@@ -504,19 +586,47 @@ where
     positive(pressure, "pressure")?;
     positive(eta_per_rho, "packing fraction factor")?;
 
-    let eta_ig = eta_per_rho * pressure / (crate::R * temperature);
-    let eta_min = (0.01 * eta_ig).clamp(1.0e-16, 1.0e-10);
-    let mut grid = Vec::with_capacity(110);
-    // Log-spaced vapor grid from eta_min up to 1e-2
-    let log_lo = eta_min.ln();
+    let rt = crate::R * temperature;
+    let eta_ig = eta_per_rho * pressure / rt;
+    if !eta_ig.is_finite() || eta_ig <= 0.0 {
+        return Err(Error::InvalidInput(
+            "pressure underflowed the dilute packing fraction",
+        ));
+    }
+
+    // Bracket the dilute ideal-gas vapor limit explicitly without an artificial floor.
+    let mut eta_lo = (0.5 * eta_ig).min(1.0e-10);
+    for _ in 0..32 {
+        let (p_lo, _) = p_and_dp_drho(eta_lo / eta_per_rho)?;
+        if p_lo <= pressure {
+            break;
+        }
+        let next = 0.5 * eta_lo;
+        if next <= 0.0 {
+            break;
+        }
+        eta_lo = next;
+    }
+
+    let mut grid = Vec::with_capacity(112);
+    grid.push(eta_lo);
+    if eta_ig < 1.0e-10 {
+        grid.push(eta_ig);
+        let eta_hi_dilute = (2.0 * eta_ig).min(1.0e-10);
+        if eta_hi_dilute > eta_ig {
+            grid.push(eta_hi_dilute);
+        }
+    }
+    // Log-spaced vapor grid from 1e-10 up to 1e-2
+    let log_lo = (1.0e-10_f64).ln();
     let log_hi = (1.0e-2_f64).ln();
     let n_log = 20usize;
     for i in 0..n_log {
         let frac = i as f64 / n_log as f64;
         grid.push((log_lo + frac * (log_hi - log_lo)).exp());
     }
-    // Include ideal-gas estimate directly when inside the physical range
-    if eta_ig > eta_min && eta_ig < 0.75 {
+    // Include ideal-gas estimate directly when inside the standard range
+    if eta_ig > 1.0e-10 && eta_ig < 0.75 {
         grid.push(eta_ig);
     }
     // Uniform dense-fluid grid from 1e-2 to 0.75
@@ -547,54 +657,131 @@ where
         }
     }
 
-    let mut root_etas = Vec::new();
+    // Locate all spinodals: both adjacent sign changes and sub-cell pairs near
+    // the critical point where dP/drho dips below zero inside one grid cell.
+    let mut spinodals: Vec<(f64, f64, SpinodalKind)> = Vec::new();
+    for pair in samples.windows(2) {
+        let (e0, _, dp0) = pair[0];
+        let (e1, _, dp1) = pair[1];
+        if dp0 > 0.0 && dp1 < 0.0 {
+            let (es, ps) = bisect_spinodal(e0, e1, dp0, eta_per_rho, &p_and_dp_drho)?;
+            spinodals.push((es, ps, SpinodalKind::Max));
+        } else if dp0 < 0.0 && dp1 > 0.0 {
+            let (es, ps) = bisect_spinodal(e0, e1, dp0, eta_per_rho, &p_and_dp_drho)?;
+            spinodals.push((es, ps, SpinodalKind::Min));
+        }
+    }
+
+    // Detect near-critical pairs of spinodals hidden inside cells where both
+    // endpoint derivatives remain positive.
+    let mut checked_ranges: Vec<(f64, f64)> = Vec::new();
+    for i in 1..(samples.len() - 1) {
+        let (em, pm, dpm) = samples[i - 1];
+        let (_, _, dp0) = samples[i];
+        let (ep, pp, dpp) = samples[i + 1];
+        if dp0 > 0.0
+            && dpm > 0.0
+            && dpp > 0.0
+            && dp0 <= dpm
+            && dp0 <= dpp
+            && (dp0 < 0.5 * rt || (pm <= pressure && pressure <= pp))
+        {
+            checked_ranges.push((em, ep));
+            if let Some(e_neg) =
+                find_negative_dp_in_interval(em, ep, dpm, dpp, eta_per_rho, &p_and_dp_drho)?
+            {
+                let (s_max, p_max) = bisect_spinodal(em, e_neg, dpm, eta_per_rho, &p_and_dp_drho)?;
+                let (s_min, p_min) = bisect_spinodal(e_neg, ep, -1.0, eta_per_rho, &p_and_dp_drho)?;
+                spinodals.push((s_max, p_max, SpinodalKind::Max));
+                spinodals.push((s_min, p_min, SpinodalKind::Min));
+            }
+        }
+    }
+    // Also guard any cell directly bracketing the target pressure with small
+    // positive slope that was not already covered by a local-minimum window.
     for pair in samples.windows(2) {
         let (e0, p0, dp0) = pair[0];
         let (e1, p1, dp1) = pair[1];
-        let r0 = p0 - pressure;
-        let r1 = p1 - pressure;
-
-        if r0 == 0.0 && dp0 > 0.0 {
-            root_etas.push(e0);
-        }
-        // Check for a spinodal inside (e0, e1) so narrow brackets near extrema are not missed.
-        if (dp0 > 0.0 && dp1 < 0.0) || (dp0 < 0.0 && dp1 > 0.0) {
-            let (es, ps) = bisect_spinodal(e0, e1, dp0, eta_per_rho, &p_and_dp_drho)?;
-            let rs = ps - pressure;
-            if dp0 > 0.0 && r0 <= 0.0 && rs >= 0.0 {
-                if let Some(root) = refine_eta_root(e0, es, pressure, eta_per_rho, &p_and_dp_drho)?
-                {
-                    root_etas.push(root);
-                }
-            } else if dp1 > 0.0
-                && rs <= 0.0
-                && r1 >= 0.0
-                && let Some(root) = refine_eta_root(es, e1, pressure, eta_per_rho, &p_and_dp_drho)?
-            {
-                root_etas.push(root);
-            }
-        } else if r0 < 0.0
-            && r1 >= 0.0
-            && (dp0 > 0.0 || dp1 > 0.0)
-            && let Some(root) = refine_eta_root(e0, e1, pressure, eta_per_rho, &p_and_dp_drho)?
+        if dp0 > 0.0
+            && dp1 > 0.0
+            && p0 <= pressure
+            && pressure <= p1
+            && dp0.min(dp1) < 0.25 * rt
+            && !checked_ranges.iter().any(|&(lo, hi)| e0 >= lo && e1 <= hi)
+            && let Some(e_neg) =
+                find_negative_dp_in_interval(e0, e1, dp0, dp1, eta_per_rho, &p_and_dp_drho)?
         {
+            let (s_max, p_max) = bisect_spinodal(e0, e_neg, dp0, eta_per_rho, &p_and_dp_drho)?;
+            let (s_min, p_min) = bisect_spinodal(e_neg, e1, -1.0, eta_per_rho, &p_and_dp_drho)?;
+            spinodals.push((s_max, p_max, SpinodalKind::Max));
+            spinodals.push((s_min, p_min, SpinodalKind::Min));
+        }
+    }
+
+    spinodals.sort_by(|a, b| a.0.total_cmp(&b.0));
+
+    // Decompose into strictly monotone mechanically stable branches.
+    let mut branches: Vec<(f64, f64, f64, f64)> = Vec::with_capacity(spinodals.len() / 2 + 2);
+    let mut cur: Option<(f64, f64)> = if samples[0].2 > 0.0 {
+        Some((samples[0].0, samples[0].1))
+    } else {
+        None
+    };
+    for &(es, ps, kind) in &spinodals {
+        match kind {
+            SpinodalKind::Max => {
+                if let Some((lo_e, lo_p)) = cur.take() {
+                    branches.push((lo_e, lo_p, es, ps));
+                }
+            }
+            SpinodalKind::Min => {
+                cur = Some((es, ps));
+            }
+        }
+    }
+    if let Some((lo_e, lo_p)) = cur
+        && let Some(&(hi_e, hi_p, hi_dp)) = samples.last()
+        && hi_dp > 0.0
+    {
+        branches.push((lo_e, lo_p, hi_e, hi_p));
+    }
+
+    let mut root_etas = Vec::with_capacity(branches.len());
+    for (b_lo, p_lo, b_hi, p_hi) in branches {
+        if pressure < p_lo || pressure > p_hi {
+            continue;
+        }
+        // Tighten bracket to the narrowest grid sub-interval inside this branch.
+        let mut lo = b_lo;
+        let mut hi = b_hi;
+        for &(e, p, _) in &samples {
+            if e > b_lo && e < b_hi {
+                if p <= pressure && e > lo {
+                    lo = e;
+                }
+                if p >= pressure && e < hi {
+                    hi = e;
+                }
+            }
+        }
+        if let Some(root) = refine_eta_root(lo, hi, pressure, eta_per_rho, &p_and_dp_drho)? {
             root_etas.push(root);
         }
     }
 
-    // Deduplicate and verify mechanical stability (dP/drho > 0).
+    // Deduplicate and verify mechanical stability (dP/drho > 0) and relative closure.
     root_etas.sort_by(f64::total_cmp);
     let mut volumes = Vec::new();
     let mut prev_eta: Option<f64> = None;
     for eta in root_etas {
         if let Some(prev) = prev_eta
-            && (eta - prev).abs() <= 1.0e-9 * eta.max(1.0e-12)
+            && (eta - prev).abs() <= 1.0e-9 * eta
         {
             continue;
         }
         let rho = eta / eta_per_rho;
         let (p, dp) = p_and_dp_drho(rho)?;
-        if dp > 0.0 && (p - pressure).abs() <= 1.0e-6 * pressure.max(1.0) {
+        if dp > 0.0 && (p - pressure).abs() <= 1.0e-8 * pressure {
             volumes.push(eta_per_rho / eta);
             prev_eta = Some(eta);
         }
@@ -1037,8 +1224,13 @@ impl LjsBh {
     }
 
     /// Legacy summary state of the model at a temperature and a volume.
+    ///
+    /// Preserves the legacy positive-pressure requirement; use `tv_state` to
+    /// inspect nonpositive-pressure metastable/spinodal states explicitly.
     pub fn state(&self, temperature: f64, volume: f64, moles: f64) -> Result<LjsState> {
-        Ok(self.tv_state(temperature, volume, moles)?.to_legacy_state())
+        let tv = self.tv_state(temperature, volume, moles)?;
+        positive(tv.pressure.value, "pressure")?;
+        Ok(tv.to_legacy_state())
     }
 
     /// Speed of sound (m/s) at `(T, V, n)`.
@@ -1404,6 +1596,11 @@ impl PreparedLjsBh {
             total = total.add(hs);
         }
         total = total.add(self.dispersion_density(rho));
+        if !total.values().iter().all(|v| v.is_finite()) {
+            return Err(Error::InvalidInput(
+                "non-finite LJS-BH density Helmholtz evaluation",
+            ));
+        }
         Ok(total)
     }
 
@@ -2581,8 +2778,13 @@ impl LjsUv {
     }
 
     /// Legacy summary state at `(T, V, n)`.
+    ///
+    /// Requires positive pressure; use `tv_state` to inspect nonpositive-pressure
+    /// states explicitly.
     pub fn state(&self, temperature: f64, volume: f64, moles: f64) -> Result<LjsState> {
-        Ok(self.tv_state(temperature, volume, moles)?.to_legacy_state())
+        let tv = self.tv_state(temperature, volume, moles)?;
+        positive(tv.pressure.value, "pressure")?;
+        Ok(tv.to_legacy_state())
     }
 
     /// Speed of sound (m/s) at `(T, V, n)`.
@@ -2797,6 +2999,11 @@ impl PreparedLjsUv {
             }
         }
         total = total.add(self.dispersion_density(rho)?);
+        if !total.values().iter().all(|v| v.is_finite()) {
+            return Err(Error::InvalidInput(
+                "non-finite LJS density Helmholtz evaluation",
+            ));
+        }
         Ok(total)
     }
 
@@ -3186,8 +3393,13 @@ impl LjsUf {
     }
 
     /// Legacy summary state at `(T, V, n)`.
+    ///
+    /// Requires positive pressure; use `tv_state` to inspect nonpositive-pressure
+    /// states explicitly.
     pub fn state(&self, temperature: f64, volume: f64, moles: f64) -> Result<LjsState> {
-        Ok(self.tv_state(temperature, volume, moles)?.to_legacy_state())
+        let tv = self.tv_state(temperature, volume, moles)?;
+        positive(tv.pressure.value, "pressure")?;
+        Ok(tv.to_legacy_state())
     }
 
     /// Speed of sound (m/s) at `(T, V, n)`.
@@ -3343,6 +3555,11 @@ impl PreparedLjsUf {
             }
         }
         total = total.add(self.dispersion_density(rho)?);
+        if !total.values().iter().all(|v| v.is_finite()) {
+            return Err(Error::InvalidInput(
+                "non-finite LJS density Helmholtz evaluation",
+            ));
+        }
         Ok(total)
     }
 

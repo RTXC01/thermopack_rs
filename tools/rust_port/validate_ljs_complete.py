@@ -138,7 +138,8 @@ def verify_upstream_defects(exe: Path, env: dict):
     # 4. init_ljs('UF') aborts in assocIndices_bookkeeping because eosLJS_UF is missing
     stdin = "DEFECTS\nljs-uf-init\n8 0\n100.0 0.0 1.0 0.0 0.0\n"
     proc = subprocess.run([exe], input=stdin, text=True, env=env, capture_output=True)
-    assert proc.returncode != 0 and "At least one CPA-component must self-associate" in proc.stdout, (
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode != 0 and "At least one CPA-component must self-associate" in combined, (
         proc.returncode,
         proc.stdout,
         proc.stderr,

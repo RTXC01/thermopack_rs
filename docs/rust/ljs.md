@@ -54,14 +54,17 @@ All four models (`LjsBh`, `LjsWca`, `LjsUv`, `LjsUf`) share two explicit
 volume-solve interfaces:
 
 * **Physical stable solver** (`volume(T, P, phase)` and `volumes(T, P)`): scans
-  the physical packing-fraction domain `eta in (0, 0.75]` (extended up to
-  `0.90` only when ultra-high pressure exceeds `P(0.75)`, always staying below
-  the Carnahan-Starling pole at `eta = 1`), refines any interior spinodal
-  `dP/drho = 0`, polishes every mechanically stable root (`dP/dV < 0`) with
-  safeguarded Newton-Raphson, and selects `Phase::Liquid` (smallest molar
-  volume), `Phase::Vapor` (largest molar volume), or `Phase::MinimumGibbs`
-  (minimum `a_res + Z - 1 - ln(Z)`). This fixes the earlier `LjsBh::volume`
-  behavior that scanned past the `eta = 1` pole for liquid states.
+  the physical packing-fraction domain from an unclipped dilute ideal-gas lower
+  bracket `eta_lo <= 0.5 * eta_ig` up to `0.75` (extended up to `0.90` only when
+  ultra-high pressure exceeds `P(0.75)`, always staying below the
+  Carnahan-Starling pole at `eta = 1`), refines both adjacent and sub-cell
+  near-critical spinodal pairs (`dP/drho = 0`), decomposes the domain into
+  strictly monotone mechanically stable branches, polishes every mechanically
+  stable root (`dP/dV < 0`) to pressure-relative tolerance with safeguarded
+  Newton-Raphson, and selects `Phase::Liquid` (smallest molar volume),
+  `Phase::Vapor` (largest molar volume), or `Phase::MinimumGibbs` (minimum
+  `a_res + Z - 1 - ln(Z)`). This fixes the earlier `LjsBh::volume` behavior
+  that scanned past the `eta = 1` pole for liquid states.
 * **Exact source compatibility iteration** (`baseline_volume_iteration`):
   reproduces `src/saft_interface.f90:pc_saft_nonassoc_volume_solver`
   (`zeta_min = 1e-10`, `zeta_max = 0.75`, vapor seed `1e-10`, liquid seed
@@ -70,9 +73,12 @@ volume-solve interfaces:
 Full `(T, V, n)` states (`tv_state` -> `LjsTvState`) and `(T, P)` states
 (`state_tp` -> `LjsTpState`) use ThermoPack's Argon ideal-gas record with
 constant `Cp_id = 2.5 * R`, reporting `Z`, `h`, `s`, `ln(phi)` with analytical
-`(T, P)` derivatives, `Cv`, `Cp`, and speed of sound. Legacy `LjsBh::state`
-and `LjsBh::fugacity_coefficient` (which returns `F_n = ln(phi) + ln(Z)`) are
-preserved unchanged for backward compatibility.
+`(T, P)` derivatives, `Cv`, `Cp`, and speed of sound (which returns `NaN` on
+mechanically unstable states where `dP/dV >= 0` or `Cp/Cv <= 0`). Legacy
+`state()` preserves the positive-pressure error (`Error::InvalidInput("pressure")`)
+at nonpositive pressures while `tv_state()` exposes negative-pressure states
+explicitly; `LjsBh::fugacity_coefficient` (which returns `F_n = ln(phi) + ln(Z)`)
+is preserved unchanged for backward compatibility.
 
 ## Validation
 
@@ -80,7 +86,7 @@ preserved unchanged for backward compatibility.
 
 `tools/rust_port/validate_ljs_complete.py` compiles `tools/rust_port/ljs_probe.f90`
 against `.reference/thermopack.dll` (GNU Fortran 14.3.0, `-fdefault-real-8 -fdefault-double-8`,
-one fresh process per case) and qualifies **72 cases** (879 scalar comparisons)
+one fresh process per case) and qualifies **72 cases** (857 scalar comparisons)
 committed to `tests/fixtures/ljs_complete.csv` (`tests/ljs_complete.rs`):
 
 * Standalone `calc_cavity_integral_LJ_Fres_test_TVN` (4 cases, including

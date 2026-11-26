@@ -2056,38 +2056,35 @@ fn test_saft_vrmie_dense_4c_extreme_strength_below_overflow_and_asymmetric_mixtu
     assert!((j_star.pressure - s_star.pressure).abs() <= 1e-12);
     assert!((j_star.pressure - j_zero.pressure).abs() <= 1e-9);
 
-    // Round 11 regression (PRRT_kwDOVJkJcc68PQbU): strong star-bipartite case where
-    // `w_ph ~ 3.61e155` would overflow `den_p^2` at `y_h = 1` if squared instead of
-    // dividing by `den_p` twice.
-    let eps_r11 = 400.0 * (thermopack_rs::R * temperature);
-    let mut eos_r11 = SaftVrMie::new(&["H2O", "H2O"]).unwrap();
-    eos_r11
-        .set_assoc_params(0, thermopack_rs::AssocScheme::Scheme4C, eps_r11, 1.0e-45)
-        .unwrap();
-    eos_r11
-        .set_assoc_params(
-            1,
-            thermopack_rs::AssocScheme::Scheme1ea,
-            0.9 * eps_r11,
-            1.0e-45,
-        )
-        .unwrap();
-    let prep_r11 = eos_r11.prepare(temperature, &[1.0, 1.0e-40]).unwrap();
-    let j_r11 = prep_r11.pressure_and_derivatives(rho).unwrap();
-    let s_r11 = prep_r11.state(rho).unwrap();
-    for (p_val, z_val) in [
-        (j_r11.pressure, j_r11.compressibility),
-        (s_r11.pressure, s_r11.compressibility),
-    ] {
-        assert!(p_val.is_finite() && z_val.is_finite());
-        assert!(
-            (p_val - expected_p).abs() < 1e-4,
-            "pressure={p_val}, expected={expected_p}"
-        );
-        let expected_z = p_val / (thermopack_rs::R * temperature * rho);
-        assert!((z_val - expected_z).abs() <= 1e-12 * expected_z);
+    // The 400 RT case overflows a squared star denominator. At 570 RT and
+    // a smaller tracer fraction, Newton can advance only one log unit per step.
+    for (exponent, trace) in [(400.0, 1.0e-40), (570.0, 1.0e-130)] {
+        let eps = exponent * (thermopack_rs::R * temperature);
+        eos_trace
+            .set_assoc_params(0, thermopack_rs::AssocScheme::Scheme4C, eps, 1.0e-45)
+            .unwrap();
+        eos_trace
+            .set_assoc_params(1, thermopack_rs::AssocScheme::Scheme1ea, 0.9 * eps, 1.0e-45)
+            .unwrap();
+        let prepared = eos_trace.prepare(temperature, &[1.0, trace]).unwrap();
+        let jet = prepared
+            .pressure_and_derivatives(rho)
+            .unwrap_or_else(|err| panic!("exponent={exponent}, trace={trace:e}: {err}"));
+        let state = prepared.state(rho).unwrap();
+        for (pressure, compressibility) in [
+            (jet.pressure, jet.compressibility),
+            (state.pressure, state.compressibility),
+        ] {
+            assert!(pressure.is_finite() && compressibility.is_finite());
+            assert!(
+                (pressure - expected_p).abs() < 1e-4,
+                "exponent={exponent}, trace={trace:e}, pressure={pressure}, expected={expected_p}"
+            );
+            let expected_z = pressure / (thermopack_rs::R * temperature * rho);
+            assert!((compressibility - expected_z).abs() <= 1e-12 * expected_z);
+        }
+        assert!((jet.pressure - state.pressure).abs() <= 1e-12);
     }
-    assert!((j_r11.pressure - s_r11.pressure).abs() <= 1e-12);
 }
 
 #[test]

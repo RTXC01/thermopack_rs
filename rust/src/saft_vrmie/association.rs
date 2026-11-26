@@ -875,6 +875,10 @@ fn solve_star_bipartite_dd(part: &SitePartition, hub: usize) -> Result<Vec<Dd>> 
 
     let mut u = u_lo.add(u_hi).mul_f64(0.5);
     let mut converged = false;
+    // A Newton step can hug a bracket endpoint far from the root. Reserve at
+    // least 104 midpoint evaluations, enough to shrink any log bracket of
+    // positive f64 site fractions to the width tolerance.
+    let mut newton_steps_left = 24;
     for _ in 0..128 {
         let y = u.exp();
         let (g, dg_du, scale) = eval_g_and_dg_du(y)?;
@@ -893,17 +897,15 @@ fn solve_star_bipartite_dd(part: &SitePartition, hub: usize) -> Result<Vec<Dd>> 
             converged = true;
             break;
         }
-        let next = if dg_du.0 < 0.0 {
+        if newton_steps_left > 0 && dg_du.0 < 0.0 {
             let cand = u.sub(g.div(dg_du));
             if cand.is_finite() && dd_gt(cand, u_lo) && dd_lt(cand, u_hi) {
-                cand
-            } else {
-                u_lo.add(u_hi).mul_f64(0.5)
+                newton_steps_left -= 1;
+                u = cand;
+                continue;
             }
-        } else {
-            u_lo.add(u_hi).mul_f64(0.5)
-        };
-        u = next;
+        }
+        u = u_lo.add(u_hi).mul_f64(0.5);
     }
 
     let y_h = u.exp();

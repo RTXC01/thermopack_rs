@@ -435,51 +435,50 @@ fn pressure_eval_scale(p_spec: f64, rho: f64, dp_drho: f64, rt: f64) -> f64 {
     p_spec.max(rho * rt).max(dp_drho.abs() * rho)
 }
 
-/// Refine a single bracket `[lo, hi]` (in packing fraction `eta`) where
-/// `P(lo) <= p_spec <= P(hi)` using safeguarded Newton-Raphson with both
-/// pressure-evaluation resolution and coordinate convergence checks.
-fn refine_eta_root<F>(
+/// Refine a stable pressure bracket, using packing fraction or molar density
+/// as the coordinate. `coordinate_per_rho` converts density to that coordinate.
+fn refine_pressure_root<F>(
     mut lo: f64,
     mut hi: f64,
     p_spec: f64,
     rt: f64,
-    eta_per_rho: f64,
+    coordinate_per_rho: f64,
     p_and_dp_drho: &F,
 ) -> Result<Option<f64>>
 where
     F: Fn(f64) -> Result<(f64, f64)>,
 {
-    let mut eta = 0.5 * (lo + hi);
+    let mut coord = 0.5 * (lo + hi);
     let mut prev_width = hi - lo;
     let mut stall_count = 0usize;
     for _ in 0..96 {
-        let rho = eta / eta_per_rho;
+        let rho = coord / coordinate_per_rho;
         let (p, dp_drho) = p_and_dp_drho(rho)?;
         let res = p - p_spec;
         if res == 0.0 {
-            return Ok(Some(eta));
+            return Ok(Some(coord));
         }
         if res < 0.0 {
-            lo = eta;
+            lo = coord;
         } else {
-            hi = eta;
+            hi = coord;
         }
         let width = hi - lo;
-        let eta_tol = 16.0 * f64::EPSILON * eta.abs();
-        if width <= eta_tol {
+        let bracket_tol = 16.0 * f64::EPSILON * coord.abs();
+        if width <= bracket_tol {
             return Ok(Some(0.5 * (lo + hi)));
         }
         let p_scale = pressure_eval_scale(p_spec, rho, dp_drho, rt);
         let p_res_tol = (1.0e-13 * p_spec).max(512.0 * f64::EPSILON * p_scale);
-        let dp_deta = dp_drho / eta_per_rho;
-        let step_est = if dp_deta.is_finite() && dp_deta > 0.0 {
-            (res / dp_deta).abs()
+        let dp_dcoord = dp_drho / coordinate_per_rho;
+        let step_est = if dp_dcoord.is_finite() && dp_dcoord > 0.0 {
+            (res / dp_dcoord).abs()
         } else {
             f64::INFINITY
         };
-        let coord_tol = 64.0 * f64::EPSILON * eta.abs();
+        let coord_tol = 64.0 * f64::EPSILON * coord.abs();
         if res.abs() <= p_res_tol && step_est <= coord_tol {
-            return Ok(Some(eta));
+            return Ok(Some(coord));
         }
 
         // Force bisection if two consecutive steps did not shrink the bracket
@@ -495,8 +494,8 @@ where
         let next = if stall_count >= 2 {
             stall_count = 0;
             0.5 * (lo + hi)
-        } else if dp_deta.is_finite() && dp_deta.abs() > 0.0 {
-            let cand = eta - res / dp_deta;
+        } else if dp_dcoord.is_finite() && dp_dcoord.abs() > 0.0 {
+            let cand = coord - res / dp_dcoord;
             if cand > lo && cand < hi {
                 cand
             } else {
@@ -505,14 +504,14 @@ where
         } else {
             0.5 * (lo + hi)
         };
-        eta = next;
+        coord = next;
     }
-    let rho = eta / eta_per_rho;
+    let rho = coord / coordinate_per_rho;
     let (p, dp_drho) = p_and_dp_drho(rho)?;
     let p_scale = pressure_eval_scale(p_spec, rho, dp_drho, rt);
     let p_fallback = (1.0e-9 * p_spec).max(2048.0 * f64::EPSILON * p_scale);
     if (p - p_spec).abs() <= p_fallback {
-        Ok(Some(eta))
+        Ok(Some(coord))
     } else {
         Ok(None)
     }
@@ -616,10 +615,67 @@ where
 const MOLAR_VOLUME_RANGE_ERROR: Error =
     Error::InvalidInput("molar volume overflowed finite floating-point range");
 
+#[derive(Default)]
 struct PhysicalVolumeRoots {
     volumes: Vec<f64>,
     below_range: bool,
     above_range: bool,
+}
+
+impl PhysicalVolumeRoots {
+    fn record(&mut self, volume: f64) {
+        let density = 1.0 / volume;
+        if !volume.is_finite() || density == 0.0 {
+            self.above_range = true;
+        } else if volume <= 0.0 || !density.is_finite() {
+            self.below_range = true;
+        } else {
+            self.volumes.push(volume);
+        }
+    }
+}
+
+fn stable_root_closes(pressure: f64, p: f64, rho: f64, dp_drho: f64, rt: f64) -> bool {
+    let scale = pressure_eval_scale(pressure, rho, dp_drho, rt);
+    dp_drho > 0.0 && (p - pressure).abs() <= (1.0e-8 * pressure).max(4096.0 * f64::EPSILON * scale)
+}
+
+// In the dilute branch, a subnormal packing fraction can have much coarser
+// spacing than the underlying density. Check the finite volume boundary in
+// density before refinement can lose the root.
+fn refine_subnormal_packing_root<F>(
+    mut lo: f64,
+    hi: f64,
+    pressure: f64,
+    rt: f64,
+    p_and_dp_drho: &F,
+) -> Result<Option<f64>>
+where
+    F: Fn(f64) -> Result<(f64, f64)>,
+{
+    let density_at_max_volume = 1.0 / f64::MAX;
+    if hi < density_at_max_volume {
+        return Ok(Some(f64::INFINITY));
+    }
+    if lo <= density_at_max_volume {
+        let (p_at_max_volume, dp) = p_and_dp_drho(density_at_max_volume)?;
+        if dp > 0.0 {
+            if pressure < p_at_max_volume {
+                return Ok(Some(f64::INFINITY));
+            }
+            if pressure == p_at_max_volume {
+                return Ok(Some(f64::MAX));
+            }
+            lo = density_at_max_volume;
+        }
+    }
+    if let Some(rho) = refine_pressure_root(lo, hi, pressure, rt, 1.0, p_and_dp_drho)? {
+        let (p, dp) = p_and_dp_drho(rho)?;
+        if stable_root_closes(pressure, p, rho, dp, rt) {
+            return Ok(Some(1.0 / rho));
+        }
+    }
+    Ok(None)
 }
 
 /// Find all mechanically stable molar volumes (m^3/mol) at `(T, P)`.
@@ -816,6 +872,7 @@ where
         branches.push((lo_e, lo_p, hi_e, hi_p));
     }
 
+    let mut roots = PhysicalVolumeRoots::default();
     let mut root_etas = Vec::with_capacity(branches.len());
     for (b_lo, p_lo, b_hi, p_hi) in branches {
         if pressure < p_lo || pressure > p_hi {
@@ -834,7 +891,19 @@ where
                 }
             }
         }
-        if let Some(root) = refine_eta_root(lo, hi, pressure, rt, eta_per_rho, &p_and_dp_drho)? {
+        if lo.is_subnormal() {
+            if let Some(volume) = refine_subnormal_packing_root(
+                lo / eta_per_rho,
+                hi / eta_per_rho,
+                pressure,
+                rt,
+                &p_and_dp_drho,
+            )? {
+                roots.record(volume);
+            }
+        } else if let Some(root) =
+            refine_pressure_root(lo, hi, pressure, rt, eta_per_rho, &p_and_dp_drho)?
+        {
             root_etas.push(root);
         }
     }
@@ -842,11 +911,6 @@ where
     // Deduplicate, verify mechanical stability (dP/drho > 0) and closure within
     // the local pressure-evaluation resolution, and reject unrepresentable volumes.
     root_etas.sort_by(f64::total_cmp);
-    let mut roots = PhysicalVolumeRoots {
-        volumes: Vec::new(),
-        below_range: false,
-        above_range: false,
-    };
     let mut prev_eta: Option<f64> = None;
     for eta in root_etas {
         if let Some(prev) = prev_eta
@@ -856,18 +920,8 @@ where
         }
         let rho = eta / eta_per_rho;
         let (p, dp) = p_and_dp_drho(rho)?;
-        let p_scale = pressure_eval_scale(pressure, rho, dp, rt);
-        let p_accept = (1.0e-8 * pressure).max(4096.0 * f64::EPSILON * p_scale);
-        if dp > 0.0 && (p - pressure).abs() <= p_accept {
-            let v = eta_per_rho / eta;
-            let rho_from_v = 1.0 / v;
-            if !v.is_finite() || rho_from_v == 0.0 {
-                roots.above_range = true;
-            } else if v <= 0.0 || !rho_from_v.is_finite() {
-                roots.below_range = true;
-            } else {
-                roots.volumes.push(v);
-            }
+        if stable_root_closes(pressure, p, rho, dp, rt) {
+            roots.record(eta_per_rho / eta);
             prev_eta = Some(eta);
         }
     }

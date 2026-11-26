@@ -590,3 +590,56 @@ qualified against central finite differences of Fortran's own `F_V` (passing
 `a` explicitly to avoid the null-pointer crash), and `tests/saft_vrmie.rs`
 independently verifies analytic derivatives, FMT compatibility combinations,
 and zero-mole infinite dilution.
+
+## Splined Lennard-Jones (`lj_splined`) and WCA cavity (`hardsphere_wca`) upstream defects
+
+Six upstream defects affect `src/lj_splined.f90`, `src/hardsphere_wca.f90`,
+and `src/assocschemeutils.f90`:
+
+1. `src/lj_splined.f90:1992-1993` (`ljx_ux_eos_constructor`): reverses the
+   arguments to Fortran `INDEX`:
+   `p_eos%lj_potential = (INDEX("LJS", eos_label) <= 0)` and
+   `p_eos%is_uf_theory = (INDEX("UF", eos_label) > 0)`. Because `eos_label`
+   (`"LJS-UV"`, `"LJS-UF"`, `"LJ-UF"`) is longer than `"LJS"` and `"UF"`,
+   both `INDEX` calls always return `0`, setting `lj_potential = .true.` and
+   `is_uf_theory = .false.` for every label. Consequently `init_lj("UF")`
+   silently evaluates `calcFresLJs_uv_theory` instead of
+   `calcFresLJ_uf_theory`. Separately, `init_lj("UV")` (`"LJ-UV"`) has no
+   entry in `src/eosdata.f90` and terminates with `stoperror("unknown eos")`.
+2. `src/assocschemeutils.f90:96-111` (`assocIndices_bookkeeping`): omits
+   `eosLJS_UF` from the non-associating SAFT model allow-list (which lists
+   `eosLJS_BH`, `eosLJS_WCA`, `eosLJS_UV`, and `eosLJ_UF`), so
+   `init_ljs("UF")` unconditionally aborts with
+   `"At least one CPA-component must self-associate."`.
+3. `src/lj_splined.f90:998-1013` (`ljs_bh_set_pure_params`): updates only
+   `saftvrmie_param%sigma_ij(1,1)` and `eps_divk_ij(1,1)` without updating
+   `saftvrmie_var%sigma_eff%d(1,1)` or `sigma_ij_cube(1,1)` (unlike the
+   type-bound `ljs_bh_set_sigma_eps`), leaving `sigma_eff%d(1,1)` stale at
+   `3.42e-10 m` and corrupting `calc_hardsphere_diameter` and `zeta_bar`
+   whenever `sigma` is changed via `ljs_bh_set_pure_params`.
+4. `src/hardsphere_wca.f90:294-348` (`calc_cavity_integral_LJ_Fres_test`):
+   comments out the direct `Fn_e`/`Fn_ee`/`Fn_eT` return branch and leaves
+   `eta_hs` derivatives zero (`V = 0`, `calcZetaX_vdW_no_segments` commented
+   out), returning `0.0` for `F_e`, `F_ee`, and `F_Te` (whereas
+   `calc_cavity_integral_LJ_Fres_test_TVN` evaluates all 10 TVN derivatives
+   correctly).
+5. `src/hardsphere_wca.f90:512-521` (`lj_boltzmann_factor`): for
+   `r > 2^(1/6)` sets `u = 0` but leaves `u_r` and `u_rr` uninitialized
+   (in `calc_cavity_integral_LJ_Fres` only `r <= 2^(1/6)` is evaluated).
+6. `src/lj_splined.f90:3073-3076,3149-3152` (`calc_ljs_dispersion` and
+   `calc_ljs_hard_sphere`): reads `F_T`, `F_V`, and `F_n` unconditionally
+   when `F_Tn`, `F_Vn`, or `F_nn` are requested (safe only when all 10
+   outputs are requested).
+
+Defects 1–4 are verified live against `.reference/thermopack.dll` in
+`tools/rust_port/validate_ljs_complete.py`. Native `LjsBh::set_parameters`,
+`LjsWca`, `LjsUv`, `LjsUf(LennardJonesSplined | LennardJones)`,
+`hardsphere_wca::cavity_integral_eta_t`, and `lj_boltzmann_factor` avoid all
+six issues while matching `calcFresLJs_bh`, `calcFresLJs_WCA`,
+`calcFresLJs_uv_theory`, `calcFresLJ_uf_theory`, `calc_ljs_dispersion`,
+`calc_ljs_hard_sphere`, `calc_wca_soft_repulsion`, and
+`calc_cavity_integral_LJ_Fres_test_TVN` across 72 live exact-source cases.
+Note also that `calc_ahs_div_nRT_CSK` in `src/saftvrmie_hardsphere.f90` omits
+the `-12.5/3` integration constant (giving `a_hs(0) = 12.5/3`); native
+`pure_hard_sphere_eta(..., true)` preserves that exact source formula so
+`kolafa_pure_reference = true` matches Fortran `PURE_HS_CSK`.

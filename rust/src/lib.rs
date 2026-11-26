@@ -153,12 +153,19 @@ pub use extcsp::{
 pub use flash::{
     FlashOptions, FlashPhase, FlashResult, RachfordRiceIteration, Stability, StabilityTrial,
 };
+pub use hardsphere_wca::{CavityDistribution, CavityEtaDerivatives};
 pub use helmholtz::{DensityHelmholtz, PureHelmholtz, PurePressure};
 pub use ideal::{EntropyReference, IdealGas, IdealProperties};
 pub use lee_kesler::{
     BwrCoeffs, BwrCoeffsDiff1, BwrCoeffsDiff2, LeeKesler, LeeKeslerDerivatives,
     LeeKeslerFugacityDerivatives, LeeKeslerState, PreparedLeeKesler,
 };
+pub use ljs::{
+    ALPHA_LJS, LjUfPotential, LjsBh, LjsControl, LjsPropertyDerivatives, LjsState, LjsTpState,
+    LjsTvState, LjsUf, LjsUfControl, LjsUv, LjsUvControl, LjsVolumeIteration, PreparedLjsBh,
+    PreparedLjsUf, PreparedLjsUv,
+};
+pub use ljs_wca::{LjsWca, LjsWcaControl, PreparedLjsWca};
 pub use mbwr::{
     Mbwr, MbwrDensityIteration, MbwrDensityParameters, MbwrDensityPath, MbwrEquilibrium,
     MbwrHelmholtzTerm, MbwrInitialization, MbwrKind, MbwrPressure, MbwrRecord, PreparedMbwr,

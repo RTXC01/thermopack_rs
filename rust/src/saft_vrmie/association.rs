@@ -328,19 +328,19 @@ pub(super) fn assoc_f_v_dd(
 
     // Refine X_k to 106-bit double-double precision.
     //
-    // First compute the coarsest exact equitable partition (1-WL color refinement)
-    // of the scaled site interaction matrix `C_{kl} = rho * m_l * Delta_{kl}`:
-    // whenever every site in class `a` has bitwise-identical summed interaction
-    // weight `W_{ab}` to every class `b`, any positive solution `Y` of the reduced
-    // system `1/Y_a = 1 + sum_b W_{ab} Y_b` expands to `X_k = Y_{class(k)}`, which
-    // satisfies all `ns` original equations identically and is therefore the unique
-    // Wertheim equilibrium solution.
+    // First compute a conservative exact equitable partition (1-WL color refinement
+    // using canonical sorted nonzero coefficient multisets) of the scaled site
+    // interaction matrix `C_{kl} = rho * m_l * Delta_{kl}`: whenever every site in
+    // class `a` has the exact same multiset of nonzero weights into every class `b`,
+    // their exact real row sums `W_{ab}` are guaranteed identical without rounding
+    // ambiguity, so any positive solution `Y` of `1/Y_a = 1 + sum_b W_{ab} Y_b`
+    // expands to the unique Wertheim equilibrium `X_k = Y_{class(k)}`.
     //
     // This merges equivalent donor/acceptor classes ONLY when the interaction graph
     // and composition mathematically justify it (e.g. pure 4C/2B/4A -> scalar
     // quadratic, symmetric 4C+2B -> strictly diagonally dominant 2x2, asymmetric
-    // 4C+1ea -> donor and acceptor classes stay distinct), eliminating the finite-
-    // precision singular constant-product nullspace when `X_k < 2^-106`.
+    // 4C+1ea or 4C+3B -> donor and acceptor classes stay distinct), eliminating the
+    // finite-precision singular constant-product nullspace when `X_k < 2^-106`.
     let m_u: Vec<Dd> = assoc
         .site_to_comp
         .iter()
@@ -367,9 +367,9 @@ pub(super) fn assoc_f_v_dd(
                 continue;
             }
             let c_kl = rho_dd.mul(m_u[l]).mul(d_kl);
-            if !c_kl.is_finite() {
+            if !c_kl.is_finite() || c_kl.0 < 0.0 || (c_kl.0 == 0.0 && c_kl.1 < 0.0) {
                 return Err(Error::InvalidInput(
-                    "non-finite scaled association matrix in high-precision evaluation",
+                    "invalid scaled association matrix in high-precision evaluation",
                 ));
             }
             c_mat[k * ns + l] = c_kl;
@@ -380,6 +380,11 @@ pub(super) fn assoc_f_v_dd(
     let mut y_g = vec![Dd::ONE; ng];
     if ng == 1 {
         let w = w_mat[0];
+        if !w.is_finite() || w.0 < 0.0 || (w.0 == 0.0 && w.1 < 0.0) {
+            return Err(Error::InvalidInput(
+                "invalid reduced association strength in high-precision evaluation",
+            ));
+        }
         let y = if w.0 == 0.0 && w.1 == 0.0 {
             Dd::ONE
         } else if w.0 > 1.0e100 {
@@ -388,12 +393,19 @@ pub(super) fn assoc_f_v_dd(
         } else {
             Dd::from_f64(2.0).div(Dd::ONE.add(Dd::ONE.add(w.mul_f64(4.0)).sqrt()))
         };
-        if !y.is_finite() || y.0 <= 0.0 {
+        if !y.is_finite() || y.0 <= 0.0 || y.0 > 1.0 + 1.0e-28 {
             return Err(Error::NotConverged(
-                "non-finite symmetric site fraction in high-precision association solver",
+                "out-of-domain symmetric site fraction in high-precision association solver",
             ));
         }
-        y_g[0] = if y.0 > 1.0 { Dd::ONE } else { y };
+        let y_bound = if y.0 > 1.0 { Dd::ONE } else { y };
+        let res = Dd::ONE.sub(y_bound).sub(w.mul(y_bound).mul(y_bound));
+        if !res.is_finite() || res.0.abs() > 1.0e-12 {
+            return Err(Error::NotConverged(
+                "symmetric site fraction residual failed tolerance in high-precision association solver",
+            ));
+        }
+        y_g[0] = y_bound;
     } else {
         // Initialize each class from the geometric mean of its member hints
         // (preserving exact single-site hints and immediately restoring the
@@ -494,6 +506,27 @@ pub(super) fn assoc_f_v_dd(
 
     let x_k: Vec<Dd> = class_of.iter().map(|&a| y_g[a]).collect();
 
+    // Certify every site fraction bound and every original ns-site Wertheim
+    // residual before forming dF_assoc/dV.
+    for k in 0..ns {
+        let xk = x_k[k];
+        if !xk.is_finite() || xk.0 <= 0.0 || xk.0 > 1.0 {
+            return Err(Error::NotConverged(
+                "site fraction out of domain in high-precision association solver",
+            ));
+        }
+        let mut sum_cx = Dd::ZERO;
+        for l in 0..ns {
+            sum_cx = sum_cx.add(c_mat[k * ns + l].mul(x_k[l]));
+        }
+        let res = Dd::ONE.sub(xk).sub(xk.mul(sum_cx));
+        if !res.is_finite() || res.0.abs() > 1.0e-12 {
+            return Err(Error::NotConverged(
+                "high-precision association site residual exceeds tolerance",
+            ));
+        }
+    }
+
     let mut f_v = Dd::ZERO;
     for k in 0..ns {
         let mk_xk = m_u[k].mul(x_k[k]);
@@ -519,59 +552,62 @@ pub(super) fn assoc_f_v_dd(
     Ok(f_v)
 }
 
-/// Compute the coarsest exact equitable partition of the `ns x ns` scaled
+/// Compute a conservative exact equitable partition of the `ns x ns` scaled
 /// interaction matrix `c_mat` (`C_{kl} = rho * m_l * Delta_{kl}`), returning
-/// `(class_of, num_classes, w_mat)` where `w_mat[a * ng + b]` is the exact
+/// `(class_of, num_classes, w_mat)` where `w_mat[a * ng + b]` is the
 /// class-aggregated weight `sum_{l in class b} C_{k, l}` shared identically by
 /// every site `k` in class `a`.
+///
+/// Refinement keys preserve the prior class `(class_of[k], sorted_nonzero_triples)`
+/// where each triple is `(class_of[l], hi_bits, lo_bits)` of the canonicalized
+/// nonzero entry `C_{kl}`. Two sites remain in the same class only when their
+/// prior class and sorted multisets of nonzero weights into every target class
+/// match identically. This guarantees exact real-sum equality with zero rounding
+/// false merges (and ensures each pass can only split existing classes), while
+/// deliberately leaving distinct-multiplicity accidental sum coincidences (such
+/// as `[2*w]` vs `[w, w]`) in separate classes for the multi-class Newton solver.
 fn equitable_site_partition(ns: usize, c_mat: &[Dd]) -> Result<(Vec<usize>, usize, Vec<Dd>)> {
+    type SitePartitionKey = (usize, Vec<(usize, u64, u64)>);
     let mut class_of = vec![0usize; ns];
     let mut num_classes = 1usize;
-    let mut scratch = Vec::with_capacity(ns);
-    let mut signatures: Vec<Vec<(u64, u64)>> = vec![Vec::new(); ns];
+    let mut keys: Vec<SitePartitionKey> =
+        (0..ns).map(|_| (0usize, Vec::with_capacity(ns))).collect();
 
     let canonical_bits = |x: f64| if x == 0.0 { 0u64 } else { x.to_bits() };
 
-    let sum_class_row = |k: usize, b: usize, classes: &[usize], buf: &mut Vec<Dd>| -> Result<Dd> {
-        buf.clear();
-        for (l, &cls) in classes.iter().enumerate() {
-            if cls == b {
-                let c_kl = c_mat[k * ns + l];
-                if c_kl.0 != 0.0 || c_kl.1 != 0.0 {
-                    buf.push(c_kl);
-                }
-            }
-        }
-        buf.sort_unstable_by_key(|v| (canonical_bits(v.0), canonical_bits(v.1)));
-        let mut acc = Dd::ZERO;
-        for &v in buf.iter() {
-            acc = acc.add(v);
-        }
-        if !acc.is_finite() {
+    let mut norm_c = vec![Dd::ZERO; ns * ns];
+    for (slot, &entry) in norm_c.iter_mut().zip(c_mat.iter()) {
+        if !entry.is_finite() {
             return Err(Error::InvalidInput(
-                "non-finite aggregated association weight in high-precision evaluation",
+                "non-finite entry in association site partition",
             ));
         }
-        Ok(acc)
-    };
+        let norm = Dd::two_sum(entry.0, entry.1);
+        if !norm.is_finite() {
+            return Err(Error::InvalidInput(
+                "non-finite normalized entry in association site partition",
+            ));
+        }
+        *slot = norm;
+    }
 
     for _ in 0..ns {
-        for (k, sig) in signatures.iter_mut().enumerate() {
-            sig.clear();
-            sig.reserve(num_classes);
-            for b in 0..num_classes {
-                let w = sum_class_row(k, b, &class_of, &mut scratch)?;
-                sig.push((canonical_bits(w.0), canonical_bits(w.1)));
+        for (k, (prior_cls, triples)) in keys.iter_mut().enumerate() {
+            *prior_cls = class_of[k];
+            triples.clear();
+            for (l, &target_cls) in class_of.iter().enumerate() {
+                let c_kl = norm_c[k * ns + l];
+                if c_kl.0 != 0.0 || c_kl.1 != 0.0 {
+                    triples.push((target_cls, canonical_bits(c_kl.0), canonical_bits(c_kl.1)));
+                }
             }
+            triples.sort_unstable();
         }
 
         let mut reps: Vec<usize> = Vec::with_capacity(ns);
         let mut next_class_of = vec![0usize; ns];
         for k in 0..ns {
-            if let Some(pos) = reps
-                .iter()
-                .position(|&rep| signatures[rep] == signatures[k])
-            {
+            if let Some(pos) = reps.iter().position(|&rep| keys[rep] == keys[k]) {
                 next_class_of[k] = pos;
             } else {
                 next_class_of[k] = reps.len();
@@ -594,11 +630,31 @@ fn equitable_site_partition(ns: usize, c_mat: &[Dd]) -> Result<(Vec<usize>, usiz
         }
     }
 
+    let mut scratch = Vec::with_capacity(ns);
     let mut w_mat = vec![Dd::ZERO; num_classes * num_classes];
     for a in 0..num_classes {
         let rep = class_rep[a];
         for b in 0..num_classes {
-            w_mat[a * num_classes + b] = sum_class_row(rep, b, &class_of, &mut scratch)?;
+            scratch.clear();
+            for (l, &cls) in class_of.iter().enumerate() {
+                if cls == b {
+                    let c_kl = norm_c[rep * ns + l];
+                    if c_kl.0 != 0.0 || c_kl.1 != 0.0 {
+                        scratch.push(c_kl);
+                    }
+                }
+            }
+            scratch.sort_unstable_by_key(|v| (canonical_bits(v.0), canonical_bits(v.1)));
+            let mut acc = Dd::ZERO;
+            for &v in &scratch {
+                acc = acc.add(v);
+            }
+            if !acc.is_finite() {
+                return Err(Error::InvalidInput(
+                    "non-finite aggregated association weight in high-precision evaluation",
+                ));
+            }
+            w_mat[a * num_classes + b] = acc;
         }
     }
 
@@ -787,6 +843,53 @@ mod tests {
         assert_ne!(cls5[0], cls5[2]);
         assert_ne!(cls5[0], cls5[4]);
         assert_ne!(cls5[2], cls5[4]);
+
+        // Round 9 counterexample (PRRT_kwDOVJkJcc68MbDL):
+        // C01 = C10 = C23 = C32 = Dd(1.0, 2^-54), C12 = C21 = Dd(2^-160, 0.0), others zero.
+        // Although the rounded DD row sums of sites 0/3 and 1/2 are bitwise identical,
+        // exact multiset partitioning must keep {0, 3} distinct from {1, 2}.
+        let w_edge = Dd(1.0, 2.0_f64.powi(-54));
+        let w_tiny = Dd(2.0_f64.powi(-160), 0.0);
+        let mut c_tiny = vec![Dd::ZERO; 16];
+        c_tiny[1] = w_edge;
+        c_tiny[4] = w_edge;
+        c_tiny[2 * 4 + 3] = w_edge;
+        c_tiny[3 * 4 + 2] = w_edge;
+        c_tiny[4 + 2] = w_tiny;
+        c_tiny[2 * 4 + 1] = w_tiny;
+        let (cls_t, ng_t, _) = equitable_site_partition(4, &c_tiny).unwrap();
+        assert_eq!(ng_t, 2);
+        assert_eq!(cls_t[0], cls_t[3]);
+        assert_eq!(cls_t[1], cls_t[2]);
+        assert_ne!(cls_t[0], cls_t[1]);
+
+        // Symmetric 4C (0,1-; 2,3+) + 2B (4-; 5+) merges to 2 classes (one per component).
+        let c11 = Dd::from_f64(1.0e30);
+        let c12 = Dd::from_f64(3.0e15);
+        let c21 = Dd::from_f64(7.0e15);
+        let c22 = Dd::from_f64(2.0e10);
+        let mut c6 = vec![Dd::ZERO; 36];
+        for k in 0..2 {
+            for l in 2..4 {
+                c6[k * 6 + l] = c11;
+                c6[l * 6 + k] = c11;
+            }
+            c6[k * 6 + 5] = c12;
+            c6[5 * 6 + k] = c21;
+        }
+        for k in 2..4 {
+            c6[k * 6 + 4] = c12;
+            c6[4 * 6 + k] = c21;
+        }
+        c6[4 * 6 + 5] = c22;
+        c6[5 * 6 + 4] = c22;
+        let (cls6, ng6, _) = equitable_site_partition(6, &c6).unwrap();
+        assert_eq!(ng6, 2);
+        assert_eq!(cls6[0], cls6[1]);
+        assert_eq!(cls6[0], cls6[2]);
+        assert_eq!(cls6[0], cls6[3]);
+        assert_eq!(cls6[4], cls6[5]);
+        assert_ne!(cls6[0], cls6[4]);
     }
 
     #[test]

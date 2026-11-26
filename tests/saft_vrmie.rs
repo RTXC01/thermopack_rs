@@ -1983,6 +1983,23 @@ fn test_saft_vrmie_dense_4c_extreme_strength_below_overflow_and_asymmetric_mixtu
         j_mix.pressure,
         p_fd
     );
+
+    // Round 9 regression (PRRT_kwDOVJkJcc68MbDH): extrapolated low-T state where the
+    // Dufal association integral turns negative (g < 0, W < 0) must be rejected by
+    // both public evaluators rather than clamping X > 1 to 1 and returning ~100 Pa.
+    let mut eos_neg = SaftVrMie::new(&["H2O"]).unwrap();
+    eos_neg
+        .set_assoc_params(
+            0,
+            thermopack_rs::AssocScheme::Scheme4C,
+            100.0 * thermopack_rs::R,
+            2.219_586_484_163_355_6e-28,
+        )
+        .unwrap();
+    let prep_neg = eos_neg.prepare(40.0, &[1.0]).unwrap();
+    let rho_neg = 65_544.335_760_036_41;
+    assert!(prep_neg.pressure_and_derivatives(rho_neg).is_err());
+    assert!(prep_neg.state(rho_neg).is_err());
 }
 
 #[test]

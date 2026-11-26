@@ -424,27 +424,39 @@ enum SpinodalKind {
     Min,
 }
 
+/// Local floating-point pressure resolution scale (Pa) at `(rho, p_spec, dp_drho, rt)`.
+///
+/// On the dilute vapor branch (`rho * rt ≈ p_spec`, `dp_drho * rho ≈ p_spec`),
+/// this equals `p_spec` so dilute closure stays strictly pressure-relative.
+/// On dense low-pressure liquids (`rho * rt >> p_spec`), this tracks the
+/// ideal/residual cancellation magnitude and coordinate-ULP pressure slope.
+#[inline]
+fn pressure_eval_scale(p_spec: f64, rho: f64, dp_drho: f64, rt: f64) -> f64 {
+    p_spec.max(rho * rt).max(dp_drho.abs() * rho)
+}
+
 /// Refine a single bracket `[lo, hi]` (in packing fraction `eta`) where
-/// `P(lo) <= p_spec <= P(hi)` using safeguarded Newton-Raphson with
-/// pressure-relative tolerance and floating-point resolution guard.
+/// `P(lo) <= p_spec <= P(hi)` using safeguarded Newton-Raphson with both
+/// pressure-evaluation resolution and coordinate convergence checks.
 fn refine_eta_root<F>(
     mut lo: f64,
     mut hi: f64,
     p_spec: f64,
+    rt: f64,
     eta_per_rho: f64,
     p_and_dp_drho: &F,
 ) -> Result<Option<f64>>
 where
     F: Fn(f64) -> Result<(f64, f64)>,
 {
-    let p_tol = 1.0e-13 * p_spec;
     let mut eta = 0.5 * (lo + hi);
-    for _ in 0..80 {
+    let mut prev_width = hi - lo;
+    let mut stall_count = 0usize;
+    for _ in 0..96 {
         let rho = eta / eta_per_rho;
         let (p, dp_drho) = p_and_dp_drho(rho)?;
         let res = p - p_spec;
-        let eta_tol = 64.0 * f64::EPSILON * eta.abs();
-        if res.abs() <= p_tol || (hi - lo) <= eta_tol {
+        if res == 0.0 {
             return Ok(Some(eta));
         }
         if res < 0.0 {
@@ -452,8 +464,38 @@ where
         } else {
             hi = eta;
         }
+        let width = hi - lo;
+        let eta_tol = 16.0 * f64::EPSILON * eta.abs();
+        if width <= eta_tol {
+            return Ok(Some(0.5 * (lo + hi)));
+        }
+        let p_scale = pressure_eval_scale(p_spec, rho, dp_drho, rt);
+        let p_res_tol = (1.0e-13 * p_spec).max(512.0 * f64::EPSILON * p_scale);
         let dp_deta = dp_drho / eta_per_rho;
-        let next = if dp_deta.is_finite() && dp_deta.abs() > 0.0 {
+        let step_est = if dp_deta.is_finite() && dp_deta > 0.0 {
+            (res / dp_deta).abs()
+        } else {
+            f64::INFINITY
+        };
+        let coord_tol = 64.0 * f64::EPSILON * eta.abs();
+        if res.abs() <= p_res_tol && step_est <= coord_tol {
+            return Ok(Some(eta));
+        }
+
+        // Force bisection if two consecutive steps did not shrink the bracket
+        // by at least half, guaranteeing worst-case logarithmic collapse even
+        // on flat near-critical curves with floating-point pressure jitter.
+        if width > 0.5 * prev_width {
+            stall_count += 1;
+        } else {
+            stall_count = 0;
+        }
+        prev_width = width;
+
+        let next = if stall_count >= 2 {
+            stall_count = 0;
+            0.5 * (lo + hi)
+        } else if dp_deta.is_finite() && dp_deta.abs() > 0.0 {
             let cand = eta - res / dp_deta;
             if cand > lo && cand < hi {
                 cand
@@ -466,8 +508,10 @@ where
         eta = next;
     }
     let rho = eta / eta_per_rho;
-    let (p, _) = p_and_dp_drho(rho)?;
-    if (p - p_spec).abs() <= 1.0e-9 * p_spec {
+    let (p, dp_drho) = p_and_dp_drho(rho)?;
+    let p_scale = pressure_eval_scale(p_spec, rho, dp_drho, rt);
+    let p_fallback = (1.0e-9 * p_spec).max(2048.0 * f64::EPSILON * p_scale);
+    if (p - p_spec).abs() <= p_fallback {
         Ok(Some(eta))
     } else {
         Ok(None)
@@ -764,37 +808,135 @@ where
                 }
             }
         }
-        if let Some(root) = refine_eta_root(lo, hi, pressure, eta_per_rho, &p_and_dp_drho)? {
+        if let Some(root) = refine_eta_root(lo, hi, pressure, rt, eta_per_rho, &p_and_dp_drho)? {
             root_etas.push(root);
         }
     }
 
-    // Deduplicate and verify mechanical stability (dP/drho > 0) and relative closure.
+    // Deduplicate, verify mechanical stability (dP/drho > 0) and closure within
+    // the local pressure-evaluation resolution, and reject unrepresentable volumes.
     root_etas.sort_by(f64::total_cmp);
     let mut volumes = Vec::new();
     let mut prev_eta: Option<f64> = None;
+    let mut saw_unrepresentable_volume = false;
     for eta in root_etas {
         if let Some(prev) = prev_eta
-            && (eta - prev).abs() <= 1.0e-9 * eta
+            && (eta - prev).abs() <= 1.0e-12 * eta
         {
             continue;
         }
         let rho = eta / eta_per_rho;
         let (p, dp) = p_and_dp_drho(rho)?;
-        if dp > 0.0 && (p - pressure).abs() <= 1.0e-8 * pressure {
-            volumes.push(eta_per_rho / eta);
-            prev_eta = Some(eta);
+        let p_scale = pressure_eval_scale(pressure, rho, dp, rt);
+        let p_accept = (1.0e-8 * pressure).max(4096.0 * f64::EPSILON * p_scale);
+        if dp > 0.0 && (p - pressure).abs() <= p_accept {
+            let v = eta_per_rho / eta;
+            if v.is_finite() && v > 0.0 && (1.0 / v).is_finite() && (1.0 / v) > 0.0 {
+                volumes.push(v);
+                prev_eta = Some(eta);
+            } else {
+                saw_unrepresentable_volume = true;
+            }
         }
     }
 
     // Sort ascending molar volume (liquid = smallest v first, vapor = largest v last).
     volumes.sort_by(f64::total_cmp);
     if volumes.is_empty() {
+        if saw_unrepresentable_volume {
+            return Err(Error::InvalidInput(
+                "molar volume overflowed finite floating-point range",
+            ));
+        }
         return Err(Error::NotConverged(
             "no mechanically stable physical volume root found",
         ));
     }
     Ok(volumes)
+}
+
+/// 8-point Gauss-Legendre quadrature nodes on `[-1, 1]`.
+const GL8_NODES: [f64; 8] = [
+    -0.960_289_856_497_536_3,
+    -0.796_666_477_413_626_7,
+    -0.525_532_409_916_329,
+    -0.183_434_642_495_649_8,
+    0.183_434_642_495_649_8,
+    0.525_532_409_916_329,
+    0.796_666_477_413_626_7,
+    0.960_289_856_497_536_3,
+];
+
+/// 8-point Gauss-Legendre quadrature weights on `[-1, 1]`.
+const GL8_WEIGHTS: [f64; 8] = [
+    0.101_228_536_290_376_26,
+    0.222_381_034_453_374_48,
+    0.313_706_645_877_887_3,
+    0.362_683_783_378_362,
+    0.362_683_783_378_362,
+    0.313_706_645_877_887_3,
+    0.222_381_034_453_374_48,
+    0.101_228_536_290_376_26,
+];
+
+/// Compute the cancellation-resistant molar Gibbs difference
+/// `G(T, v_lo) - G(T, v_hi) = integral_{v_lo}^{v_hi} (P(T, V) - P_spec) dV`
+/// (J/mol) using adaptive composite 8-point Gauss-Legendre quadrature with
+/// Neumaier compensated summation.
+///
+/// A negative result means `G(v_lo) < G(v_hi)` (the denser phase `v_lo` is more
+/// stable).
+fn gibbs_diff_maxwell_integral<F>(
+    v_lo: f64,
+    v_hi: f64,
+    pressure: f64,
+    p_and_dp_drho: &F,
+) -> Result<f64>
+where
+    F: Fn(f64) -> Result<(f64, f64)>,
+{
+    let log_space = v_hi / v_lo > 2.0;
+    let a = if log_space { v_lo.ln() } else { v_lo };
+    let b = if log_space { v_hi.ln() } else { v_hi };
+
+    let eval_panels = |n_panels: usize| -> Result<f64> {
+        let h = (b - a) / n_panels as f64;
+        let half_h = 0.5 * h;
+        let mut sum = 0.0_f64;
+        let mut comp = 0.0_f64;
+        for panel in 0..n_panels {
+            let mid = a + (panel as f64 + 0.5) * h;
+            for (&xi, &wi) in GL8_NODES.iter().zip(GL8_WEIGHTS.iter()) {
+                let u = mid + half_h * xi;
+                let (v, jac) = if log_space {
+                    let ev = u.exp();
+                    (ev, ev)
+                } else {
+                    (u, 1.0)
+                };
+                let (p, _) = p_and_dp_drho(1.0 / v)?;
+                let term = half_h * wi * (p - pressure) * jac;
+                let t = sum + term;
+                if sum.abs() >= term.abs() {
+                    comp += (sum - t) + term;
+                } else {
+                    comp += (term - t) + sum;
+                }
+                sum = t;
+            }
+        }
+        Ok(sum + comp)
+    };
+
+    let mut prev = eval_panels(8)?;
+    for n_panels in [16usize, 32, 64] {
+        let cur = eval_panels(n_panels)?;
+        if cur != 0.0 && cur.signum() == prev.signum() && (cur - prev).abs() <= 1.0e-3 * cur.abs() {
+            return Ok(cur);
+        }
+        prev = cur;
+    }
+    Ok(prev)
 }
 
 /// Select a physically stable molar volume (m^3/mol) according to `phase`.
@@ -810,7 +952,7 @@ where
     F: Fn(f64) -> Result<(f64, f64)>,
     G: Fn(f64) -> Result<f64>,
 {
-    let roots = solve_physical_volumes(temperature, pressure, eta_per_rho, p_and_dp_drho)?;
+    let roots = solve_physical_volumes(temperature, pressure, eta_per_rho, &p_and_dp_drho)?;
     match phase {
         Phase::Liquid => Ok(roots[0]),
         Phase::Vapor => Ok(*roots.last().expect("non-empty roots")),
@@ -818,16 +960,39 @@ where
             if roots.len() == 1 {
                 return Ok(roots[0]);
             }
+            let rt = crate::R * temperature;
+            let eval_g = |v: f64| -> Result<(f64, f64)> {
+                let a_res = a_res_at_rho(1.0 / v)?;
+                let z = pressure * v / rt;
+                let ln_z = z.ln();
+                let g = a_res + (z - 1.0) - ln_z;
+                let scale = 1.0_f64.max(a_res.abs()).max(z.abs()).max(ln_z.abs());
+                Ok((g, scale))
+            };
             let mut best_v = roots[0];
-            let mut best_g = f64::INFINITY;
-            for v in roots {
-                let rho = 1.0 / v;
-                let a_res = a_res_at_rho(rho)?;
-                let z = pressure * v / (crate::R * temperature);
-                let g_reduced = a_res + (z - 1.0) - z.ln();
-                if g_reduced < best_g {
-                    best_g = g_reduced;
+            let (mut best_g, mut best_scale) = eval_g(best_v)?;
+            for &v in &roots[1..] {
+                let (g, scale) = eval_g(v)?;
+                let diff = g - best_g;
+                let g_tol = 1.0e-9 * best_scale.max(scale);
+                let v_is_better = if diff.abs() > g_tol {
+                    g < best_g
+                } else {
+                    let (v_lo, v_hi) = if best_v < v { (best_v, v) } else { (v, best_v) };
+                    let dg_lo_minus_hi =
+                        gibbs_diff_maxwell_integral(v_lo, v_hi, pressure, &p_and_dp_drho)?;
+                    if dg_lo_minus_hi == 0.0 {
+                        g < best_g
+                    } else if best_v < v {
+                        dg_lo_minus_hi > 0.0
+                    } else {
+                        dg_lo_minus_hi < 0.0
+                    }
+                };
+                if v_is_better {
                     best_v = v;
+                    best_g = g;
+                    best_scale = scale;
                 }
             }
             Ok(best_v)

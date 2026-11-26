@@ -1335,3 +1335,152 @@ fn fresh_and_prepared_evaluations_agree_across_models() {
         1e-15,
     );
 }
+
+#[test]
+fn dense_low_pressure_cancellation_flat_root_close_gibbs_and_overflow_rejection() {
+    // 1. Dense low-pressure liquid branch preserved under ideal/residual pressure cancellation
+    // (BH T=85 K, P=0.1 Pa): both dense liquid and dilute vapor roots must be returned,
+    // with the liquid root straddled by public forward pressure_tv().
+    let bh = LjsBh::new();
+    let (t_bh, p_bh) = (85.0, 0.1);
+    let bh_roots = bh.volumes(t_bh, p_bh).unwrap();
+    assert_eq!(
+        bh_roots.len(),
+        2,
+        "BH T={t_bh}, P={p_bh}: expected both liquid and vapor roots, got {bh_roots:?}"
+    );
+    let v_liq = bh.volume(t_bh, p_bh, Phase::Liquid).unwrap();
+    let v_vap = bh.volume(t_bh, p_bh, Phase::Vapor).unwrap();
+    assert_close("BH dense low-P liquid", bh_roots[0], v_liq, 0.0, 1e-15);
+    assert_close("BH dilute low-P vapor", bh_roots[1], v_vap, 0.0, 1e-15);
+    assert!(
+        v_liq > 3.336_851_694_343_900e-5 && v_liq < 3.336_851_694_343_950e-5,
+        "BH liquid root {v_liq:.16e} outside straddled crossing"
+    );
+    let pr_lo = bh.pressure_tv(t_bh, 3.336_851_694_343_900e-5, 1.0).unwrap();
+    let pr_hi = bh.pressure_tv(t_bh, 3.336_851_694_343_950e-5, 1.0).unwrap();
+    assert!(pr_lo.value > p_bh && pr_hi.value < p_bh);
+    assert!(pr_lo.dv < 0.0 && pr_hi.dv < 0.0);
+    let pr_liq = bh.pressure_tv(t_bh, v_liq, 1.0).unwrap();
+    assert!(pr_liq.dv < 0.0);
+    assert!(
+        (pr_liq.value - p_bh).abs() < 1.0e-6,
+        "BH liquid residual too large: {:.3e} Pa",
+        (pr_liq.value - p_bh).abs()
+    );
+    // Dilute vapor branch remains strictly pressure-relative
+    let pr_vap = bh.pressure_tv(t_bh, v_vap, 1.0).unwrap();
+    assert!(pr_vap.dv < 0.0);
+    assert!(
+        (pr_vap.value - p_bh).abs() / p_bh < 1.0e-12,
+        "BH dilute vapor closure rel_err={:.3e}",
+        (pr_vap.value - p_bh).abs() / p_bh
+    );
+
+    // 2. Flat near-critical resolvable pressure root (LJ-UF T=163.36664638716522 K,
+    // P=5652616.747907021 Pa): returned liquid volume must converge to the local
+    // pressure-evaluation resolution (~1e-8 Pa noise floor on P ≈ 5.65e6 Pa) rather
+    // than stopping early at ~3.27e-7 Pa / 7.266782e-5.
+    let lj_uf = LjsUf::new(LjUfPotential::LennardJones);
+    let (t_flat, p_flat) = (163.366_646_387_165_22, 5_652_616.747_907_021);
+    let flat_roots = lj_uf.volumes(t_flat, p_flat).unwrap();
+    assert_eq!(flat_roots.len(), 2, "LJ-UF flat roots: {flat_roots:?}");
+    let v_flat_liq = lj_uf.volume(t_flat, p_flat, Phase::Liquid).unwrap();
+    assert_close("LJ-UF flat liq", flat_roots[0], v_flat_liq, 0.0, 1e-15);
+    // Independent forward-pressure bracket at [7.266895e-5, 7.266902e-5] straddles
+    // the crossing; the evaluation noise floor (~1.5e-8 Pa with dP/dV ≈ -50 Pa/(m^3/mol))
+    // spans [7.266885e-5, 7.266915e-5] before the spinodal near 7.266917e-5.
+    let (p_fast_lo, _) = lj_uf.pressure(t_flat, 7.266_895e-5, 1.0).unwrap();
+    let (p_fast_hi, _) = lj_uf.pressure(t_flat, 7.266_902e-5, 1.0).unwrap();
+    let p_br_lo = lj_uf.pressure_tv(t_flat, 7.266_895e-5, 1.0).unwrap();
+    let p_br_hi = lj_uf.pressure_tv(t_flat, 7.266_902e-5, 1.0).unwrap();
+    assert!(
+        p_fast_lo > p_flat
+            && p_fast_hi < p_flat
+            && p_br_lo.value > p_flat
+            && p_br_hi.value < p_flat
+            && p_br_lo.dv < 0.0
+            && p_br_hi.dv < 0.0
+    );
+    let (p_fast, _) = lj_uf.pressure(t_flat, v_flat_liq, 1.0).unwrap();
+    let pr_flat = lj_uf.pressure_tv(t_flat, v_flat_liq, 1.0).unwrap();
+    assert!(
+        v_flat_liq > 7.266_885e-5 && v_flat_liq < 7.266_915e-5,
+        "LJ-UF flat liquid root {v_flat_liq:.16e} fell outside evaluation-resolution band"
+    );
+    assert!(pr_flat.dv < 0.0);
+    assert!(
+        (p_fast - p_flat).abs() < 2.0e-8 && (pr_flat.value - p_flat).abs() < 2.0e-8,
+        "LJ-UF flat residual not at evaluation resolution: fast={:.3e}, tv={:.3e}",
+        p_fast - p_flat,
+        pr_flat.value - p_flat
+    );
+
+    // 3. Close-phase MinimumGibbs selection via Maxwell pressure integral
+    // (LJ-UF T=163.36664548723948 K, P=5652616.556625032 Pa):
+    // independent trapezoid integration of (P(T, V) - P_spec) dV gives G_liq - G_vap < 0,
+    // so MinimumGibbs must choose the liquid root; slightly lower pressure chooses vapor.
+    let (t_gibbs, p_gibbs) = (163.366_645_487_239_48, 5_652_616.556_625_032);
+    let g_roots = lj_uf.volumes(t_gibbs, p_gibbs).unwrap();
+    assert_eq!(g_roots.len(), 2, "LJ-UF close Gibbs roots: {g_roots:?}");
+    let independent_dg = |v1: f64, v2: f64, p_ref: f64, n: usize| -> f64 {
+        let h = (v2 - v1) / n as f64;
+        let mut s = 0.0;
+        for i in 0..=n {
+            let v = v1 + h * i as f64;
+            let w = if i == 0 || i == n { 0.5 } else { 1.0 };
+            let (pv, _) = lj_uf.pressure(t_gibbs, v, 1.0).unwrap();
+            s += w * (pv - p_ref) * h;
+        }
+        s
+    };
+    let dg_256 = independent_dg(g_roots[0], g_roots[1], p_gibbs, 256);
+    let dg_1024 = independent_dg(g_roots[0], g_roots[1], p_gibbs, 1024);
+    assert!(
+        dg_256 < -5.0e-13 && dg_1024 < -5.0e-13,
+        "expected G_liq - G_vap ≈ -7.77e-13 J/mol, got dg_256={dg_256:.3e}, dg_1024={dg_1024:.3e}"
+    );
+    let v_min_g = lj_uf.volume(t_gibbs, p_gibbs, Phase::MinimumGibbs).unwrap();
+    assert_close(
+        "LJ-UF close MinimumGibbs liquid",
+        g_roots[0],
+        v_min_g,
+        0.0,
+        1e-15,
+    );
+
+    // Shift pressure slightly below coexistence: G_liq - G_vap > 0 so MinimumGibbs picks vapor
+    let p_vap_favored = p_gibbs - 4.0e-5;
+    let gv_roots = lj_uf.volumes(t_gibbs, p_vap_favored).unwrap();
+    assert_eq!(gv_roots.len(), 2);
+    let dg_vap = independent_dg(gv_roots[0], gv_roots[1], p_vap_favored, 256);
+    assert!(
+        dg_vap > 0.0,
+        "expected vapor-favored dg > 0, got {dg_vap:.3e}"
+    );
+    let v_min_g_vap = lj_uf
+        .volume(t_gibbs, p_vap_favored, Phase::MinimumGibbs)
+        .unwrap();
+    assert_close(
+        "LJ-UF close MinimumGibbs vapor",
+        gv_roots[1],
+        v_min_g_vap,
+        0.0,
+        1e-15,
+    );
+
+    // 4. Reject unrepresentable molar volume (overflow to +inf) instead of returning Ok([inf])
+    let err_vols = bh.volumes(200.0, 1.0e-306).unwrap_err();
+    assert!(
+        matches!(err_vols, thermopack_rs::Error::InvalidInput(_)),
+        "expected InvalidInput on volume overflow, got {err_vols:?}"
+    );
+    let err_vap = bh.volume(200.0, 1.0e-306, Phase::Vapor).unwrap_err();
+    assert!(
+        matches!(err_vap, thermopack_rs::Error::InvalidInput(_)),
+        "expected InvalidInput on vapor volume overflow, got {err_vap:?}"
+    );
+    assert!(LjsWca::new().volumes(200.0, 1.0e-306).is_err());
+    assert!(LjsUv::new().volumes(200.0, 1.0e-306).is_err());
+    assert!(lj_uf.volumes(200.0, 1.0e-306).is_err());
+}

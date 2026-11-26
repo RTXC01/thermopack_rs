@@ -111,47 +111,147 @@ def sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
 
 
+def _extract_single_row(stdout: str, tag: str) -> list[str]:
+    rows = [s.split()[1:] for s in stdout.splitlines() if s.startswith(f"{tag} ")]
+    if len(rows) != 1:
+        raise ValueError(f"Expected exactly 1 {tag} row, got {len(rows)}: {stdout!r}")
+    return rows[0]
+
+
+def verify_defect_uf_ctor_output(stdout: str) -> None:
+    tokens = _extract_single_row(stdout, "DEFECT_UF_CTOR")
+    if len(tokens) != 4:
+        raise ValueError(f"Expected 4 DEFECT_UF_CTOR flags, got {len(tokens)}: {tokens!r}")
+    flags = [int(x) for x in tokens]
+    if flags != [1, 0, 1, 0]:
+        raise RuntimeError(f"Unexpected ljx_ux_eos_constructor flags: {flags}")
+
+
+def verify_defect_bh_setparam_output(stdout: str) -> None:
+    tokens = _extract_single_row(stdout, "DEFECT_BH_SETPARAM")
+    if len(tokens) != 4:
+        raise ValueError(f"Expected 4 DEFECT_BH_SETPARAM values, got {len(tokens)}: {tokens!r}")
+    vals = [float(x) for x in tokens]
+    if not all(math.isfinite(v) for v in vals):
+        raise ValueError(f"Non-finite DEFECT_BH_SETPARAM output: {vals!r}")
+    if abs(vals[0] - 3.7e-10) >= 1e-22:
+        raise RuntimeError(f"Unexpected updated sigma_ij in DEFECT_BH_SETPARAM: {vals!r}")
+    if abs(vals[1] - 3.42e-10) >= 1e-22:
+        raise RuntimeError(f"Expected stale sigma_eff=3.42e-10, got {vals[1]!r} ({vals!r})")
+    if abs(vals[2] - 3.42e-10 ** 3) >= 1e-40:
+        raise RuntimeError(f"Expected stale sigma_ij_cube=(3.42e-10)^3, got {vals[2]!r} ({vals!r})")
+    if abs(vals[3] - 140.0) >= 1e-12:
+        raise RuntimeError(f"Unexpected updated eps_divk_ij in DEFECT_BH_SETPARAM: {vals!r}")
+
+
+def verify_defect_cavity_test_output(stdout: str) -> None:
+    tokens = _extract_single_row(stdout, "DEFECT_CAV_TEST")
+    if len(tokens) != 6:
+        raise ValueError(f"Expected 6 DEFECT_CAV_TEST values, got {len(tokens)}: {tokens!r}")
+    vals = [float(x) for x in tokens]
+    if not all(math.isfinite(v) for v in vals):
+        raise ValueError(f"Non-finite DEFECT_CAV_TEST output: {vals!r}")
+    if not (
+        vals[0] != 0.0
+        and vals[1] != 0.0
+        and vals[3] != 0.0
+        and vals[2] == 0.0
+        and vals[4] == 0.0
+        and vals[5] == 0.0
+    ):
+        raise RuntimeError(f"Unexpected DEFECT_CAV_TEST derivative slots: {vals!r}")
+
+
+def verify_defect_ljs_uf_init_result(returncode: int, stdout: str, stderr: str) -> None:
+    combined = stdout + stderr
+    if returncode == 0 or "At least one CPA-component must self-associate" not in combined:
+        raise RuntimeError(
+            f"Expected init_ljs('UF') CPA self-association abort, got rc={returncode}, "
+            f"stdout={stdout!r}, stderr={stderr!r}"
+        )
+
+
 def verify_upstream_defects(exe: Path, env: dict):
     """Independently verify confirmed upstream Fortran defects live."""
     # 1. ljx_ux_eos_constructor reversed INDEX bug
     stdin = "DEFECTS\nuf-ctor\n8 0\n100.0 0.0 1.0 0.0 0.0\n"
     proc = subprocess.run([exe], input=stdin, text=True, env=env, capture_output=True, check=True)
-    line, = [s for s in proc.stdout.splitlines() if s.startswith("DEFECT_UF_CTOR ")]
-    flags = [int(x) for x in line.split()[1:]]
-    assert flags == [1, 0, 1, 0], f"Unexpected ljx_ux_eos_constructor flags: {flags}"
+    verify_defect_uf_ctor_output(proc.stdout)
 
     # 2. ljs_bh_set_pure_params stale sigma_eff bug
     stdin = "DEFECTS\nbh-set-pure\n8 0\n100.0 0.0 1.0 3.7e-10 140.0\n"
     proc = subprocess.run([exe], input=stdin, text=True, env=env, capture_output=True, check=True)
-    line, = [s for s in proc.stdout.splitlines() if s.startswith("DEFECT_BH_SETPARAM ")]
-    vals = [float(x) for x in line.split()[1:]]
-    assert abs(vals[0] - 3.7e-10) < 1e-22, vals
-    assert abs(vals[1] - 3.42e-10) < 1e-22, f"Expected stale sigma_eff=3.42e-10, got {vals[1]}"
+    verify_defect_bh_setparam_output(proc.stdout)
 
     # 3. calc_cavity_integral_LJ_Fres_test zero F_e/F_ee/F_Te bug
     stdin = "DEFECTS\ncavity-test\n8 0\n120.0 0.35 1.0 3.42e-10 124.0\n"
     proc = subprocess.run([exe], input=stdin, text=True, env=env, capture_output=True, check=True)
-    line, = [s for s in proc.stdout.splitlines() if s.startswith("DEFECT_CAV_TEST ")]
-    vals = [float(x) for x in line.split()[1:]]
-    assert vals[0] != 0.0 and vals[2] == 0.0 and vals[4] == 0.0 and vals[5] == 0.0, vals
+    verify_defect_cavity_test_output(proc.stdout)
 
     # 4. init_ljs('UF') aborts in assocIndices_bookkeeping because eosLJS_UF is missing
     stdin = "DEFECTS\nljs-uf-init\n8 0\n100.0 0.0 1.0 0.0 0.0\n"
     proc = subprocess.run([exe], input=stdin, text=True, env=env, capture_output=True)
-    combined = proc.stdout + proc.stderr
-    assert proc.returncode != 0 and "At least one CPA-component must self-associate" in combined, (
-        proc.returncode,
-        proc.stdout,
-        proc.stderr,
-    )
+    verify_defect_ljs_uf_init_result(proc.returncode, proc.stdout, proc.stderr)
     print("Confirmed all 4 live upstream Fortran defects (uf-ctor, bh-set-pure, cavity-test, ljs-uf-init)")
+
+
+def self_test_defect_checks() -> None:
+    """Verify defect parsers reject malformed, NaN, and corrected outputs even under python -O."""
+
+    def must_reject(fn, *args):
+        try:
+            fn(*args)
+        except (ValueError, RuntimeError):
+            return
+        raise RuntimeError(f"Defect check {fn.__name__} unexpectedly accepted {args!r}")
+
+    # 1. Cavity defect: NaN, Inf, wrong width, zero F_T, and corrected non-zero F_e must fail.
+    must_reject(verify_defect_cavity_test_output, "DEFECT_CAV_TEST NaN 2.0 0.0 3.0 0.0 0.0\n")
+    must_reject(verify_defect_cavity_test_output, "DEFECT_CAV_TEST Inf 2.0 0.0 3.0 0.0 0.0\n")
+    must_reject(verify_defect_cavity_test_output, "DEFECT_CAV_TEST 1.0 2.0 0.0 3.0 0.0\n")
+    must_reject(verify_defect_cavity_test_output, "DEFECT_CAV_TEST 1.0 2.0 0.1 3.0 0.0 0.0\n")
+    must_reject(verify_defect_cavity_test_output, "DEFECT_CAV_TEST 1.0 0.0 0.0 3.0 0.0 0.0\n")
+    verify_defect_cavity_test_output("DEFECT_CAV_TEST 1.0 2.0 0.0 3.0 0.0 0.0\n")
+
+    # 2. UF constructor defect: corrected flags or truncated output must fail.
+    must_reject(verify_defect_uf_ctor_output, "DEFECT_UF_CTOR 0 1 1 1\n")
+    must_reject(verify_defect_uf_ctor_output, "DEFECT_UF_CTOR 1 0 1\n")
+    verify_defect_uf_ctor_output("DEFECT_UF_CTOR 1 0 1 0\n")
+
+    # 3. BH set_pure_params defect: corrected sigma_eff or NaN must fail.
+    must_reject(
+        verify_defect_bh_setparam_output,
+        f"DEFECT_BH_SETPARAM 3.7e-10 3.7e-10 {3.7e-10 ** 3:.17e} 140.0\n",
+    )
+    must_reject(
+        verify_defect_bh_setparam_output,
+        f"DEFECT_BH_SETPARAM 3.7e-10 NaN {3.42e-10 ** 3:.17e} 140.0\n",
+    )
+    verify_defect_bh_setparam_output(
+        f"DEFECT_BH_SETPARAM 3.7e-10 3.42e-10 {3.42e-10 ** 3:.17e} 140.0\n"
+    )
+
+    # 4. init_ljs('UF') abort defect: zero exit or unrelated abort message must fail.
+    must_reject(
+        verify_defect_ljs_uf_init_result,
+        0,
+        "At least one CPA-component must self-associate",
+        "",
+    )
+    must_reject(verify_defect_ljs_uf_init_result, 1, "unrelated abort", "")
+    verify_defect_ljs_uf_init_result(1, "", "At least one CPA-component must self-associate")
+    print("Self-test passed for all 4 defect validators")
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--compiler", default="gfortran")
     parser.add_argument("--write-fixture", action="store_true")
+    parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args()
+    if args.self_test:
+        self_test_defect_checks()
+        return
     ref = ROOT / ".reference"
     compiler = Path(shutil.which(args.compiler) or args.compiler).resolve()
     env = dict(os.environ)

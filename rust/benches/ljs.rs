@@ -179,4 +179,15 @@ fn main() {
             .unwrap();
         f.value + f.dtt + f.dvv
     });
+
+    let lj_uf = LjsUf::new(LjUfPotential::LennardJones);
+    let lj_uf_nc = lj_uf.prepare(163.366_645_487_239_48).unwrap();
+    bench_ns("lj_uf_near_critical_min_gibbs_prep", rounds, 50, |_| {
+        black_box(&lj_uf_nc)
+            .volume(
+                black_box(5_652_616.556_625_032),
+                black_box(Phase::MinimumGibbs),
+            )
+            .unwrap()
+    });
 }

@@ -60,11 +60,16 @@ volume-solve interfaces:
   Carnahan-Starling pole at `eta = 1`), refines both adjacent and sub-cell
   near-critical spinodal pairs (`dP/drho = 0`), decomposes the domain into
   strictly monotone mechanically stable branches, polishes every mechanically
-  stable root (`dP/dV < 0`) to pressure-relative tolerance with safeguarded
-  Newton-Raphson, and selects `Phase::Liquid` (smallest molar volume),
-  `Phase::Vapor` (largest molar volume), or `Phase::MinimumGibbs` (minimum
-  `a_res + Z - 1 - ln(Z)`). This fixes the earlier `LjsBh::volume` behavior
-  that scanned past the `eta = 1` pole for liquid states.
+  stable root (`dP/dV < 0`) to both coordinate and local pressure-evaluation
+  resolution with safeguarded Newton-Raphson (preserving dense low-pressure
+  liquid roots under ideal/residual cancellation while keeping dilute vapor
+  closure strictly pressure-relative and rejecting unrepresentable overflowed
+  volumes), and selects `Phase::Liquid` (smallest molar volume), `Phase::Vapor`
+  (largest molar volume), or `Phase::MinimumGibbs` (minimum
+  `a_res + Z - 1 - ln(Z)`, falling back to adaptive Gauss-Legendre integration
+  of `int (P(T, V) - P_spec) dV` when direct reduced Gibbs energies reach
+  cancellation). This fixes the earlier `LjsBh::volume` behavior that scanned
+  past the `eta = 1` pole for liquid states.
 * **Exact source compatibility iteration** (`baseline_volume_iteration`):
   reproduces `src/saft_interface.f90:pc_saft_nonassoc_volume_solver`
   (`zeta_min = 1e-10`, `zeta_max = 0.75`, vapor seed `1e-10`, liquid seed

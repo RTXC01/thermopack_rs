@@ -1914,6 +1914,78 @@ fn test_saft_vrmie_dense_association_near_exponential_limit() {
 }
 
 #[test]
+fn test_saft_vrmie_dense_4c_extreme_strength_below_overflow_and_asymmetric_mixture() {
+    // Round 8 regression: at eps = 400*(R*T), beta = 1e-130 (well below exp overflow),
+    // rho * Delta ~= 1.805e70 so the true symmetric 4C site fraction X ~= 5.26e-36 falls
+    // below 2^-106, making an unreduced 4x4 log-space Jacobian singular in the donor/acceptor
+    // constant-product mode. Exact equitable-partition reduction collapses pure 4C to a
+    // well-conditioned scalar quadratic while preserving asymmetric mixtures unmerged.
+    let temperature = 1500.0;
+    let rho = 41954.94342;
+    let mut eos = SaftVrMie::new(&["H2O"]).unwrap();
+    eos.set_assoc_params(
+        0,
+        thermopack_rs::AssocScheme::Scheme4C,
+        400.0 * (thermopack_rs::R * temperature),
+        1e-130,
+    )
+    .unwrap();
+    let prepared = eos.prepare(temperature, &[1.0]).unwrap();
+    let jet = prepared.pressure_and_derivatives(rho).unwrap();
+    let state = prepared.state(rho).unwrap();
+    // Independently verified 80-digit symmetric EOS reference: P = 143.849959519 Pa.
+    let expected_p = 143.849_959_52;
+    for (pressure, compressibility) in [
+        (jet.pressure, jet.compressibility),
+        (state.pressure, state.compressibility),
+    ] {
+        assert!(pressure.is_finite() && compressibility.is_finite());
+        assert!(
+            (pressure - expected_p).abs() < 1e-4,
+            "pressure={pressure}, expected={expected_p}"
+        );
+        let expected_z = pressure / (thermopack_rs::R * temperature * rho);
+        assert!((compressibility - expected_z).abs() <= 1e-12 * expected_z);
+    }
+    assert!((jet.pressure - state.pressure).abs() <= 1e-12);
+    assert!((jet.compressibility - state.compressibility).abs() <= 1e-18);
+
+    // Asymmetric 4C (H2O: 2-, 2+) + 3B (NH3 configured as 2+, 1-) dense liquid mixture
+    // hits the cancellation-gated DD path with unequal donor/acceptor totals, so H2O donor
+    // and acceptor sites must stay distinct and agree with central finite differences.
+    let mut mix = SaftVrMie::new(&["H2O", "NH3"]).unwrap();
+    mix.set_assoc_params(
+        1,
+        thermopack_rs::AssocScheme::Scheme3B,
+        1500.0 * thermopack_rs::R,
+        1.0e-28,
+    )
+    .unwrap();
+    let z = [0.6, 0.4];
+    let t_mix = 220.0;
+    let prep_mix = mix.prepare(t_mix, &z).unwrap();
+    let v_liq = prep_mix.volume(100.0, Phase::Liquid).unwrap();
+    let rho_liq = 1.0 / v_liq;
+    let xk = mix.solve_assoc_x_k(t_mix, v_liq, &z).unwrap();
+    assert_eq!(xk.len(), 7);
+    assert!((xk[0] - xk[2]).abs() > 1.0e-3 * xk[0].max(xk[2]));
+    let j_mix = prep_mix.pressure_and_derivatives(rho_liq).unwrap();
+    let s_mix = prep_mix.state(rho_liq).unwrap();
+    assert!((j_mix.pressure - 100.0).abs() <= 1.0e-4);
+    assert!((j_mix.pressure - s_mix.pressure).abs() <= 1.0e-10);
+    let h = 1.0e-6 * v_liq;
+    let f_plus = mix.residual_helmholtz_tvn(t_mix, v_liq + h, &z).unwrap().f;
+    let f_minus = mix.residual_helmholtz_tvn(t_mix, v_liq - h, &z).unwrap().f;
+    let p_fd = thermopack_rs::R * t_mix * (rho_liq - (f_plus - f_minus) / (2.0 * h));
+    assert!(
+        (j_mix.pressure - p_fd).abs() <= 1.0,
+        "j_mix.pressure={}, p_fd={}",
+        j_mix.pressure,
+        p_fd
+    );
+}
+
+#[test]
 fn test_saft_vrmie_fixed_pressure_nh3_120k_quantization_and_representable_targets() {
     // Independently qualify NH3 120 K fixed-pressure liquid closure beyond saturation
     // round-trips. At T = 120 K, |dP/dv| * ulp(v_l) ~= 1.181e-6 Pa (~1.162e-6 Pa per

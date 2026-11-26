@@ -37,6 +37,11 @@ impl Dd {
     }
 
     #[inline(always)]
+    pub(super) fn is_finite(self) -> bool {
+        self.0.is_finite() && self.1.is_finite()
+    }
+
+    #[inline(always)]
     pub(super) fn quick_two_sum(a: f64, b: f64) -> Self {
         let s = a + b;
         let e = b - (s - a);

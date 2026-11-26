@@ -568,9 +568,21 @@ fn canonical_f64_bits(x: f64) -> u64 {
     if x == 0.0 { 0u64 } else { x.to_bits() }
 }
 
+#[inline(always)]
+fn dd_gt(a: Dd, b: Dd) -> bool {
+    let d = a.sub(b);
+    d.0 > 0.0 || (d.0 == 0.0 && d.1 > 0.0)
+}
+
+#[inline(always)]
+fn dd_lt(a: Dd, b: Dd) -> bool {
+    let d = a.sub(b);
+    d.0 < 0.0 || (d.0 == 0.0 && d.1 < 0.0)
+}
+
 /// Solve `w * y^2 + b * y - 1 = 0` for the unique positive root `y in (0, 1]`
 /// given `b >= 1` and `w >= 0` in 106-bit double-double precision, using exact
-/// binary scaling (`2^p`) so `b^2 + 4*w` never overflows `f64::MAX`.
+/// binary scaling (`2^p`) so neither `b^2 + 4*w` nor `b + sqrt(b^2 + 4*w)` overflows.
 fn solve_positive_quadratic_dd(b: Dd, w: Dd) -> Result<Dd> {
     if !b.is_finite()
         || !w.is_finite()
@@ -592,15 +604,18 @@ fn solve_positive_quadratic_dd(b: Dd, w: Dd) -> Result<Dd> {
         return Ok(if y.0 > 1.0 { Dd::ONE } else { y });
     }
     let scale_ref = b.0.max(w.0.sqrt());
-    let disc_sqrt = if scale_ref > 1.0e140 {
+    let y = if scale_ref > 1.0e140 {
         let p = ((scale_ref.to_bits() >> 52) as i32) - 1023;
         let bs = b.scale_pow2(-p);
         let ws = w.scale_pow2(-2 * p);
-        bs.mul(bs).add(ws.mul_f64(4.0)).sqrt().scale_pow2(p)
+        let disc_s = bs.mul(bs).add(ws.mul_f64(4.0)).sqrt();
+        // Keep the reciprocal inside the O(1) scaled domain so `b + disc_sqrt` cannot
+        // overflow near `f64::MAX`, then scale the positive root down by `2^-p`.
+        Dd::from_f64(2.0).div(bs.add(disc_s)).scale_pow2(-p)
     } else {
-        b.mul(b).add(w.mul_f64(4.0)).sqrt()
+        let disc_sqrt = b.mul(b).add(w.mul_f64(4.0)).sqrt();
+        Dd::from_f64(2.0).div(b.add(disc_sqrt))
     };
-    let y = Dd::from_f64(2.0).div(b.add(disc_sqrt));
     if !y.is_finite() || y.0 <= 0.0 || y.0 > 1.0 + 1.0e-28 {
         return Err(Error::NotConverged(
             "out-of-domain quadratic site fraction in high-precision association solver",
@@ -772,7 +787,9 @@ fn solve_star_bipartite_dd(part: &SitePartition, hub: usize) -> Result<Vec<Dd>> 
         let den_p = Dd::ONE.add(w_ph.mul(y));
         let term_p = Dd::ONE.add(d_p.mul(y)).div(den_p);
         let mut g = term_p.sub(y);
-        let mut dg_du = w_hp.mul(y).div(den_p.mul(den_p)).add(y).neg();
+        // Divide by `den_p` twice instead of squaring `den_p` so large `w_ph * y > 1e154`
+        // (e.g. upper bracket `y = 1` with `w_ph ~ 3.6e155`) never overflows `den_p^2`.
+        let mut dg_du = w_hp.mul(y).div(den_p).div(den_p).add(y).neg();
         let mut scale = term_p.0.abs().max(y.0.abs());
         for b in 0..ng {
             if b == hub || b == dom {
@@ -805,6 +822,11 @@ fn solve_star_bipartite_dd(part: &SitePartition, hub: usize) -> Result<Vec<Dd>> 
         Dd::ONE
     };
     let mut u_hi = y_hi.ln();
+    if !u_hi.is_finite() {
+        return Err(Error::NotConverged(
+            "non-finite star-bipartite upper log bound",
+        ));
+    }
     let (g_hi, _, _) = eval_g_and_dg_du(y_hi)?;
     if g_hi.0 > 0.0 {
         return Err(Error::NotConverged(
@@ -812,7 +834,7 @@ fn solve_star_bipartite_dd(part: &SitePartition, hub: usize) -> Result<Vec<Dd>> 
         ));
     }
 
-    // Start from the 2-class estimate against the dominant leaf, then lower u_lo until g > 0.
+    // Start from the 2-class estimate against the dominant leaf, then lower u_lo until g >= 0.
     let y_est = solve_positive_quadratic_dd(
         if d_p.0 < 0.0 {
             Dd::ONE.add(d_p.neg())
@@ -821,14 +843,21 @@ fn solve_star_bipartite_dd(part: &SitePartition, hub: usize) -> Result<Vec<Dd>> 
         },
         Dd::from_f64(w_ph.0.max(w_hp.0)),
     )?;
-    let mut u_lo = if y_est.0 < y_hi.0 {
+    let mut u_lo = if dd_lt(y_est, y_hi) {
         y_est.ln()
     } else {
         u_hi.sub(Dd::ONE)
     };
+    if !u_lo.is_finite() {
+        return Err(Error::NotConverged(
+            "non-finite star-bipartite lower log bound",
+        ));
+    }
+    let mut found_lo = false;
     for _ in 0..80 {
         let (g_lo, _, _) = eval_g_and_dg_du(u_lo.exp())?;
         if g_lo.0 >= 0.0 {
+            found_lo = true;
             break;
         }
         u_lo = u_lo.sub(Dd::from_f64(10.0));
@@ -838,15 +867,22 @@ fn solve_star_bipartite_dd(part: &SitePartition, hub: usize) -> Result<Vec<Dd>> 
             ));
         }
     }
+    if !found_lo {
+        return Err(Error::NotConverged(
+            "failed to bracket star-bipartite hub root from below",
+        ));
+    }
 
     let mut u = u_lo.add(u_hi).mul_f64(0.5);
-    for _ in 0..80 {
+    let mut converged = false;
+    for _ in 0..128 {
         let y = u.exp();
         let (g, dg_du, scale) = eval_g_and_dg_du(y)?;
         if g.0.abs() <= 1.0e-28 * scale.max(1.0e-300) {
+            converged = true;
             break;
         }
-        if g.0 > 0.0 {
+        if g.0 > 0.0 || (g.0 == 0.0 && g.1 > 0.0) {
             u_lo = u;
         } else {
             u_hi = u;
@@ -854,11 +890,12 @@ fn solve_star_bipartite_dd(part: &SitePartition, hub: usize) -> Result<Vec<Dd>> 
         let width = u_hi.sub(u_lo);
         if width.0 <= 1.0e-28 * u.0.abs().max(1.0) {
             u = u_lo.add(u_hi).mul_f64(0.5);
+            converged = true;
             break;
         }
         let next = if dg_du.0 < 0.0 {
             let cand = u.sub(g.div(dg_du));
-            if cand.is_finite() && cand.0 > u_lo.0 && cand.0 < u_hi.0 {
+            if cand.is_finite() && dd_gt(cand, u_lo) && dd_lt(cand, u_hi) {
                 cand
             } else {
                 u_lo.add(u_hi).mul_f64(0.5)
@@ -876,6 +913,16 @@ fn solve_star_bipartite_dd(part: &SitePartition, hub: usize) -> Result<Vec<Dd>> 
         ));
     }
     let y_h = if y_h.0 > 1.0 { Dd::ONE } else { y_h };
+    let (g_final, _, scale_final) = eval_g_and_dg_du(y_h)?;
+    let width_final = u_hi.sub(u_lo);
+    if !converged
+        || (g_final.0.abs() > 1.0e-20 * scale_final.max(1.0e-300)
+            && width_final.0 > 1.0e-24 * u.0.abs().max(1.0))
+    {
+        return Err(Error::NotConverged(
+            "star-bipartite hub balance did not converge to tolerance",
+        ));
+    }
     let mut y_g = vec![Dd::ONE; ng];
     y_g[hub] = y_h;
     for (b, slot) in y_g.iter_mut().enumerate() {
@@ -1260,6 +1307,68 @@ mod tests {
         let (x_minus, x_plus) = solve_bipartite_two_class_dd(&p_r10).unwrap();
         assert!((x_minus.0 - 5.129_181_126_449_266e-43).abs() <= 1.0e-55);
         assert!((x_plus.0 - 5.051_291_811_264_493e-41).abs() <= 1.0e-53);
+
+        // Round 11 (PRRT_kwDOVJkJcc68PQbZ): distinct-cross-strength star-bipartite (ng = 3)
+        // for H2O(4C) + H2O(1ea) with eps0 = 4194304, eps1 = 0.9*eps0, beta = 2^-300, x1 = 1e-40.
+        // Direct fraction check must match 120-digit reference to < 1e-13 relative (catching
+        // any ~1e-9 stall when Newton candidates fail single-word DD bracket comparisons).
+        let y00_z = Dd::from_f64(1.929_832_031_222_762e82);
+        let y01_z = Dd::from_f64(9.610_148_906_254_012e74);
+        let mut c_star_z = vec![Dd::ZERO; 25];
+        for k in 0..2 {
+            for l in 2..4 {
+                c_star_z[k * 5 + l] = y00_z;
+                c_star_z[l * 5 + k] = y00_z;
+            }
+            c_star_z[k * 5 + 4] = y01_z.mul_f64(1.0e-40);
+            c_star_z[4 * 5 + k] = y01_z;
+        }
+        let p_star_z = equitable_site_partition(5, &c_star_z).unwrap();
+        assert_eq!(p_star_z.num_classes, 3);
+        let hub_z = find_star_bipartite_hub(p_star_z.num_classes, &p_star_z.w_mat).unwrap();
+        let y_star_z = solve_star_bipartite_dd(&p_star_z, hub_z).unwrap();
+        let xh_z = y_star_z[p_star_z.class_of[0]].0;
+        let x1_z = y_star_z[p_star_z.class_of[2]].0;
+        let x2_z = y_star_z[p_star_z.class_of[4]].0;
+        assert!((xh_z - 5.129_181_126_449_266e-43).abs() <= 1.0e-13 * 5.129_181_126_449_266e-43);
+        assert!((x1_z - 5.051_291_811_264_493e-41).abs() <= 1.0e-13 * 5.051_291_811_264_493e-41);
+        assert!((x2_z - 1.014_359_385_221_143e-33).abs() <= 1.0e-13 * 1.014_359_385_221_143e-33);
+
+        // Round 11 (PRRT_kwDOVJkJcc68PQbU): ultra-strong star-bipartite (w_ph ~ 3.61e155)
+        // where squaring `den_p` at `y = 1` overflows f64::MAX.
+        let y00_u = Dd::from_f64(1.805_190_753_138_869e155);
+        let y01_u = Dd::from_f64(3.720_775_460_024_841e146);
+        let mut c_star_u = vec![Dd::ZERO; 25];
+        for k in 0..2 {
+            for l in 2..4 {
+                c_star_u[k * 5 + l] = y00_u;
+                c_star_u[l * 5 + k] = y00_u;
+            }
+            c_star_u[k * 5 + 4] = y01_u.mul_f64(1.0e-40);
+            c_star_u[4 * 5 + k] = y01_u;
+        }
+        let p_star_u = equitable_site_partition(5, &c_star_u).unwrap();
+        assert_eq!(p_star_u.num_classes, 3);
+        let hub_u = find_star_bipartite_hub(p_star_u.num_classes, &p_star_u.w_mat).unwrap();
+        let y_star_u = solve_star_bipartite_dd(&p_star_u, hub_u).unwrap();
+        let xh_u = y_star_u[p_star_u.class_of[0]].0;
+        let x1_u = y_star_u[p_star_u.class_of[2]].0;
+        let x2_u = y_star_u[p_star_u.class_of[4]].0;
+        assert!((xh_u - 5.539_580_779_821_734e-116).abs() <= 1.0e-13 * 5.539_580_779_821_734e-116);
+        assert!((x1_u - 5.0e-41).abs() <= 1.0e-13 * 5.0e-41);
+        assert!((x2_u - 2.425_825_977_048_904e-32).abs() <= 1.0e-13 * 2.425_825_977_048_904e-32);
+
+        // Round 11 (PRRT_kwDOVJkJcc68PQbf): quadratic reciprocal must stay in scaled domain
+        // so finite b = 1e308, w = 1e200 returns the representable positive root 1e-308.
+        let y_extreme =
+            solve_positive_quadratic_dd(Dd::from_f64(1.0e308), Dd::from_f64(1.0e200)).unwrap();
+        assert!(y_extreme.is_finite() && y_extreme.0 > 0.0);
+        assert!((y_extreme.0 - 1.0e-308).abs() <= 1.0e-320);
+        let y_norm =
+            solve_positive_quadratic_dd(Dd::from_f64(1.0e300), Dd::from_f64(1.0e200)).unwrap();
+        assert!((y_norm.0 - 1.0e-300).abs() <= 1.0e-314);
+        let y_w = solve_positive_quadratic_dd(Dd::ONE, Dd::from_f64(1.0e308)).unwrap();
+        assert!((y_w.0 - 1.0e-154).abs() <= 1.0e-168);
     }
 
     #[test]

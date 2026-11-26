@@ -215,3 +215,2425 @@ fn test_saft_vrmie_quantum_h2() {
     let st = prep.state(8000.0).unwrap();
     assert!((st.ln_phi[0] - 3.2124502130409543e-02).abs() < 1e-5);
 }
+
+#[derive(Debug, Clone, Copy)]
+enum RefSlot {
+    Value(f64),
+    UnsupportedSource,
+}
+
+#[derive(Debug, Default)]
+struct FixtureCoverage {
+    total_cases: usize,
+    per_kind: [usize; 8],
+    scalar_comparisons: usize,
+    unsupported_source_slots: usize,
+}
+
+type FixtureKey<'a> = [&'a str; 12];
+
+// Independently pinned expected case roster for `tests/fixtures/saftvrmie_tvn.csv`.
+// Each entry is [components, ref, order, hs, terms, cutoff, shift, kind, T, V, n, variant].
+const EXPECTED_FIXTURE_CASES: &[FixtureKey<'static>] = &[
+    // kind=0: extensive TVN residual Helmholtz (34 cases)
+    [
+        "CO2,C1", "DEFAULT", "-1", "1", "31", "0", "0", "0", "280", "0.0004", "0.8,1.2", "default",
+    ],
+    [
+        "NH3", "DEFAULT", "-1", "1", "31", "0", "0", "0", "320", "0.0003", "2", "default",
+    ],
+    [
+        "H2O,MEOH", "DEFAULT", "-1", "1", "31", "0", "0", "0", "380", "0.0003", "0.8,1.2",
+        "default",
+    ],
+    [
+        "ETOH,C1", "DEFAULT", "-1", "1", "31", "0", "0", "0", "350", "0.0004", "1.2,0.8", "default",
+    ],
+    [
+        "CO2,C1", "DEFAULT", "-1", "2", "31", "0", "0", "0", "280", "0.0004", "0.8,1.2", "default",
+    ],
+    [
+        "CO2,C1", "DEFAULT", "-1", "3", "31", "0", "0", "0", "280", "0.0004", "0.8,1.2", "default",
+    ],
+    [
+        "CO2,C1", "DEFAULT", "-1", "4", "31", "0", "0", "0", "280", "0.0004", "0.8,1.2", "default",
+    ],
+    [
+        "CO2,C1", "DEFAULT", "-1", "5", "31", "0", "0", "0", "280", "0.0004", "0.8,1.2", "default",
+    ],
+    [
+        "CO2,C1", "DEFAULT", "-1", "1", "1", "0", "0", "0", "280", "0.0004", "0.8,1.2", "default",
+    ],
+    [
+        "CO2,C1", "DEFAULT", "-1", "1", "2", "0", "0", "0", "280", "0.0004", "0.8,1.2", "default",
+    ],
+    [
+        "CO2,C1", "DEFAULT", "-1", "1", "4", "0", "0", "0", "280", "0.0004", "0.8,1.2", "default",
+    ],
+    [
+        "CO2,C1", "DEFAULT", "-1", "1", "8", "0", "0", "0", "280", "0.0004", "0.8,1.2", "default",
+    ],
+    [
+        "CO2,C1", "DEFAULT", "-1", "1", "16", "0", "0", "0", "280", "0.0004", "0.8,1.2", "default",
+    ],
+    [
+        "CO2", "DEFAULT", "-1", "1", "31", "3.5", "0", "0", "300", "0.0004", "2", "default",
+    ],
+    [
+        "CO2", "DEFAULT", "-1", "1", "31", "3.5", "1", "0", "300", "0.0004", "2", "default",
+    ],
+    [
+        "H2", "DEFAULT", "0", "4", "31", "0", "0", "0", "40", "0.0005", "2", "default",
+    ],
+    [
+        "H2,NE", "DEFAULT", "0", "5", "31", "0", "0", "0", "54", "0.0005", "1.3,0.7", "default",
+    ],
+    [
+        "H2", "DEFAULT", "1", "4", "31", "0", "0", "0", "40", "0.0005", "2", "default",
+    ],
+    [
+        "H2,NE", "DEFAULT", "1", "5", "31", "0", "0", "0", "54", "0.0005", "1.3,0.7", "default",
+    ],
+    [
+        "H2", "DEFAULT", "2", "4", "31", "0", "0", "0", "40", "0.0005", "2", "default",
+    ],
+    [
+        "H2,NE", "DEFAULT", "2", "5", "31", "0", "0", "0", "54", "0.0005", "1.3,0.7", "default",
+    ],
+    [
+        "H2O,MEOH", "DEFAULT", "-1", "1", "31", "0", "0", "0", "380", "0.0015", "4,6", "default",
+    ],
+    [
+        "H2O,MEOH", "DEFAULT", "-1", "1", "31", "0", "0", "0", "380", "0.0003", "0.8,1.2", "elliot",
+    ],
+    [
+        "H2,NE",
+        "DEFAULT",
+        "1",
+        "5",
+        "31",
+        "0",
+        "0",
+        "0",
+        "54",
+        "0.0005",
+        "1.3,0.7",
+        "additive-exact-quantum",
+    ],
+    [
+        "H2",
+        "DEFAULT",
+        "2",
+        "4",
+        "31",
+        "3.5",
+        "1",
+        "0",
+        "45",
+        "0.0005",
+        "2",
+        "jaen-kahn",
+    ],
+    [
+        "H2,NE",
+        "DEFAULT",
+        "2",
+        "4",
+        "31",
+        "0",
+        "0",
+        "0",
+        "54",
+        "0.0005",
+        "1.3,0.7",
+        "geometric",
+    ],
+    [
+        "H2,NE",
+        "DEFAULT",
+        "2",
+        "4",
+        "31",
+        "0",
+        "0",
+        "0",
+        "54",
+        "0.0005",
+        "1.3,0.7",
+        "arithmetic-cross",
+    ],
+    [
+        "H2,NE", "DEFAULT", "2", "4", "31", "0", "0", "0", "54", "0.0005", "1.3,0.7", "linear",
+    ],
+    [
+        "H2,NE", "DEFAULT", "2", "4", "31", "0", "0", "0", "54", "0.0005", "1.3,0.7", "bmcsl",
+    ],
+    [
+        "H2,NE", "DEFAULT", "2", "4", "31", "0", "0", "0", "54", "0.0005", "1.3,0.7", "kolafa",
+    ],
+    [
+        "H2,NE", "DEFAULT", "2", "4", "31", "0", "0", "0", "54", "0.0005", "1.3,0.7", "pair-a3",
+    ],
+    [
+        "H2,NE",
+        "DEFAULT",
+        "2",
+        "4",
+        "31",
+        "0",
+        "0",
+        "0",
+        "54",
+        "0.0005",
+        "1.3,0.7",
+        "classical-a2",
+    ],
+    [
+        "H2,NE",
+        "DEFAULT",
+        "2",
+        "4",
+        "31",
+        "0",
+        "0",
+        "0",
+        "54",
+        "0.00025",
+        "0.65,0.35",
+        "linear-then-nonadd",
+    ],
+    [
+        "CO2,C1", "DEFAULT", "-1", "5", "31", "0", "0", "0", "280", "0.0004", "0.8,1.2", "no-extra",
+    ],
+    // kind=1: DFT molar dispersion (4 cases)
+    [
+        "H2O,MEOH", "DEFAULT", "-1", "1", "31", "0", "0", "1", "380", "0.0003", "0.8,1.2",
+        "default",
+    ],
+    [
+        "H2,HE", "DEFAULT", "2", "4", "31", "0", "0", "1", "65", "0.0007", "0.7,1.3", "default",
+    ],
+    [
+        "CO2", "DEFAULT", "-1", "1", "31", "3.5", "1", "1", "300", "0.0004", "2", "default",
+    ],
+    [
+        "H2", "DEFAULT", "2", "4", "31", "3.5", "1", "1", "45", "0.0005", "2", "default",
+    ],
+    // kind=2: Dufal association RDF (1 case)
+    [
+        "H2O,MEOH", "DEFAULT", "-1", "1", "31", "0", "0", "2", "380", "0.0003", "0.8,1.2",
+        "default",
+    ],
+    // kind=3: DFT molar hard-sphere (4 cases)
+    [
+        "H2O,MEOH", "DEFAULT", "-1", "1", "31", "0", "0", "3", "380", "0.0003", "0.8,1.2",
+        "default",
+    ],
+    [
+        "H2,HE", "DEFAULT", "2", "4", "31", "0", "0", "3", "65", "0.0007", "0.7,1.3", "default",
+    ],
+    [
+        "CO2,C1", "DEFAULT", "-1", "5", "31", "0", "0", "3", "280", "0.0004", "0.8,1.2", "no-extra",
+    ],
+    [
+        "CO2,C1", "DEFAULT", "-1", "5", "31", "0", "0", "3", "280", "0.0004", "0.8,1.2", "default",
+    ],
+    // kind=4: Normal TP states (8 cases)
+    [
+        "CO2,C1",
+        "DEFAULT",
+        "-1",
+        "1",
+        "31",
+        "0",
+        "2",
+        "4",
+        "280",
+        "5000000.0",
+        "0.4,0.6",
+        "default",
+    ],
+    [
+        "CO2,C1",
+        "DEFAULT",
+        "-1",
+        "1",
+        "31",
+        "0",
+        "1",
+        "4",
+        "250",
+        "8000000.0",
+        "0.8,0.2",
+        "default",
+    ],
+    [
+        "NH3",
+        "DEFAULT",
+        "-1",
+        "1",
+        "31",
+        "0",
+        "1",
+        "4",
+        "320",
+        "5000000.0",
+        "1",
+        "default",
+    ],
+    [
+        "H2O,MEOH",
+        "DEFAULT",
+        "-1",
+        "1",
+        "31",
+        "0",
+        "1",
+        "4",
+        "380",
+        "5000000.0",
+        "0.4,0.6",
+        "default",
+    ],
+    [
+        "H2O,MEOH",
+        "DEFAULT",
+        "-1",
+        "1",
+        "31",
+        "0",
+        "1",
+        "4",
+        "380",
+        "5000000.0",
+        "0.4,0.6",
+        "elliot",
+    ],
+    [
+        "ETOH,C1",
+        "DEFAULT",
+        "-1",
+        "1",
+        "31",
+        "0",
+        "2",
+        "4",
+        "350",
+        "3000000.0",
+        "0.6,0.4",
+        "default",
+    ],
+    [
+        "H2",
+        "DEFAULT",
+        "1",
+        "4",
+        "31",
+        "0",
+        "2",
+        "4",
+        "40",
+        "2000000.0",
+        "1",
+        "default",
+    ],
+    [
+        "H2,NE",
+        "DEFAULT",
+        "2",
+        "4",
+        "31",
+        "0",
+        "2",
+        "4",
+        "54",
+        "3000000.0",
+        "0.65,0.35",
+        "default",
+    ],
+    // kind=5: Model-side FMT/DFT hooks (5 cases)
+    [
+        "CO2,C1", "DEFAULT", "-1", "1", "31", "0", "0", "5", "280", "0.0004", "0.4,0.6", "default",
+    ],
+    [
+        "CO2", "DEFAULT", "-1", "1", "31", "3.5", "1", "5", "300", "0.0004", "1", "default",
+    ],
+    [
+        "CO2", "DEFAULT", "-1", "1", "31", "1000", "1", "5", "300", "0.0004", "1", "default",
+    ],
+    [
+        "H2,NE",
+        "DEFAULT",
+        "2",
+        "4",
+        "31",
+        "0",
+        "0",
+        "5",
+        "54",
+        "0.0005",
+        "0.65,0.35",
+        "default",
+    ],
+    [
+        "H2,NE",
+        "DEFAULT",
+        "2",
+        "4",
+        "31",
+        "0",
+        "0",
+        "5",
+        "54",
+        "0.0005",
+        "0.65,0.35",
+        "arithmetic-cross",
+    ],
+    // kind=6: Pure-fluid saturation (6 cases, including near-critical H2O)
+    [
+        "H2O", "DEFAULT", "-1", "1", "31", "0", "0", "6", "300", "0", "1", "default",
+    ],
+    [
+        "H2O", "DEFAULT", "-1", "1", "31", "0", "0", "6", "325", "0", "1", "default",
+    ],
+    [
+        "H2O", "DEFAULT", "-1", "1", "31", "0", "0", "6", "373.15", "0", "1", "default",
+    ],
+    [
+        "H2O", "DEFAULT", "-1", "1", "31", "0", "0", "6", "679.0", "0", "1", "default",
+    ],
+    [
+        "H2O", "DEFAULT", "-1", "1", "31", "0", "0", "6", "679.03", "0", "1", "default",
+    ],
+    [
+        "CO2", "DEFAULT", "-1", "1", "31", "0", "0", "6", "260", "0", "1", "default",
+    ],
+    // kind=7: Pair potential & force (5 cases)
+    [
+        "CO2", "DEFAULT", "-1", "1", "31", "0", "0", "7", "260", "0.5", "1", "default",
+    ],
+    [
+        "CO2", "DEFAULT", "-1", "1", "31", "0", "0", "7", "260", "1.3", "1", "default",
+    ],
+    [
+        "CO2", "DEFAULT", "-1", "1", "31", "3.5", "1", "7", "300", "1.3", "1", "default",
+    ],
+    [
+        "CO2", "DEFAULT", "-1", "1", "31", "3.5", "1", "7", "300", "3.6", "1", "default",
+    ],
+    [
+        "H2,NE",
+        "DEFAULT",
+        "2",
+        "4",
+        "31",
+        "0",
+        "0",
+        "7",
+        "54",
+        "1.2",
+        "0.65,0.35",
+        "default",
+    ],
+];
+
+const EXPECTED_PER_KIND: [usize; 8] = [34, 4, 1, 4, 8, 5, 6, 5];
+
+fn slot_tolerances(kind: &str, nc: usize) -> Vec<(f64, f64)> {
+    match kind {
+        "4" => {
+            // [Z, dZ/dT, dZ/dP, dZ/dn(nc), H_res.., H.., S_res.., S.., lnphi(nc), dT(nc), dP(nc), dn(nc*nc), sos]
+            let mut tols = Vec::with_capacity(16 + 8 * nc + nc * nc);
+            // Z: dimensionless, 1/K, 1/Pa, 1/mol
+            tols.extend([(1e-12, 1e-9), (1e-13, 1e-8), (1e-16, 1e-8)]);
+            tols.extend(std::iter::repeat_n((1e-12, 1e-8), nc));
+            // H_res and H: J/mol, J/(mol K), m^3/mol, J/mol
+            for _ in 0..2 {
+                tols.extend([(1e-8, 1e-9), (1e-9, 1e-8), (1e-14, 1e-8)]);
+                tols.extend(std::iter::repeat_n((1e-8, 1e-8), nc));
+            }
+            // S_res and S: J/(mol K), J/(mol K^2), m^3/(mol K), J/(mol K)
+            for _ in 0..2 {
+                tols.extend([(1e-9, 1e-9), (1e-11, 1e-8), (1e-15, 1e-8)]);
+                tols.extend(std::iter::repeat_n((1e-9, 1e-8), nc));
+            }
+            // ln_phi, d/dT, d/dP, d/dn
+            tols.extend(std::iter::repeat_n((1e-11, 1e-9), nc));
+            tols.extend(std::iter::repeat_n((1e-12, 1e-8), nc));
+            tols.extend(std::iter::repeat_n((1e-16, 1e-8), nc));
+            tols.extend(std::iter::repeat_n((1e-12, 1e-8), nc * nc));
+            // speed of sound [m/s]
+            tols.push((1e-8, 1e-8));
+            tols
+        }
+        "5" => {
+            // [d(nc) [m], d_T(nc) [m/K], d_TT(nc) [m/K^2], d_ij [m], d_ij_T [m/K],
+            //  sigma_eff [m], eps_eff [K], alpha(nc*nc) [1], de_broglie [m]]
+            let mut tols = Vec::with_capacity(5 + 3 * nc + nc * nc);
+            tols.extend(std::iter::repeat_n((1e-22, 1e-10), nc));
+            tols.extend(std::iter::repeat_n((1e-26, 1e-8), nc));
+            tols.extend(std::iter::repeat_n((1e-29, 1e-7), nc));
+            tols.extend([
+                (1e-22, 1e-10),
+                (1e-26, 1e-8),
+                (1e-22, 1e-10),
+                (1e-12, 1e-10),
+            ]);
+            tols.extend(std::iter::repeat_n((1e-12, 1e-10), nc * nc));
+            tols.push((1e-22, 1e-10));
+            tols
+        }
+        "6" => {
+            // [P_sat [Pa], v_liq [m^3/mol], v_vap [m^3/mol]]
+            // Near-critical saturation has |d ln v / d ln P| ~ 2500, amplifying Fortran's
+            // own ~5e-12 fugacity tolerance into ~2.5e-7 volume shift; exact-P root parity
+            // is also asserted to 1e-8 below.
+            vec![(1e-12, 1e-8), (1e-18, 1e-6), (1e-18, 1e-6)]
+        }
+        "7" => {
+            // [u/kB [K], force/kB [K/m]]
+            vec![(1e-12, 1e-10), (1e-12, 1e-9)]
+        }
+        _ => {
+            // TVN blocks (kinds 0, 1, 2, 3)
+            vec![(1e-14, 3e-8); 6 + 3 * nc + nc * nc]
+        }
+    }
+}
+
+fn verify_saftvrmie_fixture(csv: &str) -> Result<FixtureCoverage, Vec<String>> {
+    use std::collections::BTreeSet;
+    use thermopack_rs::association::DeltaCombRule;
+    use thermopack_rs::saft_vrmie::{
+        HardSphereReference as Hs, MieTerms, PackingRule, QuantumVariant, SaftVrMieHelmholtz,
+    };
+
+    let parse_numbers = |s: &str| -> Result<Vec<f64>, String> {
+        s.split(',')
+            .map(|v| {
+                v.parse::<f64>()
+                    .map_err(|e| format!("invalid float '{v}': {e}"))
+            })
+            .collect()
+    };
+    let parse_ref_slots = |s: &str| -> Result<Vec<RefSlot>, String> {
+        s.split(',')
+            .map(|v| {
+                if v == "UNSUPPORTED_SOURCE" {
+                    Ok(RefSlot::UnsupportedSource)
+                } else {
+                    v.parse::<f64>()
+                        .map(RefSlot::Value)
+                        .map_err(|e| format!("invalid reference token '{v}': {e}"))
+                }
+            })
+            .collect()
+    };
+
+    let mut lines = csv.lines();
+    let Some(header) = lines.next() else {
+        return Err(vec!["empty SAFT-VR Mie fixture".to_string()]);
+    };
+    if !header.starts_with("components;ref;order;") {
+        return Err(vec![format!("unexpected fixture header: {header}")]);
+    }
+
+    let expected_keys: BTreeSet<FixtureKey<'static>> =
+        EXPECTED_FIXTURE_CASES.iter().copied().collect();
+    let mut seen_keys: BTreeSet<[String; 12]> = BTreeSet::new();
+    let mut coverage = FixtureCoverage::default();
+    let mut failures = Vec::new();
+
+    for (row_idx, line) in lines.enumerate() {
+        if line.trim().is_empty() {
+            failures.push(format!("row {}: unexpected blank line", row_idx + 2));
+            continue;
+        }
+        let fields: Vec<_> = line.split(';').collect();
+        if fields.len() != 15 {
+            failures.push(format!(
+                "row {}: expected 15 columns, found {}",
+                row_idx + 2,
+                fields.len()
+            ));
+            continue;
+        }
+        let key_refs: [&str; 12] = fields[..12].try_into().unwrap();
+        let key_owned: [String; 12] = std::array::from_fn(|i| fields[i].to_string());
+        if !expected_keys.contains(&key_refs) {
+            failures.push(format!(
+                "row {}: unexpected fixture case {:?}",
+                row_idx + 2,
+                key_refs
+            ));
+        }
+        if !seen_keys.insert(key_owned) {
+            failures.push(format!(
+                "row {}: duplicate fixture case {:?}",
+                row_idx + 2,
+                key_refs
+            ));
+        }
+        let kind_idx: usize = match fields[7].parse() {
+            Ok(k) if k < 8 => k,
+            _ => {
+                failures.push(format!("row {}: unknown kind {}", row_idx + 2, fields[7]));
+                continue;
+            }
+        };
+        coverage.total_cases += 1;
+        coverage.per_kind[kind_idx] += 1;
+
+        let comps: Vec<_> = fields[0].split(',').collect();
+        let order = fields[2].parse::<i32>().unwrap();
+        let mut model = if order < 0 {
+            SaftVrMie::new_with_options(&comps, fields[1])
+        } else if fields[11] == "additive-exact-quantum" {
+            SaftVrMie::new_quantum_with_hs_ref(&comps, order as u8, true, Some(fields[1]))
+        } else {
+            SaftVrMie::new_quantum(&comps, order as u8, Some(fields[1]))
+        }
+        .unwrap();
+        if fields[11] != "additive-exact-quantum" {
+            model.set_hard_sphere_reference(match fields[3] {
+                "1" => Hs::Lafitte,
+                "2" => Hs::SingleComponent,
+                "3" => Hs::Additive,
+                "4" => Hs::NonAdditive,
+                "5" => Hs::AdditiveExact,
+                _ => panic!("unknown reference"),
+            });
+        }
+        let mask = fields[4].parse::<u8>().unwrap();
+        model.set_terms(MieTerms {
+            hard_sphere: mask & 1 != 0,
+            first: mask & 2 != 0,
+            second: mask & 4 != 0,
+            third: mask & 8 != 0,
+            chain: mask & 16 != 0,
+        });
+        let mut opts = model.options();
+        match fields[11] {
+            "jaen-kahn" => opts.quantum_variant = QuantumVariant::JaenKahn,
+            "geometric" => opts.geometric_epsilon = true,
+            "arithmetic-cross" => opts.exact_cross_potential = false,
+            "linear" => opts.packing = PackingRule::Linear,
+            "linear-then-nonadd" => {
+                opts.packing = PackingRule::Linear;
+                model.set_options(opts).unwrap();
+                model.set_hard_sphere_reference(Hs::NonAdditive);
+                opts = model.options();
+            }
+            "bmcsl" => opts.bmcsl_compressibility = true,
+            "kolafa" => opts.kolafa_pure_reference = true,
+            "pair-a3" => opts.pair_prefactor_a3 = true,
+            "classical-a2" => opts.quantum_correct_a2 = false,
+            "no-extra" => opts.extra_hard_sphere = false,
+            "elliot" => model.set_delta_comb_rule(DeltaCombRule::Elliot).unwrap(),
+            "additive-exact-quantum" | "default" => {}
+            _ => panic!("unknown options: {}", fields[11]),
+        }
+        model.set_options(opts).unwrap();
+        let cutoff: f64 = fields[5].parse().unwrap();
+        if cutoff > 0. {
+            model.set_cutoff(Some((cutoff, fields[6] == "1"))).unwrap();
+        }
+        let t = fields[8].parse::<f64>().unwrap();
+        let v = fields[9].parse::<f64>().unwrap();
+        let n = match parse_numbers(fields[10]) {
+            Ok(vals) => vals,
+            Err(err) => {
+                failures.push(format!("{:?}: {err}", key_refs));
+                continue;
+            }
+        };
+        let mut expected = match parse_ref_slots(fields[12]) {
+            Ok(vals) => vals,
+            Err(err) => {
+                failures.push(format!("{:?}: {err}", key_refs));
+                continue;
+            }
+        };
+        let values = match fields[7] {
+            "4" => {
+                let phase = match fields[6] {
+                    "1" => Phase::Liquid,
+                    "2" => Phase::Vapor,
+                    "3" => Phase::MinimumGibbs,
+                    _ => panic!("unknown TP phase"),
+                };
+                let tp = model.state_tp(t, v, &n, phase).unwrap();
+                let mut vals = Vec::new();
+                for block in [
+                    &tp.compressibility_factor,
+                    &tp.residual_enthalpy,
+                    &tp.enthalpy,
+                    &tp.residual_entropy,
+                    &tp.entropy,
+                ] {
+                    vals.extend([block.value, block.dt, block.dp]);
+                    vals.extend(&block.dn);
+                }
+                vals.extend(&tp.ln_fugacity.ln_phi);
+                vals.extend(&tp.ln_fugacity.dt);
+                vals.extend(&tp.ln_fugacity.dp);
+                vals.extend(&tp.ln_fugacity.dn);
+                vals.push(tp.speed_of_sound);
+                vals
+            }
+            "5" => {
+                let (d_diag, dt_diag, dtt_diag) = model.hard_sphere_diameters(t).unwrap();
+                let (dij, dijt, _) = model.hard_sphere_diameter_ij(0, n.len() - 1, t).unwrap();
+                let (seff, _, _) = model.effective_sigma_ij(0, n.len() - 1, t).unwrap();
+                let (eeff, _, _) = model.effective_epsilon_ij(0, n.len() - 1, t).unwrap();
+                let amat = model.alpha_vdw(t).unwrap();
+                let lam_db = model.de_broglie_wavelength(0, t).unwrap();
+                let mut vals = Vec::new();
+                vals.extend(d_diag);
+                vals.extend(dt_diag);
+                vals.extend(dtt_diag);
+                vals.extend([dij, dijt, seff, eeff]);
+                vals.extend(amat);
+                vals.push(lam_db);
+                vals
+            }
+            "6" => {
+                let prep = model.prepare(t, &n).unwrap();
+                let sat = prep.saturation_pressure(t).unwrap();
+                let clapeyron_err =
+                    (sat.enthalpy_vaporization - t * sat.entropy_vaporization).abs();
+                if !clapeyron_err.is_finite()
+                    || clapeyron_err > 1e-6 * sat.enthalpy_vaporization.abs().max(1.0)
+                {
+                    failures.push(format!(
+                        "{:?}: Delta H != T Delta S ({:.8e} vs {:.8e})",
+                        key_refs,
+                        sat.enthalpy_vaporization,
+                        t * sat.entropy_vaporization
+                    ));
+                }
+                // Also verify both phase volumes at Fortran's exact reference pressure to 1e-8.
+                if let [
+                    RefSlot::Value(ref_p),
+                    RefSlot::Value(ref_vl),
+                    RefSlot::Value(ref_vv),
+                ] = expected.as_slice()
+                    && ref_p.is_finite()
+                    && ref_vl.is_finite()
+                    && ref_vv.is_finite()
+                {
+                    let vl_at_ref = prep.volume(*ref_p, Phase::Liquid).unwrap();
+                    let vv_at_ref = prep.volume(*ref_p, Phase::Vapor).unwrap();
+                    if (vl_at_ref - ref_vl).abs() > 1e-8 * ref_vl.abs()
+                        || (vv_at_ref - ref_vv).abs() > 1e-8 * ref_vv.abs()
+                    {
+                        failures.push(format!(
+                            "{:?}: roots at ref P mismatch ({vl_at_ref:.8e}, {vv_at_ref:.8e}) vs ({ref_vl:.8e}, {ref_vv:.8e})",
+                            key_refs
+                        ));
+                    }
+                }
+                vec![sat.pressure, sat.liquid_volume, sat.vapor_volume]
+            }
+            "7" => {
+                let nc = n.len();
+                let comp0 = model.components()[0];
+                let comp_last = model.components()[nc - 1];
+                let sigma_ij =
+                    0.5 * (comp0.sigma + comp_last.sigma) * (1.0 - model.get_lij(0, nc - 1));
+                let r = v * sigma_ij;
+                let (u, force) = model.pair_potential(0, nc - 1, r, t).unwrap();
+                vec![u, force]
+            }
+            kind => {
+                let f = if kind == "2" {
+                    let g = model.association_rdf_tvn(0, n.len() - 1, t, v, &n).unwrap();
+                    Ok(SaftVrMieHelmholtz {
+                        f: g.g,
+                        f_t: g.temperature,
+                        f_v: g.volume,
+                        f_n: g.moles,
+                        f_tt: g.temperature_second,
+                        f_tv: g.temperature_volume,
+                        f_tn: g.temperature_moles,
+                        f_vv: g.volume_second,
+                        f_vn: g.volume_moles,
+                        f_nn: g.moles_second,
+                        x_k: vec![],
+                    })
+                } else if kind == "3" {
+                    model.hard_sphere_tvn(t, v, &n)
+                } else if kind == "1" {
+                    model.dispersion_tvn(t, v, &n)
+                } else {
+                    model.residual_helmholtz_tvn(t, v, &n)
+                }
+                .unwrap();
+                let mut vals = vec![f.f, f.f_t, f.f_v];
+                vals.extend(f.f_n);
+                vals.extend([f.f_tt, f.f_tv]);
+                vals.extend(f.f_tn);
+                vals.push(f.f_vv);
+                vals.extend(f.f_vn);
+                vals.extend(f.f_nn);
+                // Upstream Fortran defects for extra hard-sphere mixtures (hs=3,5):
+                // - saftvrmie_hardsphere.f90:235 has an extraneous term in a_VV;
+                // - saftvrmie_interface.f90:898 subtracts Fhse_TV instead of adding it.
+                // Qualify those entries against central finite differences of Fortran F_V.
+                if n.len() > 1
+                    && matches!(fields[3], "3" | "5")
+                    && matches!(kind, "0" | "3")
+                    && opts.extra_hard_sphere
+                {
+                    let dv_fv: f64 = fields[13].parse().unwrap();
+                    expected[5 + 2 * n.len()] = RefSlot::Value(dv_fv);
+                    if kind == "3" {
+                        let dt_fv: f64 = fields[14].parse().unwrap();
+                        expected[4 + n.len()] = RefSlot::Value(dt_fv);
+                    }
+                }
+                vals
+            }
+        };
+        let tols = slot_tolerances(fields[7], n.len());
+        if expected.len() != values.len() || tols.len() != values.len() {
+            failures.push(format!(
+                "{:?}: length mismatch expected={} values={} tols={}",
+                key_refs,
+                expected.len(),
+                values.len(),
+                tols.len()
+            ));
+            continue;
+        }
+        for (index, ((&value, slot), (atol, rtol))) in
+            values.iter().zip(expected).zip(tols).enumerate()
+        {
+            match slot {
+                RefSlot::UnsupportedSource => {
+                    // Only the classical `de_Broglie_wavelength` slot on kind=5 (upstream
+                    // zero-mass divide-by-zero in src/saft_interface.f90:860) is permitted
+                    // to be marked UNSUPPORTED_SOURCE.
+                    if fields[7] == "5" && order < 0 && index + 1 == values.len() {
+                        coverage.unsupported_source_slots += 1;
+                        let comp0 = model.components()[0];
+                        let mass = 1.0e-3 * comp0.molar_mass / 6.02214076e23;
+                        let closed = 6.626069311e-34
+                            / (2.0 * std::f64::consts::PI * mass * 1.380649e-23 * t).sqrt();
+                        if !value.is_finite() || (value - closed).abs() > 1e-13 * closed {
+                            failures.push(format!(
+                                "{:?} block {index} (classical de Broglie closed form): {value:.8e} vs {closed:.8e}",
+                                key_refs
+                            ));
+                        }
+                    } else {
+                        failures.push(format!(
+                            "{:?} block {index}: unexpected UNSUPPORTED_SOURCE marker",
+                            key_refs
+                        ));
+                    }
+                }
+                RefSlot::Value(reference) => {
+                    coverage.scalar_comparisons += 1;
+                    if !value.is_finite()
+                        || !reference.is_finite()
+                        || (value - reference).abs() > atol + rtol * reference.abs()
+                    {
+                        failures.push(format!(
+                            "{:?} block {index}: {value:.8e} vs {reference:.8e} (atol={atol:.1e}, rtol={rtol:.1e})",
+                            key_refs
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
+    for expected_key in &expected_keys {
+        let owned: [String; 12] = std::array::from_fn(|i| expected_key[i].to_string());
+        if !seen_keys.contains(&owned) {
+            failures.push(format!("missing expected fixture case {:?}", expected_key));
+        }
+    }
+    if coverage.total_cases != EXPECTED_FIXTURE_CASES.len() {
+        failures.push(format!(
+            "case count mismatch: got {}, expected {}",
+            coverage.total_cases,
+            EXPECTED_FIXTURE_CASES.len()
+        ));
+    }
+    if coverage.per_kind != EXPECTED_PER_KIND {
+        failures.push(format!(
+            "per-kind count mismatch: got {:?}, expected {:?}",
+            coverage.per_kind, EXPECTED_PER_KIND
+        ));
+    }
+    if coverage.unsupported_source_slots != 3 {
+        failures.push(format!(
+            "unsupported source slot count mismatch: got {}, expected 3",
+            coverage.unsupported_source_slots
+        ));
+    }
+
+    if failures.is_empty() {
+        Ok(coverage)
+    } else {
+        Err(failures)
+    }
+}
+
+#[test]
+fn exact_source_tvn() {
+    let path = std::env::var_os("SAFTVRMIE_FIXTURE")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| {
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("tests/fixtures/saftvrmie_tvn.csv")
+        });
+    let csv = std::fs::read_to_string(path).unwrap();
+    let coverage =
+        verify_saftvrmie_fixture(&csv).unwrap_or_else(|errs| panic!("{}", errs.join("\n")));
+    assert_eq!(coverage.total_cases, EXPECTED_FIXTURE_CASES.len());
+    assert_eq!(coverage.per_kind, EXPECTED_PER_KIND);
+    assert_eq!(coverage.unsupported_source_slots, 3);
+}
+
+#[test]
+fn test_saft_vrmie_raw_mole_scaling_and_overflow() {
+    let eos = SaftVrMie::new(&["H2O", "MEOH"]).unwrap();
+    let t = 380.0;
+    let v_unit = 1.5e-4;
+    let x = [0.4, 0.6];
+
+    let f1 = eos.residual_helmholtz_tvn(t, v_unit, &x).unwrap();
+    let d1 = eos.dispersion_tvn(t, v_unit, &x).unwrap();
+    let h1 = eos.hard_sphere_tvn(t, v_unit, &x).unwrap();
+    let g1 = eos.association_rdf_tvn(0, 1, t, v_unit, &x).unwrap();
+    let tp1 = eos.state_tp(t, 5.0e6, &x, Phase::Liquid).unwrap();
+
+    for &scale in &[0.01_f64, 10.0, 1.0e-140] {
+        let n = [x[0] * scale, x[1] * scale];
+        let v = v_unit * scale;
+
+        let fs = eos.residual_helmholtz_tvn(t, v, &n).unwrap();
+        assert!((fs.f / scale - f1.f).abs() < 1e-11 * (1.0 + f1.f.abs()));
+        assert!((fs.f_t / scale - f1.f_t).abs() < 1e-11 * (1.0 + f1.f_t.abs()));
+        assert!((fs.f_v - f1.f_v).abs() < 1e-11 * (1.0 + f1.f_v.abs()));
+        assert!((fs.f_tt / scale - f1.f_tt).abs() < 1e-11 * (1.0 + f1.f_tt.abs()));
+        assert!((fs.f_tv - f1.f_tv).abs() < 1e-11 * (1.0 + f1.f_tv.abs()));
+        assert!((fs.f_vv * scale - f1.f_vv).abs() < 1e-10 * (1.0 + f1.f_vv.abs()));
+        for i in 0..2 {
+            assert!((fs.f_n[i] - f1.f_n[i]).abs() < 1e-11 * (1.0 + f1.f_n[i].abs()));
+            assert!((fs.f_tn[i] - f1.f_tn[i]).abs() < 1e-11 * (1.0 + f1.f_tn[i].abs()));
+            assert!((fs.f_vn[i] * scale - f1.f_vn[i]).abs() < 1e-10 * (1.0 + f1.f_vn[i].abs()));
+            for j in 0..2 {
+                let k = i * 2 + j;
+                assert!((fs.f_nn[k] * scale - f1.f_nn[k]).abs() < 1e-10 * (1.0 + f1.f_nn[k].abs()));
+            }
+        }
+        assert_eq!(fs.x_k.len(), f1.x_k.len());
+        for (a, b) in fs.x_k.iter().zip(&f1.x_k) {
+            assert!((a - b).abs() < 1e-12);
+        }
+
+        // Intensive molar quantities scale as degree 0 in (V, n).
+        if scale >= 1.0e-100 {
+            let ds = eos.dispersion_tvn(t, v, &n).unwrap();
+            assert!((ds.f - d1.f).abs() < 1e-11 * (1.0 + d1.f.abs()));
+            assert!((ds.f_v * scale - d1.f_v).abs() < 1e-11 * (1.0 + d1.f_v.abs()));
+            assert!((ds.f_vv * scale * scale - d1.f_vv).abs() < 1e-10 * (1.0 + d1.f_vv.abs()));
+
+            let hs = eos.hard_sphere_tvn(t, v, &n).unwrap();
+            assert!((hs.f - h1.f).abs() < 1e-11 * (1.0 + h1.f.abs()));
+            assert!((hs.f_v * scale - h1.f_v).abs() < 1e-11 * (1.0 + h1.f_v.abs()));
+
+            let gs = eos.association_rdf_tvn(0, 1, t, v, &n).unwrap();
+            assert!((gs.g - g1.g).abs() < 1e-11 * (1.0 + g1.g.abs()));
+            assert!((gs.volume * scale - g1.volume).abs() < 1e-11 * (1.0 + g1.volume.abs()));
+        }
+
+        let tps = eos.state_tp(t, 5.0e6, &n, Phase::Liquid).unwrap();
+        assert!((tps.volume - tp1.volume).abs() < 1e-12 * tp1.volume);
+        assert!(
+            (tps.compressibility_factor.value - tp1.compressibility_factor.value).abs() < 1e-12
+        );
+        assert!(
+            (tps.enthalpy.value - tp1.enthalpy.value).abs()
+                < 1e-10 * (1.0 + tp1.enthalpy.value.abs())
+        );
+        for i in 0..2 {
+            assert!((tps.ln_fugacity.ln_phi[i] - tp1.ln_fugacity.ln_phi[i]).abs() < 1e-11);
+            assert!(
+                (tps.compressibility_factor.dn[i] * scale - tp1.compressibility_factor.dn[i]).abs()
+                    < 1e-10 * (1.0 + tp1.compressibility_factor.dn[i].abs())
+            );
+            for j in 0..2 {
+                let k = i * 2 + j;
+                assert!(
+                    (tps.ln_fugacity.dn[k] * scale - tp1.ln_fugacity.dn[k]).abs()
+                        < 1e-10 * (1.0 + tp1.ln_fugacity.dn[k].abs())
+                );
+            }
+        }
+    }
+
+    // Extreme underflow must return an explicit error instead of Inf/NaN.
+    let tiny = [0.4e-310, 0.6e-310];
+    assert!(
+        eos.residual_helmholtz_tvn(t, v_unit * 1e-310, &tiny)
+            .is_err()
+    );
+    assert!(eos.dispersion_tvn(t, v_unit * 1e-310, &tiny).is_err());
+    assert!(eos.hard_sphere_tvn(t, v_unit * 1e-310, &tiny).is_err());
+    assert!(
+        eos.association_rdf_tvn(0, 1, t, v_unit * 1e-310, &tiny)
+            .is_err()
+    );
+    assert!(eos.state_tp(t, 5.0e6, &tiny, Phase::Liquid).is_err());
+}
+
+#[test]
+fn test_saft_vrmie_zero_mole_infinite_dilution() {
+    // Cross-associating mixture at zero mole for MEOH: analytic F_n(MEOH) must
+    // match forward finite difference of F, proving exact infinite-dilution X_k.
+    let eos = SaftVrMie::new(&["H2O", "MEOH"]).unwrap();
+    let t = 380.0;
+    let v = 1.5e-4;
+    let n0 = [1.0, 0.0];
+    let f0 = eos.residual_helmholtz_tvn(t, v, &n0).unwrap();
+    let h = 1.0e-7;
+    let fp = eos.residual_helmholtz_tvn(t, v, &[1.0, h]).unwrap();
+    let fd_fn1 = (fp.f - f0.f) / h;
+    assert!(
+        (f0.f_n[1] - fd_fn1).abs() < 1e-5 * (1.0 + fd_fn1.abs()),
+        "infinite-dilution F_n[1] mismatch: analytic={} vs fd={}",
+        f0.f_n[1],
+        fd_fn1
+    );
+    // Infinite-dilution MEOH site fractions must be strictly below 1 (bound by H2O).
+    assert!(f0.x_k.iter().all(|&x| x > 0.0 && x < 1.0));
+
+    // Non-associating binary at zero mole via TP path must stay finite and satisfy
+    // pure-component limit for component 0.
+    let eos_mix = SaftVrMie::new(&["CO2", "C1"]).unwrap();
+    let eos_pure = SaftVrMie::new(&["CO2"]).unwrap();
+    let tp_mix = eos_mix
+        .state_tp(280.0, 5.0e6, &[1.0, 0.0], Phase::Liquid)
+        .unwrap();
+    let tp_pure = eos_pure
+        .state_tp(280.0, 5.0e6, &[1.0], Phase::Liquid)
+        .unwrap();
+    assert!((tp_mix.volume - tp_pure.volume).abs() < 1e-12 * tp_pure.volume);
+    assert!((tp_mix.ln_fugacity.ln_phi[0] - tp_pure.ln_fugacity.ln_phi[0]).abs() < 1e-11);
+    assert!(tp_mix.ln_fugacity.ln_phi[1].is_finite());
+}
+
+#[test]
+fn test_saft_vrmie_finite_differences_tvn_and_tp() {
+    use thermopack_rs::saft_vrmie::HardSphereReference;
+
+    // 1. Verify exact analytic F_VV and F_TV on AdditiveExact where Fortran has defects.
+    let mut eos = SaftVrMie::new(&["CO2", "C1"]).unwrap();
+    eos.set_hard_sphere_reference(HardSphereReference::AdditiveExact);
+    let t = 280.0;
+    let v = 4.0e-4;
+    let n = [0.8, 1.2];
+    let f = eos.residual_helmholtz_tvn(t, v, &n).unwrap();
+    let hv = v * 1e-6;
+    let fvp = eos.residual_helmholtz_tvn(t, v + hv, &n).unwrap();
+    let fvm = eos.residual_helmholtz_tvn(t, v - hv, &n).unwrap();
+    let fd_fvv = (fvp.f_v - fvm.f_v) / (2.0 * hv);
+    assert!((f.f_vv - fd_fvv).abs() < 1e-7 * (1.0 + fd_fvv.abs()));
+
+    let hs = eos.hard_sphere_tvn(t, v, &n).unwrap();
+    let ht = t * 1e-6;
+    let htp = eos.hard_sphere_tvn(t + ht, v, &n).unwrap();
+    let htm = eos.hard_sphere_tvn(t - ht, v, &n).unwrap();
+    let fd_hs_tv = (htp.f_v - htm.f_v) / (2.0 * ht);
+    assert!((hs.f_tv - fd_hs_tv).abs() < 1e-7 * (1.0 + fd_hs_tv.abs()));
+    let hvp = eos.hard_sphere_tvn(t, v + hv, &n).unwrap();
+    let hvm = eos.hard_sphere_tvn(t, v - hv, &n).unwrap();
+    let fd_hs_vv = (hvp.f_v - hvm.f_v) / (2.0 * hv);
+    assert!((hs.f_vv - fd_hs_vv).abs() < 1e-7 * (1.0 + fd_hs_vv.abs()));
+
+    // 2. Verify TP derivatives (Gibbs-Duhem, symmetry, d/dT, d/dP, d/dn) on associating mixture.
+    let assoc = SaftVrMie::new(&["H2O", "MEOH"]).unwrap();
+    let p = 5.0e6;
+    let t_a = 380.0;
+    let n_a = [0.8, 1.2];
+    let tp = assoc.state_tp(t_a, p, &n_a, Phase::Liquid).unwrap();
+    // Symmetry of d(ln phi_i)/dn_j
+    assert!((tp.ln_fugacity.dn[1] - tp.ln_fugacity.dn[2]).abs() < 1e-11);
+    // Gibbs-Duhem: sum_i n_i d(ln phi_i)/dn_j = 0
+    for j in 0..2 {
+        let gd = n_a[0] * tp.ln_fugacity.dn[j] + n_a[1] * tp.ln_fugacity.dn[2 + j];
+        assert!(gd.abs() < 1e-10, "Gibbs-Duhem violated for j={j}: {gd}");
+    }
+    // Central FD in T and P
+    let d_t = 1e-4;
+    let tp_tp = assoc.state_tp(t_a + d_t, p, &n_a, Phase::Liquid).unwrap();
+    let tp_tm = assoc.state_tp(t_a - d_t, p, &n_a, Phase::Liquid).unwrap();
+    let fd_h_t = (tp_tp.enthalpy.value - tp_tm.enthalpy.value) / (2.0 * d_t);
+    assert!((tp.cp - fd_h_t).abs() < 1e-6 * fd_h_t.abs());
+    for i in 0..2 {
+        let fd_lnphi_t = (tp_tp.ln_fugacity.ln_phi[i] - tp_tm.ln_fugacity.ln_phi[i]) / (2.0 * d_t);
+        assert!((tp.ln_fugacity.dt[i] - fd_lnphi_t).abs() < 1e-7 * (1.0 + fd_lnphi_t.abs()));
+    }
+    let d_p = p * 1e-6;
+    let tp_pp = assoc.state_tp(t_a, p + d_p, &n_a, Phase::Liquid).unwrap();
+    let tp_pm = assoc.state_tp(t_a, p - d_p, &n_a, Phase::Liquid).unwrap();
+    for i in 0..2 {
+        let fd_lnphi_p = (tp_pp.ln_fugacity.ln_phi[i] - tp_pm.ln_fugacity.ln_phi[i]) / (2.0 * d_p);
+        assert!((tp.ln_fugacity.dp[i] - fd_lnphi_p).abs() < 1e-7 * (1.0 + fd_lnphi_p.abs()));
+    }
+}
+
+#[test]
+fn test_saft_vrmie_association_controls_and_saturation() {
+    use thermopack_rs::association::{AssocScheme, DeltaCombRule};
+    use thermopack_rs::rdf::saftvrmie_rdf;
+
+    let mut eos = SaftVrMie::new(&["H2O", "MEOH"]).unwrap();
+    assert!(eos.has_association());
+
+    let t = 380.0;
+    let v = 3.0e-4;
+    let n = [0.8, 1.2];
+    let xk_std = eos.solve_assoc_x_k(t, v, &n).unwrap();
+    assert_eq!(xk_std.len(), 7); // 4 sites on H2O (4C) + 3 sites on MEOH (3B)
+    let f_std = eos.residual_helmholtz_tvn(t, v, &n).unwrap();
+    for (a, b) in xk_std.iter().zip(&f_std.x_k) {
+        assert!((a - b).abs() < 1e-13);
+    }
+
+    // Switching to Elliot combining rule changes cross-association consistently.
+    eos.set_delta_comb_rule(DeltaCombRule::Elliot).unwrap();
+    let f_ell = eos.residual_helmholtz_tvn(t, v, &n).unwrap();
+    assert!((f_ell.f - f_std.f).abs() > 1e-4);
+
+    // Public rdf::saftvrmie_rdf dispatcher matches association_rdf_tvn.
+    let g_direct = eos.association_rdf_tvn(0, 1, t, v, &n).unwrap();
+    let g_dispatch = saftvrmie_rdf(&eos, t, v, &n, 0, 1).unwrap();
+    assert!((g_direct.g - g_dispatch.g).abs() < 1e-15);
+    assert!((g_direct.volume - g_dispatch.volume).abs() < 1e-15);
+
+    // Disabling association via set_assoc_params removes association contribution.
+    let mut h2o = SaftVrMie::new(&["H2O"]).unwrap();
+    assert!(h2o.has_association());
+    let prep_h2o = h2o.prepare(373.15, &[1.0]).unwrap();
+    let sat = prep_h2o.saturation_pressure(373.15).unwrap();
+    assert!(sat.pressure > 5.0e4 && sat.pressure < 2.0e5);
+    assert!(sat.liquid_volume < sat.vapor_volume);
+
+    // MinimumGibbs selects vapor at low pressure and liquid at high pressure.
+    let v_low = prep_h2o
+        .volume(0.5 * sat.pressure, Phase::MinimumGibbs)
+        .unwrap();
+    let v_vap = prep_h2o.volume(0.5 * sat.pressure, Phase::Vapor).unwrap();
+    assert!((v_low - v_vap).abs() < 1e-10 * v_vap);
+    let v_high = prep_h2o
+        .volume(2.0 * sat.pressure, Phase::MinimumGibbs)
+        .unwrap();
+    let v_liq = prep_h2o.volume(2.0 * sat.pressure, Phase::Liquid).unwrap();
+    assert!((v_high - v_liq).abs() < 1e-10 * v_liq);
+
+    h2o.set_assoc_params(0, AssocScheme::NoAssoc, 0.0, 0.0)
+        .unwrap();
+    assert!(!h2o.has_association());
+    assert!(
+        h2o.solve_assoc_x_k(373.15, 1.0e-4, &[1.0])
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[test]
+fn test_saft_vrmie_fmt_compatibility_and_model_hooks() {
+    use thermopack_rs::saft_vrmie::HardSphereReference;
+
+    // Single component is always FMT compatible.
+    let pure = SaftVrMie::new(&["CO2"]).unwrap();
+    assert_eq!(pure.fmt_compatibility(), (true, false));
+
+    // Mixtures depend on hard-sphere reference, packing rule, and extra_hard_sphere.
+    let mut mix = SaftVrMie::new(&["CO2", "C1"]).unwrap();
+    assert_eq!(mix.fmt_compatibility(), (true, false)); // Lafitte (additive, no extra)
+    mix.set_hard_sphere_reference(HardSphereReference::NonAdditive);
+    assert_eq!(mix.fmt_compatibility(), (false, false));
+    mix.set_hard_sphere_reference(HardSphereReference::SingleComponent);
+    assert_eq!(mix.fmt_compatibility(), (false, false));
+    mix.set_hard_sphere_reference(HardSphereReference::Additive);
+    assert_eq!(mix.fmt_compatibility(), (false, true)); // extra enabled, non-exact binary dhs
+    let mut opts = mix.options();
+    opts.extra_hard_sphere = false;
+    mix.set_options(opts).unwrap();
+    assert_eq!(mix.fmt_compatibility(), (true, false)); // fixes upstream uninitialized bug
+    mix.set_hard_sphere_reference(HardSphereReference::AdditiveExact);
+    assert_eq!(mix.fmt_compatibility(), (true, true)); // exact binary dhs + extra enabled
+    opts = mix.options();
+    opts.extra_hard_sphere = false;
+    mix.set_options(opts).unwrap();
+    assert_eq!(mix.fmt_compatibility(), (true, false));
+    opts.packing = thermopack_rs::saft_vrmie::PackingRule::Linear;
+    mix.set_options(opts).unwrap();
+    assert_eq!(mix.fmt_compatibility(), (false, false));
+
+    // Binary gammaij setter/getter round-trip.
+    mix.set_gammaij(0, 1, 0.05);
+    assert!((mix.get_gammaij(0, 1) - 0.05).abs() < 1e-15);
+
+    // Pair potential force matches -du/dr via central FD (both untruncated and truncated/shifted).
+    let r = 4.2e-10;
+    let dr = 1e-14;
+    let (u, f) = pure.pair_potential(0, 0, r, 300.0).unwrap();
+    let (up, _) = pure.pair_potential(0, 0, r + dr, 300.0).unwrap();
+    let (um, _) = pure.pair_potential(0, 0, r - dr, 300.0).unwrap();
+    assert!(u.is_finite());
+    assert!((f - (-(up - um) / (2.0 * dr))).abs() < 1e-7 * (1.0 + f.abs()));
+
+    let mut cut_pure = SaftVrMie::new(&["CO2"]).unwrap();
+    cut_pure.set_cutoff(Some((3.5, true))).unwrap();
+    assert_eq!(cut_pure.cutoff(), Some((3.5, true)));
+    let sigma = cut_pure.components()[0].sigma;
+    let (u_beyond, f_beyond) = cut_pure.pair_potential(0, 0, 3.6 * sigma, 300.0).unwrap();
+    assert_eq!(u_beyond, 0.0);
+    assert_eq!(f_beyond, 0.0);
+    let (u_at_cut, _) = cut_pure.pair_potential(0, 0, 3.5 * sigma, 300.0).unwrap();
+    assert!(u_at_cut.abs() < 1e-15);
+
+    // Quantum de Boer parameter setter/getter round-trip and FH1 additive-exact constructor.
+    let mut q = SaftVrMie::new_quantum_with_hs_ref(&["H2", "NE"], 1, true, None).unwrap();
+    assert_eq!(
+        q.hard_sphere_reference(),
+        HardSphereReference::AdditiveExact
+    );
+    let lam0 = q.de_boer_parameter(0).unwrap();
+    assert!(lam0 > 0.0);
+    q.set_de_boer_parameter(0, lam0 * 1.1).unwrap();
+    assert!((q.de_boer_parameter(0).unwrap() - lam0 * 1.1).abs() < 1e-12);
+    let ldb = q.de_broglie_wavelength(0, 40.0).unwrap();
+    assert!(ldb > 0.0 && ldb.is_finite());
+}
+
+#[test]
+fn test_saft_vrmie_tv_tp_entropy_and_saturation_clapeyron() {
+    // CO2/C1 = 0.4/0.6 at 280 K and 5 MPa: prepared TV state total entropy must
+    // match state_tp total entropy (no extra R*ln(Z)).
+    let mix = SaftVrMie::new(&["CO2", "C1"]).unwrap();
+    let tp = mix
+        .state_tp(280.0, 5.0e6, &[0.4, 0.6], Phase::Vapor)
+        .unwrap();
+    let tv = mix
+        .prepare(280.0, &[0.4, 0.6])
+        .unwrap()
+        .state(1.0 / tp.volume)
+        .unwrap();
+    assert!(
+        (tv.s_total - tp.entropy.value).abs() < 1e-10,
+        "TV/TP s_total mismatch: tv={} vs tp={}",
+        tv.s_total,
+        tp.entropy.value
+    );
+    assert!((tv.s_residual - tp.residual_entropy.value).abs() < 1e-10);
+    assert!((tv.h_total - tp.enthalpy.value).abs() < 1e-9);
+    assert!((tv.g_residual - tp.residual_gibbs.value).abs() < 1e-9);
+    for (a, b) in tv.ln_phi.iter().zip(&tp.ln_fugacity.ln_phi) {
+        assert!((a - b).abs() < 1e-11);
+    }
+
+    // Pure CO2 saturation at 260 K must satisfy Delta H = T * Delta S.
+    let co2 = SaftVrMie::new(&["CO2"]).unwrap();
+    let sat = co2
+        .prepare(260.0, &[1.0])
+        .unwrap()
+        .saturation_pressure(260.0)
+        .unwrap();
+    let tds = 260.0 * sat.entropy_vaporization;
+    assert!(
+        (sat.enthalpy_vaporization - tds).abs() < 1e-7 * sat.enthalpy_vaporization.abs(),
+        "CO2 260 K Delta H ({}) != T Delta S ({})",
+        sat.enthalpy_vaporization,
+        tds
+    );
+}
+
+#[test]
+fn test_saft_vrmie_cold_associating_saturation() {
+    // Water at 300 K and 325 K must converge cleanly using the common-pressure
+    // Gibbs residual and match exact Fortran safe_bubP and Delta H = T Delta S.
+    let h2o = SaftVrMie::new(&["H2O"]).unwrap();
+    for &(t, ref_p) in &[(300.0, 3583.558125_f64), (325.0, 13503.845912_f64)] {
+        let prep = h2o.prepare(t, &[1.0]).unwrap();
+        let sat = prep.saturation_pressure(t).unwrap();
+        assert!(
+            (sat.pressure - ref_p).abs() < 1e-6 * ref_p,
+            "H2O {t} K P_sat={} vs Fortran {}",
+            sat.pressure,
+            ref_p
+        );
+        assert!(sat.liquid_volume < sat.vapor_volume);
+        let jl = prep
+            .pressure_and_derivatives(1.0 / sat.liquid_volume)
+            .unwrap();
+        let jv = prep
+            .pressure_and_derivatives(1.0 / sat.vapor_volume)
+            .unwrap();
+        assert!((jl.pressure - sat.pressure).abs() < 1e-6 * sat.pressure);
+        assert!((jv.pressure - sat.pressure).abs() < 1e-6 * sat.pressure);
+        let tds = t * sat.entropy_vaporization;
+        assert!(
+            (sat.enthalpy_vaporization - tds).abs() < 1e-7 * sat.enthalpy_vaporization.abs(),
+            "H2O {t} K Delta H ({}) != T Delta S ({})",
+            sat.enthalpy_vaporization,
+            tds
+        );
+    }
+}
+
+#[test]
+fn test_saft_vrmie_tp_mole_derivative_contract() {
+    // Verify the explicit partial-molar vs intensive raw-mole derivative contract
+    // on CO2/C1 at 280 K, 5 MPa, n = [0.8, 1.2].
+    let eos = SaftVrMie::new(&["CO2", "C1"]).unwrap();
+    let t = 280.0;
+    let p = 5.0e6;
+    let n = [0.8, 1.2];
+    let total = n[0] + n[1];
+    let x = [n[0] / total, n[1] / total];
+    let tp = eos.state_tp(t, p, &n, Phase::Vapor).unwrap();
+
+    // 1. Euler identity for all partial molar fields: sum_i x_i * q_bar_i = q.
+    for block in [
+        &tp.specific_volume,
+        &tp.residual_enthalpy,
+        &tp.enthalpy,
+        &tp.residual_entropy,
+        &tp.entropy,
+        &tp.residual_gibbs,
+    ] {
+        let euler = x[0] * block.dn[0] + x[1] * block.dn[1];
+        assert!(
+            (euler - block.value).abs() < 1e-11 * (1.0 + block.value.abs()),
+            "Euler identity failed: {euler} vs {}",
+            block.value
+        );
+        // Zero-degree intensive derivative satisfies sum_i n_i * (dq/dn_i) = 0.
+        let idn = block.intensive_dn(total).unwrap();
+        assert!((n[0] * idn[0] + n[1] * idn[1]).abs() < 1e-11 * (1.0 + block.value.abs()));
+    }
+
+    // 2. Central finite differences wrt n[0]:
+    //    - block.dn[0] matches d(N * q)/dn[0] (partial molar)
+    //    - block.intensive_dn(N)[0] matches dq/dn[0] (intensive raw-mole)
+    //    - compressibility_factor.dn[0] and ln_fugacity.dn match intensive raw-mole directly.
+    let h = 2.0e-6;
+    let np = [n[0] + h, n[1]];
+    let nm = [n[0] - h, n[1]];
+    let tp_p = eos.state_tp(t, p, &np, Phase::Vapor).unwrap();
+    let tp_m = eos.state_tp(t, p, &nm, Phase::Vapor).unwrap();
+
+    let fd_v_extensive = ((np[0] + np[1]) * tp_p.specific_volume.value
+        - (nm[0] + nm[1]) * tp_m.specific_volume.value)
+        / (2.0 * h);
+    let fd_v_intensive = (tp_p.specific_volume.value - tp_m.specific_volume.value) / (2.0 * h);
+    assert!(
+        (tp.specific_volume.dn[0] - fd_v_extensive).abs() < 1e-8 * fd_v_extensive.abs(),
+        "partial molar v mismatch: {} vs {}",
+        tp.specific_volume.dn[0],
+        fd_v_extensive
+    );
+    let v_idn = tp.specific_volume.intensive_dn(total).unwrap();
+    assert!(
+        (v_idn[0] - fd_v_intensive).abs() < 1e-8 * fd_v_intensive.abs(),
+        "intensive dv/dn mismatch: {} vs {}",
+        v_idn[0],
+        fd_v_intensive
+    );
+
+    let fd_h_intensive = (tp_p.enthalpy.value - tp_m.enthalpy.value) / (2.0 * h);
+    let h_idn = tp.enthalpy.intensive_dn(total).unwrap();
+    assert!((h_idn[0] - fd_h_intensive).abs() < 1e-7 * (1.0 + fd_h_intensive.abs()));
+
+    let fd_s_intensive = (tp_p.entropy.value - tp_m.entropy.value) / (2.0 * h);
+    let s_idn = tp.entropy.intensive_dn(total).unwrap();
+    assert!((s_idn[0] - fd_s_intensive).abs() < 1e-7 * (1.0 + fd_s_intensive.abs()));
+
+    let fd_z = (tp_p.compressibility_factor.value - tp_m.compressibility_factor.value) / (2.0 * h);
+    assert!((tp.compressibility_factor.dn[0] - fd_z).abs() < 1e-8 * (1.0 + fd_z.abs()));
+    for i in 0..2 {
+        let fd_lnphi = (tp_p.ln_fugacity.ln_phi[i] - tp_m.ln_fugacity.ln_phi[i]) / (2.0 * h);
+        assert!(
+            (tp.ln_fugacity.dn[i * 2] - fd_lnphi).abs() < 1e-8 * (1.0 + fd_lnphi.abs()),
+            "d(ln phi[{i}])/dn[0] mismatch"
+        );
+    }
+
+    assert!(tp.specific_volume.intensive_dn(0.0).is_err());
+    assert!(tp.specific_volume.intensive_dn(-1.0).is_err());
+}
+
+#[test]
+fn test_saft_vrmie_nonadditive_preserves_packing_rule() {
+    use thermopack_rs::saft_vrmie::{HardSphereReference, PackingRule};
+
+    let mut q = SaftVrMie::new_quantum(&["H2", "NE"], 2, None).unwrap();
+    let mut opts = q.options();
+    opts.packing = PackingRule::Linear;
+    q.set_options(opts).unwrap();
+    // Reselecting NonAdditive must preserve the active Linear packing rule (Fortran behavior).
+    q.set_hard_sphere_reference(HardSphereReference::NonAdditive);
+    assert_eq!(q.options().packing, PackingRule::Linear);
+    let f = q
+        .residual_helmholtz_tvn(54.0, 2.5e-4, &[0.65, 0.35])
+        .unwrap();
+    assert!(
+        (f.f - -0.0911097035476).abs() < 1e-10,
+        "NonAdditive after Linear F mismatch: {}",
+        f.f
+    );
+
+    // Other presets must still set their Fortran-specified packing rules.
+    q.set_hard_sphere_reference(HardSphereReference::SingleComponent);
+    assert_eq!(q.options().packing, PackingRule::Leonard);
+    q.set_hard_sphere_reference(HardSphereReference::Lafitte);
+    assert_eq!(q.options().packing, PackingRule::Lafitte);
+    q.set_hard_sphere_reference(HardSphereReference::Additive);
+    assert_eq!(q.options().packing, PackingRule::Lafitte);
+    q.set_hard_sphere_reference(HardSphereReference::AdditiveExact);
+    assert_eq!(q.options().packing, PackingRule::Lafitte);
+}
+
+#[test]
+fn test_saft_vrmie_dilute_volume_closure_and_rejection() {
+    let eos = SaftVrMie::new(&["CO2", "C1"]).unwrap();
+    let t = 280.0;
+    let x = [0.4, 0.6];
+    let prep = eos.prepare(t, &x).unwrap();
+
+    // At 1e-24 Pa, the ideal-gas root is representable in f64 and must close P tightly.
+    let p_dilute = 1.0e-24;
+    let v = eos.volume_tp(t, p_dilute, &x, Phase::Vapor).unwrap();
+    let jet = prep.pressure_and_derivatives(1.0 / v).unwrap();
+    assert!(
+        (jet.pressure - p_dilute).abs() <= 1e-10 * p_dilute,
+        "dilute root pressure miss: P(v)={} vs target={}",
+        jet.pressure,
+        p_dilute
+    );
+
+    // At an unrepresentable ultra-low pressure where packing underflows the solver floor,
+    // volume_tp must return an error rather than a volume whose pressure misses the target.
+    assert!(eos.volume_tp(t, 1.0e-250, &x, Phase::Vapor).is_err());
+}
+
+#[test]
+fn test_saft_vrmie_shifted_alpha_vdw_invalid_cutoff() {
+    let mut co2 = SaftVrMie::new(&["CO2"]).unwrap();
+    co2.set_cutoff(Some((0.9, true))).unwrap();
+    assert!(
+        co2.alpha_vdw(260.0).is_err(),
+        "shifted alpha_vdw at r_cut=0.9 must return Err, not Ok([NaN])"
+    );
+
+    // Cutoff at sigma (1.0), at r_min, or unresolvably close to r_min must fail.
+    let comp = co2.components()[0];
+    let r_min = (comp.lambda_r / comp.lambda_a).powf(1.0 / (comp.lambda_r - comp.lambda_a));
+    for r_bad in [1.0, r_min, r_min + 1.0e-14 * r_min] {
+        co2.set_cutoff(Some((r_bad, true))).unwrap();
+        assert!(co2.alpha_vdw(260.0).is_err());
+    }
+
+    // Shallow attractive wells immediately above r_min must resolve positive alpha
+    // without catastrophic cancellation (85-digit references: 1.2372642e-6 and 1.2372673e-7).
+    for &(r_cut, ref_alpha) in &[
+        (1.0776444455346241_f64, 1.2372642e-6_f64),
+        (1.0776435455346243_f64, 1.2372673e-7_f64),
+    ] {
+        co2.set_cutoff(Some((r_cut, true))).unwrap();
+        let a = co2.alpha_vdw(260.0).unwrap();
+        assert_eq!(a.len(), 1);
+        assert!(
+            a[0].is_finite() && a[0] > 0.0 && (a[0] - ref_alpha).abs() < 1e-5 * ref_alpha,
+            "shallow shifted alpha_vdw at r_cut={r_cut}: got {:.10e}, expected {ref_alpha:.10e}",
+            a[0]
+        );
+    }
+
+    // Valid deep and large finite cutoffs above r_min must preserve full precision
+    // without 1 - eps_eff cancellation or r_cut^3 overflow (80-digit references).
+    let alpha_inf = {
+        let mut untrunc = SaftVrMie::new(&["CO2"]).unwrap();
+        untrunc.set_cutoff(None).unwrap();
+        untrunc.alpha_vdw(300.0).unwrap()[0]
+    };
+    for &(r_cut, ref_alpha) in &[
+        (2.0 * r_min, 0.5174975228640601_f64),
+        (3.5_f64, 0.6698028323490535_f64),
+        (900.0_f64, 0.76278035683822295_f64),
+        (1000.0_f64, 0.7627804751722388_f64),
+        (1.0e12_f64, alpha_inf),
+        (1.0e100_f64, alpha_inf),
+    ] {
+        co2.set_cutoff(Some((r_cut, true))).unwrap();
+        let a = co2.alpha_vdw(300.0).unwrap();
+        assert_eq!(a.len(), 1);
+        assert!(
+            a[0].is_finite() && a[0] > 0.0 && (a[0] - ref_alpha).abs() <= 1e-13 * ref_alpha,
+            "deep shifted alpha_vdw at r_cut={r_cut}: got {:.16e}, expected {ref_alpha:.16e}",
+            a[0]
+        );
+    }
+
+    // Continuity across the r_cut = 2 * r_min shallow/deep branch handoff.
+    co2.set_cutoff(Some((2.0 * r_min * (1.0 - 1.0e-12), true)))
+        .unwrap();
+    let a_left = co2.alpha_vdw(300.0).unwrap()[0];
+    co2.set_cutoff(Some((2.0 * r_min * (1.0 + 1.0e-12), true)))
+        .unwrap();
+    let a_right = co2.alpha_vdw(300.0).unwrap()[0];
+    assert!(
+        (a_right - a_left).abs() <= 1e-11 * a_left,
+        "discontinuity across 2*r_min handoff: left={a_left:.16e}, right={a_right:.16e}"
+    );
+
+    // Unshifted large finite cutoff must also converge smoothly without overflow.
+    co2.set_cutoff(Some((1.0e100, false))).unwrap();
+    let a_unshifted = co2.alpha_vdw(300.0).unwrap()[0];
+    assert!((a_unshifted - alpha_inf).abs() <= 1e-14 * alpha_inf);
+}
+
+#[test]
+fn test_saft_vrmie_low_temp_liquid_bracket_no_panic() {
+    // Ultra-cold heavy alkane states where dP/drho remains negative past eta=0.72
+    // must return a distinct packing-limit error (not panic and not misreport
+    // the isotherm as supercritical).
+    let nc20 = SaftVrMie::new(&["NC20"]).unwrap();
+    let prep_35 = nc20.prepare(35.0, &[1.0]).unwrap();
+    let err_35 = prep_35.saturation_pressure(35.0).unwrap_err();
+    let msg_35 = err_35.to_string();
+    assert!(
+        msg_35.contains("packing limit") && !msg_35.contains("supercritical"),
+        "NC20 at 35 K should report packing-limit exhaustion, got: {msg_35}"
+    );
+
+    // Contrast with true supercritical states (including the same fluid NC20 at 900 K),
+    // which must still report supercritical.
+    let err_nc20_sup = nc20
+        .prepare(900.0, &[1.0])
+        .unwrap()
+        .saturation_pressure(900.0)
+        .unwrap_err();
+    assert!(
+        err_nc20_sup.to_string().contains("supercritical"),
+        "NC20 at 900 K should report supercritical, got: {err_nc20_sup}"
+    );
+    let h2o = SaftVrMie::new(&["H2O"]).unwrap();
+    let err_sup = h2o
+        .prepare(680.0, &[1.0])
+        .unwrap()
+        .saturation_pressure(680.0)
+        .unwrap_err();
+    assert!(
+        err_sup.to_string().contains("supercritical"),
+        "H2O at 680 K should report supercritical, got: {err_sup}"
+    );
+
+    for &t in &[30.0_f64, 35.0, 40.0, 50.0, 80.0, 150.0] {
+        let prep = nc20.prepare(t, &[1.0]).unwrap();
+        if let Ok(sat) = prep.saturation_pressure(t) {
+            assert!(sat.liquid_volume < sat.vapor_volume);
+            let st_l = prep.state(1.0 / sat.liquid_volume).unwrap();
+            let st_v = prep.state(1.0 / sat.vapor_volume).unwrap();
+            assert!(st_l.dp_drho > 0.0 && st_v.dp_drho > 0.0);
+            assert!((st_l.pressure - sat.pressure).abs() <= 1e-6 * sat.pressure);
+            assert!((st_v.pressure - sat.pressure).abs() <= 1e-6 * sat.pressure);
+        }
+    }
+}
+
+#[test]
+fn test_saft_vrmie_strict_pressure_closure_rejection() {
+    // Stiff dense liquid at ultra-low target pressure cannot close P(v) = P_target
+    // within 1e-6 relative in f64 and must return Err(NotConverged), not a 2.6% miss.
+    let h2o = SaftVrMie::new(&["H2O"]).unwrap();
+    let prep_h2o = h2o.prepare(300.0, &[1.0]).unwrap();
+    assert!(
+        h2o.volume_tp(300.0, 1.0e-3, &[1.0], Phase::Liquid).is_err(),
+        "H2O liquid at 300 K, 1e-3 Pa must fail pressure closure"
+    );
+    assert!(
+        prep_h2o.volume(1.0e-3, Phase::Liquid).is_err(),
+        "prepared H2O liquid at 300 K, 1e-3 Pa must fail pressure closure"
+    );
+
+    // Cold NH3 at 100 K has a vapor pressure too small for f64 liquid pressure closure
+    // and must return Err(NotConverged) instead of returning a ~7.7% liquid pressure miss.
+    let nh3 = SaftVrMie::new(&["NH3"]).unwrap();
+    let prep_nh3 = nh3.prepare(100.0, &[1.0]).unwrap();
+    assert!(
+        prep_nh3.saturation_pressure(100.0).is_err(),
+        "NH3 saturation at 100 K must fail pressure closure"
+    );
+
+    // Normal cold-water saturation (300 K, 325 K) must continue to succeed with tight
+    // relative pressure closure on both liquid and vapor roots.
+    for &t in &[300.0_f64, 325.0] {
+        let prep = h2o.prepare(t, &[1.0]).unwrap();
+        let sat = prep.saturation_pressure(t).unwrap();
+        let st_l = prep.state(1.0 / sat.liquid_volume).unwrap();
+        let st_v = prep.state(1.0 / sat.vapor_volume).unwrap();
+        assert!(
+            (st_l.pressure - sat.pressure).abs() <= 1e-6 * sat.pressure,
+            "H2O {t} K liquid pressure miss: {} vs {}",
+            st_l.pressure,
+            sat.pressure
+        );
+        assert!(
+            (st_v.pressure - sat.pressure).abs() <= 1e-6 * sat.pressure,
+            "H2O {t} K vapor pressure miss: {} vs {}",
+            st_v.pressure,
+            sat.pressure
+        );
+    }
+}
+
+#[test]
+fn test_saft_vrmie_steep_liquid_ulp_recovery_nh3() {
+    // At 130 K and 120 K, NH3 has representable f64 liquid volumes that close within
+    // 1e-6 relative pressure despite evaluation noise near the steep liquid branch.
+    // Both volume(Phase::Liquid) and saturation_pressure must recover them cleanly.
+    let nh3 = SaftVrMie::new(&["NH3"]).unwrap();
+
+    // Direct volume check at T = 130 K, P = 2.20945469250487 Pa.
+    let prep_130 = nh3.prepare(130.0, &[1.0]).unwrap();
+    let p_130 = 2.20945469250487_f64;
+    let vl_130 = prep_130.volume(p_130, Phase::Liquid).unwrap();
+    let jet_130 = prep_130.pressure_and_derivatives(1.0 / vl_130).unwrap();
+    assert!(jet_130.dp_drho > 0.0);
+    assert!(
+        (jet_130.pressure - p_130).abs() <= 1.0e-6 * p_130,
+        "NH3 130 K liquid pressure miss: {} vs {p_130}",
+        jet_130.pressure
+    );
+
+    for &t in &[120.0_f64, 130.0] {
+        let prep = nh3.prepare(t, &[1.0]).unwrap();
+        let sat = prep.saturation_pressure(t).unwrap();
+        assert!(sat.pressure.is_finite() && sat.pressure > 0.0);
+        assert!(sat.liquid_volume < sat.vapor_volume);
+        let st_l = prep.state(1.0 / sat.liquid_volume).unwrap();
+        let st_v = prep.state(1.0 / sat.vapor_volume).unwrap();
+        assert!(st_l.dp_drho > 0.0 && st_v.dp_drho > 0.0);
+        assert!(
+            (st_l.pressure - sat.pressure).abs() <= 1.0e-6 * sat.pressure,
+            "NH3 {t} K liquid pressure miss: {} vs {}",
+            st_l.pressure,
+            sat.pressure
+        );
+        assert!(
+            (st_v.pressure - sat.pressure).abs() <= 1.0e-6 * sat.pressure,
+            "NH3 {t} K vapor pressure miss: {} vs {}",
+            st_v.pressure,
+            sat.pressure
+        );
+        let tds = t * sat.entropy_vaporization;
+        assert!(
+            (sat.enthalpy_vaporization - tds).abs() < 1e-6 * sat.enthalpy_vaporization.abs(),
+            "NH3 {t} K Delta H ({}) != T Delta S ({tds})",
+            sat.enthalpy_vaporization
+        );
+        // Round-trip both single-phase volume requests at the reported saturation pressure.
+        let vl_rt = prep.volume(sat.pressure, Phase::Liquid).unwrap();
+        let vv_rt = prep.volume(sat.pressure, Phase::Vapor).unwrap();
+        let jl_rt = prep.pressure_and_derivatives(1.0 / vl_rt).unwrap();
+        let jv_rt = prep.pressure_and_derivatives(1.0 / vv_rt).unwrap();
+        assert!((jl_rt.pressure - sat.pressure).abs() <= 1.0e-6 * sat.pressure);
+        assert!((jv_rt.pressure - sat.pressure).abs() <= 1.0e-6 * sat.pressure);
+    }
+}
+
+#[test]
+fn test_saft_vrmie_dense_association_near_exponential_limit() {
+    let temperature = 1500.0;
+    let rho = 41954.94342;
+    let mut eos = SaftVrMie::new(&["H2O"]).unwrap();
+    eos.set_assoc_params(
+        0,
+        thermopack_rs::AssocScheme::Scheme4C,
+        709.781 * (thermopack_rs::R * temperature),
+        1e-300,
+    )
+    .unwrap();
+    let prepared = eos.prepare(temperature, &[1.0]).unwrap();
+    let jet = prepared.pressure_and_derivatives(rho).unwrap();
+    let state = prepared.state(rho).unwrap();
+    // Independently verified 60-digit EOS reference: P = 143.8499584938 Pa
+    // (cancelling ~2.15 GPa non-association and association contributions).
+    let expected_p = 143.849_958_493_8;
+    for (pressure, compressibility) in [
+        (jet.pressure, jet.compressibility),
+        (state.pressure, state.compressibility),
+    ] {
+        assert!(pressure.is_finite() && compressibility.is_finite());
+        assert!(
+            (pressure - expected_p).abs() < 1e-4,
+            "pressure={pressure}, expected={expected_p}"
+        );
+        let expected_z = pressure / (thermopack_rs::R * temperature * rho);
+        assert!((compressibility - expected_z).abs() <= 1e-12 * expected_z);
+    }
+    assert!((jet.pressure - state.pressure).abs() <= 1e-12);
+    assert!((jet.compressibility - state.compressibility).abs() <= 1e-18);
+
+    // Also check right up against ln(f64::MAX) (~709.78271289) where f64::exp is still finite.
+    eos.set_assoc_params(
+        0,
+        thermopack_rs::AssocScheme::Scheme4C,
+        709.782_7 * (thermopack_rs::R * temperature),
+        1e-300,
+    )
+    .unwrap();
+    let prepared_edge = eos.prepare(temperature, &[1.0]).unwrap();
+    let jet_edge = prepared_edge.pressure_and_derivatives(rho).unwrap();
+    let state_edge = prepared_edge.state(rho).unwrap();
+    assert!(jet_edge.pressure.is_finite() && jet_edge.compressibility.is_finite());
+    assert!((jet_edge.pressure - state_edge.pressure).abs() <= 1e-12);
+    assert!((jet_edge.pressure - expected_p).abs() < 1e-3);
+
+    // Above ln(f64::MAX), overflow must be rejected cleanly with Err rather than Ok(NaN).
+    eos.set_assoc_params(
+        0,
+        thermopack_rs::AssocScheme::Scheme4C,
+        710.0 * (thermopack_rs::R * temperature),
+        1e-300,
+    )
+    .unwrap();
+    let prepared_ovf = eos.prepare(temperature, &[1.0]).unwrap();
+    assert!(prepared_ovf.pressure_and_derivatives(rho).is_err());
+    assert!(prepared_ovf.state(rho).is_err());
+}
+
+#[test]
+fn test_saft_vrmie_dense_4c_extreme_strength_below_overflow_and_asymmetric_mixture() {
+    // Round 8 regression: at eps = 400*(R*T), beta = 1e-130 (well below exp overflow),
+    // rho * Delta ~= 1.805e70 so the true symmetric 4C site fraction X ~= 5.26e-36 falls
+    // below 2^-106, making an unreduced 4x4 log-space Jacobian singular in the donor/acceptor
+    // constant-product mode. Exact equitable-partition reduction collapses pure 4C to a
+    // well-conditioned scalar quadratic while preserving asymmetric mixtures unmerged.
+    let temperature = 1500.0;
+    let rho = 41954.94342;
+    let mut eos = SaftVrMie::new(&["H2O"]).unwrap();
+    eos.set_assoc_params(
+        0,
+        thermopack_rs::AssocScheme::Scheme4C,
+        400.0 * (thermopack_rs::R * temperature),
+        1e-130,
+    )
+    .unwrap();
+    let prepared = eos.prepare(temperature, &[1.0]).unwrap();
+    let jet = prepared.pressure_and_derivatives(rho).unwrap();
+    let state = prepared.state(rho).unwrap();
+    // Independently verified 80-digit symmetric EOS reference: P = 143.849959519 Pa.
+    let expected_p = 143.849_959_52;
+    for (pressure, compressibility) in [
+        (jet.pressure, jet.compressibility),
+        (state.pressure, state.compressibility),
+    ] {
+        assert!(pressure.is_finite() && compressibility.is_finite());
+        assert!(
+            (pressure - expected_p).abs() < 1e-4,
+            "pressure={pressure}, expected={expected_p}"
+        );
+        let expected_z = pressure / (thermopack_rs::R * temperature * rho);
+        assert!((compressibility - expected_z).abs() <= 1e-12 * expected_z);
+    }
+    assert!((jet.pressure - state.pressure).abs() <= 1e-12);
+    assert!((jet.compressibility - state.compressibility).abs() <= 1e-18);
+
+    // Asymmetric 4C (H2O: 2-, 2+) + 3B (NH3 configured as 2+, 1-) dense liquid mixture
+    // hits the cancellation-gated DD path with unequal donor/acceptor totals, so H2O donor
+    // and acceptor sites must stay distinct and agree with central finite differences.
+    let mut mix = SaftVrMie::new(&["H2O", "NH3"]).unwrap();
+    mix.set_assoc_params(
+        1,
+        thermopack_rs::AssocScheme::Scheme3B,
+        1500.0 * thermopack_rs::R,
+        1.0e-28,
+    )
+    .unwrap();
+    let z = [0.6, 0.4];
+    let t_mix = 220.0;
+    let prep_mix = mix.prepare(t_mix, &z).unwrap();
+    let v_liq = prep_mix.volume(100.0, Phase::Liquid).unwrap();
+    let rho_liq = 1.0 / v_liq;
+    let xk = mix.solve_assoc_x_k(t_mix, v_liq, &z).unwrap();
+    assert_eq!(xk.len(), 7);
+    assert!((xk[0] - xk[2]).abs() > 1.0e-3 * xk[0].max(xk[2]));
+    let j_mix = prep_mix.pressure_and_derivatives(rho_liq).unwrap();
+    let s_mix = prep_mix.state(rho_liq).unwrap();
+    assert!((j_mix.pressure - 100.0).abs() <= 1.0e-4);
+    assert!((j_mix.pressure - s_mix.pressure).abs() <= 1.0e-10);
+    let h = 1.0e-6 * v_liq;
+    let f_plus = mix.residual_helmholtz_tvn(t_mix, v_liq + h, &z).unwrap().f;
+    let f_minus = mix.residual_helmholtz_tvn(t_mix, v_liq - h, &z).unwrap().f;
+    let p_fd = thermopack_rs::R * t_mix * (rho_liq - (f_plus - f_minus) / (2.0 * h));
+    assert!(
+        (j_mix.pressure - p_fd).abs() <= 1.0,
+        "j_mix.pressure={}, p_fd={}",
+        j_mix.pressure,
+        p_fd
+    );
+
+    // Round 9 regression (PRRT_kwDOVJkJcc68MbDH): extrapolated low-T state where the
+    // Dufal association integral turns negative (g < 0, W < 0) must be rejected by
+    // both public evaluators rather than clamping X > 1 to 1 and returning ~100 Pa.
+    let mut eos_neg = SaftVrMie::new(&["H2O"]).unwrap();
+    eos_neg
+        .set_assoc_params(
+            0,
+            thermopack_rs::AssocScheme::Scheme4C,
+            100.0 * thermopack_rs::R,
+            2.219_586_484_163_355_6e-28,
+        )
+        .unwrap();
+    let prep_neg = eos_neg.prepare(40.0, &[1.0]).unwrap();
+    let rho_neg = 65_544.335_760_036_41;
+    assert!(prep_neg.pressure_and_derivatives(rho_neg).is_err());
+    assert!(prep_neg.state(rho_neg).is_err());
+
+    // Round 10 regression (PRRT_kwDOVJkJcc68Mn4z): identical H2O parameters with
+    // Scheme4C + trace Scheme1ea (eps = 4_194_304.0, beta = 2^-300) at 1500 K and
+    // rho = 41954.94342. Positive trace [1.0, 1e-40] splits into 2 exact bipartite
+    // classes (X_- ~= 5.13e-43, X_+ ~= 5.05e-41 << 2^-106); both public evaluators
+    // must converge, match the independent 120-digit reference (~143.84995952 Pa),
+    // and remain continuous with the zero-tracer [1.0, 0.0] limit.
+    let mut eos_trace = SaftVrMie::new(&["H2O", "H2O"]).unwrap();
+    let eps_r10 = 4_194_304.0;
+    let beta_r10 = 2.0_f64.powi(-300);
+    eos_trace
+        .set_assoc_params(0, thermopack_rs::AssocScheme::Scheme4C, eps_r10, beta_r10)
+        .unwrap();
+    eos_trace
+        .set_assoc_params(1, thermopack_rs::AssocScheme::Scheme1ea, eps_r10, beta_r10)
+        .unwrap();
+    let prep_zero = eos_trace.prepare(temperature, &[1.0, 0.0]).unwrap();
+    let prep_pos = eos_trace.prepare(temperature, &[1.0, 1.0e-40]).unwrap();
+    let j_zero = prep_zero.pressure_and_derivatives(rho).unwrap();
+    let s_zero = prep_zero.state(rho).unwrap();
+    let j_pos = prep_pos.pressure_and_derivatives(rho).unwrap();
+    let s_pos = prep_pos.state(rho).unwrap();
+    for (p_val, z_val) in [
+        (j_zero.pressure, j_zero.compressibility),
+        (s_zero.pressure, s_zero.compressibility),
+        (j_pos.pressure, j_pos.compressibility),
+        (s_pos.pressure, s_pos.compressibility),
+    ] {
+        assert!(p_val.is_finite() && z_val.is_finite());
+        assert!(
+            (p_val - expected_p).abs() < 1e-4,
+            "pressure={p_val}, expected={expected_p}"
+        );
+        let expected_z = p_val / (thermopack_rs::R * temperature * rho);
+        assert!((z_val - expected_z).abs() <= 1e-12 * expected_z);
+    }
+    assert!((j_pos.pressure - s_pos.pressure).abs() <= 1e-12);
+    assert!((j_pos.pressure - j_zero.pressure).abs() <= 1e-9);
+    assert!((s_pos.pressure - s_zero.pressure).abs() <= 1e-9);
+
+    // Also verify star-bipartite ng = 3 (distinct tracer association energy, [1.0, 1e-40]).
+    eos_trace
+        .set_assoc_params(
+            1,
+            thermopack_rs::AssocScheme::Scheme1ea,
+            0.9 * eps_r10,
+            beta_r10,
+        )
+        .unwrap();
+    let prep_star = eos_trace.prepare(temperature, &[1.0, 1.0e-40]).unwrap();
+    let j_star = prep_star.pressure_and_derivatives(rho).unwrap();
+    let s_star = prep_star.state(rho).unwrap();
+    assert!((j_star.pressure - expected_p).abs() < 1e-4);
+    assert!((j_star.pressure - s_star.pressure).abs() <= 1e-12);
+    assert!((j_star.pressure - j_zero.pressure).abs() <= 1e-9);
+
+    // The 400 RT case overflows a squared star denominator. At 570 RT and
+    // a smaller tracer fraction, Newton can advance only one log unit per step.
+    for (exponent, trace) in [(400.0, 1.0e-40), (570.0, 1.0e-130)] {
+        let eps = exponent * (thermopack_rs::R * temperature);
+        eos_trace
+            .set_assoc_params(0, thermopack_rs::AssocScheme::Scheme4C, eps, 1.0e-45)
+            .unwrap();
+        eos_trace
+            .set_assoc_params(1, thermopack_rs::AssocScheme::Scheme1ea, 0.9 * eps, 1.0e-45)
+            .unwrap();
+        let prepared = eos_trace.prepare(temperature, &[1.0, trace]).unwrap();
+        let jet = prepared
+            .pressure_and_derivatives(rho)
+            .unwrap_or_else(|err| panic!("exponent={exponent}, trace={trace:e}: {err}"));
+        let state = prepared.state(rho).unwrap();
+        for (pressure, compressibility) in [
+            (jet.pressure, jet.compressibility),
+            (state.pressure, state.compressibility),
+        ] {
+            assert!(pressure.is_finite() && compressibility.is_finite());
+            assert!(
+                (pressure - expected_p).abs() < 1e-4,
+                "exponent={exponent}, trace={trace:e}, pressure={pressure}, expected={expected_p}"
+            );
+            let expected_z = pressure / (thermopack_rs::R * temperature * rho);
+            assert!((compressibility - expected_z).abs() <= 1e-12 * expected_z);
+        }
+        assert!((jet.pressure - state.pressure).abs() <= 1e-12);
+    }
+}
+
+#[test]
+fn test_saft_vrmie_fixed_pressure_nh3_120k_quantization_and_representable_targets() {
+    // Independently qualify NH3 120 K fixed-pressure liquid closure beyond saturation
+    // round-trips. At T = 120 K, |dP/dv| * ulp(v_l) ~= 1.181e-6 Pa (~1.162e-6 Pa per
+    // 1.0/v density ULP), while the cancellation-gated 106-bit double-double pressure
+    // evaluator eliminates multi-term f64 jitter and CRT pow/exp drift so P(1/v) is
+    // strictly monotone across adjacent representable volumes.
+    let nh3 = SaftVrMie::new(&["NH3"]).unwrap();
+    let prep = nh3.prepare(120.0, &[1.0]).unwrap();
+    let v_anchor = 2.140022878775016e-5_f64;
+    let j_anchor = prep.pressure_and_derivatives(1.0 / v_anchor).unwrap();
+    let ulp_v = v_anchor.next_up() - v_anchor;
+    let dp_ulp = j_anchor.dp_dv.abs() * ulp_v;
+    assert!(
+        dp_ulp > 1.0e-6 && dp_ulp < 1.5e-6,
+        "unexpected NH3 120 K 1-ULP pressure spacing: {dp_ulp:.6e}"
+    );
+
+    // 1. Verify strict monotonicity (zero inversions) and exact slope-matched reciprocal-
+    // density stepping across +-64 ULPs (zero multi-ULP cancellation jitter).
+    let mut v_scan = v_anchor;
+    for _ in 0..64 {
+        v_scan = v_scan.next_down();
+    }
+    let mut prev_v = v_scan;
+    let mut prev_p = prep
+        .pressure_and_derivatives(1.0 / prev_v)
+        .unwrap()
+        .pressure;
+    for _ in 0..128 {
+        v_scan = v_scan.next_up();
+        let j = prep.pressure_and_derivatives(1.0 / v_scan).unwrap();
+        assert!(j.dp_drho > 0.0);
+        assert!(
+            j.pressure < prev_p,
+            "NH3 120 K dense liquid P(1/v) must decrease monotonically with v: prev={prev_p:.12e}, cur={:.12e}",
+            j.pressure
+        );
+        let jump = prev_p - j.pressure;
+        let expected_jump = j.dp_drho * (1.0 / prev_v - 1.0 / v_scan);
+        assert!(
+            (jump - expected_jump).abs() <= 1.0e-4 * dp_ulp,
+            "NH3 120 K adjacent ULP jump {jump:.6e} deviated from exact reciprocal-density step {expected_jump:.6e}"
+        );
+        prev_v = v_scan;
+        prev_p = j.pressure;
+    }
+
+    // 2. Fixed targets with verified representable roots under the production f64
+    // model constants + 106-bit pressure evaluator (0.275800421086915 Pa, 0.65 Pa,
+    // and >= 2 Pa where 2e-6 * P > dp_ulp) must close unconditionally within 1e-6
+    // across all CRTs and debug/release builds.
+    for &p_rep in &[0.275800421086915_f64, 0.65, 2.0, 5.0, 100.0] {
+        let vl = prep.volume(p_rep, Phase::Liquid).unwrap_or_else(|e| {
+            panic!("NH3 120 K fixed P={p_rep} failed unexpectedly: {e}");
+        });
+        let j = prep.pressure_and_derivatives(1.0 / vl).unwrap();
+        assert!(j.dp_drho > 0.0);
+        assert!(
+            (j.pressure - p_rep).abs() <= 1.0e-6 * p_rep,
+            "NH3 120 K fixed P={p_rep} pressure miss: {} (rel={:.3e})",
+            j.pressure,
+            (j.pressure - p_rep).abs() / p_rep
+        );
+    }
+    // 0.65 Pa lies above P_sat (~0.2758 Pa), so MinimumGibbs must also return the closed liquid root.
+    let v_min_065 = prep.volume(0.65, Phase::MinimumGibbs).unwrap();
+    let j_min_065 = prep.pressure_and_derivatives(1.0 / v_min_065).unwrap();
+    assert!(j_min_065.dp_drho > 0.0 && v_min_065 < 1.0e-4);
+    assert!((j_min_065.pressure - 0.65).abs() <= 1.0e-6 * 0.65);
+
+    // 3. For 0.305 Pa (where 2e-6 * P = 6.10e-7 Pa < 1.162e-6 Pa per reciprocal-density
+    // ULP), verify the exact local representable bracket and confirm volume() agrees with
+    // whether a representable root exists within 1e-6 under the noise-free evaluator.
+    let target = 0.305_f64;
+    let mut vc = v_anchor;
+    for _ in 0..8 {
+        let j = prep.pressure_and_derivatives(1.0 / vc).unwrap();
+        let step = (j.pressure - target) / j.dp_dv;
+        vc -= step;
+        if step.abs() <= ulp_v {
+            break;
+        }
+    }
+    let mut v_lo = vc;
+    for _ in 0..16 {
+        v_lo = v_lo.next_down();
+    }
+    let mut v_cur = v_lo;
+    let mut closing_count = 0usize;
+    let mut best_rel = f64::INFINITY;
+    for _ in 0..=32 {
+        let j = prep.pressure_and_derivatives(1.0 / v_cur).unwrap();
+        if j.pressure.is_finite() && j.dp_drho > 0.0 {
+            let rel = (j.pressure - target).abs() / target;
+            best_rel = best_rel.min(rel);
+            if rel <= 1.0e-6 {
+                closing_count += 1;
+            }
+        }
+        v_cur = v_cur.next_up();
+    }
+    match prep.volume(target, Phase::Liquid) {
+        Ok(v) => {
+            assert!(closing_count > 0);
+            let j = prep.pressure_and_derivatives(1.0 / v).unwrap();
+            assert!(j.dp_drho > 0.0 && (j.pressure - target).abs() <= 1.0e-6 * target);
+        }
+        Err(_) => {
+            assert_eq!(
+                closing_count, 0,
+                "NH3 120 K P={target} returned Err despite {closing_count} closing roots (best_rel={best_rel:.3e})"
+            );
+        }
+    }
+}
+
+#[test]
+fn test_saft_vrmie_nc20_dense_liquid_recovery_and_round_trip() {
+    // Regression for NC20 dense cold-liquid fixed-pressure recovery and saturation
+    // round-trips (302.5 K, 315.5 K, 328.5 K).
+    let eos = SaftVrMie::new(&["NC20"]).unwrap();
+
+    // 1. At 302.5 K around v = 3.58908447398568185e-4 m^3/mol, P(1/v) must be monotone
+    // (non-increasing with v; adjacent volumes that map to the same f64 1/v stay equal),
+    // and prep.volume(j.pressure, Liquid) must recover the strict <= 1e-6 root.
+    let prep302 = eos.prepare(302.5, &[1.0]).unwrap();
+    let v_ref = 3.589_084_473_985_682e-4_f64;
+    let j_ref = prep302.pressure_and_derivatives(1.0 / v_ref).unwrap();
+    assert!(j_ref.dp_drho > 0.0 && j_ref.pressure > 0.0);
+    let mut v_cur = v_ref;
+    for _ in 0..20 {
+        v_cur = v_cur.next_down();
+    }
+    let mut prev_p = prep302
+        .pressure_and_derivatives(1.0 / v_cur)
+        .unwrap()
+        .pressure;
+    for _ in 0..40 {
+        v_cur = v_cur.next_up();
+        let j = prep302.pressure_and_derivatives(1.0 / v_cur).unwrap();
+        assert!(
+            j.pressure <= prev_p,
+            "NC20 302.5 K dense liquid P(1/v) inverted: prev={prev_p:.12e}, cur={:.12e}",
+            j.pressure
+        );
+        prev_p = j.pressure;
+    }
+    let v_rec = prep302.volume(j_ref.pressure, Phase::Liquid).unwrap();
+    let j_rec = prep302.pressure_and_derivatives(1.0 / v_rec).unwrap();
+    assert!(j_rec.dp_drho > 0.0);
+    assert!(
+        (j_rec.pressure - j_ref.pressure).abs() <= 1.0e-6 * j_ref.pressure,
+        "NC20 302.5 K fixed-pressure recovery miss: {} vs {}",
+        j_rec.pressure,
+        j_ref.pressure
+    );
+    // Exact fixed target 1.00555667643224106e-3 Pa from Round 6 review must also recover
+    // strictly within 1e-6 across all CRTs and debug/release builds.
+    let p_r6 = 1.005_556_676_432_241e-3_f64;
+    let v_r6 = prep302.volume(p_r6, Phase::Liquid).unwrap();
+    let j_r6 = prep302.pressure_and_derivatives(1.0 / v_r6).unwrap();
+    assert!(j_r6.dp_drho > 0.0);
+    assert!(
+        (j_r6.pressure - p_r6).abs() <= 1.0e-6 * p_r6,
+        "NC20 302.5 K fixed P={p_r6} recovery miss: {} (rel={:.3e})",
+        j_r6.pressure,
+        (j_r6.pressure - p_r6).abs() / p_r6
+    );
+    // Representable fixed pressures above the 1-ULP spacing (~2e-7 Pa -> P >= 0.25 Pa).
+    for &p_fix in &[0.25_f64, 1.0] {
+        let vl = prep302.volume(p_fix, Phase::Liquid).unwrap();
+        let j = prep302.pressure_and_derivatives(1.0 / vl).unwrap();
+        assert!(j.dp_drho > 0.0 && (j.pressure - p_fix).abs() <= 1.0e-6 * p_fix);
+    }
+
+    // 2. Direct saturation-liquid round-trips at 315.5 K and 328.5 K.
+    for &t in &[315.5_f64, 328.5] {
+        let prep = eos.prepare(t, &[1.0]).unwrap();
+        let sat = prep.saturation_pressure(t).unwrap();
+        let jl = prep
+            .pressure_and_derivatives(1.0 / sat.liquid_volume)
+            .unwrap();
+        assert!(jl.dp_drho > 0.0);
+        assert!(
+            (jl.pressure - sat.pressure).abs() <= 1.0e-6 * sat.pressure,
+            "NC20 {t} K sat liquid pressure miss: {} vs {}",
+            jl.pressure,
+            sat.pressure
+        );
+        let vl_rt = prep
+            .volume(sat.pressure, Phase::Liquid)
+            .unwrap_or_else(|e| {
+                panic!("NC20 {t} K saturation liquid round-trip failed: {e}");
+            });
+        let j_rt = prep.pressure_and_derivatives(1.0 / vl_rt).unwrap();
+        assert!(j_rt.dp_drho > 0.0);
+        assert!(
+            (j_rt.pressure - sat.pressure).abs() <= 1.0e-6 * sat.pressure,
+            "NC20 {t} K round-trip pressure miss: {} vs {}",
+            j_rt.pressure,
+            sat.pressure
+        );
+    }
+}
+
+#[test]
+fn test_saft_vrmie_snapped_saturation_gibbs_and_pressure_contract() {
+    // Directly verify the documented saturation contract on both ordinary cases
+    // (|Delta G/(RT)| < 1e-10) and stiff cold-liquid snapped cases where the nearest
+    // representable liquid volume dictates the coexistence pressure (both pressures
+    // close within <= 1e-6 relative and common-pressure |Delta G/(RT)| <= 5e-6).
+    const RGAS: f64 = 8.31446261815324;
+    let eval_dg = |prep: &thermopack_rs::saft_vrmie::PreparedSaftVrMie<'_>,
+                   t: f64,
+                   p: f64,
+                   vl: f64,
+                   vv: f64| {
+        let fl = prep.helmholtz_terms(1.0 / vl).unwrap().a_res;
+        let fv = prep.helmholtz_terms(1.0 / vv).unwrap().a_res;
+        (fl - fv) + p * (vl - vv) / (RGAS * t) - (vl / vv).ln()
+    };
+
+    // 1. Ordinary convergence cases must achieve tight common-pressure Gibbs equality.
+    for &(fluid, t) in &[("H2O", 300.0_f64), ("CO2", 260.0), ("NH3", 130.0)] {
+        let eos = SaftVrMie::new(&[fluid]).unwrap();
+        let prep = eos.prepare(t, &[1.0]).unwrap();
+        let sat = prep.saturation_pressure(t).unwrap();
+        let jl = prep
+            .pressure_and_derivatives(1.0 / sat.liquid_volume)
+            .unwrap();
+        let jv = prep
+            .pressure_and_derivatives(1.0 / sat.vapor_volume)
+            .unwrap();
+        let dg = eval_dg(&prep, t, sat.pressure, sat.liquid_volume, sat.vapor_volume);
+        assert!((jl.pressure - sat.pressure).abs() <= 1.0e-6 * sat.pressure);
+        assert!((jv.pressure - sat.pressure).abs() <= 1.0e-6 * sat.pressure);
+        assert!(
+            dg.abs() <= 1.0e-10,
+            "{fluid} {t} K ordinary saturation should satisfy |dg| <= 1e-10, got {dg:.6e}"
+        );
+    }
+
+    // 2. Stiff cold-liquid states that exercise the snapped branch (NH3 118.75 K,
+    // NC20 317.5 K, and NC20 321.25 K) plus NH3 120 K: certify both pressure residuals
+    // <= 1e-6 and common-pressure |Delta G/(RT)| <= 5e-6, and confirm the snapped branch is hit.
+    let mut saw_snapped = false;
+    for &(fluid, t) in &[
+        ("NH3", 118.75_f64),
+        ("NH3", 120.0),
+        ("NC20", 317.5),
+        ("NC20", 321.25),
+    ] {
+        let eos = SaftVrMie::new(&[fluid]).unwrap();
+        let prep = eos.prepare(t, &[1.0]).unwrap();
+        let sat = prep.saturation_pressure(t).unwrap();
+        let jl = prep
+            .pressure_and_derivatives(1.0 / sat.liquid_volume)
+            .unwrap();
+        let jv = prep
+            .pressure_and_derivatives(1.0 / sat.vapor_volume)
+            .unwrap();
+        let err_l = (jl.pressure - sat.pressure).abs() / sat.pressure;
+        let err_v = (jv.pressure - sat.pressure).abs() / sat.pressure;
+        let dg = eval_dg(&prep, t, sat.pressure, sat.liquid_volume, sat.vapor_volume);
+        assert!(sat.liquid_volume < sat.vapor_volume);
+        assert!(jl.dp_drho > 0.0 && jv.dp_drho > 0.0);
+        assert!(
+            err_l <= 1.0e-6,
+            "{fluid} {t} K liquid pressure residual {err_l:.3e} > 1e-6"
+        );
+        assert!(
+            err_v <= 1.0e-6,
+            "{fluid} {t} K vapor pressure residual {err_v:.3e} > 1e-6"
+        );
+        assert!(
+            dg.abs() <= 5.0e-6,
+            "{fluid} {t} K snapped Gibbs residual |dg|={:.6e} > 5e-6",
+            dg.abs()
+        );
+        if dg.abs() > 1.0e-10 {
+            saw_snapped = true;
+        }
+    }
+    assert!(
+        saw_snapped,
+        "expected at least one of NH3 115/120 K or NC20 321.25 K to exercise the snapped branch"
+    );
+}
+
+#[test]
+fn test_saft_vrmie_minimum_gibbs_preserves_closed_vapor_phase() {
+    // At T = 300 K and low pressures well below P_sat (~3500 Pa), the dense liquid root
+    // cannot close within 1e-6 relative pressure in f64, while vapor closes cleanly and
+    // is overwhelmingly lower in Gibbs energy. MinimumGibbs must return the closed vapor
+    // root in both volume_tp and state_tp, while Phase::Liquid still enforces the 1e-6 cap.
+    let h2o = SaftVrMie::new(&["H2O"]).unwrap();
+    let prep = h2o.prepare(300.0, &[1.0]).unwrap();
+    for &p in &[0.001_f64, 0.1, 1.0, 2.0] {
+        // Any returned liquid root must itself close within 1e-6 relative pressure;
+        // at 0.001 Pa the acceptance window (+-1e-9 Pa) is ~630x narrower than 1 ULP
+        // so no representable liquid root closes and Phase::Liquid must fail.
+        if let Ok(vl) = h2o.volume_tp(300.0, p, &[1.0], Phase::Liquid) {
+            assert!(
+                p >= 0.1,
+                "H2O liquid at 300 K, {p} Pa should not close in f64"
+            );
+            let jet_l = prep.pressure_and_derivatives(1.0 / vl).unwrap();
+            assert!(
+                (jet_l.pressure - p).abs() <= 1.0e-6 * p,
+                "H2O liquid at 300 K, {p} Pa returned unclosed root: {}",
+                jet_l.pressure
+            );
+        }
+        let vv = h2o.volume_tp(300.0, p, &[1.0], Phase::Vapor).unwrap();
+        let v_min = h2o
+            .volume_tp(300.0, p, &[1.0], Phase::MinimumGibbs)
+            .unwrap();
+        assert!(
+            (v_min - vv).abs() <= 1e-12 * vv,
+            "H2O 300 K, {p} Pa MinimumGibbs={v_min} != Vapor={vv}"
+        );
+        let jet = prep.pressure_and_derivatives(1.0 / v_min).unwrap();
+        assert!(
+            (jet.pressure - p).abs() <= 1.0e-6 * p,
+            "H2O 300 K, {p} Pa MinimumGibbs pressure miss: {}",
+            jet.pressure
+        );
+        let st_min = h2o.state_tp(300.0, p, &[1.0], Phase::MinimumGibbs).unwrap();
+        let st_vap = h2o.state_tp(300.0, p, &[1.0], Phase::Vapor).unwrap();
+        assert!((st_min.volume - st_vap.volume).abs() <= 1e-12 * st_vap.volume);
+        assert!((st_min.enthalpy.value - st_vap.enthalpy.value).abs() <= 1e-9);
+    }
+
+    // Conservative rejection when liquid is the lower-Gibbs phase (above P_sat)
+    // yet cannot close within 1e-6 relative pressure: NH3 at 100 K, P = 0.01 Pa
+    // has P >> P_sat(100 K) so liquid wins thermodynamically, while vapor closes
+    // as a metastable root; MinimumGibbs must NOT return the metastable vapor.
+    let nh3 = SaftVrMie::new(&["NH3"]).unwrap();
+    assert!(nh3.volume_tp(100.0, 0.01, &[1.0], Phase::Vapor).is_ok());
+    assert!(nh3.volume_tp(100.0, 0.01, &[1.0], Phase::Liquid).is_err());
+    assert!(
+        nh3.volume_tp(100.0, 0.01, &[1.0], Phase::MinimumGibbs)
+            .is_err(),
+        "NH3 100 K, 0.01 Pa MinimumGibbs must reject when unclosed liquid has lower Gibbs energy"
+    );
+
+    // Conversely, at high pressure well above P_sat where liquid is the stable phase,
+    // MinimumGibbs must select the liquid root and close P tightly.
+    let p_hi = 1.0e6_f64;
+    let vl = h2o.volume_tp(300.0, p_hi, &[1.0], Phase::Liquid).unwrap();
+    let v_min_hi = h2o
+        .volume_tp(300.0, p_hi, &[1.0], Phase::MinimumGibbs)
+        .unwrap();
+    assert!((v_min_hi - vl).abs() <= 1e-12 * vl);
+}
+
+#[test]
+fn test_saft_vrmie_near_critical_and_supercritical_saturation() {
+    // Near-critical H2O approaches the model critical point (~679.05+ K) with distinct
+    // stable liquid and vapor roots matching exact Fortran safe_bubP and specificVolume.
+    let h2o = SaftVrMie::new(&["H2O"]).unwrap();
+    for &(t, ref_p, ref_vl, ref_vv, v_tol) in &[
+        (
+            679.0_f64,
+            2.9899230947147384e7_f64,
+            5.3457096925394434e-5_f64,
+            5.6424951690857218e-5_f64,
+            5e-6_f64,
+        ),
+        (
+            679.02,
+            2.9905171742265098e7,
+            5.3714200709089771e-5,
+            5.6143937927108431e-5,
+            5e-6,
+        ),
+        (
+            679.03,
+            2.9908142399416812e7,
+            5.3868162605370886e-5,
+            5.5978197100523462e-5,
+            5e-6,
+        ),
+        (
+            679.05,
+            2.9914084757380079e7,
+            5.4286329803272869e-5,
+            5.5531591512499044e-5,
+            1e-4,
+        ),
+    ] {
+        let prep = h2o.prepare(t, &[1.0]).unwrap();
+        let sat = prep.saturation_pressure(t).unwrap();
+        assert!(
+            (sat.pressure - ref_p).abs() < 1e-7 * ref_p,
+            "H2O {t} K P_sat={} vs Fortran {ref_p}",
+            sat.pressure
+        );
+        assert!(
+            (sat.liquid_volume - ref_vl).abs() < v_tol * ref_vl,
+            "H2O {t} K v_l={} vs Fortran {ref_vl}",
+            sat.liquid_volume
+        );
+        assert!(
+            (sat.vapor_volume - ref_vv).abs() < v_tol * ref_vv,
+            "H2O {t} K v_v={} vs Fortran {ref_vv}",
+            sat.vapor_volume
+        );
+        let vl_ref = prep.volume(ref_p, Phase::Liquid).unwrap();
+        let vv_ref = prep.volume(ref_p, Phase::Vapor).unwrap();
+        assert!((vl_ref - ref_vl).abs() < 1e-7 * ref_vl);
+        assert!((vv_ref - ref_vv).abs() < 1e-7 * ref_vv);
+        assert!(sat.liquid_volume < sat.vapor_volume);
+        let st_l = prep.state(1.0 / sat.liquid_volume).unwrap();
+        let st_v = prep.state(1.0 / sat.vapor_volume).unwrap();
+        assert!(st_l.dp_drho > 0.0 && st_v.dp_drho > 0.0);
+        let tds = t * sat.entropy_vaporization;
+        assert!(
+            (sat.enthalpy_vaporization - tds).abs() < 1e-6 * sat.enthalpy_vaporization.abs(),
+            "H2O {t} K Delta H ({}) != T Delta S ({tds})",
+            sat.enthalpy_vaporization
+        );
+    }
+
+    // True supercritical states must return Err rather than fictitious coexistence.
+    for &t_sup in &[680.0_f64, 700.0] {
+        let prep = h2o.prepare(t_sup, &[1.0]).unwrap();
+        assert!(
+            prep.saturation_pressure(t_sup).is_err(),
+            "supercritical H2O at {t_sup} K must not report coexistence"
+        );
+    }
+    let co2 = SaftVrMie::new(&["CO2"]).unwrap();
+    let prep_co2 = co2.prepare(320.0, &[1.0]).unwrap();
+    assert!(prep_co2.saturation_pressure(320.0).is_err());
+}
+
+#[test]
+fn test_saft_vrmie_pair_potential_cap_and_raw() {
+    let co2 = SaftVrMie::new(&["CO2"]).unwrap();
+    let comp = co2.components()[0];
+    let r_core = 0.5 * comp.sigma;
+    let t = 260.0;
+
+    // Default pair_potential matches Fortran saft_interface::potential: caps u at 500*eps/kB
+    // while keeping force uncapped.
+    let (u_capped, f_capped) = co2.pair_potential(0, 0, r_core, t).unwrap();
+    let expected_cap = 500.0 * comp.eps_depth_divk;
+    assert!((u_capped - expected_cap).abs() < 1e-12 * expected_cap);
+
+    // Raw uncapped helper returns the full repulsive potential whose -du/dr matches force.
+    let (u_raw, f_raw) = co2.pair_potential_with_cap(0, 0, r_core, t, None).unwrap();
+    assert!(u_raw > 1.0e10);
+    assert_eq!(f_capped, f_raw);
+    let dr = r_core * 1.0e-6;
+    let (up, _) = co2
+        .pair_potential_with_cap(0, 0, r_core + dr, t, None)
+        .unwrap();
+    let (um, _) = co2
+        .pair_potential_with_cap(0, 0, r_core - dr, t, None)
+        .unwrap();
+    let fd_force = -(up - um) / (2.0 * dr);
+    assert!((f_raw - fd_force).abs() < 1e-6 * fd_force.abs());
+
+    // Custom cap mirrors max_pot_val_in; non-finite cap is rejected.
+    let (u_custom, _) = co2
+        .pair_potential_with_cap(0, 0, r_core, t, Some(100.0))
+        .unwrap();
+    assert!((u_custom - 100.0 * comp.eps_depth_divk).abs() < 1e-12);
+    assert!(
+        co2.pair_potential_with_cap(0, 0, r_core, t, Some(f64::NAN))
+            .is_err()
+    );
+}
+
+#[test]
+fn test_saft_vrmie_oracle_tamper_detection() {
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/saftvrmie_tvn.csv");
+    let csv = std::fs::read_to_string(path).unwrap();
+    let lines: Vec<&str> = csv.lines().collect();
+
+    // 1. Header-only fixture must fail.
+    let header_only = format!("{}\n", lines[0]);
+    assert!(verify_saftvrmie_fixture(&header_only).is_err());
+
+    // 2. Dropping any row must fail.
+    let dropped = format!("{}\n", lines[..lines.len() - 1].join("\n"));
+    assert!(verify_saftvrmie_fixture(&dropped).is_err());
+
+    // 3. Zeroing d_T, d_TT, and d_ij_T on a HOOKS row (kind=5) must fail.
+    let zeroed_hooks = lines
+        .iter()
+        .map(|&line| {
+            let mut fields: Vec<String> = line.split(';').map(String::from).collect();
+            if fields.len() == 15 && fields[7] == "5" && fields[0] == "CO2,C1" {
+                let mut blocks: Vec<String> = fields[12].split(',').map(String::from).collect();
+                // For nc=2: indices 2,3 = d_T; 4,5 = d_TT; 7 = d_ij_T.
+                for idx in [2, 3, 4, 5, 7] {
+                    blocks[idx] = "0.0".to_string();
+                }
+                fields[12] = blocks.join(",");
+                fields.join(";")
+            } else {
+                line.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(verify_saftvrmie_fixture(&zeroed_hooks).is_err());
+
+    // 4. Non-finite (NaN) reference value must fail.
+    let nan_ref = lines
+        .iter()
+        .enumerate()
+        .map(|(idx, &line)| {
+            if idx == 1 {
+                let mut fields: Vec<String> = line.split(';').map(String::from).collect();
+                let mut blocks: Vec<String> = fields[12].split(',').map(String::from).collect();
+                blocks[0] = "NaN".to_string();
+                fields[12] = blocks.join(",");
+                fields.join(";")
+            } else {
+                line.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(verify_saftvrmie_fixture(&nan_ref).is_err());
+
+    // 5. UNSUPPORTED_SOURCE on a quantum hook slot (where Fortran supports de Broglie) must fail.
+    let bad_unsupported = lines
+        .iter()
+        .map(|&line| {
+            let mut fields: Vec<String> = line.split(';').map(String::from).collect();
+            if fields.len() == 15 && fields[7] == "5" && fields[2] == "2" && fields[11] == "default"
+            {
+                let mut blocks: Vec<String> = fields[12].split(',').map(String::from).collect();
+                *blocks.last_mut().unwrap() = "UNSUPPORTED_SOURCE".to_string();
+                fields[12] = blocks.join(",");
+                fields.join(";")
+            } else {
+                line.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(verify_saftvrmie_fixture(&bad_unsupported).is_err());
+}

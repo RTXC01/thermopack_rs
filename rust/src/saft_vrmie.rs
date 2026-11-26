@@ -2,9 +2,21 @@
 // Reference: Lafitte et al. (2013) doi:10.1063/1.4819786 and Aasen et al. (2019) doi:10.1063/1.5136079.
 // Copyright thermotools and Contributors. Apache-2.0.
 
+mod association;
+mod dd;
+mod kernel;
+use self::association::{AssocTempCoeffs, MieRdf, assoc_f_v_dd};
+use self::dd::Dd;
+use self::kernel::EvalMode;
+use crate::association::{
+    AssocScheme, AssociationParams, DeltaCombRule, assoc_helmholtz_all, assoc_helmholtz_first,
+    assoc_helmholtz_pressure_jet, assoc_helmholtz_value, solve_for_x_k,
+};
+/// Extensive reduced Helmholtz energy (mol), all TVN derivatives and site fractions.
+pub type SaftVrMieHelmholtz = crate::association::AssociationHelmholtz;
 use crate::component::component;
 use crate::cubic::Phase;
-use crate::error::{Error, Result};
+use crate::error::{Error, Result, positive};
 use crate::ideal::IdealGas;
 use crate::saft_vrmie_data;
 
@@ -12,9 +24,10 @@ use crate::saft_vrmie_data;
 const N_A: f64 = 6.02214076e23;
 const K_B: f64 = 1.380649e-23;
 const RGAS: f64 = N_A * K_B; // 8.31446261815324 J/(mol*K)
-const H_PLANCK: f64 = 6.62607015e-34; // J*s
+const H_PLANCK: f64 = 6.626069311e-34; // J*s, thermopack_constants::h_const
 const PI: f64 = std::f64::consts::PI;
 const MACHINE_PREC: f64 = 2.220446049250313e-16;
+const DEFAULT_MAX_REDUCED_POTENTIAL: f64 = 500.0;
 
 // Gauss-Kronrod 21 weights and positive nodes for Barker-Henderson diameter
 #[allow(clippy::excessive_precision)]
@@ -46,6 +59,91 @@ const WK_21: [f64; 11] = [
     0.147739104901338491374841515972068,
     0.149445554002916905664936468389821,
 ];
+
+#[allow(clippy::excessive_precision)]
+const X_NODES_21: [f64; 21] = [
+    -XK_21[0], -XK_21[1], -XK_21[2], -XK_21[3], -XK_21[4], -XK_21[5], -XK_21[6], -XK_21[7],
+    -XK_21[8], -XK_21[9], XK_21[10], XK_21[9], XK_21[8], XK_21[7], XK_21[6], XK_21[5], XK_21[4],
+    XK_21[3], XK_21[2], XK_21[1], XK_21[0],
+];
+
+#[allow(clippy::excessive_precision)]
+const W_NODES_21: [f64; 21] = [
+    WK_21[0], WK_21[1], WK_21[2], WK_21[3], WK_21[4], WK_21[5], WK_21[6], WK_21[7], WK_21[8],
+    WK_21[9], WK_21[10], WK_21[9], WK_21[8], WK_21[7], WK_21[6], WK_21[5], WK_21[4], WK_21[3],
+    WK_21[2], WK_21[1], WK_21[0],
+];
+
+/// Evaluate `exp(-z) - 1 + z` without catastrophic cancellation for small `|z|`.
+#[inline]
+fn expm1_minus(z: f64) -> f64 {
+    if z.abs() < 1.0e-2 {
+        let z2 = z * z;
+        z2 * (0.5
+            - z * (1.0 / 6.0
+                - z * (1.0 / 24.0
+                    - z * (1.0 / 120.0 - z * (1.0 / 720.0 - z * (1.0 / 5040.0 - z / 40320.0))))))
+    } else {
+        (-z).exp_m1() + z
+    }
+}
+
+/// Evaluate the reduced Mie excess above the well minimum, `u*(r_min * (1 + tau)) + 1 >= 0`,
+/// without catastrophic cancellation near `tau = 0`.
+#[inline]
+fn mie_well_excess_tau(tau: f64, la: f64, lr: f64) -> f64 {
+    let ln_t = tau.ln_1p();
+    (la * expm1_minus(lr * ln_t) - lr * expm1_minus(la * ln_t)) / (lr - la)
+}
+
+/// Evaluate `d[u*(r_min - d)]/dd > 0` for `d > 0` without cancellation near `d = 0`.
+#[inline]
+fn mie_well_left_deriv(d: f64, r_min: f64, la: f64, lr: f64) -> f64 {
+    let tau = -d / r_min;
+    let ln_t = tau.ln_1p();
+    let r = r_min - d;
+    let pref = (la * lr) / ((lr - la) * r);
+    pref * (-la * ln_t).exp() * (-(lr - la) * ln_t).exp_m1()
+}
+
+/// Evaluate `u*(1 + delta)` for `delta >= 0` without cancellation near `r = 1`.
+#[inline]
+fn mie_shifted_unit_value(delta: f64, c: f64, la: f64, lr: f64) -> f64 {
+    let s = delta.ln_1p();
+    c * (-la * s).exp() * (-(lr - la) * s).exp_m1()
+}
+
+/// Evaluate `du*(1 + delta)/d(delta)` for `delta >= 0`.
+#[inline]
+fn mie_shifted_unit_slope(delta: f64, c: f64, la: f64, lr: f64) -> f64 {
+    let s = delta.ln_1p();
+    (c / (1.0 + delta)) * (-lr * (-lr * s).exp() + la * (-la * s).exp())
+}
+
+/// Fast positive-exponent power avoiding `libm::pow` for exact small integers
+/// and sharing a single `ln(base)` across `(base^n, base^m)` when both are non-integer.
+#[inline(always)]
+fn pow_pos_pair(base: f64, n: f64, m: f64) -> (f64, f64) {
+    let n_int = (1.0..=64.0).contains(&n) && n == (n as i32) as f64;
+    let m_int = (1.0..=64.0).contains(&m) && m == (m as i32) as f64;
+    let eval_int = |b: f64, e: f64| -> f64 {
+        if e == 6.0 {
+            let b2 = b * b;
+            b2 * b2 * b2
+        } else {
+            b.powi(e as i32)
+        }
+    };
+    match (n_int, m_int) {
+        (true, true) => (eval_int(base, n), eval_int(base, m)),
+        (true, false) => (eval_int(base, n), (m * base.ln()).exp()),
+        (false, true) => ((n * base.ln()).exp(), eval_int(base, m)),
+        (false, false) => {
+            let ln_b = base.ln();
+            ((n * ln_b).exp(), (m * ln_b).exp())
+        }
+    }
+}
 
 // Effective packing fraction polynomial coefficients for Sutherland potential (row: 0..3, col: 0..3)
 const LAM_COEFF: [[f64; 4]; 4] = [
@@ -104,6 +202,12 @@ pub struct SaftVrMiePressureJet {
 }
 
 /// Complete thermodynamic state properties bundle at (T, rho).
+///
+/// `s_residual` and `g_residual` use the TP-referenced residual basis
+/// (`s_res = -R*(T*F_T + F - ln Z)`), matching [`SaftVrMieTpState`], while
+/// `s_total` is the true total molar entropy at `(T, rho)` (agreeing with
+/// [`SaftVrMie::state_tp`] at the same state and satisfying `Delta H = T Delta S`
+/// at coexistence).
 #[derive(Debug, Clone)]
 pub struct SaftVrMieState {
     pub pressure: f64,
@@ -111,10 +215,13 @@ pub struct SaftVrMieState {
     pub residual_helmholtz: f64,
     pub u_residual: f64,
     pub h_residual: f64,
+    /// Residual molar entropy `[J/(mol K)]` on the TP residual basis.
     pub s_residual: f64,
     pub a_residual: f64,
+    /// Residual molar Gibbs energy `[J/mol]` on the TP residual basis.
     pub g_residual: f64,
     pub h_total: f64,
+    /// Total molar entropy `[J/(mol K)]` at `(T, rho)`.
     pub s_total: f64,
     pub cv_residual: f64,
     pub cv_total: f64,
@@ -137,10 +244,223 @@ pub struct SaftVrMieSaturation {
     pub entropy_vaporization: f64,
 }
 
+/// Scalar property with exact first `(T, P, n)` derivatives.
+///
+/// Following ThermoPack's Fortran TP conventions, the mole-derivative field
+/// `dn` holds one of two bases depending on the property on [`SaftVrMieTpState`]:
+/// - For molar properties of extensive quantities (`specific_volume`,
+///   `residual_enthalpy`, `enthalpy`, `residual_entropy`, `entropy`, and
+///   `residual_gibbs`), `dn[i]` is the **partial molar property**
+///   `d(N * q) / dn_i` at constant `(T, P, n_{j != i})` (homogeneous of degree
+///   `0` in total moles `N`, satisfying `sum_i x_i * dn[i] = value`). Call
+///   [`SaftVrMieDerivatives::intensive_dn`] to obtain the raw-mole derivative
+///   `dq / dn_i = (dn[i] - value) / N` of the intensive molar value.
+/// - For `compressibility_factor`, `dn[i]` is directly the **intensive**
+///   raw-mole derivative `dZ / dn_i` at constant `(T, P, n_{j != i})`
+///   (homogeneous of degree `-1` in `N`, matching Fortran `eos::zfac`).
+#[derive(Debug, Clone)]
+pub struct SaftVrMieDerivatives {
+    /// Property value (intensive molar basis).
+    pub value: f64,
+    /// Temperature derivative at constant `(P, n)`.
+    pub dt: f64,
+    /// Pressure derivative at constant `(T, n)`.
+    pub dp: f64,
+    /// Mole derivatives at constant `(T, P, n_{j != i})`: partial molar
+    /// `d(N * q) / dn_i` for molar volume/enthalpy/entropy/Gibbs fields, or
+    /// intensive `dZ / dn_i` for `compressibility_factor`.
+    pub dn: Vec<f64>,
+}
+
+impl SaftVrMieDerivatives {
+    /// Convert partial molar derivatives `d(N * q) / dn_i` stored in `self.dn`
+    /// into raw-mole derivatives of the intensive molar value:
+    /// `dq / dn_i = (d(N * q) / dn_i - q) / N`.
+    ///
+    /// Use this on partial-molar fields of [`SaftVrMieTpState`]
+    /// (`specific_volume`, `residual_enthalpy`, `enthalpy`, `residual_entropy`,
+    /// `entropy`, `residual_gibbs`) when differentiating the intensive molar
+    /// quantity `q(T, P, n)` directly with respect to raw mole numbers `n_i`.
+    pub fn intensive_dn(&self, total_moles: f64) -> Result<Vec<f64>> {
+        positive(total_moles, "total moles")?;
+        let inv_n = 1.0 / total_moles;
+        Ok(self
+            .dn
+            .iter()
+            .map(|&q_bar| (q_bar - self.value) * inv_n)
+            .collect())
+    }
+}
+
+/// Fugacity coefficients `ln(phi_i)` and exact first `(T, P, n)` derivatives.
+#[derive(Debug, Clone)]
+pub struct SaftVrMieFugacityDerivatives {
+    /// Natural logarithm of fugacity coefficients `ln(phi_i)`.
+    pub ln_phi: Vec<f64>,
+    /// Temperature derivatives `d(ln phi_i)/dT` at constant `(P, n)`.
+    pub dt: Vec<f64>,
+    /// Pressure derivatives `d(ln phi_i)/dP` at constant `(T, n)`.
+    pub dp: Vec<f64>,
+    /// Row-major `nc x nc` intensive raw-mole derivatives `d(ln phi_i)/dn_j`
+    /// at constant `(T, P)` (homogeneous of degree `-1` in total moles).
+    pub dn: Vec<f64>,
+}
+
+/// Complete TP thermodynamic state bundle with analytical `(T, P, n)` derivatives.
+///
+/// Mole-derivative basis contract (matching ThermoPack Fortran `eos`):
+/// - `compressibility_factor.dn` and `ln_fugacity.dn` are intensive raw-mole
+///   derivatives (`dZ/dn_i`, `d(ln phi_i)/dn_j`, homogeneous of degree `-1`).
+/// - `specific_volume.dn`, `residual_enthalpy.dn`, `enthalpy.dn`,
+///   `residual_entropy.dn`, `entropy.dn`, and `residual_gibbs.dn` are partial
+///   molar quantities `d(N * q) / dn_i` (homogeneous of degree `0`). Use
+///   [`SaftVrMieDerivatives::intensive_dn`] to convert any partial molar vector
+///   to raw-mole derivatives `dq / dn_i` of the intensive molar value.
+#[derive(Debug, Clone)]
+pub struct SaftVrMieTpState {
+    /// Molar volume `[m^3/mol]`.
+    pub volume: f64,
+    /// Compressibility factor `Z`, `(T, P)` derivatives, and intensive raw-mole `dZ/dn_i`.
+    pub compressibility_factor: SaftVrMieDerivatives,
+    /// Molar volume `v`, `(T, P)` derivatives, and partial molar volumes `d(N*v)/dn_i`.
+    pub specific_volume: SaftVrMieDerivatives,
+    /// Residual molar enthalpy `[J/mol]`, `(T, P)` derivatives, and partial molar `d(N*h_res)/dn_i`.
+    pub residual_enthalpy: SaftVrMieDerivatives,
+    /// Total molar enthalpy `[J/mol]`, `(T, P)` derivatives, and partial molar `d(N*h)/dn_i`.
+    pub enthalpy: SaftVrMieDerivatives,
+    /// Residual molar entropy `[J/(mol K)]` (TP basis), `(T, P)` derivatives, and partial molar `d(N*s_res)/dn_i`.
+    pub residual_entropy: SaftVrMieDerivatives,
+    /// Total molar entropy `[J/(mol K)]`, `(T, P)` derivatives, and partial molar `d(N*s)/dn_i`.
+    pub entropy: SaftVrMieDerivatives,
+    /// Residual molar Gibbs energy `[J/mol]` (TP basis), `(T, P)` derivatives, and partial molar `d(N*g_res)/dn_i`.
+    pub residual_gibbs: SaftVrMieDerivatives,
+    /// Fugacity coefficients `ln(phi_i)` and intensive `(T, P, n)` derivatives.
+    pub ln_fugacity: SaftVrMieFugacityDerivatives,
+    /// Isobaric heat capacity `C_p` `[J/(mol K)]`.
+    pub cp: f64,
+    /// Isochoric heat capacity `C_v` `[J/(mol K)]`.
+    pub cv: f64,
+    /// Single-phase speed of sound `[m/s]`.
+    pub speed_of_sound: f64,
+}
+
+/// Reference presets from `saftvrmie_options::set_hs_reference`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum HardSphereReference {
+    /// Default Lafitte additive hard-sphere reference (`LAFITTE_HS_REF = 1`).
+    #[default]
+    Lafitte,
+    /// Single-component effective hard-sphere reference (`SINGLE_COMP_HS_REF = 2`).
+    SingleComponent,
+    /// Additive reference with Leonard non-additive correction (`ADDITIVE_HS_REF = 3`).
+    Additive,
+    /// Non-additive Santos hard-sphere reference (`NON_ADD_HS_REF = 4`).
+    NonAdditive,
+    /// Additive reference with exact cross diameters and extra term (`ADDITIVE_EXACT_HS_REF = 5`).
+    AdditiveExact,
+}
+
+/// Toggle switches for individual SAFT-VR Mie Helmholtz contributions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MieTerms {
+    /// Hard-sphere reference contribution (`enable_hs`).
+    pub hard_sphere: bool,
+    /// First-order dispersion contribution (`enable_A1`).
+    pub first: bool,
+    /// Second-order dispersion contribution (`enable_A2`).
+    pub second: bool,
+    /// Third-order dispersion contribution (`enable_A3`).
+    pub third: bool,
+    /// Chain formation contribution (`enable_chain`).
+    pub chain: bool,
+}
+impl Default for MieTerms {
+    fn default() -> Self {
+        Self {
+            hard_sphere: true,
+            first: true,
+            second: true,
+            third: true,
+            chain: true,
+        }
+    }
+}
+
+/// Packing-fraction mixing rule (`saftvrmie_options::zeta_mixing_rule`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PackingRule {
+    /// Lafitte quadratic packing rule (`ZETA_LAFITTE = 1`).
+    Lafitte,
+    /// Linear volume-fraction mixing rule (`ZETA_LINEAR = 2`).
+    Linear,
+    /// Leonard cubed mean-diameter rule (`ZETA_LEONARD = 3`).
+    Leonard,
+}
+
+/// Second-order quantum correction specification (`saftvrmie_options::quantum_correction_spec`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum QuantumVariant {
+    /// Standard Feynman-Hibbs prefactor 1/2 (`quantum_correction_spec = 0`).
+    FeynmanHibbs,
+    /// Jaen-Kahn prefactor 9/10 (`quantum_correction_spec = 1`).
+    JaenKahn,
+}
+impl QuantumVariant {
+    fn second_factor(self) -> f64 {
+        match self {
+            Self::FeynmanHibbs => 0.5,
+            Self::JaenKahn => 0.9,
+        }
+    }
+}
+
+/// Independent submodel selections from `saftvrmie_options`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MieOptions {
+    /// Packing-fraction mixing rule.
+    pub packing: PackingRule,
+    /// Leonard extra hard-sphere non-additivity correction (`enable_hs_extra`).
+    pub extra_hard_sphere: bool,
+    /// Exact effective cross-potential parameters (`exact_crosspot_eff`).
+    pub exact_cross_potential: bool,
+    /// Geometric epsilon combining rule (`!use_epsrule_Lafitte`).
+    pub geometric_epsilon: bool,
+    /// BMCSL isothermal compressibility (`Khs_EoS = KHS_EOS_BMCSL`).
+    pub bmcsl_compressibility: bool,
+    /// Kolafa-Labik-Malijevsky pure hard-sphere EoS (`pure_hs_EoS = PURE_HS_CSK`).
+    pub kolafa_pure_reference: bool,
+    /// Pair-sigma prefactor in third-order dispersion (`a3_model = A3_SIJ_PREFAC`).
+    pub pair_prefactor_a3: bool,
+    /// Second-order quantum correction prefactor variant.
+    pub quantum_variant: QuantumVariant,
+    /// Include quantum corrections in second-order dispersion (`quantum_correct_A2`).
+    pub quantum_correct_a2: bool,
+}
+impl Default for MieOptions {
+    fn default() -> Self {
+        Self {
+            packing: PackingRule::Lafitte,
+            extra_hard_sphere: false,
+            exact_cross_potential: true,
+            geometric_epsilon: false,
+            bmcsl_compressibility: false,
+            kolafa_pure_reference: false,
+            pair_prefactor_a3: false,
+            quantum_variant: QuantumVariant::FeynmanHibbs,
+            quantum_correct_a2: true,
+        }
+    }
+}
+
 /// SAFT-VR Mie and SAFT-VRQ Mie model instance.
 #[derive(Debug, Clone)]
 pub struct SaftVrMie {
     components: Vec<SaftVrMieComponent>,
+    assoc_schemes: Vec<AssocScheme>,
+    assoc_eps: Vec<f64>,
+    assoc_beta: Vec<f64>,
+    association: AssociationParams,
+    integral_coefficients: Vec<[f64; 66]>,
     kij: Vec<f64>,
     lij: Vec<f64>,
     gamma_ij: Vec<f64>,
@@ -154,6 +474,10 @@ pub struct SaftVrMie {
     d_feynhibbs_param_ij: Vec<f64>,
     ideal: Vec<IdealGas>,
     exact_binary_dhs: bool,
+    reference: HardSphereReference,
+    terms: MieTerms,
+    options: MieOptions,
+    cutoff: Option<(f64, bool)>,
 }
 
 impl SaftVrMie {
@@ -172,11 +496,17 @@ impl SaftVrMie {
         let mut components = Vec::with_capacity(nc);
         let mut ideal = Vec::with_capacity(nc);
 
+        let mut schemes = Vec::with_capacity(nc);
+        let mut eps_assoc = Vec::with_capacity(nc);
+        let mut kab = Vec::with_capacity(nc);
         for &ident in comps {
             let record = saft_vrmie_data::lookup_pure(ident, Some(parameter_reference))
                 .ok_or_else(|| {
                     Error::UnknownComponent(format!("SAFT-VR Mie record for {ident}"))
                 })?;
+            schemes.push(record.scheme);
+            eps_assoc.push(record.eps_assoc_divk * crate::R);
+            kab.push(record.kab);
             let comp_info = component(ident)?;
             let molar_mass = comp_info.molar_mass; // g/mol
 
@@ -196,7 +526,23 @@ impl SaftVrMie {
             ideal.push(IdealGas::new(comp_info)?);
         }
 
+        let association = AssociationParams::for_saft_vr_mie(
+            &schemes,
+            &eps_assoc,
+            &kab,
+            DeltaCombRule::Standard,
+        )?;
+        let integral_coefficients = if association.has_sites() {
+            vec![[0.0; 66]; nc * nc]
+        } else {
+            Vec::new()
+        };
         let mut s = Self {
+            assoc_schemes: schemes,
+            assoc_eps: eps_assoc,
+            assoc_beta: kab,
+            association,
+            integral_coefficients,
             components,
             kij: vec![0.0; nc * nc],
             lij: vec![0.0; nc * nc],
@@ -211,6 +557,10 @@ impl SaftVrMie {
             d_feynhibbs_param_ij: vec![0.0; nc * nc],
             ideal,
             exact_binary_dhs: false,
+            reference: HardSphereReference::Lafitte,
+            terms: MieTerms::default(),
+            options: MieOptions::default(),
+            cutoff: None,
         };
 
         // Initialize interaction parameters from database
@@ -236,6 +586,1160 @@ impl SaftVrMie {
         Ok(s)
     }
 
+    /// Initialize the Aasen FH0, FH1 or FH2 model with the Santos non-additive reference.
+    pub fn new_quantum(comps: &[&str], order: u8, reference: Option<&str>) -> Result<Self> {
+        Self::new_quantum_with_hs_ref(comps, order, false, reference)
+    }
+
+    /// Initialize SAFT-VRQ Mie with explicit `additive_hs_ref` selection matching
+    /// `eoslibinit::init_quantum_saftvrmie`.
+    pub fn new_quantum_with_hs_ref(
+        comps: &[&str],
+        order: u8,
+        additive_hs_ref: bool,
+        reference: Option<&str>,
+    ) -> Result<Self> {
+        let default_ref = match order {
+            0 => "AASEN2019-FH0",
+            1 => "AASEN2019-FH1",
+            2 => "AASEN2019-FH2",
+            _ => return Err(Error::InvalidInput("FH order must be 0, 1 or 2")),
+        };
+        let mut model = Self::new_with_options(
+            comps,
+            reference
+                .filter(|r| !r.eq_ignore_ascii_case("default"))
+                .unwrap_or(default_ref),
+        )?;
+        if model
+            .components
+            .iter()
+            .any(|c| c.fh_order != i32::from(order) || (order > 0 && (c.mass <= 0. || c.m != 1.)))
+        {
+            return Err(Error::InvalidInput(
+                "component parameter set incompatible with quantum order",
+            ));
+        }
+        model.set_hard_sphere_reference(if additive_hs_ref {
+            HardSphereReference::AdditiveExact
+        } else {
+            HardSphereReference::NonAdditive
+        });
+        Ok(model)
+    }
+
+    /// Active hard-sphere reference preset.
+    pub fn hard_sphere_reference(&self) -> HardSphereReference {
+        self.reference
+    }
+
+    /// Select a hard-sphere reference preset matching `saftvrmie_options::set_hs_reference`.
+    ///
+    /// Note that `HardSphereReference::NonAdditive` resets `kolafa_pure_reference`
+    /// to `false` (`PURE_HS_CS`) and leaves the active `options.packing` rule
+    /// unchanged, matching Fortran `set_hs_reference(NON_ADD_HS_REF)`.
+    pub fn set_hard_sphere_reference(&mut self, reference: HardSphereReference) {
+        self.reference = reference;
+        match reference {
+            HardSphereReference::Lafitte => {
+                self.options.packing = PackingRule::Lafitte;
+                self.exact_binary_dhs = false;
+                self.options.extra_hard_sphere = false;
+            }
+            HardSphereReference::SingleComponent => {
+                self.options.packing = PackingRule::Leonard;
+                self.exact_binary_dhs = true;
+                self.options.extra_hard_sphere = false;
+            }
+            HardSphereReference::Additive => {
+                self.options.packing = PackingRule::Lafitte;
+                self.exact_binary_dhs = false;
+                self.options.extra_hard_sphere = true;
+            }
+            HardSphereReference::NonAdditive => {
+                self.options.kolafa_pure_reference = false;
+                self.exact_binary_dhs = true;
+                self.options.extra_hard_sphere = false;
+            }
+            HardSphereReference::AdditiveExact => {
+                self.options.packing = PackingRule::Lafitte;
+                self.exact_binary_dhs = true;
+                self.options.extra_hard_sphere = true;
+            }
+        }
+    }
+
+    /// Active independent submodel options.
+    pub fn options(&self) -> MieOptions {
+        self.options
+    }
+
+    /// Update independent submodel options, validating model consistency.
+    pub fn set_options(&mut self, options: MieOptions) -> Result<()> {
+        if options.bmcsl_compressibility && self.components.iter().any(|c| c.m != 1.) {
+            return Err(Error::InvalidInput(
+                "BMCSL compressibility requires spherical molecules",
+            ));
+        }
+        if self.reference == HardSphereReference::SingleComponent
+            && options.packing != PackingRule::Leonard
+        {
+            return Err(Error::InvalidInput(
+                "single component reference requires Leonard packing",
+            ));
+        }
+        self.options = options;
+        self.recompute_cross_parameters();
+        Ok(())
+    }
+
+    /// Active Helmholtz term toggles.
+    pub fn terms(&self) -> MieTerms {
+        self.terms
+    }
+
+    /// Enable or disable individual SAFT-VR Mie Helmholtz terms.
+    pub fn set_terms(&mut self, terms: MieTerms) {
+        self.terms = terms;
+    }
+
+    /// Active reduced potential cutoff `(r_cut, shift_enabled)`, or `None` for full Mie range.
+    pub fn cutoff(&self) -> Option<(f64, bool)> {
+        self.cutoff
+    }
+
+    /// Reduced cutoff distance in sigma units. `None` restores the infinite-range potential.
+    pub fn set_cutoff(&mut self, cutoff: Option<(f64, bool)>) -> Result<()> {
+        if let Some((r, _)) = cutoff
+            && (self.num_components() != 1 || !r.is_finite() || r <= 0.)
+        {
+            return Err(Error::InvalidInput(
+                "truncation requires a pure fluid and positive finite cutoff",
+            ));
+        }
+        self.cutoff = cutoff;
+        Ok(())
+    }
+
+    /// Whether the model has any active associating sites.
+    pub fn has_association(&self) -> bool {
+        self.association.has_sites()
+    }
+
+    /// Override association parameters `(scheme, eps [J/mol], beta [m^3])` for one component.
+    pub fn set_assoc_params(
+        &mut self,
+        index: usize,
+        scheme: AssocScheme,
+        eps: f64,
+        beta: f64,
+    ) -> Result<()> {
+        if index >= self.num_components() {
+            return Err(Error::InvalidInput("component index out of bounds"));
+        }
+        let mut schemes = self.assoc_schemes.clone();
+        let mut eps_vec = self.assoc_eps.clone();
+        let mut beta_vec = self.assoc_beta.clone();
+        schemes[index] = scheme;
+        eps_vec[index] = eps;
+        beta_vec[index] = beta;
+        let association = AssociationParams::for_saft_vr_mie(
+            &schemes,
+            &eps_vec,
+            &beta_vec,
+            self.association.delta_comb_rule,
+        )?;
+        self.assoc_schemes = schemes;
+        self.assoc_eps = eps_vec;
+        self.assoc_beta = beta_vec;
+        self.association = association;
+        let nc = self.num_components();
+        if self.association.has_sites() {
+            if self.integral_coefficients.len() != nc * nc {
+                self.integral_coefficients = vec![[0.0; 66]; nc * nc];
+            }
+            self.recompute_cross_parameters();
+        } else {
+            self.integral_coefficients.clear();
+        }
+        Ok(())
+    }
+
+    /// Select the cross-association Delta combining rule (`Standard` or `Elliot`).
+    pub fn set_delta_comb_rule(&mut self, rule: DeltaCombRule) -> Result<()> {
+        self.association = AssociationParams::for_saft_vr_mie(
+            &self.assoc_schemes,
+            &self.assoc_eps,
+            &self.assoc_beta,
+            rule,
+        )?;
+        Ok(())
+    }
+
+    /// Solve for equilibrium non-bonded association site fractions `X_k` at `(T, V, n)`.
+    pub fn solve_assoc_x_k(
+        &self,
+        temperature: f64,
+        volume: f64,
+        moles: &[f64],
+    ) -> Result<Vec<f64>> {
+        positive(volume, "total volume")?;
+        let state = self.prepare(temperature, moles)?;
+        if !self.association.has_sites() {
+            return Ok(Vec::new());
+        }
+        let total: f64 = moles.iter().sum();
+        let v_unit = volume / total;
+        if !v_unit.is_finite() || v_unit <= 0.0 {
+            return Err(Error::InvalidInput(
+                "molar volume must be finite and strictly positive",
+            ));
+        }
+        solve_for_x_k(
+            &self.association,
+            &MieRdf::new(&state, 1.0 / v_unit),
+            temperature,
+            v_unit,
+            &state.mole_fractions,
+            None,
+        )
+    }
+
+    /// `(is_fmt_consistent, nonadditive_extra_enabled)` matching `test_fmt_compatibility`.
+    pub fn fmt_compatibility(&self) -> (bool, bool) {
+        if self.num_components() == 1 {
+            return (true, false);
+        }
+        let additive = matches!(
+            self.reference,
+            HardSphereReference::Lafitte
+                | HardSphereReference::Additive
+                | HardSphereReference::AdditiveExact
+        ) && self.options.packing == PackingRule::Lafitte;
+        let extra = self.options.extra_hard_sphere;
+        (additive && (!extra || self.exact_binary_dhs), extra)
+    }
+
+    /// Extensive residual F=Ares/(RT) and its ten TVN blocks at raw mole amounts.
+    pub fn residual_helmholtz_tvn(
+        &self,
+        temperature: f64,
+        volume: f64,
+        moles: &[f64],
+    ) -> Result<SaftVrMieHelmholtz> {
+        self.derivatives(temperature, volume, moles, EvalMode::Total)
+    }
+
+    /// Reduced molar dispersion energy and its TVN derivatives, as used by DFT.
+    pub fn dispersion_tvn(
+        &self,
+        temperature: f64,
+        volume: f64,
+        moles: &[f64],
+    ) -> Result<SaftVrMieHelmholtz> {
+        self.derivatives(temperature, volume, moles, EvalMode::Dispersion)
+    }
+
+    /// Reduced molar hard-sphere energy and its TVN derivatives, as used by DFT.
+    pub fn hard_sphere_tvn(
+        &self,
+        temperature: f64,
+        volume: f64,
+        moles: &[f64],
+    ) -> Result<SaftVrMieHelmholtz> {
+        self.derivatives(temperature, volume, moles, EvalMode::HardSphere)
+    }
+
+    fn derivatives_unit(
+        &self,
+        state: &PreparedSaftVrMie<'_>,
+        v_unit: f64,
+        mode: EvalMode,
+    ) -> Result<SaftVrMieHelmholtz> {
+        let nc = self.num_components();
+        let rho = 1.0 / v_unit;
+        let empty = AssociationParams::empty(nc);
+        let model = if mode == EvalMode::Total {
+            &self.association
+        } else {
+            &empty
+        };
+        let mut out = assoc_helmholtz_all(
+            model,
+            &MieRdf::new(state, rho),
+            state.temperature,
+            v_unit,
+            &state.mole_fractions,
+        )?;
+        for i in 0..nc + 2 {
+            for j in i..nc + 2 {
+                let terms = state.eval_second(rho, i, j, mode)?;
+                let f = match mode {
+                    EvalMode::Total => terms.total,
+                    EvalMode::Dispersion => terms.dispersion,
+                    EvalMode::HardSphere => terms.hard_sphere,
+                };
+                if i == j {
+                    match i {
+                        0 => {
+                            out.f += f.f0;
+                            out.f_t += f.f1;
+                        }
+                        1 => out.f_v += f.f1,
+                        _ => out.f_n[i - 2] += f.f1,
+                    }
+                }
+                match (i, j) {
+                    (0, 0) => out.f_tt += f.f12,
+                    (0, 1) => out.f_tv += f.f12,
+                    (0, _) => out.f_tn[j - 2] += f.f12,
+                    (1, 1) => out.f_vv += f.f12,
+                    (1, _) => out.f_vn[j - 2] += f.f12,
+                    _ => {
+                        out.f_nn[(i - 2) * nc + j - 2] += f.f12;
+                        if i != j {
+                            out.f_nn[(j - 2) * nc + i - 2] += f.f12;
+                        }
+                    }
+                }
+            }
+        }
+        Ok(out)
+    }
+
+    fn derivatives(
+        &self,
+        temperature: f64,
+        volume: f64,
+        moles: &[f64],
+        mode: EvalMode,
+    ) -> Result<SaftVrMieHelmholtz> {
+        positive(volume, "total volume")?;
+        let state = self.prepare(temperature, moles)?;
+        let total: f64 = moles.iter().sum();
+        let v_unit = volume / total;
+        if !v_unit.is_finite() || v_unit <= 0.0 {
+            return Err(Error::InvalidInput(
+                "molar volume must be finite and strictly positive",
+            ));
+        }
+        let mut out = self.derivatives_unit(&state, v_unit, mode)?;
+        if mode == EvalMode::Total {
+            out.f *= total;
+            out.f_t *= total;
+            out.f_tt *= total;
+            out.f_vv /= total;
+            for val in &mut out.f_vn {
+                *val /= total;
+            }
+            for val in &mut out.f_nn {
+                *val /= total;
+            }
+        } else {
+            // Molar quantities are homogeneous of degree 0 in (V, n).
+            out.f_v /= total;
+            out.f_tv /= total;
+            out.f_vv = (out.f_vv / total) / total;
+            for val in out.f_n.iter_mut().chain(&mut out.f_tn) {
+                *val /= total;
+            }
+            for val in out.f_vn.iter_mut().chain(&mut out.f_nn) {
+                *val = (*val / total) / total;
+            }
+        }
+        if ![out.f, out.f_t, out.f_v, out.f_tt, out.f_tv, out.f_vv]
+            .iter()
+            .all(|v| v.is_finite())
+            || !out.f_n.iter().all(|v| v.is_finite())
+            || !out.f_tn.iter().all(|v| v.is_finite())
+            || !out.f_vn.iter().all(|v| v.is_finite())
+            || !out.f_nn.iter().all(|v| v.is_finite())
+        {
+            return Err(Error::InvalidInput(
+                "non-finite SAFT-VR Mie Helmholtz derivative",
+            ));
+        }
+        Ok(out)
+    }
+
+    /// Solve for the molar volume `[m^3/mol]` at `(T, P, n)` for the requested `phase`.
+    pub fn volume_tp(
+        &self,
+        temperature: f64,
+        pressure: f64,
+        moles: &[f64],
+        phase: Phase,
+    ) -> Result<f64> {
+        let prepared = self.prepare(temperature, moles)?;
+        prepared.volume(pressure, phase)
+    }
+
+    /// Evaluate the complete TP thermodynamic state with exact first `(T, P, n)`
+    /// derivatives from all ten TVN Helmholtz blocks at `(T, P, n)` for `phase`.
+    pub fn state_tp(
+        &self,
+        temperature: f64,
+        pressure: f64,
+        moles: &[f64],
+        phase: Phase,
+    ) -> Result<SaftVrMieTpState> {
+        positive(temperature, "temperature")?;
+        positive(pressure, "pressure")?;
+        let prepared = self.prepare(temperature, moles)?;
+        let total: f64 = moles.iter().sum();
+        let v_molar = prepared.volume(pressure, phase)?;
+        let v_total = v_molar * total;
+        if !v_total.is_finite() || v_total <= 0.0 {
+            return Err(Error::InvalidInput(
+                "total volume overflowed or underflowed",
+            ));
+        }
+
+        let nc = self.num_components();
+        let h = self.derivatives_unit(&prepared, v_molar, EvalMode::Total)?;
+        let t = temperature;
+        let v = v_molar;
+        let inv_n = 1.0 / total;
+        let rho_u = 1.0 / v;
+        let p_eval = if (rho_u - h.f_v).abs() < 1.0e-5 * (rho_u + h.f_v.abs()) {
+            let hint = if self.association.has_sites() {
+                Some(h.x_k.as_slice())
+            } else {
+                None
+            };
+            prepared.eval_high_precision_pressure_and_z(rho_u, hint)?.0
+        } else {
+            RGAS * t / v - RGAS * t * h.f_v
+        };
+        let p_v = -RGAS * t / (v * v) - RGAS * t * h.f_vv;
+        let p_t = p_eval / t - RGAS * t * h.f_tv;
+        let p_n: Vec<f64> = h
+            .f_vn
+            .iter()
+            .map(|&fvn| RGAS * t / v - RGAS * t * fvn)
+            .collect();
+
+        let v_t = -p_t / p_v;
+        let v_p = 1.0 / p_v;
+        let v_n_partial: Vec<f64> = p_n.iter().map(|&pni| -pni / p_v).collect();
+
+        let z = p_eval * v / (RGAS * t);
+        let ln_z = z.ln();
+        let z_t = (p_eval / (RGAS * t)) * (v_t - v / t);
+        let z_p = (v + p_eval * v_p) / (RGAS * t);
+        let z_dn: Vec<f64> = v_n_partial
+            .iter()
+            .map(|&vni| (p_eval / (RGAS * t)) * (vni - v) * inv_n)
+            .collect();
+
+        let h_res = -RGAS * t * t * h.f_t + p_eval * v - RGAS * t;
+        let cv_res = -RGAS * (2.0 * t * h.f_t + t * t * h.f_tt);
+        let cp_res = cv_res - t * p_t * p_t / p_v - RGAS;
+        let h_res_t = cp_res;
+        let h_res_p = v - t * v_t;
+        let mut h_res_dn = Vec::with_capacity(nc);
+        for i in 0..nc {
+            h_res_dn.push(-RGAS * t * t * h.f_tn[i] + t * p_t * v_n_partial[i] - RGAS * t);
+        }
+
+        let s_res = -RGAS * (h.f + t * h.f_t - ln_z);
+        let s_res_t = cp_res / t;
+        let s_res_p = -v_t + RGAS / p_eval;
+        let mut s_res_dn = Vec::with_capacity(nc);
+        for i in 0..nc {
+            s_res_dn.push(-RGAS * (h.f_n[i] + t * h.f_tn[i] - ln_z) + p_t * v_n_partial[i] - RGAS);
+        }
+
+        let g_res = h_res - t * s_res;
+        let g_res_t = -s_res;
+        let g_res_p = v - RGAS * t / p_eval;
+        let g_res_dn: Vec<f64> = h.f_n.iter().map(|&fni| RGAS * t * (fni - ln_z)).collect();
+
+        let mut h_id = 0.0;
+        let mut cp_id = 0.0;
+        let mut s_id = 0.0;
+        let mut h_id_comp = Vec::with_capacity(nc);
+        let mut s_id_comp = Vec::with_capacity(nc);
+        for i in 0..nc {
+            let id = self.ideal[i].properties(t, p_eval)?;
+            let xi = prepared.mole_fractions[i];
+            h_id += xi * id.enthalpy;
+            cp_id += xi * id.cp;
+            if xi > 0.0 {
+                s_id += xi * (id.entropy - RGAS * xi.ln());
+            }
+            h_id_comp.push(id.enthalpy);
+            s_id_comp.push(id.entropy - RGAS * xi.max(1.0e-100).ln());
+        }
+        let h_tot_dn: Vec<f64> = h_res_dn
+            .iter()
+            .zip(&h_id_comp)
+            .map(|(r, id)| r + id)
+            .collect();
+        let s_tot_dn: Vec<f64> = s_res_dn
+            .iter()
+            .zip(&s_id_comp)
+            .map(|(r, id)| r + id)
+            .collect();
+
+        let mut ln_phi = Vec::with_capacity(nc);
+        let mut dlnphi_dt = Vec::with_capacity(nc);
+        let mut dlnphi_dp = Vec::with_capacity(nc);
+        let mut dlnphi_dn = vec![0.0; nc * nc];
+        for i in 0..nc {
+            ln_phi.push(h.f_n[i] - ln_z);
+            dlnphi_dt.push(h.f_tn[i] + 1.0 / t - v_n_partial[i] * p_t / (RGAS * t));
+            dlnphi_dp.push(v_n_partial[i] / (RGAS * t) - 1.0 / p_eval);
+            for j in 0..nc {
+                let d_unit = h.f_nn[i * nc + j] + 1.0 + p_n[i] * p_n[j] / (RGAS * t * p_v);
+                dlnphi_dn[i * nc + j] = d_unit * inv_n;
+            }
+        }
+
+        let cv = cp_id - RGAS + cv_res;
+        let cp = cp_id + cp_res;
+        let dp_drho = -p_v * v * v;
+        let mw_kg = prepared.molar_mass_mix * 1.0e-3;
+        let sound_speed = if dp_drho > 0.0 && cp > 0.0 && cv > 0.0 && mw_kg > 0.0 {
+            ((cp / cv) * dp_drho / mw_kg).sqrt()
+        } else {
+            0.0
+        };
+
+        let all_finite = [
+            v,
+            z,
+            z_t,
+            z_p,
+            v_t,
+            v_p,
+            h_res,
+            h_res_t,
+            h_res_p,
+            s_res,
+            s_res_t,
+            s_res_p,
+            g_res,
+            g_res_t,
+            g_res_p,
+            cp,
+            cv,
+            sound_speed,
+        ]
+        .iter()
+        .all(|q| q.is_finite())
+            && z_dn.iter().all(|q| q.is_finite())
+            && v_n_partial.iter().all(|q| q.is_finite())
+            && h_res_dn.iter().all(|q| q.is_finite())
+            && s_res_dn.iter().all(|q| q.is_finite())
+            && g_res_dn.iter().all(|q| q.is_finite())
+            && ln_phi.iter().all(|q| q.is_finite())
+            && dlnphi_dt.iter().all(|q| q.is_finite())
+            && dlnphi_dp.iter().all(|q| q.is_finite())
+            && dlnphi_dn.iter().all(|q| q.is_finite());
+        if !all_finite {
+            return Err(Error::InvalidInput(
+                "non-finite SAFT-VR Mie TP thermodynamic state",
+            ));
+        }
+
+        Ok(SaftVrMieTpState {
+            volume: v,
+            compressibility_factor: SaftVrMieDerivatives {
+                value: z,
+                dt: z_t,
+                dp: z_p,
+                dn: z_dn,
+            },
+            specific_volume: SaftVrMieDerivatives {
+                value: v,
+                dt: v_t,
+                dp: v_p,
+                dn: v_n_partial,
+            },
+            residual_enthalpy: SaftVrMieDerivatives {
+                value: h_res,
+                dt: h_res_t,
+                dp: h_res_p,
+                dn: h_res_dn,
+            },
+            enthalpy: SaftVrMieDerivatives {
+                value: h_id + h_res,
+                dt: cp,
+                dp: h_res_p,
+                dn: h_tot_dn,
+            },
+            residual_entropy: SaftVrMieDerivatives {
+                value: s_res,
+                dt: s_res_t,
+                dp: s_res_p,
+                dn: s_res_dn,
+            },
+            entropy: SaftVrMieDerivatives {
+                value: s_id + s_res,
+                dt: cp / t,
+                dp: -v_t,
+                dn: s_tot_dn,
+            },
+            residual_gibbs: SaftVrMieDerivatives {
+                value: g_res,
+                dt: g_res_t,
+                dp: g_res_p,
+                dn: g_res_dn,
+            },
+            ln_fugacity: SaftVrMieFugacityDerivatives {
+                ln_phi,
+                dt: dlnphi_dt,
+                dp: dlnphi_dp,
+                dn: dlnphi_dn,
+            },
+            cp,
+            cv,
+            speed_of_sound: sound_speed,
+        })
+    }
+
+    /// Evaluate fugacity coefficients and their exact `(T, P, n)` derivatives at `(T, P, n)`.
+    pub fn ln_fugacity_derivatives_tp(
+        &self,
+        temperature: f64,
+        pressure: f64,
+        moles: &[f64],
+        phase: Phase,
+    ) -> Result<SaftVrMieFugacityDerivatives> {
+        Ok(self
+            .state_tp(temperature, pressure, moles, phase)?
+            .ln_fugacity)
+    }
+
+    /// Pure-component Barker-Henderson hard-sphere diameters `(d, d_T, d_TT)` at `T`,
+    /// matching `saft_interface::calc_hard_sphere_diameter`.
+    pub fn hard_sphere_diameters(
+        &self,
+        temperature: f64,
+    ) -> Result<(Vec<f64>, Vec<f64>, Vec<f64>)> {
+        positive(temperature, "temperature")?;
+        let nc = self.num_components();
+        let mut d = Vec::with_capacity(nc);
+        let mut d_t = Vec::with_capacity(nc);
+        let mut d_tt = Vec::with_capacity(nc);
+        for i in 0..nc {
+            let pair = self.potential(i, i);
+            let se = pair.effective_sigma(temperature);
+            let (di, dit, ditt) = pair.diameter(temperature, se)?;
+            d.push(di);
+            d_t.push(dit);
+            d_tt.push(ditt);
+        }
+        Ok((d, d_t, d_tt))
+    }
+
+    /// Pair hard-sphere diameter `(d_ij, d_T_ij, d_TT_ij)` at `T`,
+    /// matching `saft_interface::calc_hard_sphere_diameter_ij`.
+    pub fn hard_sphere_diameter_ij(
+        &self,
+        i: usize,
+        j: usize,
+        temperature: f64,
+    ) -> Result<(f64, f64, f64)> {
+        positive(temperature, "temperature")?;
+        let nc = self.num_components();
+        if i >= nc || j >= nc {
+            return Err(Error::InvalidInput("component index out of bounds"));
+        }
+        let dummy_x = vec![1.0 / nc as f64; nc];
+        let prep = PreparedSaftVrMie::new(self, temperature, dummy_x)?;
+        let k = i * nc + j;
+        Ok((prep.d[k], prep.d_t[k], prep.d_tt[k]))
+    }
+
+    /// Effective quantum/classical collision diameter `(sigma_eff, dT, dTT)` for pair `(i, j)`.
+    pub fn effective_sigma_ij(
+        &self,
+        i: usize,
+        j: usize,
+        temperature: f64,
+    ) -> Result<(f64, f64, f64)> {
+        positive(temperature, "temperature")?;
+        let nc = self.num_components();
+        if i >= nc || j >= nc {
+            return Err(Error::InvalidInput("component index out of bounds"));
+        }
+        let dummy_x = vec![1.0 / nc as f64; nc];
+        let prep = PreparedSaftVrMie::new(self, temperature, dummy_x)?;
+        let [v, vt, vtt] = prep.effective[i * nc + j].0;
+        Ok((v, vt, vtt))
+    }
+
+    /// Effective quantum/classical well depth `(eps_eff/kB, dT, dTT)` for pair `(i, j)`.
+    pub fn effective_epsilon_ij(
+        &self,
+        i: usize,
+        j: usize,
+        temperature: f64,
+    ) -> Result<(f64, f64, f64)> {
+        positive(temperature, "temperature")?;
+        let nc = self.num_components();
+        if i >= nc || j >= nc {
+            return Err(Error::InvalidInput("component index out of bounds"));
+        }
+        let dummy_x = vec![1.0 / nc as f64; nc];
+        let prep = PreparedSaftVrMie::new(self, temperature, dummy_x)?;
+        let [v, vt, vtt] = prep.effective[i * nc + j].1;
+        Ok((v, vt, vtt))
+    }
+
+    /// Dimensionless van der Waals attractive energy matrix `alpha_ij(T)` (`nc x nc`),
+    /// matching `saft_interface::alpha` (including truncated/shifted classical potentials).
+    ///
+    /// For shifted cutoffs, cutoffs at, below, or unresolvably close to `r_min`
+    /// (`r_cut - r_min <= 1e-12 * r_min`) return `Error::NotConverged`. Near `r_min`
+    /// (`r_cut <= 2 * r_min`), the shifted well depth `eps_eff = u*(r_cut) + 1` and
+    /// inner zero offset `r_min - sigma_eff` are solved relative to `r_min`, using
+    /// 21-point Gauss-Kronrod quadrature on shallow wells (`eps_eff < 0.25`). For
+    /// deep wells and large finite cutoffs (`r_cut > 2 * r_min`), `u_cut = -u*(r_cut)`
+    /// is evaluated directly, the inner zero offset `sigma_eff - 1` is solved near
+    /// `sigma = 1`, and the tail uses `r_cut^(3 - lambda)` to avoid `1 - eps_eff`
+    /// cancellation and `r_cut^3` overflow.
+    pub fn alpha_vdw(&self, temperature: f64) -> Result<Vec<f64>> {
+        positive(temperature, "temperature")?;
+        let nc = self.num_components();
+        if let Some((r_cut, shift)) = self.cutoff {
+            if self.components.iter().any(|c| c.fh_order > 0) {
+                return Err(Error::Unsupported(
+                    "truncated alpha_vdw is not supported for quantum potentials",
+                ));
+            }
+            let mut out = vec![0.0; nc * nc];
+            for i in 0..nc {
+                for j in i..nc {
+                    let idx = i * nc + j;
+                    let la = self.lambda_a_ij[idx];
+                    let lr = self.lambda_r_ij[idx];
+                    let c = self.c_ij[idx];
+                    let a = if shift {
+                        let r_min = (lr / la).powf(1.0 / (lr - la));
+                        let delta_c = r_cut - r_min;
+                        if !r_min.is_finite() || !delta_c.is_finite() || delta_c <= 1.0e-12 * r_min
+                        {
+                            return Err(Error::NotConverged(
+                                "cannot resolve shifted potential well for cutoff radius",
+                            ));
+                        }
+                        if r_cut <= 2.0 * r_min {
+                            let eps_eff = mie_well_excess_tau(delta_c / r_min, la, lr);
+                            if !eps_eff.is_finite() || eps_eff <= 0.0 || eps_eff >= 1.0 {
+                                return Err(Error::NotConverged(
+                                    "cannot resolve shifted potential well depth for cutoff radius",
+                                ));
+                            }
+                            // Solve g(d) = (u*(r_min - d) + 1) - eps_eff = 0 for the positive
+                            // offset d = r_min - sigma_eff in (0, r_min - 1), avoiding catastrophic
+                            // subtraction of rs - r_min for shallow wells.
+                            let d_max = r_min - 1.0;
+                            let mut lo = 0.0_f64;
+                            let mut hi = d_max;
+                            let mut d_s = delta_c.min(0.5 * d_max);
+                            let mut converged = false;
+                            for _ in 0..60 {
+                                let f = mie_well_excess_tau(-d_s / r_min, la, lr) - eps_eff;
+                                if f.abs() <= 1.0e-13 * eps_eff {
+                                    converged = true;
+                                    break;
+                                }
+                                if f < 0.0 {
+                                    lo = d_s;
+                                } else {
+                                    hi = d_s;
+                                }
+                                let df = mie_well_left_deriv(d_s, r_min, la, lr);
+                                let mut next = if df.is_finite() && df > 0.0 {
+                                    d_s - f / df
+                                } else {
+                                    0.5 * (lo + hi)
+                                };
+                                if !next.is_finite() || next <= lo || next >= hi {
+                                    next = 0.5 * (lo + hi);
+                                }
+                                let step = (next - d_s).abs();
+                                d_s = next;
+                                if step <= 1.0e-14 * d_s || (hi - lo) <= 1.0e-14 * d_s {
+                                    let f_chk = mie_well_excess_tau(-d_s / r_min, la, lr) - eps_eff;
+                                    converged =
+                                        f_chk.is_finite() && f_chk.abs() <= 1.0e-11 * eps_eff;
+                                    break;
+                                }
+                            }
+                            if !converged || !d_s.is_finite() || d_s <= 0.0 || d_s >= d_max {
+                                return Err(Error::NotConverged(
+                                    "cannot solve shifted potential zero for cutoff radius",
+                                ));
+                            }
+                            let sigma_eff = r_min - d_s;
+                            if eps_eff < 0.25 {
+                                // Integrate the strictly positive integrand
+                                // (1 - (u*(r_min + x) + 1) / eps_eff) * (r_min + x)^2 over
+                                // x in [-d_s, 0] and [0, delta_c] with 21-point Gauss-Kronrod.
+                                let quad_x = |x_lo: f64, x_hi: f64| -> f64 {
+                                    let mid = 0.5 * (x_lo + x_hi);
+                                    let half = 0.5 * (x_hi - x_lo);
+                                    let mut acc = 0.0;
+                                    for k in 0..21 {
+                                        let x = mid + half * X_NODES_21[k];
+                                        let r = r_min + x;
+                                        let excess = mie_well_excess_tau(x / r_min, la, lr);
+                                        let depth = (1.0 - excess / eps_eff).max(0.0);
+                                        acc += W_NODES_21[k] * depth * r * r;
+                                    }
+                                    half * acc
+                                };
+                                (quad_x(-d_s, 0.0) + quad_x(0.0, delta_c)) / sigma_eff.powi(3)
+                            } else {
+                                let u_cut = c * (r_cut.powf(-la) - r_cut.powf(-lr));
+                                let rc_a = r_cut.powf(3.0 - la);
+                                let rc_r = r_cut.powf(3.0 - lr);
+                                let sigma3 = sigma_eff.powi(3);
+                                let num = c / (sigma_eff.powf(la - 3.0) * (la - 3.0))
+                                    - c / (sigma_eff.powf(lr - 3.0) * (lr - 3.0))
+                                    + c * (lr / (3.0 * (lr - 3.0))) * rc_r
+                                    - c * (la / (3.0 * (la - 3.0))) * rc_a
+                                    + u_cut * sigma3 / 3.0;
+                                num / (eps_eff * sigma3)
+                            }
+                        } else {
+                            // Deep-well / large-cutoff path (r_cut > 2 * r_min): evaluate
+                            // u_cut = -u*(r_cut) directly, solve u*(1 + ds) + u_cut = 0 for
+                            // ds = sigma_eff - 1 >= 0, and evaluate the cutoff tail via
+                            // r_cut^(3 - lambda) without 1 - eps_eff cancellation or r_cut^3 overflow.
+                            let u_cut = c * (r_cut.powf(-la) - r_cut.powf(-lr));
+                            if !u_cut.is_finite() || u_cut < 0.0 || u_cut >= 1.0 {
+                                return Err(Error::NotConverged(
+                                    "cannot resolve shifted potential well depth for cutoff radius",
+                                ));
+                            }
+                            let eps_eff = 1.0 - u_cut;
+                            let init_slope = c * (lr - la);
+                            let d_max = r_min - 1.0;
+                            let delta_s = if u_cut <= 1.0e-30 * init_slope {
+                                0.0
+                            } else {
+                                let mut lo = 0.0_f64;
+                                let mut hi = d_max;
+                                let mut ds = (u_cut / init_slope).min(0.5 * d_max);
+                                if !ds.is_finite() || ds <= 0.0 {
+                                    ds = 0.5 * d_max;
+                                }
+                                let mut converged = false;
+                                for _ in 0..60 {
+                                    let f = mie_shifted_unit_value(ds, c, la, lr) + u_cut;
+                                    if f.abs() <= 1.0e-13 * u_cut {
+                                        converged = true;
+                                        break;
+                                    }
+                                    if f > 0.0 {
+                                        lo = ds;
+                                    } else {
+                                        hi = ds;
+                                    }
+                                    let df = mie_shifted_unit_slope(ds, c, la, lr);
+                                    let mut next = if df.is_finite() && df < 0.0 {
+                                        ds - f / df
+                                    } else {
+                                        0.5 * (lo + hi)
+                                    };
+                                    if !next.is_finite() || next <= lo || next >= hi {
+                                        next = 0.5 * (lo + hi);
+                                    }
+                                    let step = (next - ds).abs();
+                                    ds = next;
+                                    if step <= 1.0e-14 * ds || (hi - lo) <= 1.0e-14 * ds {
+                                        let f_chk = mie_shifted_unit_value(ds, c, la, lr) + u_cut;
+                                        converged =
+                                            f_chk.is_finite() && f_chk.abs() <= 1.0e-11 * u_cut;
+                                        break;
+                                    }
+                                }
+                                if !converged || !ds.is_finite() || ds < 0.0 || ds >= d_max {
+                                    return Err(Error::NotConverged(
+                                        "cannot solve shifted potential zero for cutoff radius",
+                                    ));
+                                }
+                                ds
+                            };
+                            let sigma_eff = 1.0 + delta_s;
+                            let rc_a = r_cut.powf(3.0 - la);
+                            let rc_r = r_cut.powf(3.0 - lr);
+                            let sigma3 = sigma_eff.powi(3);
+                            let num = c / (sigma_eff.powf(la - 3.0) * (la - 3.0))
+                                - c / (sigma_eff.powf(lr - 3.0) * (lr - 3.0))
+                                + c * (lr / (3.0 * (lr - 3.0))) * rc_r
+                                - c * (la / (3.0 * (la - 3.0))) * rc_a
+                                + u_cut * sigma3 / 3.0;
+                            num / (eps_eff * sigma3)
+                        }
+                    } else {
+                        c / (la - 3.0) - c / (lr - 3.0) + c * r_cut.powf(3.0 - lr) / (lr - 3.0)
+                            - c * r_cut.powf(3.0 - la) / (la - 3.0)
+                    };
+                    if !a.is_finite() || (shift && a <= 0.0) {
+                        return Err(Error::NotConverged(
+                            "non-finite or non-positive truncated van der Waals alpha parameter",
+                        ));
+                    }
+                    out[idx] = a;
+                    out[j * nc + i] = a;
+                }
+            }
+            return Ok(out);
+        }
+
+        if self.components.iter().all(|c| c.fh_order == 0) {
+            return Ok(self.alpha_ij.clone());
+        }
+
+        let dummy_x = vec![1.0 / nc as f64; nc];
+        let prep = PreparedSaftVrMie::new(self, temperature, dummy_x)?;
+        let mut out = vec![0.0; nc * nc];
+        for i in 0..nc {
+            for j in i..nc {
+                let idx = i * nc + j;
+                let la = self.lambda_a_ij[idx];
+                let lr = self.lambda_r_ij[idx];
+                let sigma = self.sigma_ij[idx];
+                let sigma_eff = prep.effective[idx].0[0];
+                let eps_eff = prep.effective[idx].1[0];
+                let order = self.components[i].fh_order as usize;
+                let dfh = self.d_feynhibbs_param_ij[idx] / (sigma * sigma * temperature);
+                let second_fac = self.options.quantum_variant.second_factor();
+                let qf = |lam: f64| {
+                    let q1 = lam * (lam - 1.0) * dfh;
+                    [1.0, q1, second_fac * (lam + 1.0) * (lam + 2.0) * dfh * q1]
+                };
+                let qa = qf(la);
+                let qr = qf(lr);
+                let ratio = sigma / sigma_eff;
+                let mut sum = 0.0;
+                for k in 0..=order {
+                    let a = la + 2.0 * k as f64;
+                    let r = lr + 2.0 * k as f64;
+                    sum += qa[k] * ratio.powf(a) / (a - 3.0) - qr[k] * ratio.powf(r) / (r - 3.0);
+                }
+                let val = sum * self.c_ij[idx] * self.eps_divk_ij[idx] / eps_eff;
+                if !val.is_finite() {
+                    return Err(Error::NotConverged(
+                        "non-finite quantum van der Waals alpha parameter",
+                    ));
+                }
+                out[idx] = val;
+                out[j * nc + i] = val;
+            }
+        }
+        Ok(out)
+    }
+
+    /// Pair interaction potential `u(r)/k_B [K]` and force `-du/dr / k_B [K/m]`
+    /// at separation `r [m]` and temperature `T [K]`, matching ThermoPack
+    /// `saft_interface::potential` (including Feynman-Hibbs, truncation/shift,
+    /// and the default reduced core cap of `500.0 * eps_ij / k_B`).
+    ///
+    /// Matching Fortran `saft_interface::potential`, the potential value is capped
+    /// at `500.0 * eps_divk_ij` (and `NaN` is replaced by that cap), while the
+    /// returned force `-du/dr / k_B` remains the uncapped analytical derivative
+    /// of the Mie/quantum-Mie potential (or `0.0` for `r > r_cut`). Use
+    /// [`SaftVrMie::pair_potential_with_cap`] with `None` for the raw uncapped
+    /// potential or `Some(cap)` for a custom reduced cap (`max_pot_val_in`).
+    pub fn pair_potential(
+        &self,
+        i: usize,
+        j: usize,
+        r: f64,
+        temperature: f64,
+    ) -> Result<(f64, f64)> {
+        self.pair_potential_with_cap(i, j, r, temperature, Some(DEFAULT_MAX_REDUCED_POTENTIAL))
+    }
+
+    /// Pair interaction potential `u(r)/k_B [K]` and uncapped analytical force
+    /// `-du/dr / k_B [K/m]` with an explicit reduced potential cap
+    /// `max_reduced_potential` (in multiples of `eps_ij / k_B`, matching
+    /// `saft_interface::potential`'s `max_pot_val_in`), or `None` for the raw
+    /// uncapped potential.
+    pub fn pair_potential_with_cap(
+        &self,
+        i: usize,
+        j: usize,
+        r: f64,
+        temperature: f64,
+        max_reduced_potential: Option<f64>,
+    ) -> Result<(f64, f64)> {
+        positive(r, "separation")?;
+        positive(temperature, "temperature")?;
+        if let Some(cap) = max_reduced_potential
+            && !cap.is_finite()
+        {
+            return Err(Error::InvalidInput("reduced potential cap must be finite"));
+        }
+        let nc = self.num_components();
+        if i >= nc || j >= nc {
+            return Err(Error::InvalidInput("component index out of bounds"));
+        }
+        let pair = self.potential(i, j);
+        let (mut u, force) = if let Some((rc, shift)) = self.cutoff {
+            let r_cut = rc * pair.sigma;
+            if r > r_cut {
+                (0.0, 0.0)
+            } else {
+                let pot = pair.evaluate(r, temperature);
+                let mut u = pot.u_divk;
+                if shift {
+                    u -= pair.evaluate(r_cut, temperature).u_divk;
+                }
+                (u, -pot.u_divk_r)
+            }
+        } else {
+            let pot = pair.evaluate(r, temperature);
+            (pot.u_divk, -pot.u_divk_r)
+        };
+        if let Some(max_pot_val) = max_reduced_potential {
+            let cap = max_pot_val * pair.eps_depth_divk;
+            if u.is_nan() || u > cap {
+                u = cap;
+            }
+        }
+        Ok((u, force))
+    }
+
+    /// Set the segment mass `[kg]` used for quantum corrections on component `index`.
+    pub fn set_mass(&mut self, index: usize, mass: f64) -> Result<()> {
+        if index >= self.num_components() {
+            return Err(Error::InvalidInput("component index out of bounds"));
+        }
+        if !mass.is_finite() || mass < 0.0 {
+            return Err(Error::InvalidInput("mass must be finite and non-negative"));
+        }
+        self.components[index].mass = mass;
+        self.recompute_cross_parameters();
+        Ok(())
+    }
+
+    /// Quantum de Boer parameter `Lambda = h / (sigma * sqrt(m * eps))` for component `index`.
+    pub fn de_boer_parameter(&self, index: usize) -> Result<f64> {
+        let comp = self
+            .components
+            .get(index)
+            .ok_or(Error::InvalidInput("component index out of bounds"))?;
+        if comp.mass <= 0.0 {
+            return Err(Error::InvalidInput(
+                "component has non-positive quantum mass",
+            ));
+        }
+        let eps = comp.eps_depth_divk * K_B;
+        Ok(H_PLANCK / (comp.sigma * (comp.mass * eps).sqrt()))
+    }
+
+    /// Adjust component `index` quantum mass to match the specified de Boer parameter `Lambda`.
+    pub fn set_de_boer_parameter(&mut self, index: usize, lambda: f64) -> Result<()> {
+        if index >= self.num_components() {
+            return Err(Error::InvalidInput("component index out of bounds"));
+        }
+        if !lambda.is_finite() || lambda < MACHINE_PREC {
+            return Err(Error::InvalidInput(
+                "de Boer parameter must be strictly positive",
+            ));
+        }
+        let comp = &self.components[index];
+        let eps = comp.eps_depth_divk * K_B;
+        let sigma = comp.sigma;
+        let mass = (H_PLANCK * H_PLANCK) / (sigma * sigma * lambda * lambda * eps);
+        self.components[index].mass = mass;
+        self.recompute_cross_parameters();
+        Ok(())
+    }
+
+    /// Thermal de Broglie wavelength `h / sqrt(2 pi m k_B T) [m]` for component `index`.
+    pub fn de_broglie_wavelength(&self, index: usize, temperature: f64) -> Result<f64> {
+        positive(temperature, "temperature")?;
+        let comp = self
+            .components
+            .get(index)
+            .ok_or(Error::InvalidInput("component index out of bounds"))?;
+        let mass = if comp.mass > 0.0 {
+            comp.mass
+        } else {
+            1.0e-3 * comp.molar_mass / N_A
+        };
+        Ok(H_PLANCK / (2.0 * PI * mass * K_B * temperature).sqrt())
+    }
+
+    /// Site ownership, association energies (J/mol) and bonding volumes (m^3).
+    pub fn association_parameters(&self) -> &AssociationParams {
+        &self.association
+    }
+
+    /// The Dufal association integral for a pair of associating components
+    /// and its derivatives with respect to T, total V and raw mole amounts.
+    pub fn association_rdf_tvn(
+        &self,
+        i: usize,
+        j: usize,
+        t: f64,
+        v: f64,
+        n: &[f64],
+    ) -> Result<crate::rdf::RdfDerivatives> {
+        use crate::association::AssociationRdfProvider;
+        for index in [i, j] {
+            if self
+                .association
+                .comp_vs_sites
+                .get(index)
+                .and_then(|s| *s)
+                .is_none()
+            {
+                return Err(Error::InvalidInput(
+                    "RDF requires an associating component pair",
+                ));
+            }
+        }
+        positive(v, "total volume")?;
+        let p = self.prepare(t, n)?;
+        let sum: f64 = n.iter().sum();
+        let v_unit = v / sum;
+        if !v_unit.is_finite() || v_unit <= 0.0 {
+            return Err(Error::InvalidInput(
+                "molar volume must be finite and strictly positive",
+            ));
+        }
+        let mut r = MieRdf::new(&p, 1.0 / v_unit).rdf_second(i, j)?.rdf;
+        r.volume /= sum;
+        r.temperature_volume /= sum;
+        r.volume_second = (r.volume_second / sum) / sum;
+        for val in r.moles.iter_mut().chain(&mut r.temperature_moles) {
+            *val /= sum;
+        }
+        for val in r.volume_moles.iter_mut().chain(&mut r.moles_second) {
+            *val = (*val / sum) / sum;
+        }
+        let all_finite = [
+            r.g,
+            r.temperature,
+            r.volume,
+            r.temperature_second,
+            r.temperature_volume,
+            r.volume_second,
+        ]
+        .iter()
+        .all(|q| q.is_finite())
+            && r.moles.iter().all(|q| q.is_finite())
+            && r.temperature_moles.iter().all(|q| q.is_finite())
+            && r.volume_moles.iter().all(|q| q.is_finite())
+            && r.moles_second.iter().all(|q| q.is_finite());
+        if !all_finite {
+            return Err(Error::InvalidInput(
+                "non-finite SAFT-VR Mie association RDF derivative",
+            ));
+        }
+        Ok(r)
+    }
+
     /// Number of components in the mixture.
     #[inline]
     pub fn num_components(&self) -> usize {
@@ -245,6 +1749,35 @@ impl SaftVrMie {
     /// Access component parameters.
     pub fn components(&self) -> &[SaftVrMieComponent] {
         &self.components
+    }
+
+    #[inline(always)]
+    fn potential(&self, i: usize, j: usize) -> PairPotential {
+        let k = i * self.num_components() + j;
+        PairPotential {
+            sigma: self.sigma_ij[k],
+            eps_depth_divk: self.eps_divk_ij[k],
+            lambda_a: self.lambda_a_ij[k],
+            lambda_r: self.lambda_r_ij[k],
+            c_fac: self.c_ij[k],
+            d_param: self.d_feynhibbs_param_ij[k],
+            fh_order: self.components[i].fh_order,
+            second_factor: self.options.quantum_variant.second_factor(),
+        }
+    }
+
+    /// Repulsive-exponent binary interaction in the Mie combining rule.
+    pub fn set_gammaij(&mut self, i: usize, j: usize, value: f64) {
+        let nc = self.num_components();
+        self.gamma_ij[i * nc + j] = value;
+        self.gamma_ij[j * nc + i] = value;
+        self.recompute_cross_parameters();
+    }
+
+    /// Get repulsive-exponent binary interaction parameter `gamma_ij`.
+    pub fn get_gammaij(&self, i: usize, j: usize) -> f64 {
+        let nc = self.num_components();
+        self.gamma_ij[i * nc + j]
     }
 
     /// Set binary interaction parameter kij.
@@ -291,6 +1824,10 @@ impl SaftVrMie {
                         * ((c_i.lambda_r - 3.0) * (c_j.lambda_r - 3.0)).sqrt();
                 self.lambda_a_ij[idx] = la_ij;
                 self.lambda_r_ij[idx] = lr_ij;
+                if self.association.has_sites() {
+                    self.integral_coefficients[idx] = saft_vrmie_data::ASSOCIATION_B
+                        .map(|row| row.into_iter().rev().fold(0.0, |acc, b| acc * lr_ij + b));
+                }
 
                 // Segment diameter
                 let sig_ij = 0.5 * (c_i.sigma + c_j.sigma) * (1.0 - self.lij[idx]);
@@ -303,7 +1840,11 @@ impl SaftVrMie {
                     * (si3 * sj3).sqrt()
                     * (c_i.eps_depth_divk * c_j.eps_depth_divk).sqrt()
                     / (sig_ij * sig_ij * sig_ij);
-                self.eps_divk_ij[idx] = eps_ij;
+                self.eps_divk_ij[idx] = if self.options.geometric_epsilon {
+                    (1. - self.kij[idx]) * (c_i.eps_depth_divk * c_j.eps_depth_divk).sqrt()
+                } else {
+                    eps_ij
+                };
 
                 // Mie prefactor C_ij
                 let exp_factor = la_ij / (lr_ij - la_ij);
@@ -350,9 +1891,17 @@ impl SaftVrMie {
         if temperature <= 0.0 || !temperature.is_finite() {
             return Err(Error::InvalidInput("temperature must be strictly positive"));
         }
+        if self.reference == HardSphereReference::SingleComponent && !self.exact_binary_dhs {
+            return Err(Error::InvalidInput(
+                "single component reference requires exact pair diameters",
+            ));
+        }
         let nc = self.num_components();
         if mole_fractions.len() != nc {
             return Err(Error::InvalidInput("mole fractions length mismatch"));
+        }
+        if mole_fractions.iter().any(|&n| n < 0.0) {
+            return Err(Error::InvalidInput("nonnegative mole amounts required"));
         }
         let sum_x: f64 = mole_fractions.iter().sum();
         if sum_x <= 0.0 || !sum_x.is_finite() {
@@ -362,7 +1911,7 @@ impl SaftVrMie {
         }
         let x: Vec<f64> = mole_fractions.iter().map(|&v| v / sum_x).collect();
 
-        PreparedSaftVrMie::new(self, temperature, &x)
+        PreparedSaftVrMie::new(self, temperature, x)
     }
 }
 
@@ -372,6 +1921,8 @@ pub struct PreparedSaftVrMie<'a> {
     model: &'a SaftVrMie,
     temperature: f64,
     mole_fractions: Vec<f64>,
+    exact_d: Vec<[f64; 3]>,
+    effective: Vec<([f64; 3], [f64; 3])>,
     d: Vec<f64>,    // nc * nc
     d_t: Vec<f64>,  // nc * nc
     d_tt: Vec<f64>, // nc * nc
@@ -380,46 +1931,112 @@ pub struct PreparedSaftVrMie<'a> {
     conv_eta: f64,  // eta = conv_eta * rho
     conv_zeta: f64, // zeta_bar = conv_zeta * rho
     xs: Vec<f64>,   // segment mole fractions xs_i = x_i * m_i / m_bar
+    assoc_reduced_factor: f64,
+    assoc_t_coeffs: Vec<Option<AssocTempCoeffs>>,
 }
 
 impl<'a> PreparedSaftVrMie<'a> {
-    fn new(model: &'a SaftVrMie, temperature: f64, x: &[f64]) -> Result<Self> {
+    fn new(model: &'a SaftVrMie, temperature: f64, x: Vec<f64>) -> Result<Self> {
         let nc = model.num_components();
         let mut d = vec![0.0; nc * nc];
         let mut d_t = vec![0.0; nc * nc];
         let mut d_tt = vec![0.0; nc * nc];
 
-        // 1. Solve pure Barker-Henderson hard-sphere diameters
+        let extra = model.options.extra_hard_sphere;
+        let need_exact_d = extra && nc > 1;
+        let mut exact_d = if need_exact_d {
+            vec![[0.; 3]; nc * nc]
+        } else {
+            Vec::new()
+        };
+        let mut effective = vec![([0.; 3], [0.; 3]); nc * nc];
         for i in 0..nc {
-            let idx = i * nc + i;
-            let comp = &model.components[i];
-            let c_fac = model.c_ij[idx];
-            let d_param = model.d_feynhibbs_param_ij[idx];
-            let (di, di_t, di_tt) = calc_hardsphere_diameter_pure(
-                temperature,
-                comp.sigma,
-                comp.eps_depth_divk,
-                comp.lambda_a,
-                comp.lambda_r,
-                c_fac,
-                d_param,
-                comp.fh_order,
-            )?;
-            d[idx] = di;
-            d_t[idx] = di_t;
-            d_tt[idx] = di_tt;
+            for j in i..nc {
+                let k = i * nc + j;
+                let eps = model.eps_divk_ij[k];
+                let la = model.lambda_a_ij[k];
+                let lr = model.lambda_r_ij[k];
+                let pair = model.potential(i, j);
+                let fh = pair.fh_order;
+                if fh != model.components[j].fh_order {
+                    return Err(Error::InvalidInput("inconsistent FH orders in mixture"));
+                }
+                if i != j && fh > 0 && !model.options.exact_cross_potential {
+                    continue;
+                }
+                let se = pair.effective_sigma(temperature);
+                let ee = if fh == 0 {
+                    [eps, 0., 0.]
+                } else {
+                    let potential = |r| pair.evaluate(r, temperature);
+                    let mut r = se.0 * (lr / la).powf(1. / (lr - la));
+                    for _ in 0..35 {
+                        let u = potential(r);
+                        let step = u.u_divk_r / u.u_divk_rr;
+                        r -= step;
+                        if step.abs() < 1e-14 * pair.sigma {
+                            break;
+                        }
+                    }
+                    let u = potential(r);
+                    [
+                        -u.u_divk,
+                        -u.u_divk_t,
+                        -u.u_divk_tt + u.u_divk_tr.powi(2) / u.u_divk_rr,
+                    ]
+                };
+                effective[k] = ([se.0, se.1, se.2], ee);
+                effective[j * nc + i] = effective[k];
+            }
         }
-
-        // 2. Mixture diameters
         for i in 0..nc {
-            for j in 0..nc {
-                if i != j {
-                    let idx = i * nc + j;
-                    let ii = i * nc + i;
+            for j in i..nc {
+                let k = i * nc + j;
+                if i != j
+                    && model.components[i].fh_order > 0
+                    && !model.options.exact_cross_potential
+                {
+                    for a in 0..3 {
+                        effective[k].0[a] =
+                            0.5 * (effective[i * nc + i].0[a] + effective[j * nc + j].0[a]);
+                        effective[k].1[a] =
+                            0.5 * (effective[i * nc + i].1[a] + effective[j * nc + j].1[a]);
+                    }
+                    effective[j * nc + i] = effective[k];
+                }
+                if i == j || model.exact_binary_dhs || need_exact_d {
+                    let [se, st, stt] = effective[k].0;
+                    let (v, vt, vtt) =
+                        model.potential(i, j).diameter(temperature, (se, st, stt))?;
+                    if need_exact_d {
+                        exact_d[k] = [v, vt, vtt];
+                        exact_d[j * nc + i] = exact_d[k];
+                    }
+                    if i == j || model.exact_binary_dhs {
+                        d[k] = v;
+                        d_t[k] = vt;
+                        d_tt[k] = vtt;
+                        let sym = j * nc + i;
+                        d[sym] = v;
+                        d_t[sym] = vt;
+                        d_tt[sym] = vtt;
+                    }
+                }
+            }
+        }
+        if !model.exact_binary_dhs {
+            for i in 0..nc {
+                let ii = i * nc + i;
+                for j in i + 1..nc {
                     let jj = j * nc + j;
-                    d[idx] = 0.5 * (d[ii] + d[jj]);
-                    d_t[idx] = 0.5 * (d_t[ii] + d_t[jj]);
-                    d_tt[idx] = 0.5 * (d_tt[ii] + d_tt[jj]);
+                    let k = i * nc + j;
+                    let sym = j * nc + i;
+                    d[k] = 0.5 * (d[ii] + d[jj]);
+                    d_t[k] = 0.5 * (d_t[ii] + d_t[jj]);
+                    d_tt[k] = 0.5 * (d_tt[ii] + d_tt[jj]);
+                    d[sym] = d[k];
+                    d_t[sym] = d_t[k];
+                    d_tt[sym] = d_tt[k];
                 }
             }
         }
@@ -445,27 +2062,76 @@ impl<'a> PreparedSaftVrMie<'a> {
             for j in 0..nc {
                 let idx = i * nc + j;
                 let dij = d[idx];
-                let sij = model.sigma_ij[idx];
-                sum_d3 += xs[i] * xs[j] * (dij * dij * dij);
-                sum_sig3 += xs[i] * xs[j] * (sij * sij * sij);
+                let sij = effective[idx].0[0];
+                match model.options.packing {
+                    PackingRule::Lafitte => {
+                        sum_d3 += xs[i] * xs[j] * (dij * dij * dij);
+                        sum_sig3 += xs[i] * xs[j] * (sij * sij * sij);
+                    }
+                    PackingRule::Linear if i == j => {
+                        sum_d3 += xs[i] * (dij * dij * dij);
+                        sum_sig3 += xs[i] * (sij * sij * sij);
+                    }
+                    PackingRule::Leonard => {
+                        sum_d3 += xs[i] * xs[j] * dij;
+                        sum_sig3 += xs[i] * xs[j] * sij;
+                    }
+                    _ => {}
+                }
             }
         }
 
+        if model.options.packing == PackingRule::Leonard {
+            sum_d3 = sum_d3 * sum_d3 * sum_d3;
+            sum_sig3 = sum_sig3 * sum_sig3 * sum_sig3;
+        }
         let conv_eta = (PI * N_A / 6.0) * m_bar * sum_d3;
         let conv_zeta = (PI * N_A / 6.0) * m_bar * sum_sig3;
+
+        let (assoc_reduced_factor, assoc_t_coeffs) = if model.association.has_sites() {
+            let mut sum_assoc_sig3 = 0.0;
+            for i in 0..nc {
+                for j in 0..nc {
+                    let s = model.sigma_ij[i * nc + j];
+                    sum_assoc_sig3 += xs[i] * xs[j] * (s * s * s);
+                }
+            }
+            let mut t_coeffs = vec![None; nc * nc];
+            for i in 0..nc {
+                if model.association.comp_vs_sites[i].is_none() {
+                    continue;
+                }
+                for j in i..nc {
+                    if model.association.comp_vs_sites[j].is_none() {
+                        continue;
+                    }
+                    let idx = i * nc + j;
+                    let c = AssocTempCoeffs::compute(model, idx, temperature);
+                    t_coeffs[idx] = Some(c);
+                    t_coeffs[j * nc + i] = Some(c);
+                }
+            }
+            (sum_assoc_sig3 * N_A * m_bar, t_coeffs)
+        } else {
+            (0.0, Vec::new())
+        };
 
         Ok(Self {
             model,
             temperature,
-            mole_fractions: x.to_vec(),
+            mole_fractions: x,
             d,
             d_t,
             d_tt,
+            exact_d,
+            effective,
             m_bar,
             molar_mass_mix,
             conv_eta,
             conv_zeta,
             xs,
+            assoc_reduced_factor,
+            assoc_t_coeffs,
         })
     }
 
@@ -498,228 +2164,81 @@ impl<'a> PreparedSaftVrMie<'a> {
 
     /// Helmholtz free energy terms at density rho [mol/m^3].
     pub fn helmholtz_terms(&self, rho: f64) -> Result<SaftVrMieHelmholtzTerms> {
-        let eta = self.packing_fraction(rho);
-        if eta >= 1.0 || eta < 0.0 {
-            return Err(Error::InvalidInput(
-                "density exceeds maximum packing fraction",
+        if rho == 0.0 {
+            return Ok(SaftVrMieHelmholtzTerms {
+                a_hs: 0.,
+                a1: 0.,
+                a2: 0.,
+                a3: 0.,
+                a_chain: 0.,
+                a_res: 0.,
+            });
+        }
+        let terms = self.eval_scalar(rho)?;
+        let t = self.temperature;
+        let a_assoc = if self.model.association.has_sites() && rho > 0.0 {
+            assoc_helmholtz_value(
+                &self.model.association,
+                &MieRdf::new(self, rho),
+                t,
+                1.0 / rho,
+                &self.mole_fractions,
+            )?
+            .0
+        } else {
+            0.0
+        };
+        Ok(SaftVrMieHelmholtzTerms {
+            a_hs: terms.hs,
+            a1: terms.a1,
+            a2: terms.a2,
+            a3: terms.a3,
+            a_chain: terms.chain,
+            a_res: terms.total + a_assoc,
+        })
+    }
+
+    /// Evaluate `P = R*T*(rho - f_v)` and `Z = 1 - f_v/rho` in 106-bit double-double
+    /// precision when catastrophic cancellation occurs (`|rho - f_v| < 1e-5 * (rho + |f_v|)`),
+    /// eliminating multi-term `f64` rounding jitter and CRT `pow`/`exp` divergence on
+    /// ultra-low-pressure dense liquids without adding overhead on ordinary states.
+    #[inline(never)]
+    fn eval_high_precision_pressure_and_z(
+        &self,
+        rho: f64,
+        x_k_hint: Option<&[f64]>,
+    ) -> Result<(f64, f64)> {
+        let mut f_v_dd = self.eval_first_v_dd(rho)?;
+        if self.model.association.has_sites() {
+            let owned_hint;
+            let hint = match x_k_hint {
+                Some(h) if !h.is_empty() => h,
+                _ => {
+                    owned_hint = solve_for_x_k(
+                        &self.model.association,
+                        &MieRdf::new(self, rho),
+                        self.temperature,
+                        1.0 / rho,
+                        &self.mole_fractions,
+                        None,
+                    )?;
+                    owned_hint.as_slice()
+                }
+            };
+            let f_v_assoc = assoc_f_v_dd(self, rho, hint)?;
+            f_v_dd = f_v_dd.add(f_v_assoc);
+        }
+        let rho_dd = Dd::from_f64(rho);
+        let diff_dd = rho_dd.sub(f_v_dd);
+        let rt_dd = Dd::two_prod(RGAS, self.temperature);
+        let p = rt_dd.mul(diff_dd).0;
+        let z = diff_dd.div(rho_dd).0;
+        if !p.is_finite() || !z.is_finite() {
+            return Err(Error::NotConverged(
+                "non-finite high-precision SAFT-VR Mie pressure or compressibility",
             ));
         }
-        let zeta_bar = self.dispersion_packing_fraction(rho);
-        let nc = self.model.num_components();
-        let t = self.temperature;
-        let beta = 1.0 / t;
-
-        // 1. Hard-sphere term (BMCSL for mixture, Carnahan-Starling for pure fluid)
-        let a_hs = if nc == 1 {
-            let om = 1.0 - eta;
-            (4.0 * eta - 3.0 * eta * eta) / (om * om)
-        } else {
-            let mut z0 = 0.0;
-            let mut z1 = 0.0;
-            let mut z2 = 0.0;
-            let mut z3 = 0.0;
-            for i in 0..nc {
-                let di = self.d[i * nc + i];
-                let factor =
-                    (PI * N_A / 6.0) * rho * self.model.components[i].m * self.mole_fractions[i];
-                let di2 = di * di;
-                z0 += factor;
-                z1 += factor * di;
-                z2 += factor * di2;
-                z3 += factor * (di2 * di);
-            }
-            let em3 = 1.0 - z3;
-            let pref = 1.0 / z0;
-            let z2_3 = z2 * z2 * z2;
-            pref * (3.0 * z1 * z2 / em3
-                + z2_3 / (z3 * em3 * em3)
-                + (z2_3 / (z3 * z3) - z0) * em3.ln())
-        };
-
-        // 2. Dispersion A1, A2, A3
-        let mut a1_mix = 0.0;
-        let mut a2_mix = 0.0;
-        let mut a3_mix = 0.0;
-
-        // Carnahan-Starling isothermal compressibility Khs
-        let eta2 = eta * eta;
-        let eta3 = eta2 * eta;
-        let eta4 = eta2 * eta2;
-        let om_eta = 1.0 - eta;
-        let om_eta2 = om_eta * om_eta;
-        let denum_khs = 1.0 + 4.0 * eta + 4.0 * eta2 - 4.0 * eta3 + eta4;
-        let khs = (om_eta2 * om_eta2) / denum_khs;
-
-        for i in 0..nc {
-            for j in 0..nc {
-                let idx = i * nc + j;
-                let la = self.model.lambda_a_ij[idx];
-                let lr = self.model.lambda_r_ij[idx];
-                let eps = self.model.eps_divk_ij[idx];
-                let c_fac = self.model.c_ij[idx];
-                let x0 = self.model.sigma_ij[idx] / self.d[idx];
-                let f_alpha = &self.model.f_alpha_ij[idx];
-
-                // a1_ij
-                let asr = calc_a1_sutherland(eta, lr, eps);
-                let asa = calc_a1_sutherland(eta, la, eps);
-                let (br, ba) = if x0 > 1.0 {
-                    (
-                        calc_b_tilde(x0, eta, lr, eps),
-                        calc_b_tilde(x0, eta, la, eps),
-                    )
-                } else {
-                    (0.0, 0.0)
-                };
-                let a1_tilde = c_fac * (x0.powf(la) * (asa + ba) - x0.powf(lr) * (asr + br));
-                let dij = self.d[idx];
-                let eta_ij = (PI * N_A / 6.0) * self.m_bar * rho * (dij * dij * dij);
-                let a1_ij = eta_ij * a1_tilde;
-
-                // a2_ij
-                let lam_2r = 2.0 * lr;
-                let lam_2a = 2.0 * la;
-                let lam_ar = la + lr;
-                let as_2r = calc_a1_sutherland(eta, lam_2r, eps);
-                let as_2a = calc_a1_sutherland(eta, lam_2a, eps);
-                let as_ar = calc_a1_sutherland(eta, lam_ar, eps);
-                let (b_2r, b_2a, b_ar) = if x0 > 1.0 {
-                    (
-                        calc_b_tilde(x0, eta, lam_2r, eps),
-                        calc_b_tilde(x0, eta, lam_2a, eps),
-                        calc_b_tilde(x0, eta, lam_ar, eps),
-                    )
-                } else {
-                    (0.0, 0.0, 0.0)
-                };
-                let a22_tilde = x0.powf(lam_2a) * (as_2a + b_2a)
-                    - 2.0 * x0.powf(lam_ar) * (as_ar + b_ar)
-                    + x0.powf(lam_2r) * (as_2r + b_2r);
-                let zb2 = zeta_bar * zeta_bar;
-                let chi = zeta_bar
-                    * (f_alpha[0]
-                        + f_alpha[1] * (zb2 * zb2)
-                        + f_alpha[2] * crate::numerics::ipow(zeta_bar, 7));
-                let a2_ij = 0.5 * eps * (c_fac * c_fac) * khs * (1.0 + chi) * eta_ij * a22_tilde;
-
-                // a3_ij
-                let a3_ij = -(eps * eps * eps)
-                    * f_alpha[3]
-                    * zeta_bar
-                    * (f_alpha[4] * zeta_bar + f_alpha[5] * zb2).exp();
-
-                let weight = self.xs[i] * self.xs[j];
-                a1_mix += weight * a1_ij;
-                a2_mix += weight * a2_ij;
-                a3_mix += weight * a3_ij;
-            }
-        }
-
-        // 3. Chain term
-        let mut a_chain = 0.0;
-        for i in 0..nc {
-            let mi = self.model.components[i].m;
-            if (mi - 1.0).abs() > 1e-12 {
-                let idx = i * nc + i;
-                let la = self.model.lambda_a_ij[idx];
-                let lr = self.model.lambda_r_ij[idx];
-                let eps = self.model.eps_divk_ij[idx];
-                let c_fac = self.model.c_ij[idx];
-                let x0 = self.model.sigma_ij[idx] / self.d[idx];
-                let alpha = self.model.alpha_ij[idx];
-
-                // gd
-                let one_m_eta = 1.0 - eta;
-                let d2 = one_m_eta * one_m_eta;
-                let d3 = d2 * one_m_eta;
-                let k0 = -one_m_eta.ln()
-                    + (42.0 * eta - 39.0 * eta2 + 9.0 * eta3 - 2.0 * eta4) / (6.0 * d3);
-                let k1 = (eta4 + 6.0 * eta2 - 12.0 * eta) / (2.0 * d3);
-                let k2 = (-3.0 * eta2) / (8.0 * d2);
-                let k3 = (-eta4 + 3.0 * eta2 + 3.0 * eta) / (6.0 * d3);
-                let x0_2 = x0 * x0;
-                let exparg = k0 + k1 * x0 + k2 * x0_2 + k3 * (x0_2 * x0);
-                let gd = exparg.exp();
-
-                // g1
-                let (asr, asr_e) = calc_a1_sutherland_with_deriv(eta, lr, eps);
-                let (asa, asa_e) = calc_a1_sutherland_with_deriv(eta, la, eps);
-                let (br, br_e, ba, ba_e) = if x0 > 1.0 {
-                    let (br, br_e) = calc_b_tilde_with_deriv(x0, eta, lr, eps);
-                    let (ba, ba_e) = calc_b_tilde_with_deriv(x0, eta, la, eps);
-                    (br, br_e, ba, ba_e)
-                } else {
-                    (0.0, 0.0, 0.0, 0.0)
-                };
-                let a1_tilde = c_fac * (x0.powf(la) * (asa + ba) - x0.powf(lr) * (asr + br));
-                let a1_tilde_e =
-                    c_fac * (x0.powf(la) * (asa_e + ba_e) - x0.powf(lr) * (asr_e + br_e));
-                let g11 = (1.0 / (4.0 * eps)) * (a1_tilde + eta * a1_tilde_e);
-                let g12 = (c_fac / (12.0 * eps))
-                    * (-la * x0.powf(la) * (asa + ba) + lr * x0.powf(lr) * (asr + br));
-                let g1 = g11 + g12;
-
-                // g2
-                let lam_2r = 2.0 * lr;
-                let lam_2a = 2.0 * la;
-                let lam_ar = la + lr;
-                let (as_2r, as_2r_e) = calc_a1_sutherland_with_deriv(eta, lam_2r, eps);
-                let (as_2a, as_2a_e) = calc_a1_sutherland_with_deriv(eta, lam_2a, eps);
-                let (as_ar, as_ar_e) = calc_a1_sutherland_with_deriv(eta, lam_ar, eps);
-                let (b_2r, b_2r_e, b_2a, b_2a_e, b_ar, b_ar_e) = if x0 > 1.0 {
-                    let (b_2r, b_2r_e) = calc_b_tilde_with_deriv(x0, eta, lam_2r, eps);
-                    let (b_2a, b_2a_e) = calc_b_tilde_with_deriv(x0, eta, lam_2a, eps);
-                    let (b_ar, b_ar_e) = calc_b_tilde_with_deriv(x0, eta, lam_ar, eps);
-                    (b_2r, b_2r_e, b_2a, b_2a_e, b_ar, b_ar_e)
-                } else {
-                    (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-                };
-                let a22_tilde = x0.powf(lam_2a) * (as_2a + b_2a)
-                    - 2.0 * x0.powf(lam_ar) * (as_ar + b_ar)
-                    + x0.powf(lam_2r) * (as_2r + b_2r);
-                let a22_tilde_e = x0.powf(lam_2a) * (as_2a_e + b_2a_e)
-                    - 2.0 * x0.powf(lam_ar) * (as_ar_e + b_ar_e)
-                    + x0.powf(lam_2r) * (as_2r_e + b_2r_e);
-                let num_khs = d2 * d2;
-                let num_khs_d = -4.0 * d3;
-                let den_khs_d = 4.0 + 8.0 * eta - 12.0 * eta2 + 4.0 * eta3;
-                let khs_e = (num_khs_d * denum_khs - num_khs * den_khs_d) / (denum_khs * denum_khs);
-                let c_fac2 = c_fac * c_fac;
-                let g21 = (c_fac2 / (8.0 * eps))
-                    * (khs * (a22_tilde + eta * a22_tilde_e) + eta * khs_e * a22_tilde);
-                let g22 = khs
-                    * (c_fac2 / (12.0 * eps))
-                    * (-la * x0.powf(lam_2a) * (as_2a + b_2a)
-                        + lam_ar * x0.powf(lam_ar) * (as_ar + b_ar)
-                        - lr * x0.powf(lam_2r) * (as_2r + b_2r));
-
-                let theta = (eps / t).exp() - 1.0;
-                let gam_c = theta
-                    * 10.0
-                    * (1.0 - (10.0 * (0.57 - alpha)).tanh())
-                    * zeta_bar
-                    * (-6.7 * zeta_bar - 8.0 * (zeta_bar * zeta_bar)).exp();
-                let g2 = (1.0 + gam_c) * (g21 + g22);
-
-                let beta_eps = eps / t;
-                let w = (beta_eps * g1 + (beta_eps * beta_eps) * g2) / gd;
-                let g_contact = gd * w.exp();
-
-                a_chain -= self.mole_fractions[i] * (mi - 1.0) * g_contact.ln();
-            }
-        }
-
-        let am = a_hs + beta * a1_mix + beta * beta * a2_mix + (beta * beta * beta) * a3_mix;
-        let a_res = self.m_bar * am + a_chain;
-
-        Ok(SaftVrMieHelmholtzTerms {
-            a_hs,
-            a1: a1_mix,
-            a2: a2_mix,
-            a3: a3_mix,
-            a_chain,
-            a_res,
-        })
+        Ok((p, z))
     }
 
     /// Pressure and derivatives at density rho [mol/m^3].
@@ -727,39 +2246,39 @@ impl<'a> PreparedSaftVrMie<'a> {
         let v = 1.0 / rho;
         let t = self.temperature;
 
-        // Central difference step for volume derivative
-        let hv = 1e-5 * v;
-        let rho_p = 1.0 / (v + hv);
-        let rho_m = 1.0 / (v - hv);
-
-        let terms = self.helmholtz_terms(rho)?;
-        let terms_p = self.helmholtz_terms(rho_p)?;
-        let terms_m = self.helmholtz_terms(rho_m)?;
-
-        let f_v = (terms_p.a_res - terms_m.a_res) / (2.0 * hv);
-        let f_vv = (terms_p.a_res - 2.0 * terms.a_res + terms_m.a_res) / (hv * hv);
-
-        // Pressure P = rho * R * T - R * T * F_V
-        let p = rho * RGAS * t - RGAS * t * f_v;
-        let z = p / (rho * RGAS * t);
-
-        // dP/dV = - rho^2 * R * T - R * T * F_VV
-        let dp_dv = -rho * rho * RGAS * t - RGAS * t * f_vv;
+        let vv = self.eval_second(rho, 1, 1, EvalMode::Total)?.total;
+        let tv = self.eval_second(rho, 0, 1, EvalMode::Total)?.total;
+        let mut f = vv.f0;
+        let mut f_v = vv.f1;
+        let mut f_vv = vv.f12;
+        let mut f_tv = tv.f12;
+        let mut assoc_x_k = Vec::new();
+        if self.model.association.has_sites() {
+            let a = assoc_helmholtz_pressure_jet(
+                &self.model.association,
+                &MieRdf::new(self, rho),
+                t,
+                v,
+                &self.mole_fractions,
+            )?;
+            f += a.f;
+            f_v += a.f_v;
+            f_vv += a.f_vv;
+            f_tv += a.f_tv;
+            assoc_x_k = a.x_k;
+        }
+        let (p, z) = if (rho - f_v).abs() < 1.0e-5 * (rho + f_v.abs()) {
+            let hint = if assoc_x_k.is_empty() {
+                None
+            } else {
+                Some(assoc_x_k.as_slice())
+            };
+            self.eval_high_precision_pressure_and_z(rho, hint)?
+        } else {
+            (RGAS * t * (rho - f_v), 1. - f_v / rho)
+        };
+        let dp_dv = -RGAS * t * (rho * rho + f_vv);
         let dp_drho = -dp_dv / (rho * rho);
-
-        // Temperature derivative dP/dT via analytical step on Prepared state
-        let ht = 1e-4 * t;
-        let prep_tp = PreparedSaftVrMie::new(self.model, t + ht, &self.mole_fractions)?;
-        let prep_tm = PreparedSaftVrMie::new(self.model, t - ht, &self.mole_fractions)?;
-
-        let terms_tp_p = prep_tp.helmholtz_terms(rho_p)?;
-        let terms_tp_m = prep_tp.helmholtz_terms(rho_m)?;
-        let terms_tm_p = prep_tm.helmholtz_terms(rho_p)?;
-        let terms_tm_m = prep_tm.helmholtz_terms(rho_m)?;
-
-        let f_v_tp = (terms_tp_p.a_res - terms_tp_m.a_res) / (2.0 * hv);
-        let f_v_tm = (terms_tm_p.a_res - terms_tm_m.a_res) / (2.0 * hv);
-        let f_tv = (f_v_tp - f_v_tm) / (2.0 * ht);
 
         // dP/dT = rho * R - R * F_V - R * T * F_TV
         let dp_dt = rho * RGAS - RGAS * f_v - RGAS * t * f_tv;
@@ -767,7 +2286,7 @@ impl<'a> PreparedSaftVrMie<'a> {
         Ok(SaftVrMiePressureJet {
             pressure: p,
             compressibility: z,
-            residual_helmholtz: terms.a_res,
+            residual_helmholtz: f,
             dp_drho,
             dp_dv,
             dp_dt,
@@ -776,74 +2295,135 @@ impl<'a> PreparedSaftVrMie<'a> {
 
     /// Complete thermodynamic state properties at density rho [mol/m^3].
     pub fn state(&self, rho: f64) -> Result<SaftVrMieState> {
-        let jet = self.pressure_and_derivatives(rho)?;
         let t = self.temperature;
-        let ht = 1e-4 * t;
+        let v = 1.0 / rho;
+        let nc = self.model.components.len();
 
-        // Temperature derivative F_T and second derivative F_TT
-        let terms = self.helmholtz_terms(rho)?;
-        let prep_tp = PreparedSaftVrMie::new(self.model, t + ht, &self.mole_fractions)?;
-        let prep_tm = PreparedSaftVrMie::new(self.model, t - ht, &self.mole_fractions)?;
-        let terms_tp = prep_tp.helmholtz_terms(rho)?;
-        let terms_tm = prep_tm.helmholtz_terms(rho)?;
+        let vv = self.eval_second(rho, 1, 1, EvalMode::Total)?.total;
+        let tv = self.eval_second(rho, 0, 1, EvalMode::Total)?.total;
+        let tt = self.eval_second(rho, 0, 0, EvalMode::Total)?.total;
+        let mut f = vv.f0;
+        let mut f_v = vv.f1;
+        let mut f_vv = vv.f12;
+        let mut f_tv = tv.f12;
+        let mut f_t = tt.f1;
+        let mut f_tt = tt.f12;
 
-        let f_t = (terms_tp.a_res - terms_tm.a_res) / (2.0 * ht);
-        let f_tt = (terms_tp.a_res - 2.0 * terms.a_res + terms_tm.a_res) / (ht * ht);
+        let mut assoc_fn: Option<Vec<f64>> = None;
+        let mut assoc_x_k = Vec::new();
+        if self.model.association.has_sites() {
+            let rdf = MieRdf::new(self, rho);
+            if nc == 1 {
+                let a = assoc_helmholtz_pressure_jet(
+                    &self.model.association,
+                    &rdf,
+                    t,
+                    v,
+                    &self.mole_fractions,
+                )?;
+                f += a.f;
+                f_t += a.f_t;
+                f_v += a.f_v;
+                f_tt += a.f_tt;
+                f_tv += a.f_tv;
+                f_vv += a.f_vv;
+                assoc_x_k = a.x_k;
+            } else {
+                let a =
+                    assoc_helmholtz_all(&self.model.association, &rdf, t, v, &self.mole_fractions)?;
+                f += a.f;
+                f_t += a.f_t;
+                f_v += a.f_v;
+                f_tt += a.f_tt;
+                f_tv += a.f_tv;
+                f_vv += a.f_vv;
+                assoc_fn = Some(a.f_n);
+                assoc_x_k = a.x_k;
+            }
+        }
+
+        let (p, z) = if (rho - f_v).abs() < 1.0e-5 * (rho + f_v.abs()) {
+            let hint = if assoc_x_k.is_empty() {
+                None
+            } else {
+                Some(assoc_x_k.as_slice())
+            };
+            self.eval_high_precision_pressure_and_z(rho, hint)?
+        } else {
+            (RGAS * t * (rho - f_v), 1.0 - f_v / rho)
+        };
+        let dp_dv = -RGAS * t * (rho * rho + f_vv);
+        let dp_drho = -dp_dv / (rho * rho);
+        let dp_dt = rho * RGAS - RGAS * f_v - RGAS * t * f_tv;
 
         let u_res = -RGAS * t * t * f_t;
-        let h_res = u_res + RGAS * t * (jet.compressibility - 1.0);
-        let s_res = -RGAS * (t * f_t + terms.a_res) + RGAS * (jet.compressibility).ln();
-        let a_res_energy = RGAS * t * terms.a_res;
+        let h_res = u_res + RGAS * t * (z - 1.0);
+        let s_res_tv = -RGAS * (t * f_t + f);
+        let s_res = s_res_tv + RGAS * z.ln();
+        let a_res_energy = RGAS * t * f;
         let g_res = h_res - t * s_res;
 
         let cv_res = -RGAS * (2.0 * t * f_t + t * t * f_tt);
 
-        // Ideal gas contribution
+        // Ideal gas contribution evaluated at TV ideal pressure rho * R * T
         let mut cp_id = 0.0;
         let mut h_id = 0.0;
-        let mut s_id = 0.0;
+        let mut s_id_tv = 0.0;
         let p_ref = 100_000.0;
-        for i in 0..self.model.components.len() {
+        for i in 0..nc {
             let id_props = self.model.ideal[i].properties(t, p_ref)?;
             let xi = self.mole_fractions[i];
             cp_id += xi * id_props.cp;
             h_id += xi * id_props.enthalpy;
-            let mix_term = if xi > 1e-15 { xi * xi.ln() } else { 0.0 };
-            s_id += xi * id_props.entropy - RGAS * mix_term;
+            let mix_term = if xi > 0.0 { xi * xi.ln() } else { 0.0 };
+            s_id_tv += xi * id_props.entropy - RGAS * mix_term;
         }
-        s_id -= RGAS * (rho * RGAS * t / p_ref).ln();
+        s_id_tv -= RGAS * (rho * RGAS * t / p_ref).ln();
 
         let cv_total = cp_id - RGAS + cv_res;
-        let cp_total = cv_total - t * (jet.dp_dt * jet.dp_dt) / jet.dp_dv;
+        let cp_total = cv_total - t * (dp_dt * dp_dt) / dp_dv;
 
         let gamma = cp_total / cv_total;
         let mw_kg = self.molar_mass_mix * 1e-3;
-        let sound_speed = if jet.dp_drho > 0.0 && gamma > 0.0 && mw_kg > 0.0 {
-            (gamma * jet.dp_drho / mw_kg).sqrt()
+        let sound_speed = if dp_drho > 0.0 && gamma > 0.0 && mw_kg > 0.0 {
+            (gamma * dp_drho / mw_kg).sqrt()
         } else {
             0.0
         };
 
         // Fugacity coefficients
-        let ln_phi = self.fugacity_coefficients(rho, jet.compressibility)?;
+        let ln_z = z.ln();
+        let ln_phi = if nc == 1 {
+            vec![f + (z - 1.0) - ln_z]
+        } else {
+            let mut vals = (0..nc)
+                .map(|i| Ok(self.eval_first(rho, 2 + i)?.total.f1 - ln_z))
+                .collect::<Result<Vec<_>>>()?;
+            if let Some(afn) = assoc_fn {
+                for (value, assoc) in vals.iter_mut().zip(afn) {
+                    *value += assoc;
+                }
+            }
+            vals
+        };
 
         Ok(SaftVrMieState {
-            pressure: jet.pressure,
-            compressibility: jet.compressibility,
-            residual_helmholtz: terms.a_res,
+            pressure: p,
+            compressibility: z,
+            residual_helmholtz: f,
             u_residual: u_res,
             h_residual: h_res,
             s_residual: s_res,
             a_residual: a_res_energy,
             g_residual: g_res,
             h_total: h_id + h_res,
-            s_total: s_id + s_res,
+            s_total: s_id_tv + s_res_tv,
             cv_residual: cv_res,
             cv_total,
             cp_total,
-            dp_drho: jet.dp_drho,
-            dp_dv: jet.dp_dv,
-            dp_dt: jet.dp_dt,
+            dp_drho,
+            dp_dv,
+            dp_dt,
             sound_speed,
             ln_phi,
         })
@@ -858,40 +2438,36 @@ impl<'a> PreparedSaftVrMie<'a> {
             return Ok(vec![ln_phi]);
         }
 
-        // Numerical composition derivatives of extensive Helmholtz free energy F = n_total * A^res / (RT)
-        let mut ln_phi = Vec::with_capacity(nc);
-        let dn = 1e-6;
-        let v = 1.0 / rho;
-
-        for i in 0..nc {
-            let mut n_p = self.mole_fractions.clone();
-            let mut n_m = self.mole_fractions.clone();
-            n_p[i] += dn;
-            n_m[i] -= dn;
-
-            let sumn_p: f64 = n_p.iter().sum();
-            let sumn_m: f64 = n_m.iter().sum();
-
-            let x_p: Vec<f64> = n_p.iter().map(|&n| n / sumn_p).collect();
-            let x_m: Vec<f64> = n_m.iter().map(|&n| n / sumn_m).collect();
-
-            let prep_p = PreparedSaftVrMie::new(self.model, self.temperature, &x_p)?;
-            let prep_m = PreparedSaftVrMie::new(self.model, self.temperature, &x_m)?;
-
-            let rho_p = sumn_p / v;
-            let rho_m = sumn_m / v;
-
-            let terms_p = prep_p.helmholtz_terms(rho_p)?;
-            let terms_m = prep_m.helmholtz_terms(rho_m)?;
-
-            let f_tot_p = sumn_p * terms_p.a_res;
-            let f_tot_m = sumn_m * terms_m.a_res;
-
-            let d_f_dn = (f_tot_p - f_tot_m) / (2.0 * dn);
-            ln_phi.push(d_f_dn - z.ln());
+        let ln_z = z.ln();
+        let mut ln_phi = (0..nc)
+            .map(|i| Ok(self.eval_first(rho, 2 + i)?.total.f1 - ln_z))
+            .collect::<Result<Vec<_>>>()?;
+        if self.model.association.has_sites() {
+            let a = assoc_helmholtz_first(
+                &self.model.association,
+                &MieRdf::new(self, rho),
+                self.temperature,
+                1. / rho,
+                &self.mole_fractions,
+            )?;
+            for (value, assoc) in ln_phi.iter_mut().zip(a.f_n) {
+                *value += assoc;
+            }
         }
-
         Ok(ln_phi)
+    }
+
+    /// Dimensionless Gibbs energy difference `(G(vl) - G(vv)) / (R*T)` at a
+    /// common imposed pressure `pressure`:
+    /// `(F(T, vl) - F(T, vv)) + P*(vl - vv)/(R*T) - ln(vl / vv)`.
+    ///
+    /// Because each root satisfies `d[F + P*v/(R*T) - ln v]/dv = 0` at `P(v) = P`,
+    /// small pressure residuals on stiff dense liquid roots enter only at second
+    /// order rather than leaking first-order into `ln(Z)`.
+    fn imposed_pressure_gibbs_diff(&self, pressure: f64, vl: f64, vv: f64) -> Result<f64> {
+        let fl = self.helmholtz_terms(1.0 / vl)?.a_res;
+        let fv = self.helmholtz_terms(1.0 / vv)?.a_res;
+        Ok((fl - fv) + pressure * (vl - vv) / (RGAS * self.temperature) - (vl / vv).ln())
     }
 
     /// Single-phase volume root for a specified pressure and phase.
@@ -902,40 +2478,194 @@ impl<'a> PreparedSaftVrMie<'a> {
             ));
         }
 
-        let conv_eta = self.conv_eta;
-        let mut zeta_max = 0.55;
-        let mut zeta_min = 1e-8;
+        if phase == Phase::MinimumGibbs {
+            return Ok(self.solve_minimum_gibbs(pressure_target)?.0);
+        }
 
-        let mut zeta = match phase {
-            Phase::Vapor => {
-                let z_ideal = conv_eta * pressure_target / (RGAS * self.temperature);
-                z_ideal.clamp(zeta_min, 0.05)
-            }
-            Phase::Liquid => 0.45,
-            Phase::MinimumGibbs => {
-                let vl = self.volume(pressure_target, Phase::Liquid)?;
-                let vv = self.volume(pressure_target, Phase::Vapor)?;
-                if (vl - vv).abs() < 1e-10 * vl {
-                    return Ok(vl);
+        let attempt = self.solve_single_phase_attempt(pressure_target, phase, true)?;
+        if attempt.closed {
+            Ok(attempt.volume)
+        } else {
+            Err(Error::NotConverged(
+                "SAFT-VR Mie volume solver did not converge",
+            ))
+        }
+    }
+
+    /// Solve `Phase::MinimumGibbs` while avoiding dense ULP recovery whenever the
+    /// bounded liquid candidate already establishes a clear vapor win.
+    /// Returns `(volume, liquid_recovery_evals)`.
+    fn solve_minimum_gibbs(&self, pressure_target: f64) -> Result<(f64, usize)> {
+        let vap = self.solve_single_phase_attempt(pressure_target, Phase::Vapor, true);
+        let liq = self.solve_single_phase_attempt(pressure_target, Phase::Liquid, false);
+        match (liq, vap) {
+            (Ok(l), Ok(v)) if l.closed && v.closed => {
+                if (l.volume - v.volume).abs() < 1e-10 * l.volume {
+                    return Ok((l.volume, 0));
                 }
-                let st_l = self.state(1.0 / vl)?;
-                let st_v = self.state(1.0 / vv)?;
-                if st_l.g_residual < st_v.g_residual {
-                    return Ok(vl);
+                let dg = self.imposed_pressure_gibbs_diff(pressure_target, l.volume, v.volume)?;
+                Ok((if dg < 0.0 { l.volume } else { v.volume }, 0))
+            }
+            (Ok(mut l), Ok(v)) if !l.closed && v.closed => {
+                // First check whether the bounded dense liquid candidate already proves
+                // a clear vapor win before paying for dense ULP pressure recovery.
+                let dp = (l.pressure - pressure_target).abs();
+                let dv_est = if l.dp_dv.is_finite() && l.dp_dv < 0.0 {
+                    dp / l.dp_dv.abs()
                 } else {
-                    return Ok(vv);
+                    f64::INFINITY
+                };
+                if l.volume.is_finite()
+                    && l.volume > 0.0
+                    && l.volume < v.volume
+                    && l.pressure.is_finite()
+                    && l.dp_drho > 0.0
+                    && dv_est.is_finite()
+                    && dv_est <= 1.0e-6 * l.volume
+                {
+                    let dg_err_bound = dp * dv_est / (RGAS * self.temperature);
+                    let margin = (10.0 * dg_err_bound).max(1.0e-3);
+                    let dg =
+                        self.imposed_pressure_gibbs_diff(pressure_target, l.volume, v.volume)?;
+                    if dg.is_finite() && dg > margin {
+                        return Ok((v.volume, 0));
+                    }
                 }
+                // Liquid may win or Gibbs ordering is too close to call: run bounded
+                // dense ULP recovery on the liquid candidate and enforce strict closure.
+                let (zeta_min, zeta_max) = self.single_phase_zeta_bounds(pressure_target)?;
+                l = self.recover_volume_ulps(pressure_target, zeta_min, zeta_max, l)?;
+                if l.closed {
+                    if (l.volume - v.volume).abs() < 1e-10 * l.volume {
+                        return Ok((l.volume, l.recovery_evals));
+                    }
+                    let dg =
+                        self.imposed_pressure_gibbs_diff(pressure_target, l.volume, v.volume)?;
+                    return Ok((if dg < 0.0 { l.volume } else { v.volume }, l.recovery_evals));
+                }
+                Err(Error::NotConverged(
+                    "SAFT-VR Mie minimum-Gibbs volume solver did not converge",
+                ))
             }
-        };
+            (Err(err), _) | (_, Err(err)) => Err(err),
+            _ => Err(Error::NotConverged(
+                "SAFT-VR Mie volume solver did not converge",
+            )),
+        }
+    }
 
+    fn single_phase_zeta_bounds(&self, pressure_target: f64) -> Result<(f64, f64)> {
+        let zeta_ideal = self.conv_eta * pressure_target / (RGAS * self.temperature);
+        if !zeta_ideal.is_finite() || zeta_ideal <= 0.0 {
+            return Err(Error::NotConverged(
+                "SAFT-VR Mie volume target underflowed representable packing range",
+            ));
+        }
+        let zeta_min = (1.0e-10_f64).min(0.1 * zeta_ideal).max(1.0e-140);
+        Ok((zeta_min, 0.75))
+    }
+
+    fn solve_single_phase_attempt(
+        &self,
+        pressure_target: f64,
+        phase: Phase,
+        recover: bool,
+    ) -> Result<VolumeAttempt> {
+        let (zeta_min, zeta_max) = self.single_phase_zeta_bounds(pressure_target)?;
+        let zeta_ideal = self.conv_eta * pressure_target / (RGAS * self.temperature);
+        let zeta_init = match phase {
+            Phase::Vapor => zeta_ideal.clamp(zeta_min, 0.05),
+            Phase::Liquid => 0.45,
+            Phase::MinimumGibbs => unreachable!(),
+        };
+        self.solve_volume_in_zeta_bracket(pressure_target, zeta_min, zeta_max, zeta_init, recover)
+    }
+
+    /// Solve `P(conv_eta / zeta) = pressure_target` strictly within a monotone
+    /// branch bracket `[zeta_lo, zeta_hi]`, enforcing `<= 1e-6 * pressure_target`
+    /// relative pressure closure on every returned root.
+    fn volume_in_zeta_bracket(
+        &self,
+        pressure_target: f64,
+        zeta_min: f64,
+        zeta_max: f64,
+        zeta_init: f64,
+    ) -> Result<f64> {
+        let attempt = self.solve_volume_in_zeta_bracket(
+            pressure_target,
+            zeta_min,
+            zeta_max,
+            zeta_init,
+            true,
+        )?;
+        if attempt.closed {
+            Ok(attempt.volume)
+        } else {
+            Err(Error::NotConverged(
+                "SAFT-VR Mie volume solver did not converge",
+            ))
+        }
+    }
+
+    /// Core safeguarded Newton-bisection volume solver with noise-guarded bracket
+    /// updates and optional bounded local representable-`f64` ULP recovery near
+    /// steep liquid roots. Returns the best candidate along with whether it
+    /// satisfied strict `<= 1e-6 * pressure_target` relative pressure closure.
+    fn solve_volume_in_zeta_bracket(
+        &self,
+        pressure_target: f64,
+        mut zeta_min: f64,
+        mut zeta_max: f64,
+        zeta_init: f64,
+        recover: bool,
+    ) -> Result<VolumeAttempt> {
+        if !pressure_target.is_finite()
+            || pressure_target <= 0.0
+            || !zeta_min.is_finite()
+            || !zeta_max.is_finite()
+            || zeta_min <= 0.0
+            || zeta_min >= zeta_max
+            || zeta_max >= 1.0
+        {
+            return Err(Error::NotConverged(
+                "SAFT-VR Mie volume solver received invalid packing bracket",
+            ));
+        }
+        let conv_eta = self.conv_eta;
+        let orig_zeta_min = zeta_min;
+        let orig_zeta_max = zeta_max;
+        let mut zeta = zeta_init.clamp(zeta_min, zeta_max);
         let mut v = conv_eta / zeta;
+        if !v.is_finite() || v <= 0.0 || !(1.0 / v).is_finite() || (1.0 / v) <= 0.0 {
+            return Err(Error::NotConverged(
+                "SAFT-VR Mie volume target exceeded representable molar volume",
+            ));
+        }
         let mut jet = self.pressure_and_derivatives(1.0 / v)?;
         let mut f = (1.0 - zeta) * (jet.pressure - pressure_target);
 
-        let max_iter = 60;
+        let mut best_stable: Option<VolumeAttempt> =
+            if jet.pressure.is_finite() && jet.dp_drho > 0.0 {
+                Some(VolumeAttempt {
+                    volume: v,
+                    pressure: jet.pressure,
+                    dp_dv: jet.dp_dv,
+                    dp_drho: jet.dp_drho,
+                    closed: false,
+                    recovery_evals: 0,
+                })
+            } else {
+                None
+            };
+
+        let max_iter = 80;
         for _ in 0..max_iter {
             let df_dzeta = pressure_target - jet.pressure - ((1.0 - zeta) / zeta) * jet.dp_dv * v;
-            let mut zeta_new = zeta - f / df_dzeta;
+            let mut zeta_new = if df_dzeta.is_finite() && df_dzeta != 0.0 {
+                zeta - f / df_dzeta
+            } else {
+                0.5 * (zeta_max + zeta_min)
+            };
 
             if zeta_new > zeta_max || zeta_new < zeta_min || !zeta_new.is_finite() {
                 zeta_new = 0.5 * (zeta_max + zeta_min);
@@ -944,29 +2674,553 @@ impl<'a> PreparedSaftVrMie<'a> {
             let v_old = v;
             zeta = zeta_new;
             v = conv_eta / zeta;
+            if !v.is_finite() || v <= 0.0 || !(1.0 / v).is_finite() || (1.0 / v) <= 0.0 {
+                return Err(Error::NotConverged(
+                    "SAFT-VR Mie volume solver left representable molar volume range",
+                ));
+            }
 
             jet = self.pressure_and_derivatives(1.0 / v)?;
             f = (1.0 - zeta) * (jet.pressure - pressure_target);
 
-            let v_converged = (v - v_old).abs() < 1e5 * MACHINE_PREC * v_old;
-            let p_converged =
-                (jet.pressure - pressure_target).abs() < 1e8 * MACHINE_PREC * pressure_target;
-
-            if v_converged && p_converged {
-                return Ok(v);
+            let p_err = (jet.pressure - pressure_target).abs();
+            let noise_floor = 1e2 * MACHINE_PREC * (jet.dp_dv * v).abs();
+            if jet.pressure.is_finite()
+                && jet.dp_drho > 0.0
+                && best_stable
+                    .as_ref()
+                    .is_none_or(|b| p_err < (b.pressure - pressure_target).abs())
+            {
+                best_stable = Some(VolumeAttempt {
+                    volume: v,
+                    pressure: jet.pressure,
+                    dp_dv: jet.dp_dv,
+                    dp_drho: jet.dp_drho,
+                    closed: false,
+                    recovery_evals: 0,
+                });
             }
 
-            if f > 0.0 {
-                zeta_max = zeta;
-            } else if f < 0.0 {
-                zeta_min = zeta;
+            let v_converged = (v - v_old).abs() <= 1e2 * MACHINE_PREC * v_old;
+            let p_tol = (1e5 * MACHINE_PREC * pressure_target)
+                .max(noise_floor)
+                .min(1.0e-6 * pressure_target);
+            let p_converged = jet.pressure.is_finite() && p_err <= p_tol;
+
+            if v_converged && p_converged {
+                return Ok(VolumeAttempt {
+                    volume: v,
+                    pressure: jet.pressure,
+                    dp_dv: jet.dp_dv,
+                    dp_drho: jet.dp_drho,
+                    closed: true,
+                    recovery_evals: 0,
+                });
+            }
+
+            // Guard bracket updates against evaluation noise near steep liquid roots
+            // so a noisy residual sign cannot exclude an adjacent representable root.
+            if p_err > noise_floor {
+                if f > 0.0 {
+                    zeta_max = zeta;
+                } else if f < 0.0 {
+                    zeta_min = zeta;
+                }
+            } else if jet.dp_drho > 0.0 && (v - v_old).abs() <= 1e3 * MACHINE_PREC * v_old {
+                break;
+            }
+            if (zeta_max - zeta_min) <= 8.0 * MACHINE_PREC * zeta {
+                break;
             }
         }
 
-        Ok(v)
+        let mut best = best_stable.unwrap_or(VolumeAttempt {
+            volume: v,
+            pressure: jet.pressure,
+            dp_dv: jet.dp_dv,
+            dp_drho: jet.dp_drho,
+            closed: false,
+            recovery_evals: 0,
+        });
+        let p_cap = 1.0e-6 * pressure_target;
+        let best_err = if best.pressure.is_finite() {
+            (best.pressure - pressure_target).abs()
+        } else {
+            f64::INFINITY
+        };
+        best.closed = best.volume.is_finite()
+            && best.volume > 0.0
+            && best.pressure.is_finite()
+            && best.dp_drho > 0.0
+            && best_err <= p_cap;
+        if recover && !best.closed {
+            best = self.recover_volume_ulps(pressure_target, orig_zeta_min, orig_zeta_max, best)?;
+        }
+        Ok(best)
     }
 
-    /// Pure-fluid saturation pressure at temperature T.
+    /// Bounded representable-`f64` ULP neighborhood recovery around a tightly
+    /// localized stable root candidate. Bounds search radius by residual and local
+    /// 1-ULP pressure spacing (`<= 14` evaluations when `dp_ulp > 64 * p_cap`,
+    /// `<= 50` evaluations otherwise), stops immediately once `<= 1e-6 * P` is met,
+    /// and stops each direction once it crosses and moves monotonically away from
+    /// `pressure_target`.
+    fn recover_volume_ulps(
+        &self,
+        pressure_target: f64,
+        orig_zeta_min: f64,
+        orig_zeta_max: f64,
+        mut best: VolumeAttempt,
+    ) -> Result<VolumeAttempt> {
+        let p_cap = 1.0e-6 * pressure_target;
+        let mut best_err = if best.pressure.is_finite() {
+            (best.pressure - pressure_target).abs()
+        } else {
+            f64::INFINITY
+        };
+        if best_err <= p_cap
+            || !best.volume.is_finite()
+            || best.volume <= 0.0
+            || !best.pressure.is_finite()
+            || best.dp_drho <= 0.0
+            || !best.dp_dv.is_finite()
+            || best.dp_dv >= 0.0
+        {
+            best.closed = best.volume.is_finite()
+                && best.volume > 0.0
+                && best.pressure.is_finite()
+                && best.dp_drho > 0.0
+                && best_err <= p_cap;
+            return Ok(best);
+        }
+
+        let dv_est = (best.pressure - pressure_target) / best.dp_dv;
+        if !dv_est.is_finite() || dv_est.abs() > 1.0e-8 * best.volume {
+            return Ok(best);
+        }
+
+        let conv_eta = self.conv_eta;
+        let v_lo = (conv_eta / orig_zeta_max).max(f64::MIN_POSITIVE);
+        let v_hi = {
+            let hi = conv_eta / orig_zeta_min;
+            if hi.is_finite() && hi > v_lo {
+                hi
+            } else {
+                f64::MAX
+            }
+        };
+        if v_lo >= v_hi {
+            return Ok(best);
+        }
+
+        let ulp_v = (best.volume.next_up() - best.volume)
+            .abs()
+            .max(f64::MIN_POSITIVE);
+        let dp_ulp = best.dp_dv.abs() * ulp_v;
+        // Bound the scan radius by local pressure spacing: when 1 ULP already jumps
+        // by > 64x the allowed tolerance (e.g. H2O 300 K 0.001 Pa or NH3 100 K 0.01 Pa),
+        // only inspect the immediate +-6 ULP crossing bracket (<= 14 evaluations).
+        // When 1 ULP is <= 64x p_cap, allow a bounded +-12..24 ULP window with a wider
+        // away_cutoff so non-monotone multi-segment chain jitter (e.g. NC20 near
+        // 302-325 K) does not terminate prematurely or fail round-trip recovery.
+        let (radius, away_cutoff): (usize, f64) = if dp_ulp > 64.0 * p_cap {
+            (6, (4.0 * dp_ulp).max(4.0 * p_cap))
+        } else {
+            let est_ulps = (dv_est.abs() / ulp_v).ceil().min(16.0) as usize;
+            (
+                (est_ulps + 8).clamp(12, 24),
+                (16.0 * dp_ulp).max(16.0 * p_cap),
+            )
+        };
+
+        let v_center = (best.volume - dv_est).clamp(v_lo, v_hi);
+        let mut evals = best.recovery_evals;
+        let mut seen_above = best.pressure > pressure_target;
+        let mut seen_below = best.pressure < pressure_target;
+
+        let eval_cand = |cand_v: f64,
+                         best: &mut VolumeAttempt,
+                         best_err: &mut f64,
+                         seen_above: &mut bool,
+                         seen_below: &mut bool,
+                         evals: &mut usize|
+         -> Result<Option<f64>> {
+            if cand_v < v_lo || cand_v > v_hi || !(1.0 / cand_v).is_finite() {
+                return Ok(None);
+            }
+            *evals += 1;
+            let cand_jet = self.pressure_and_derivatives(1.0 / cand_v)?;
+            if !cand_jet.pressure.is_finite() || cand_jet.dp_drho <= 0.0 {
+                return Ok(None);
+            }
+            let diff = cand_jet.pressure - pressure_target;
+            if diff > 0.0 {
+                *seen_above = true;
+            } else if diff < 0.0 {
+                *seen_below = true;
+            }
+            let err = diff.abs();
+            if err < *best_err {
+                *best_err = err;
+                *best = VolumeAttempt {
+                    volume: cand_v,
+                    pressure: cand_jet.pressure,
+                    dp_dv: cand_jet.dp_dv,
+                    dp_drho: cand_jet.dp_drho,
+                    closed: false,
+                    recovery_evals: *evals,
+                };
+            }
+            Ok(Some(diff))
+        };
+
+        if let Some(diff0) = eval_cand(
+            v_center,
+            &mut best,
+            &mut best_err,
+            &mut seen_above,
+            &mut seen_below,
+            &mut evals,
+        )? && best_err > p_cap
+            && diff0.abs() > 4.0 * dp_ulp
+        {
+            // One cheap linear re-centering step when the initial prediction still
+            // sits more than 4 ULPs from the crossing.
+            let step = diff0 / best.dp_dv;
+            if step.is_finite() && step.abs() <= 1.0e-8 * v_center {
+                let v_refined = (v_center - step).clamp(v_lo, v_hi);
+                if v_refined != v_center {
+                    let _ = eval_cand(
+                        v_refined,
+                        &mut best,
+                        &mut best_err,
+                        &mut seen_above,
+                        &mut seen_below,
+                        &mut evals,
+                    )?;
+                }
+            }
+        }
+
+        // Always center the bounded ULP sweep on the strictly closest candidate
+        // found so far (never on a noisier re-centered point), and adapt the
+        // directional cutoff to any observed local jump deviation.
+        if best_err > p_cap {
+            let mut v_up = best.volume;
+            let mut v_dn = best.volume;
+            let mut prev_up_p = best.pressure;
+            let mut prev_dn_p = best.pressure;
+            let mut observed_jitter = 0.0_f64;
+            let mut up_active = true;
+            let mut dn_active = true;
+            for _ in 0..radius {
+                if best_err <= p_cap || (!up_active && !dn_active) {
+                    break;
+                }
+                if up_active {
+                    let next_u = v_up.next_up();
+                    if next_u <= v_hi && next_u > v_up {
+                        v_up = next_u;
+                        if let Some(diff) = eval_cand(
+                            v_up,
+                            &mut best,
+                            &mut best_err,
+                            &mut seen_above,
+                            &mut seen_below,
+                            &mut evals,
+                        )? {
+                            let cur_p = pressure_target + diff;
+                            observed_jitter =
+                                observed_jitter.max(((cur_p - prev_up_p) + dp_ulp).abs());
+                            prev_up_p = cur_p;
+                            if best_err <= p_cap {
+                                break;
+                            }
+                            let eff_cutoff =
+                                if observed_jitter <= 0.25 * dp_ulp && dp_ulp > 64.0 * p_cap {
+                                    (1.5 * dp_ulp).max(4.0 * p_cap)
+                                } else {
+                                    away_cutoff.max(4.0 * observed_jitter)
+                                };
+                            // Since dP/dv < 0, increasing v lowers P; once past target
+                            // (diff < 0) and far below target on a bracketed crossing, stop up.
+                            if seen_above && seen_below && diff < -eff_cutoff {
+                                up_active = false;
+                            }
+                        }
+                    } else {
+                        up_active = false;
+                    }
+                }
+                if dn_active {
+                    let next_d = v_dn.next_down();
+                    if next_d >= v_lo && next_d < v_dn {
+                        v_dn = next_d;
+                        if let Some(diff) = eval_cand(
+                            v_dn,
+                            &mut best,
+                            &mut best_err,
+                            &mut seen_above,
+                            &mut seen_below,
+                            &mut evals,
+                        )? {
+                            let cur_p = pressure_target + diff;
+                            observed_jitter =
+                                observed_jitter.max(((cur_p - prev_dn_p) - dp_ulp).abs());
+                            prev_dn_p = cur_p;
+                            if best_err <= p_cap {
+                                break;
+                            }
+                            let eff_cutoff =
+                                if observed_jitter <= 0.25 * dp_ulp && dp_ulp > 64.0 * p_cap {
+                                    (1.5 * dp_ulp).max(4.0 * p_cap)
+                                } else {
+                                    away_cutoff.max(4.0 * observed_jitter)
+                                };
+                            // Since dP/dv < 0, decreasing v raises P; once past target
+                            // (diff > 0) and far above target on a bracketed crossing, stop down.
+                            if seen_above && seen_below && diff > eff_cutoff {
+                                dn_active = false;
+                            }
+                        }
+                    } else {
+                        dn_active = false;
+                    }
+                }
+            }
+        }
+
+        best.recovery_evals = evals;
+        best.closed = best.volume.is_finite()
+            && best.volume > 0.0
+            && best.pressure.is_finite()
+            && best.dp_drho > 0.0
+            && best_err <= p_cap;
+        Ok(best)
+    }
+
+    /// Locate the mechanical spinodals on this pure-fluid isotherm by searching
+    /// for `dP/drho < 0` in the physical fluid packing range (`eta <= 0.56`,
+    /// staying below unphysical high-packing association/dispersion polynomial poles).
+    ///
+    /// Distinguishes true supercritical isotherms (`dP/drho >= 0` across the
+    /// physical fluid range) from subcritical isotherms whose dense liquid branch
+    /// exhausts the packing cap (`eta = 0.72`) before reaching a stable endpoint.
+    fn locate_spinodals(&self) -> Result<SpinodalSearch> {
+        let conv_eta = self.conv_eta;
+        let dp_drho_at = |eta: f64| -> Result<f64> {
+            Ok(self.pressure_and_derivatives(eta / conv_eta)?.dp_drho)
+        };
+
+        // Scan across the physical fluid packing range to spot or bracket the
+        // fluid-phase minimum of dP/drho without stepping into unphysical high-eta poles.
+        const N_GRID: usize = 40;
+        let eta_lo = 0.005_f64;
+        let eta_hi = 0.56_f64;
+        let mut grid_eta = [0.0_f64; N_GRID];
+        let mut grid_dp = [0.0_f64; N_GRID];
+        let mut min_idx = 0usize;
+        let mut min_dp = f64::INFINITY;
+        for k in 0..N_GRID {
+            let eta = eta_lo + (eta_hi - eta_lo) * (k as f64) / ((N_GRID - 1) as f64);
+            let dp = dp_drho_at(eta)?;
+            grid_eta[k] = eta;
+            grid_dp[k] = dp;
+            if dp < min_dp {
+                min_dp = dp;
+                min_idx = k;
+            }
+        }
+
+        let mut eta_mid = if min_dp < 0.0 {
+            Some(grid_eta[min_idx])
+        } else {
+            None
+        };
+
+        // If no coarse point was negative, minimize dP/drho around min_idx via
+        // golden-section search to catch narrow near-critical unstable loops.
+        if eta_mid.is_none() {
+            let mut a = if min_idx > 0 {
+                grid_eta[min_idx - 1]
+            } else {
+                1.0e-4
+            };
+            let mut b = if min_idx + 1 < N_GRID {
+                grid_eta[min_idx + 1]
+            } else {
+                0.58
+            };
+            let inv_phi = 0.5 * (5.0_f64.sqrt() - 1.0);
+            let mut c = b - inv_phi * (b - a);
+            let mut d = a + inv_phi * (b - a);
+            let mut fc = dp_drho_at(c)?;
+            let mut fd = dp_drho_at(d)?;
+            for _ in 0..55 {
+                if fc < 0.0 {
+                    eta_mid = Some(c);
+                    break;
+                }
+                if fd < 0.0 {
+                    eta_mid = Some(d);
+                    break;
+                }
+                if (b - a) <= 1.0e-10 * b {
+                    break;
+                }
+                if fc < fd {
+                    b = d;
+                    d = c;
+                    fd = fc;
+                    c = b - inv_phi * (b - a);
+                    fc = dp_drho_at(c)?;
+                } else {
+                    a = c;
+                    c = d;
+                    fc = fd;
+                    d = a + inv_phi * (b - a);
+                    fd = dp_drho_at(d)?;
+                }
+            }
+        }
+
+        let Some(eta_unstable) = eta_mid else {
+            return Ok(SpinodalSearch::Supercritical);
+        };
+
+        // Vapor spinodal (local P maximum): dP/drho crosses + -> - on (0, eta_unstable).
+        let mut lo_v = 1.0e-8_f64.min(0.1 * eta_unstable);
+        while dp_drho_at(lo_v)? <= 0.0 && lo_v > 1.0e-30 {
+            lo_v *= 0.1;
+        }
+        if dp_drho_at(lo_v)? <= 0.0 {
+            return Ok(SpinodalSearch::InvalidBracket);
+        }
+        let mut hi_v = eta_unstable;
+        for _ in 0..64 {
+            if (hi_v - lo_v) <= 1.0e-12 * hi_v {
+                break;
+            }
+            let mid = 0.5 * (lo_v + hi_v);
+            if dp_drho_at(mid)? > 0.0 {
+                lo_v = mid;
+            } else {
+                hi_v = mid;
+            }
+        }
+        let eta_spin_v = lo_v;
+        let p_max = self
+            .pressure_and_derivatives(eta_spin_v / conv_eta)?
+            .pressure;
+
+        // Liquid spinodal (local P minimum): find the first positive-dP/drho grid point
+        // strictly above eta_unstable, bounded strictly by ETA_LIQUID_CAP so the liquid
+        // bracket never inverts or steps into unphysical high-packing poles.
+        const ETA_LIQUID_CAP: f64 = 0.72;
+        let mut lo_l = eta_unstable;
+        let mut hi_l = None;
+        for k in 0..N_GRID {
+            if grid_eta[k] > eta_unstable && grid_dp[k] > 0.0 {
+                hi_l = Some(grid_eta[k]);
+                break;
+            }
+        }
+        let mut hi_l = match hi_l {
+            Some(eta) => eta,
+            None => {
+                if eta_unstable >= ETA_LIQUID_CAP {
+                    return Ok(SpinodalSearch::LiquidPackingCapReached);
+                }
+                let mut probe = (eta_unstable + 0.02).min(ETA_LIQUID_CAP);
+                while probe < ETA_LIQUID_CAP && dp_drho_at(probe)? <= 0.0 {
+                    probe = (probe + 0.02).min(ETA_LIQUID_CAP);
+                }
+                if dp_drho_at(probe)? <= 0.0 {
+                    return Ok(SpinodalSearch::LiquidPackingCapReached);
+                }
+                probe
+            }
+        };
+        for _ in 0..64 {
+            if (hi_l - lo_l) <= 1.0e-12 * hi_l {
+                break;
+            }
+            let mid = 0.5 * (lo_l + hi_l);
+            if dp_drho_at(mid)? < 0.0 {
+                lo_l = mid;
+            } else {
+                hi_l = mid;
+            }
+        }
+        let eta_spin_l = hi_l;
+        if eta_spin_l >= ETA_LIQUID_CAP {
+            return Ok(SpinodalSearch::LiquidPackingCapReached);
+        }
+        let p_min = self
+            .pressure_and_derivatives(eta_spin_l / conv_eta)?
+            .pressure;
+
+        // Choose a safe upper liquid-branch packing bound strictly above eta_spin_l
+        // and at or below ETA_LIQUID_CAP where dP/drho > 0.
+        let mut eta_l_max = eta_spin_l;
+        for k in 0..N_GRID {
+            if grid_eta[k] > eta_spin_l {
+                if grid_dp[k] <= 0.0 {
+                    break;
+                }
+                eta_l_max = grid_eta[k];
+            }
+        }
+        if eta_l_max <= eta_spin_l {
+            eta_l_max = (eta_spin_l + 0.05).min(ETA_LIQUID_CAP);
+        }
+
+        if eta_spin_l >= eta_l_max || eta_l_max > ETA_LIQUID_CAP {
+            return Ok(SpinodalSearch::LiquidPackingCapReached);
+        }
+        if !eta_spin_v.is_finite()
+            || !eta_spin_l.is_finite()
+            || !eta_l_max.is_finite()
+            || eta_spin_v <= 0.0
+            || eta_spin_v >= eta_spin_l
+            || !p_max.is_finite()
+            || !p_min.is_finite()
+            || p_max <= 0.0
+            || p_max <= p_min
+        {
+            return Ok(SpinodalSearch::InvalidBracket);
+        }
+        Ok(SpinodalSearch::Found(IsothermSpinodals {
+            eta_v: eta_spin_v,
+            p_max,
+            eta_l: eta_spin_l,
+            p_min,
+            eta_l_max,
+        }))
+    }
+
+    /// Pure-fluid saturation pressure at temperature `T`.
+    ///
+    /// # Closure and Gibbs-Equality Contract
+    ///
+    /// - **Ordinary convergence**: solves common-pressure dimensionless Gibbs
+    ///   equality `|Delta G / (R T)| < 1e-13` (or `< 1e-10` on a converged
+    ///   pressure bracket) and certifies that both liquid and vapor states are
+    ///   mechanically stable (`dP/drho > 0`, `v_l < v_v`) and reevaluate within
+    ///   `<= 1e-6 * P_sat`.
+    /// - **Snapped cold-liquid branch**: on stiff low-pressure liquids where a
+    ///   single `f64` ULP of liquid volume changes pressure by more than
+    ///   `1e-6 * P_sat`, no representable liquid volume may fall within
+    ///   `1e-6` of the exact Gibbs-equal pressure `p_eq`. When the nearest
+    ///   representable stable liquid root still satisfies
+    ///   `|P_l - p_eq| <= 5e-6 * p_eq`, this method replaces the reported
+    ///   coexistence pressure with `P_l`, re-solves the vapor root at `P_l`,
+    ///   and certifies `|P_l - p| <= 1e-6 * p`, `|P_v - p| <= 1e-6 * p`, and
+    ///   common-pressure Gibbs residual `|Delta G / (R T)| <= 5e-6`.
+    /// - **Rejection**: returns distinct `Error::NotConverged` diagnostics for
+    ///   supercritical isotherms, subcritical isotherms whose liquid branch
+    ///   exhausts the packing cap (`eta = 0.72`), and cold states whose nearest
+    ///   liquid root cannot satisfy the pressure and Gibbs closure caps.
     pub fn saturation_pressure(&self, temperature: f64) -> Result<SaftVrMieSaturation> {
         if self.model.num_components() != 1 {
             return Err(Error::Unsupported(
@@ -974,68 +3228,218 @@ impl<'a> PreparedSaftVrMie<'a> {
             ));
         }
 
-        let prep = self.model.prepare(temperature, &[1.0])?;
+        let owned_prep;
+        let prep = if (self.temperature - temperature).abs() == 0.0 {
+            self
+        } else {
+            owned_prep = self.model.prepare(temperature, &[1.0])?;
+            &owned_prep
+        };
         let comp_info = component(self.model.components[0].ident)?;
         let tc = comp_info.critical_temperature;
         let pc = comp_info.critical_pressure;
         let omega = comp_info.acentric_factor;
 
         let exp_arg: f64 = 5.373 * (1.0 + omega) * (1.0 - tc / temperature);
-        let mut p_est = pc * exp_arg.exp();
-        if p_est >= pc || p_est <= 0.0 || !p_est.is_finite() {
-            p_est = 0.5 * pc;
+        let mut p = pc * exp_arg.exp();
+        if p >= pc || p <= 0.0 || !p.is_finite() {
+            p = 0.5 * pc;
         }
 
-        let mut p = p_est;
-        let max_iter = 50;
+        let mut p_lo: Option<f64> = None;
+        let mut p_hi: Option<f64> = None;
+        let mut spinodals: Option<IsothermSpinodals> = None;
+        let max_iter = 60;
 
         for _ in 0..max_iter {
-            let vl = match prep.volume(p, Phase::Liquid) {
-                Ok(v) => v,
-                Err(_) => {
-                    p *= 0.8;
-                    continue;
+            let (vl_attempt, vl, vv) = if let Some(sp) = spinodals {
+                let zeta_ideal = prep.conv_eta * p / (RGAS * temperature);
+                let zeta_min_v = (1.0e-10_f64)
+                    .min(0.1 * zeta_ideal)
+                    .max(1.0e-140)
+                    .min(0.5 * sp.eta_v);
+                // Defer ULP pressure recovery until convergence: bounded liquid candidates
+                // evaluate imposed_pressure_gibbs_diff to second-order accuracy (~1e-15).
+                let vl_att = prep.solve_volume_in_zeta_bracket(
+                    p,
+                    sp.eta_l,
+                    sp.eta_l_max,
+                    0.5 * (sp.eta_l + sp.eta_l_max),
+                    false,
+                )?;
+                let vl_bounded = vl_att.closed
+                    || (vl_att.volume.is_finite()
+                        && vl_att.volume > 0.0
+                        && vl_att.pressure.is_finite()
+                        && vl_att.dp_drho > 0.0
+                        && vl_att.dp_dv.is_finite()
+                        && vl_att.dp_dv < 0.0
+                        && (vl_att.pressure - p).abs() / vl_att.dp_dv.abs()
+                            <= 1.0e-6 * vl_att.volume);
+                if !vl_bounded {
+                    return Err(Error::NotConverged(
+                        "SAFT-VR Mie liquid volume solver did not converge during saturation",
+                    ));
                 }
-            };
-            let vv = match prep.volume(p, Phase::Vapor) {
-                Ok(v) => v,
-                Err(_) => {
-                    p *= 1.2;
-                    continue;
+                let zeta_v_init = if zeta_min_v < 0.9 * sp.eta_v {
+                    zeta_ideal.clamp(zeta_min_v, 0.9 * sp.eta_v)
+                } else {
+                    0.5 * (zeta_min_v + sp.eta_v)
+                };
+                let vv = prep.volume_in_zeta_bracket(p, zeta_min_v, sp.eta_v, zeta_v_init)?;
+                (Some(vl_att), vl_att.volume, vv)
+            } else {
+                let vl_res = prep.volume(p, Phase::Liquid);
+                let vv_res = prep.volume(p, Phase::Vapor);
+                match (vl_res, vv_res) {
+                    (Ok(vl), Ok(vv)) if vv > vl && (vv - vl) > 1e-10 * vl => (None, vl, vv),
+                    _ => {
+                        // Switch to exact mechanical spinodal bounds so near-critical
+                        // coexistence is preserved, supercritical isotherms are rejected,
+                        // and liquid packing-cap exhaustion reports a distinct error.
+                        let sp = match prep.locate_spinodals()? {
+                            SpinodalSearch::Found(sp) => sp,
+                            SpinodalSearch::Supercritical => {
+                                return Err(Error::NotConverged(
+                                    "supercritical temperature: no vapor-liquid coexistence",
+                                ));
+                            }
+                            SpinodalSearch::LiquidPackingCapReached => {
+                                return Err(Error::NotConverged(
+                                    "liquid branch reached packing limit (eta = 0.72) before establishing a stable dense endpoint",
+                                ));
+                            }
+                            SpinodalSearch::InvalidBracket => {
+                                return Err(Error::NotConverged(
+                                    "failed to bracket mechanical spinodals on subcritical isotherm",
+                                ));
+                            }
+                        };
+                        spinodals = Some(sp);
+                        if sp.p_min > 0.0 {
+                            p_lo = Some(p_lo.map_or(sp.p_min, |lo| lo.max(sp.p_min)));
+                        }
+                        p_hi = Some(p_hi.map_or(sp.p_max, |hi| hi.min(sp.p_max)));
+                        p = if sp.p_min > 0.0 {
+                            0.5 * (sp.p_min + sp.p_max)
+                        } else if p <= 0.0 || p >= sp.p_max {
+                            0.5 * sp.p_max
+                        } else {
+                            p
+                        };
+                        continue;
+                    }
                 }
             };
 
-            if (vv - vl).abs() < 1e-12 * vl {
+            let dg = prep.imposed_pressure_gibbs_diff(p, vl, vv)?;
+            if dg > 0.0 {
+                p_lo = Some(p_lo.map_or(p, |lo| lo.max(p)));
+            } else if dg < 0.0 {
+                p_hi = Some(p_hi.map_or(p, |hi| hi.min(p)));
+            }
+
+            let d_dg_dlnp = p * (vl - vv) / (RGAS * temperature);
+            let d_ln_p = -dg / d_dg_dlnp;
+            let bracket_tight =
+                matches!((p_lo, p_hi), (Some(lo), Some(hi)) if (hi - lo) <= 1e-13 * hi);
+            if (dg.abs() < 1e-13 && d_ln_p.abs() < 1e-12) || (bracket_tight && dg.abs() < 1e-10) {
+                let vl = if let (Some(sp), Some(att)) = (spinodals, vl_attempt)
+                    && !att.closed
+                {
+                    prep.recover_volume_ulps(p, sp.eta_l, sp.eta_l_max, att)?
+                        .volume
+                } else {
+                    vl
+                };
+                let state_l = prep.state(1.0 / vl)?;
+                let state_v = prep.state(1.0 / vv)?;
+                let p_closed = state_l.pressure.is_finite()
+                    && state_v.pressure.is_finite()
+                    && (state_l.pressure - p).abs() <= 1.0e-6 * p
+                    && (state_v.pressure - p).abs() <= 1.0e-6 * p;
+                if vl < vv && state_l.dp_drho > 0.0 && state_v.dp_drho > 0.0 && p_closed {
+                    return Ok(SaftVrMieSaturation {
+                        pressure: p,
+                        temperature,
+                        liquid_volume: vl,
+                        vapor_volume: vv,
+                        enthalpy_vaporization: state_v.h_total - state_l.h_total,
+                        entropy_vaporization: state_v.s_total - state_l.s_total,
+                    });
+                }
+                // On stiff cold liquids where a single f64 ULP of liquid volume shifts P
+                // by more than 1e-6 * P_sat (e.g. NH3 at 120 K), the nearest representable
+                // liquid volume can sit just outside 1e-6 * p_eq solely from IEEE-754
+                // quantization. When state_l.pressure still agrees with p_eq to <= 5e-6,
+                // snap the reported coexistence pressure to state_l.pressure and re-solve
+                // the vapor root so both phases close within 1e-6 relative pressure while
+                // keeping Gibbs equality within 5e-6 RT.
+                let p_l = state_l.pressure;
+                if state_l.dp_drho > 0.0
+                    && p_l.is_finite()
+                    && p_l > 0.0
+                    && (p_l - p).abs() <= 5.0e-6 * p
+                {
+                    let vv_snap = if let Some(sp) = spinodals {
+                        let zeta_ideal = prep.conv_eta * p_l / (RGAS * temperature);
+                        let zeta_min_v = (1.0e-10_f64)
+                            .min(0.1 * zeta_ideal)
+                            .max(1.0e-140)
+                            .min(0.5 * sp.eta_v);
+                        let zeta_v_init = if zeta_min_v < 0.9 * sp.eta_v {
+                            zeta_ideal.clamp(zeta_min_v, 0.9 * sp.eta_v)
+                        } else {
+                            0.5 * (zeta_min_v + sp.eta_v)
+                        };
+                        prep.volume_in_zeta_bracket(p_l, zeta_min_v, sp.eta_v, zeta_v_init)
+                    } else {
+                        prep.volume(p_l, Phase::Vapor)
+                    };
+                    if let Ok(vv_s) = vv_snap {
+                        let state_v_s = prep.state(1.0 / vv_s)?;
+                        let dg_s = prep.imposed_pressure_gibbs_diff(p_l, vl, vv_s)?;
+                        let p_v_closed = state_v_s.pressure.is_finite()
+                            && (state_v_s.pressure - p_l).abs() <= 1.0e-6 * p_l;
+                        if vl < vv_s
+                            && state_v_s.dp_drho > 0.0
+                            && p_v_closed
+                            && dg_s.is_finite()
+                            && dg_s.abs() <= 5.0e-6
+                        {
+                            return Ok(SaftVrMieSaturation {
+                                pressure: p_l,
+                                temperature,
+                                liquid_volume: vl,
+                                vapor_volume: vv_s,
+                                enthalpy_vaporization: state_v_s.h_total - state_l.h_total,
+                                entropy_vaporization: state_v_s.s_total - state_l.s_total,
+                            });
+                        }
+                    }
+                }
                 return Err(Error::NotConverged(
-                    "liquid and vapor volumes converged to the same critical root",
+                    "saturation roots failed mechanical stability or pressure closure check",
                 ));
             }
 
-            let state_l = prep.state(1.0 / vl)?;
-            let state_v = prep.state(1.0 / vv)?;
-
-            let delta_ln_phi = state_l.ln_phi[0] - state_v.ln_phi[0];
-            if delta_ln_phi.abs() < 1e-10 {
-                return Ok(SaftVrMieSaturation {
-                    pressure: p,
-                    temperature,
-                    liquid_volume: vl,
-                    vapor_volume: vv,
-                    enthalpy_vaporization: state_v.h_total - state_l.h_total,
-                    entropy_vaporization: state_v.s_total - state_l.s_total,
-                });
+            let mut p_next = if d_ln_p.is_finite() {
+                p * d_ln_p.clamp(-2.0, 2.0).exp()
+            } else {
+                f64::NAN
+            };
+            if !p_next.is_finite()
+                || p_next <= 0.0
+                || p_lo.is_some_and(|lo| p_next <= lo)
+                || p_hi.is_some_and(|hi| p_next >= hi)
+            {
+                p_next = match (p_lo, p_hi) {
+                    (Some(lo), Some(hi)) if hi <= 10.0 * lo => 0.5 * (lo + hi),
+                    (Some(lo), Some(hi)) => (lo * hi).sqrt(),
+                    _ => p * d_ln_p.clamp(-1.0, 1.0).exp(),
+                };
             }
-
-            let d_delta_dp = (vl - vv) / (RGAS * temperature);
-            let mut dp = -delta_ln_phi / d_delta_dp;
-            if dp.abs() > 0.5 * p {
-                dp = 0.5 * p * dp.signum();
-            }
-
-            p += dp;
-            if p <= 0.0 {
-                p = 0.5 * (p - dp);
-            }
+            p = p_next;
         }
 
         Err(Error::NotConverged(
@@ -1049,6 +3453,33 @@ impl<'a> PreparedSaftVrMie<'a> {
 // ----------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Copy)]
+struct VolumeAttempt {
+    volume: f64,
+    pressure: f64,
+    dp_dv: f64,
+    dp_drho: f64,
+    closed: bool,
+    recovery_evals: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum SpinodalSearch {
+    Found(IsothermSpinodals),
+    Supercritical,
+    LiquidPackingCapReached,
+    InvalidBracket,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct IsothermSpinodals {
+    eta_v: f64,
+    p_max: f64,
+    eta_l: f64,
+    p_min: f64,
+    eta_l_max: f64,
+}
+
+#[derive(Debug, Clone, Copy)]
 struct MiePot {
     u_divk: f64,
     u_divk_t: f64,
@@ -1058,10 +3489,8 @@ struct MiePot {
     u_divk_tr: f64,
 }
 
-#[allow(clippy::too_many_arguments)]
-fn calc_mie_potential_full(
-    r: f64,
-    temperature: f64,
+#[derive(Clone, Copy)]
+struct PairPotential {
     sigma: f64,
     eps_depth_divk: f64,
     lambda_a: f64,
@@ -1069,81 +3498,295 @@ fn calc_mie_potential_full(
     c_fac: f64,
     d_param: f64,
     fh_order: i32,
-) -> MiePot {
-    let n = lambda_r;
-    let m = lambda_a;
-    let en_r = 1.0 / r;
-    let r1 = sigma * en_r;
+    second_factor: f64,
+}
+impl PairPotential {
+    #[inline(always)]
+    fn evaluate_classical(self, r: f64) -> (f64, f64, f64) {
+        let n = self.lambda_r;
+        let m = self.lambda_a;
+        let en_r = 1.0 / r;
+        let r1 = self.sigma * en_r;
+        let (r_n, r_m) = pow_pos_pair(r1, n, m);
+        let dr_n = -n * r_n * en_r;
+        let dr_m = -m * r_m * en_r;
+        let d2r_n = -(n + 1.0) * dr_n * en_r;
+        let d2r_m = -(m + 1.0) * dr_m * en_r;
+        let pref = self.c_fac * self.eps_depth_divk;
+        (
+            (r_n - r_m) * pref,
+            (dr_n - dr_m) * pref,
+            (d2r_n - d2r_m) * pref,
+        )
+    }
 
-    let r_n = r1.powf(n);
-    let r_m = r1.powf(m);
-    let dr_n = -n * r_n * en_r;
-    let dr_m = -m * r_m * en_r;
-    let d2r_n = -(n + 1.0) * dr_n * en_r;
-    let d2r_m = -(m + 1.0) * dr_m * en_r;
+    #[inline(always)]
+    fn evaluate(self, r: f64, temperature: f64) -> MiePot {
+        let Self {
+            sigma,
+            eps_depth_divk,
+            lambda_a,
+            lambda_r,
+            c_fac,
+            d_param,
+            fh_order,
+            second_factor,
+        } = self;
+        let n = lambda_r;
+        let m = lambda_a;
+        let en_r = 1.0 / r;
+        let r1 = sigma * en_r;
 
-    let mut u = r_n - r_m;
-    let mut u_t = 0.0;
-    let mut u_tt = 0.0;
-    let mut u_r = dr_n - dr_m;
-    let mut u_rr = d2r_n - d2r_m;
-    let mut u_tr = 0.0;
+        let (r_n, r_m) = pow_pos_pair(r1, n, m);
+        let dr_n = -n * r_n * en_r;
+        let dr_m = -m * r_m * en_r;
+        let d2r_n = -(n + 1.0) * dr_n * en_r;
+        let d2r_m = -(m + 1.0) * dr_m * en_r;
 
-    if fh_order > 0 && d_param > 0.0 && temperature > 0.0 {
-        let tinv = 1.0 / temperature;
-        let d = d_param * tinv;
-        let d_t = -d_param * tinv * tinv;
-        let d_tt = 2.0 * d_param * (tinv * tinv * tinv);
+        let mut u = r_n - r_m;
+        let mut u_t = 0.0;
+        let mut u_tt = 0.0;
+        let mut u_r = dr_n - dr_m;
+        let mut u_rr = d2r_n - d2r_m;
+        let mut u_tr = 0.0;
 
-        let q1_n = n * (n - 1.0);
-        let q1_m = m * (m - 1.0);
-        let en_r2 = en_r * en_r;
+        if fh_order > 0 && d_param > 0.0 && temperature > 0.0 {
+            let tinv = 1.0 / temperature;
+            let d = d_param * tinv;
+            let d_t = -d_param * tinv * tinv;
+            let d_tt = 2.0 * d_param * (tinv * tinv * tinv);
 
-        let prod_q1 = en_r2 * (q1_n * r_n - q1_m * r_m);
-        let prod_q1_r = -en_r2 * ((n + 2.0) * q1_n * r_n - (m + 2.0) * q1_m * r_m) * en_r;
-        let prod_q1_rr = en_r2
-            * ((n + 3.0) * (n + 2.0) * q1_n * r_n - (m + 3.0) * (m + 2.0) * q1_m * r_m)
-            * en_r2;
+            let q1_n = n * (n - 1.0);
+            let q1_m = m * (m - 1.0);
+            let en_r2 = en_r * en_r;
 
-        u += d * prod_q1;
-        u_t += d_t * prod_q1;
-        u_tt += d_tt * prod_q1;
-        u_r += d * prod_q1_r;
-        u_rr += d * prod_q1_rr;
-        u_tr += d_t * prod_q1_r;
-
-        if fh_order > 1 {
-            let d2 = d * d;
-            let d2_t = 2.0 * d * d_t;
-            let d2_tt = 2.0 * (d * d_tt + d_t * d_t);
-
-            let q2_n = 0.5 * n * (n - 1.0) * (n + 1.0) * (n + 2.0);
-            let q2_m = 0.5 * m * (m - 1.0) * (m + 1.0) * (m + 2.0);
-            let en_r4 = en_r2 * en_r2;
-
-            let prod_q2 = en_r4 * (q2_n * r_n - q2_m * r_m);
-            let prod_q2_r = -en_r4 * ((n + 4.0) * q2_n * r_n - (m + 4.0) * q2_m * r_m) * en_r;
-            let prod_q2_rr = en_r4
-                * ((n + 5.0) * (n + 4.0) * q2_n * r_n - (m + 5.0) * (m + 4.0) * q2_m * r_m)
+            let prod_q1 = en_r2 * (q1_n * r_n - q1_m * r_m);
+            let prod_q1_r = -en_r2 * ((n + 2.0) * q1_n * r_n - (m + 2.0) * q1_m * r_m) * en_r;
+            let prod_q1_rr = en_r2
+                * ((n + 3.0) * (n + 2.0) * q1_n * r_n - (m + 3.0) * (m + 2.0) * q1_m * r_m)
                 * en_r2;
 
-            u += d2 * prod_q2;
-            u_t += d2_t * prod_q2;
-            u_tt += d2_tt * prod_q2;
-            u_r += d2 * prod_q2_r;
-            u_rr += d2 * prod_q2_rr;
-            u_tr += d2_t * prod_q2_r;
+            u += d * prod_q1;
+            u_t += d_t * prod_q1;
+            u_tt += d_tt * prod_q1;
+            u_r += d * prod_q1_r;
+            u_rr += d * prod_q1_rr;
+            u_tr += d_t * prod_q1_r;
+
+            if fh_order > 1 {
+                let d2 = d * d;
+                let d2_t = 2.0 * d * d_t;
+                let d2_tt = 2.0 * (d * d_tt + d_t * d_t);
+
+                let q2_n = second_factor * n * (n - 1.0) * (n + 1.0) * (n + 2.0);
+                let q2_m = second_factor * m * (m - 1.0) * (m + 1.0) * (m + 2.0);
+                let en_r4 = en_r2 * en_r2;
+
+                let prod_q2 = en_r4 * (q2_n * r_n - q2_m * r_m);
+                let prod_q2_r = -en_r4 * ((n + 4.0) * q2_n * r_n - (m + 4.0) * q2_m * r_m) * en_r;
+                let prod_q2_rr = en_r4
+                    * ((n + 5.0) * (n + 4.0) * q2_n * r_n - (m + 5.0) * (m + 4.0) * q2_m * r_m)
+                    * en_r2;
+
+                u += d2 * prod_q2;
+                u_t += d2_t * prod_q2;
+                u_tt += d2_tt * prod_q2;
+                u_r += d2 * prod_q2_r;
+                u_rr += d2 * prod_q2_rr;
+                u_tr += d2_t * prod_q2_r;
+            }
+        }
+
+        let pref = c_fac * eps_depth_divk;
+        MiePot {
+            u_divk: u * pref,
+            u_divk_t: u_t * pref,
+            u_divk_tt: u_tt * pref,
+            u_divk_r: u_r * pref,
+            u_divk_rr: u_rr * pref,
+            u_divk_tr: u_tr * pref,
         }
     }
 
-    let pref = c_fac * eps_depth_divk;
-    MiePot {
-        u_divk: u * pref,
-        u_divk_t: u_t * pref,
-        u_divk_tt: u_tt * pref,
-        u_divk_r: u_r * pref,
-        u_divk_rr: u_rr * pref,
-        u_divk_tr: u_tr * pref,
+    #[inline]
+    fn effective_sigma(self, temperature: f64) -> (f64, f64, f64) {
+        let sigma = self.sigma;
+        let fh_order = self.fh_order;
+        // 1. Solve effective sigma (where U(r) = 0)
+        if fh_order == 0 {
+            (sigma, 0.0, 0.0)
+        } else {
+            let mut r = sigma;
+            for _ in 0..25 {
+                let pot = self.evaluate(r, temperature);
+                let f = pot.u_divk;
+                let df = pot.u_divk_r;
+                let d2f = pot.u_divk_rr;
+                let step = -f / df * (1.0 + f * d2f / (2.0 * df * df));
+                r += step;
+                if step.abs() < 1e-15 * sigma {
+                    break;
+                }
+            }
+            let pot = self.evaluate(r, temperature);
+            let s_t = -pot.u_divk_t / pot.u_divk_r;
+            let s_tt = -(pot.u_divk_tt + pot.u_divk_rr * s_t * s_t + 2.0 * pot.u_divk_tr * s_t)
+                / pot.u_divk_r;
+            (r, s_t, s_tt)
+        }
+    }
+
+    // Keep diameter self-contained so LLVM always optimizes its inner 21-point
+    // Gauss-Kronrod loop independently of unrelated callers in this module.
+    #[inline(never)]
+    fn diameter(
+        self,
+        temperature: f64,
+        (sigma_eff, sig_t, sig_tt): (f64, f64, f64),
+    ) -> Result<(f64, f64, f64)> {
+        let ln_eps = MACHINE_PREC.ln();
+        let inv_t = 1.0 / temperature;
+        let inv_t2 = inv_t * inv_t;
+        let inv_t3 = inv_t2 * inv_t;
+
+        if self.fh_order == 0 {
+            // Classical Mie fast path: u_t = u_tt = u_tr = 0 and sig_t = sig_tt = 0.
+            let mut rs = 0.70;
+            for _ in 0..25 {
+                let r = rs * sigma_eff;
+                let (u, u_r, u_rr) = self.evaluate_classical(r);
+                let f = u * inv_t + ln_eps;
+                let df = sigma_eff * u_r * inv_t;
+                let d2f = sigma_eff * sigma_eff * u_rr * inv_t;
+                let step = -f / df * (1.0 + f * d2f / (2.0 * df * df));
+                rs += step;
+                if step.abs() < 1e-15 {
+                    break;
+                }
+            }
+
+            let r0 = rs * sigma_eff;
+            let (_, u0_r, u0_rr) = self.evaluate_classical(r0);
+            let r0_t = -ln_eps / u0_r;
+            let r0_tt = -(u0_rr * r0_t * r0_t) / u0_r;
+
+            let mut d_int = 0.0;
+            let mut d_t_int = 0.0;
+            let mut d_tt_int = 0.0;
+
+            let sigma_j2 = 0.5 * (sigma_eff - r0);
+            let sigma_j2_t = -0.5 * r0_t;
+            let sigma_j2_tt = -0.5 * r0_tt;
+
+            for i in 0..21 {
+                let xk = X_NODES_21[i];
+                let wk = W_NODES_21[i];
+                let one_minus_xk = 1.0 - xk;
+
+                let r = sigma_j2 * xk + sigma_j2 + r0;
+                let r_t = 0.5 * one_minus_xk * r0_t;
+                let r_tt = 0.5 * one_minus_xk * r0_tt;
+
+                let (u, u_r, u_rr) = self.evaluate_classical(r);
+
+                let pref = sigma_j2 * wk;
+                let pref_t = sigma_j2_t * wk;
+                let pref_tt = sigma_j2_tt * wk;
+
+                let minus_exp = -(-u * inv_t).exp();
+                let one_plus_mexp = 1.0 + minus_exp;
+                d_int += pref * one_plus_mexp;
+
+                let dt3 = u * inv_t2 - u_r * r_t * inv_t;
+                d_t_int += pref * minus_exp * dt3 + pref_t * one_plus_mexp;
+
+                let d_tt2 = minus_exp * dt3;
+                let d_tt3 = 2.0 * u_r * r_t * inv_t2
+                    - 2.0 * u * inv_t3
+                    - u_rr * (r_t * r_t) * inv_t
+                    - u_r * r_tt * inv_t;
+                d_tt_int += pref_t * minus_exp * dt3
+                    + pref * d_tt2 * dt3
+                    + pref * minus_exp * d_tt3
+                    + pref_tt * one_plus_mexp
+                    + pref_t * d_tt2;
+            }
+
+            return Ok((r0 + d_int, r0_t + d_t_int, r0_tt + d_tt_int));
+        }
+
+        // Quantum Feynman-Hibbs path: solve r0 (where exp(-beta u(r0)) = machine_prec).
+        let mut rs = 0.70;
+        for _ in 0..25 {
+            let r = rs * sigma_eff;
+            let pot = self.evaluate(r, temperature);
+            let f = pot.u_divk * inv_t + ln_eps;
+            let df = sigma_eff * pot.u_divk_r * inv_t;
+            let d2f = sigma_eff * sigma_eff * pot.u_divk_rr * inv_t;
+            let step = -f / df * (1.0 + f * d2f / (2.0 * df * df));
+            rs += step;
+            if step.abs() < 1e-15 {
+                break;
+            }
+        }
+
+        let r0 = rs * sigma_eff;
+        let pot0 = self.evaluate(r0, temperature);
+        let r0_t = -(pot0.u_divk_t + ln_eps) / pot0.u_divk_r;
+        let r0_tt = -(pot0.u_divk_tt + 2.0 * pot0.u_divk_tr * r0_t + pot0.u_divk_rr * r0_t * r0_t)
+            / pot0.u_divk_r;
+
+        // Kronrod 21 quadrature integration on [r0, sigma_eff].
+        let mut d_int = 0.0;
+        let mut d_t_int = 0.0;
+        let mut d_tt_int = 0.0;
+
+        let sigma_j2 = 0.5 * (sigma_eff - r0);
+        let sigma_j2_t = 0.5 * (sig_t - r0_t);
+        let sigma_j2_tt = 0.5 * (sig_tt - r0_tt);
+
+        for i in 0..21 {
+            let xk = X_NODES_21[i];
+            let wk = W_NODES_21[i];
+
+            let r = sigma_j2 * xk + sigma_j2 + r0;
+            let r_t = sigma_j2_t * xk + sigma_j2_t + r0_t;
+            let r_tt = sigma_j2_tt * xk + sigma_j2_tt + r0_tt;
+
+            let pot = self.evaluate(r, temperature);
+
+            let pref = sigma_j2 * wk;
+            let pref_t = sigma_j2_t * wk;
+            let pref_tt = sigma_j2_tt * wk;
+
+            let minus_exp = -(-pot.u_divk * inv_t).exp();
+            d_int += pref * (1.0 + minus_exp);
+
+            let dt3 = pot.u_divk * inv_t2 - pot.u_divk_t * inv_t - pot.u_divk_r * r_t * inv_t;
+            let d_t1 = pref;
+            let d_t2 = minus_exp;
+            let d_t4 = pref_t;
+            let d_t5 = 1.0 + minus_exp;
+            d_t_int += d_t1 * d_t2 * dt3 + d_t4 * d_t5;
+
+            let d_tt1 = pref_t;
+            let d_tt2 = minus_exp * dt3;
+            let d_tt3 = 2.0 * pot.u_divk_t * inv_t2 + 2.0 * pot.u_divk_r * r_t * inv_t2
+                - 2.0 * pot.u_divk * inv_t3
+                - pot.u_divk_tt * inv_t
+                - 2.0 * pot.u_divk_tr * r_t * inv_t
+                - pot.u_divk_rr * (r_t * r_t) * inv_t
+                - pot.u_divk_r * r_tt * inv_t;
+            let d_tt4 = pref_tt;
+            let d_tt5 = d_tt2;
+            d_tt_int += d_tt1 * d_t2 * dt3
+                + d_t1 * d_tt2 * dt3
+                + d_t1 * d_t2 * d_tt3
+                + d_tt4 * d_t5
+                + d_t4 * d_tt5;
+        }
+
+        Ok((r0 + d_int, r0_t + d_t_int, r0_tt + d_tt_int))
     }
 }
 
@@ -1158,79 +3801,7 @@ pub(crate) fn calc_hardsphere_diameter_pure(
     d_param: f64,
     fh_order: i32,
 ) -> Result<(f64, f64, f64)> {
-    // 1. Solve effective sigma (where U(r) = 0)
-    let (sigma_eff, sig_t, sig_tt) = if fh_order == 0 {
-        (sigma, 0.0, 0.0)
-    } else {
-        let mut r = sigma;
-        for _ in 0..25 {
-            let pot = calc_mie_potential_full(
-                r,
-                temperature,
-                sigma,
-                eps_depth_divk,
-                lambda_a,
-                lambda_r,
-                c_fac,
-                d_param,
-                fh_order,
-            );
-            let f = pot.u_divk;
-            let df = pot.u_divk_r;
-            let d2f = pot.u_divk_rr;
-            let step = -f / df * (1.0 + f * d2f / (2.0 * df * df));
-            r += step;
-            if step.abs() < 1e-15 * sigma {
-                break;
-            }
-        }
-        let pot = calc_mie_potential_full(
-            r,
-            temperature,
-            sigma,
-            eps_depth_divk,
-            lambda_a,
-            lambda_r,
-            c_fac,
-            d_param,
-            fh_order,
-        );
-        let s_t = -pot.u_divk_t / pot.u_divk_r;
-        let s_tt =
-            -(pot.u_divk_tt + pot.u_divk_rr * s_t * s_t + 2.0 * pot.u_divk_tr * s_t) / pot.u_divk_r;
-        (r, s_t, s_tt)
-    };
-
-    // 2. Solve r0 (where exp(-beta u(r0)) = machine_prec)
-    let ln_eps = MACHINE_PREC.ln();
-    let mut rs = 0.70;
-    for _ in 0..25 {
-        let r = rs * sigma_eff;
-        let pot = calc_mie_potential_full(
-            r,
-            temperature,
-            sigma,
-            eps_depth_divk,
-            lambda_a,
-            lambda_r,
-            c_fac,
-            d_param,
-            fh_order,
-        );
-        let f = pot.u_divk / temperature + ln_eps;
-        let df = sigma_eff * pot.u_divk_r / temperature;
-        let d2f = sigma_eff * sigma_eff * pot.u_divk_rr / temperature;
-        let step = -f / df * (1.0 + f * d2f / (2.0 * df * df));
-        rs += step;
-        if step.abs() < 1e-15 {
-            break;
-        }
-    }
-
-    let r0 = rs * sigma_eff;
-    let pot0 = calc_mie_potential_full(
-        r0,
-        temperature,
+    let pair = PairPotential {
         sigma,
         eps_depth_divk,
         lambda_a,
@@ -1238,160 +3809,9 @@ pub(crate) fn calc_hardsphere_diameter_pure(
         c_fac,
         d_param,
         fh_order,
-    );
-    let r0_t = -(pot0.u_divk_t + ln_eps) / pot0.u_divk_r;
-    let r0_tt = -(pot0.u_divk_tt + 2.0 * pot0.u_divk_tr * r0_t + pot0.u_divk_rr * r0_t * r0_t)
-        / pot0.u_divk_r;
-
-    // 3. Kronrod 21 Quadrature integration on [r0, sigma_eff]
-    let mut d_int = 0.0;
-    let mut d_t_int = 0.0;
-    let mut d_tt_int = 0.0;
-
-    let sigma_j2 = 0.5 * (sigma_eff - r0);
-    let sigma_j2_t = 0.5 * (sig_t - r0_t);
-    let sigma_j2_tt = 0.5 * (sig_tt - r0_tt);
-
-    // Symmetric 21 points
-    let mut x_nodes = [0.0; 21];
-    let mut w_nodes = [0.0; 21];
-    for i in 0..10 {
-        x_nodes[i] = -XK_21[i];
-        x_nodes[11 + i] = XK_21[9 - i];
-        w_nodes[i] = WK_21[i];
-        w_nodes[11 + i] = WK_21[9 - i];
-    }
-    x_nodes[10] = 0.0;
-    w_nodes[10] = WK_21[10];
-
-    let t2 = temperature * temperature;
-    let t3 = t2 * temperature;
-
-    for i in 0..21 {
-        let xk = x_nodes[i];
-        let wk = w_nodes[i];
-
-        let r = sigma_j2 * xk + sigma_j2 + r0;
-        let r_t = sigma_j2_t * xk + sigma_j2_t + r0_t;
-        let r_tt = sigma_j2_tt * xk + sigma_j2_tt + r0_tt;
-
-        let pot = calc_mie_potential_full(
-            r,
-            temperature,
-            sigma,
-            eps_depth_divk,
-            lambda_a,
-            lambda_r,
-            c_fac,
-            d_param,
-            fh_order,
-        );
-
-        let pref = sigma_j2 * wk;
-        let pref_t = sigma_j2_t * wk;
-        let pref_tt = sigma_j2_tt * wk;
-
-        let minus_exp = -(-pot.u_divk / temperature).exp();
-        d_int += pref * (1.0 + minus_exp);
-
-        let dt3 = pot.u_divk / t2 - pot.u_divk_t / temperature - pot.u_divk_r * r_t / temperature;
-        let d_t1 = pref;
-        let d_t2 = minus_exp;
-        let d_t4 = pref_t;
-        let d_t5 = 1.0 + minus_exp;
-        d_t_int += d_t1 * d_t2 * dt3 + d_t4 * d_t5;
-
-        let d_tt1 = pref_t;
-        let d_tt2 = minus_exp * dt3;
-        let d_tt3 = pot.u_divk_t / t2 + pot.u_divk_r * r_t / t2
-            - 2.0 * pot.u_divk / t3
-            - pot.u_divk_tt / temperature
-            - pot.u_divk_tr * r_t / temperature
-            + pot.u_divk_t / t2
-            - pot.u_divk_tr * r_t / temperature
-            - pot.u_divk_rr * (r_t * r_t) / temperature
-            - pot.u_divk_r * r_tt / temperature
-            + pot.u_divk_r * r_t / t2;
-        let d_tt4 = pref_tt;
-        let d_tt5 = d_tt2;
-        d_tt_int += d_tt1 * d_t2 * dt3
-            + d_t1 * d_tt2 * dt3
-            + d_t1 * d_t2 * d_tt3
-            + d_tt4 * d_t5
-            + d_t4 * d_tt5;
-    }
-
-    Ok((r0 + d_int, r0_t + d_t_int, r0_tt + d_tt_int))
-}
-
-fn calc_eff_eta(eta: f64, lam: f64) -> f64 {
-    let inv_lam = [1.0, 1.0 / lam, 1.0 / (lam * lam), 1.0 / (lam * lam * lam)];
-    let mut c_vec = [0.0; 4];
-    for j in 0..4 {
-        for i in 0..4 {
-            c_vec[j] += LAM_COEFF[i][j] * inv_lam[i];
-        }
-    }
-    eta * (c_vec[0] + eta * (c_vec[1] + eta * (c_vec[2] + eta * c_vec[3])))
-}
-
-fn calc_eff_eta_with_deriv(eta: f64, lam: f64) -> (f64, f64) {
-    let inv_lam = [1.0, 1.0 / lam, 1.0 / (lam * lam), 1.0 / (lam * lam * lam)];
-    let mut c_vec = [0.0; 4];
-    for j in 0..4 {
-        for i in 0..4 {
-            c_vec[j] += LAM_COEFF[i][j] * inv_lam[i];
-        }
-    }
-    let ef = eta * (c_vec[0] + eta * (c_vec[1] + eta * (c_vec[2] + eta * c_vec[3])));
-    let ef_e = c_vec[0] + eta * (2.0 * c_vec[1] + eta * (3.0 * c_vec[2] + 4.0 * eta * c_vec[3]));
-    (ef, ef_e)
-}
-
-fn calc_a1_sutherland(eta: f64, lam: f64, eps_val: f64) -> f64 {
-    let ef = calc_eff_eta(eta, lam);
-    let pref = 6.0 * eps_val / (lam - 3.0);
-    let om = 1.0 - ef;
-    let denum = om * om * om;
-    -2.0 * pref * (1.0 - 0.5 * ef) / denum
-}
-
-fn calc_a1_sutherland_with_deriv(eta: f64, lam: f64, eps_val: f64) -> (f64, f64) {
-    let (ef, ef_e) = calc_eff_eta_with_deriv(eta, lam);
-    let pref = 6.0 * eps_val / (lam - 3.0);
-    let om = 1.0 - ef;
-    let denum = om * om * om;
-    let as_val = -2.0 * pref * (1.0 - 0.5 * ef) / denum;
-    let temp1 = -pref * (5.0 - 2.0 * ef) / denum / (1.0 - ef);
-    let as_e = temp1 * ef_e;
-    (as_val, as_e)
-}
-
-fn calc_b_tilde(x0: f64, eta: f64, lam: f64, eps_val: f64) -> f64 {
-    let i_term = -(x0.powf(3.0 - lam) - 1.0) / (lam - 3.0);
-    let j_term = -((lam - 3.0) * x0.powf(4.0 - lam) - (lam - 4.0) * x0.powf(3.0 - lam) - 1.0)
-        / ((lam - 3.0) * (lam - 4.0));
-    let om = 1.0 - eta;
-    let d3 = om * om * om;
-    let keta10 = (2.0 - eta) / d3;
-    let keta20 = -9.0 * eta * (1.0 + eta) / d3;
-    6.0 * eps_val * (keta10 * i_term + keta20 * j_term)
-}
-
-fn calc_b_tilde_with_deriv(x0: f64, eta: f64, lam: f64, eps_val: f64) -> (f64, f64) {
-    let i_term = -(x0.powf(3.0 - lam) - 1.0) / (lam - 3.0);
-    let j_term = -((lam - 3.0) * x0.powf(4.0 - lam) - (lam - 4.0) * x0.powf(3.0 - lam) - 1.0)
-        / ((lam - 3.0) * (lam - 4.0));
-    let om = 1.0 - eta;
-    let d3 = om * om * om;
-    let d4 = (1.0 - eta) * d3;
-    let keta10 = (2.0 - eta) / d3;
-    let keta11 = (5.0 - 2.0 * eta) / d4;
-    let keta20 = -9.0 * eta * (1.0 + eta) / d3;
-    let keta21 = -9.0 * (eta * eta + 4.0 * eta + 1.0) / d4;
-    let b_val = 6.0 * eps_val * (keta10 * i_term + keta20 * j_term);
-    let b_e = 6.0 * eps_val * (keta11 * i_term + keta21 * j_term);
-    (b_val, b_e)
+        second_factor: 0.5,
+    };
+    pair.diameter(temperature, pair.effective_sigma(temperature))
 }
 
 /// The six coefficients of the polynomials of the van der Waals attractive
@@ -1411,4 +3831,136 @@ pub(crate) fn alpha_coefficients(alpha: f64) -> [f64; 6] {
         f_alpha[k] = num / den;
     }
     f_alpha
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn recovery_eval_count_is_strictly_bounded_on_rejected_minimum_gibbs_and_recovered_cases() {
+        // 1. Rejected stiff dense liquids must bound ULP recovery to <= 16 evaluations.
+        let h2o = SaftVrMie::new(&["H2O"]).unwrap();
+        let prep_w = h2o.prepare(300.0, &[1.0]).unwrap();
+        let att_w = prep_w
+            .solve_single_phase_attempt(0.001, Phase::Liquid, true)
+            .unwrap();
+        assert!(!att_w.closed);
+        assert!(
+            att_w.recovery_evals <= 16,
+            "H2O 300 K 0.001 Pa Liquid recovery evals = {} (> 16)",
+            att_w.recovery_evals
+        );
+
+        let nh3 = SaftVrMie::new(&["NH3"]).unwrap();
+        let prep_n100 = nh3.prepare(100.0, &[1.0]).unwrap();
+        let att_n100 = prep_n100
+            .solve_single_phase_attempt(0.01, Phase::Liquid, true)
+            .unwrap();
+        assert!(!att_n100.closed);
+        assert!(
+            att_n100.recovery_evals <= 16,
+            "NH3 100 K 0.01 Pa Liquid recovery evals = {} (> 16)",
+            att_n100.recovery_evals
+        );
+
+        // 2. MinimumGibbs at low pressure where vapor clearly wins must pay 0 liquid
+        // recovery evaluations and return the pressure-closed vapor root.
+        let (v_min, liq_rec_evals) = prep_w.solve_minimum_gibbs(0.001).unwrap();
+        assert_eq!(
+            liq_rec_evals, 0,
+            "H2O 300 K 0.001 Pa MinimumGibbs should not run liquid recovery before vapor wins"
+        );
+        let j_min = prep_w.pressure_and_derivatives(1.0 / v_min).unwrap();
+        assert!((j_min.pressure - 0.001).abs() <= 1.0e-6 * 0.001);
+
+        // 3. Successful steep liquid recovery (NH3 130 K at P = 2.20945469250487 Pa)
+        // must close within 1e-6 using a small bounded evaluation count.
+        let prep_n130 = nh3.prepare(130.0, &[1.0]).unwrap();
+        let p_130 = 2.20945469250487_f64;
+        let att_n130 = prep_n130
+            .solve_single_phase_attempt(p_130, Phase::Liquid, true)
+            .unwrap();
+        assert!(att_n130.closed);
+        assert!((att_n130.pressure - p_130).abs() <= 1.0e-6 * p_130);
+        assert!(
+            att_n130.recovery_evals <= 50,
+            "NH3 130 K Liquid recovery evals = {} (> 50)",
+            att_n130.recovery_evals
+        );
+
+        // 4. NH3 120 K (0.275800421086915 Pa, 0.65 Pa) and NC20 302.5 K dense liquid
+        // recovery must close strictly within 1e-6 with small bounded evaluation counts.
+        let prep_n120 = nh3.prepare(120.0, &[1.0]).unwrap();
+        for &p_t in &[0.275800421086915_f64, 0.65] {
+            let att = prep_n120
+                .solve_single_phase_attempt(p_t, Phase::Liquid, true)
+                .unwrap();
+            assert!(att.closed, "NH3 120 K P={p_t} did not close");
+            assert!((att.pressure - p_t).abs() <= 1.0e-6 * p_t);
+            assert!(
+                att.recovery_evals <= 16,
+                "NH3 120 K P={p_t} recovery evals = {} (> 16)",
+                att.recovery_evals
+            );
+        }
+        let nc20 = SaftVrMie::new(&["NC20"]).unwrap();
+        let prep_nc20 = nc20.prepare(302.5, &[1.0]).unwrap();
+        let p_nc20 = prep_nc20
+            .pressure_and_derivatives(1.0 / 3.589_084_473_985_682e-4)
+            .unwrap()
+            .pressure;
+        let att_nc20 = prep_nc20
+            .solve_single_phase_attempt(p_nc20, Phase::Liquid, true)
+            .unwrap();
+        assert!(att_nc20.closed, "NC20 302.5 K P={p_nc20} did not close");
+        assert!((att_nc20.pressure - p_nc20).abs() <= 1.0e-6 * p_nc20);
+        assert!(
+            att_nc20.recovery_evals <= 16,
+            "NC20 302.5 K recovery evals = {} (> 16)",
+            att_nc20.recovery_evals
+        );
+    }
+
+    #[test]
+    fn assoc_dufal_fast_path_matches_high_precision_reference() {
+        type DufalCase = (&'static [&'static str], f64, &'static [f64], f64, f64);
+        let cases: &[DufalCase] = &[
+            // Routine vapor and moderate/high-density states
+            (&["H2O"], 300.0, &[1.0], 4.0e-7, 1e-13),
+            (&["H2O"], 300.0, &[1.0], 55_500.0, 1e-13),
+            (&["NH3"], 320.0, &[1.0], 30_000.0, 1e-13),
+            (&["H2O", "MEOH"], 370.0, &[0.4, 0.6], 14_000.0, 1e-13),
+            // Cancellation-sensitive cold dense liquid states
+            (&["NH3"], 120.0, &[1.0], 1.0 / 2.140022878775016e-5, 1e-14),
+            (&["NH3"], 130.0, &[1.0], 1.0 / 2.163165264149184e-5, 1e-14),
+        ];
+        for &(comps, t, x, rho, rtol) in cases {
+            let eos = SaftVrMie::new(comps).unwrap();
+            let prep = eos.prepare(t, x).unwrap();
+            let rdf = MieRdf::new(&prep, rho);
+            for i in 0..comps.len() {
+                for j in i..comps.len() {
+                    let fast0 = rdf.integral::<0>(i, j);
+                    let ref0 = rdf.integral_high_precision::<0>(i, j);
+                    assert!(
+                        (fast0[0] - ref0[0]).abs() <= 1e-15 + rtol * ref0[0].abs(),
+                        "{comps:?} T={t} rho={rho} ({i},{j}) ORDER=0: {} vs {}",
+                        fast0[0],
+                        ref0[0]
+                    );
+                    let fast2 = rdf.integral::<2>(i, j);
+                    let ref2 = rdf.integral_high_precision::<2>(i, j);
+                    for k in 0..6 {
+                        assert!(
+                            (fast2[k] - ref2[k]).abs() <= 1e-14 + rtol * ref2[k].abs(),
+                            "{comps:?} T={t} rho={rho} ({i},{j}) ORDER=2 slot {k}: {} vs {}",
+                            fast2[k],
+                            ref2[k]
+                        );
+                    }
+                }
+            }
+        }
+    }
 }

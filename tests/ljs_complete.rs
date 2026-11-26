@@ -1484,3 +1484,44 @@ fn dense_low_pressure_cancellation_flat_root_close_gibbs_and_overflow_rejection(
     assert!(LjsUv::new().volumes(200.0, 1.0e-306).is_err());
     assert!(lj_uf.volumes(200.0, 1.0e-306).is_err());
 }
+
+#[test]
+fn vapor_volume_overflow_does_not_select_liquid() {
+    let model = LjsBh::new();
+    let temperature = 85.0;
+    let pressure = 1.0e-306;
+    let liquid = model.volume(temperature, pressure, Phase::Liquid).unwrap();
+    assert_close(
+        "dense liquid volume",
+        liquid,
+        3.336_851_696_116_317e-5,
+        1e-12,
+        0.0,
+    );
+    for result in [
+        model.volumes(temperature, pressure).map(|_| ()),
+        model
+            .volume(temperature, pressure, Phase::Vapor)
+            .map(|_| ()),
+        model
+            .volume(temperature, pressure, Phase::MinimumGibbs)
+            .map(|_| ()),
+    ] {
+        assert!(
+            matches!(result, Err(thermopack_rs::Error::InvalidInput(_))),
+            "{result:?}"
+        );
+    }
+
+    let pressure = 3.970_625_475_093_25e-306;
+    let roots = model.volumes(temperature, pressure).unwrap();
+    assert_eq!(roots.len(), 2);
+    assert_close("dense liquid volume", roots[0], liquid, 1e-12, 0.0);
+    let vapor = roots[1];
+    assert!(vapor.is_finite() && vapor > 1.0e308);
+    let round_trip = model.pressure_tv(temperature, vapor, 1.0).unwrap().value;
+    assert!((round_trip / pressure - 1.0).abs() < 1e-8, "{round_trip:e}");
+    for phase in [Phase::Vapor, Phase::MinimumGibbs] {
+        assert_eq!(model.volume(temperature, pressure, phase).unwrap(), vapor);
+    }
+}

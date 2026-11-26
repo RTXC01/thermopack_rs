@@ -68,8 +68,11 @@ volume-solve interfaces:
   (largest molar volume), or `Phase::MinimumGibbs` (minimum
   `a_res + Z - 1 - ln(Z)`, falling back to adaptive Gauss-Legendre integration
   of `int (P(T, V) - P_spec) dV` when direct reduced Gibbs energies reach
-  cancellation). This fixes the earlier `LjsBh::volume` behavior that scanned
-  past the `eta = 1` pole for liquid states.
+  cancellation). If a stable root is outside the finite molar-volume range,
+  `volumes` and `Phase::MinimumGibbs` return a range error. Explicit liquid and
+  vapor requests can still return their own root when it is representable.
+  This fixes the earlier `LjsBh::volume` behavior that scanned past the
+  `eta = 1` pole for liquid states.
 * **Exact source compatibility iteration** (`baseline_volume_iteration`):
   reproduces `src/saft_interface.f90:pc_saft_nonassoc_volume_solver`
   (`zeta_min = 1e-10`, `zeta_max = 0.75`, vapor seed `1e-10`, liquid seed

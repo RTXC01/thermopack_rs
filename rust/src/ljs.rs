@@ -613,16 +613,42 @@ where
     Ok(None)
 }
 
-/// Find all mechanically stable molar volumes (m^3/mol) at `(T, P)` on the
-/// physical packing-fraction domain `eta in (0, 0.75]` (extended up to `0.90`
-/// only when `P(0.75) < P_spec`). Returns molar volumes sorted ascending
-/// (liquid first, vapor last).
+const MOLAR_VOLUME_RANGE_ERROR: Error =
+    Error::InvalidInput("molar volume overflowed finite floating-point range");
+
+struct PhysicalVolumeRoots {
+    volumes: Vec<f64>,
+    below_range: bool,
+    above_range: bool,
+}
+
+/// Find all mechanically stable molar volumes (m^3/mol) at `(T, P)`.
+/// Return an error if any stable root cannot be represented.
 pub(crate) fn solve_physical_volumes<F>(
     temperature: f64,
     pressure: f64,
     eta_per_rho: f64,
     p_and_dp_drho: F,
 ) -> Result<Vec<f64>>
+where
+    F: Fn(f64) -> Result<(f64, f64)>,
+{
+    let roots = find_physical_volume_roots(temperature, pressure, eta_per_rho, p_and_dp_drho)?;
+    if roots.below_range || roots.above_range {
+        return Err(MOLAR_VOLUME_RANGE_ERROR);
+    }
+    Ok(roots.volumes)
+}
+
+// Search eta in (0, 0.75], extending up to 0.90 when P(0.75) < P_spec.
+// Preserve out-of-range roots so phase selection can distinguish a missing
+// representation from a genuinely single-phase state.
+fn find_physical_volume_roots<F>(
+    temperature: f64,
+    pressure: f64,
+    eta_per_rho: f64,
+    p_and_dp_drho: F,
+) -> Result<PhysicalVolumeRoots>
 where
     F: Fn(f64) -> Result<(f64, f64)>,
 {
@@ -816,9 +842,12 @@ where
     // Deduplicate, verify mechanical stability (dP/drho > 0) and closure within
     // the local pressure-evaluation resolution, and reject unrepresentable volumes.
     root_etas.sort_by(f64::total_cmp);
-    let mut volumes = Vec::new();
+    let mut roots = PhysicalVolumeRoots {
+        volumes: Vec::new(),
+        below_range: false,
+        above_range: false,
+    };
     let mut prev_eta: Option<f64> = None;
-    let mut saw_unrepresentable_volume = false;
     for eta in root_etas {
         if let Some(prev) = prev_eta
             && (eta - prev).abs() <= 1.0e-12 * eta
@@ -831,28 +860,29 @@ where
         let p_accept = (1.0e-8 * pressure).max(4096.0 * f64::EPSILON * p_scale);
         if dp > 0.0 && (p - pressure).abs() <= p_accept {
             let v = eta_per_rho / eta;
-            if v.is_finite() && v > 0.0 && (1.0 / v).is_finite() && (1.0 / v) > 0.0 {
-                volumes.push(v);
-                prev_eta = Some(eta);
+            let rho_from_v = 1.0 / v;
+            if !v.is_finite() || rho_from_v == 0.0 {
+                roots.above_range = true;
+            } else if v <= 0.0 || !rho_from_v.is_finite() {
+                roots.below_range = true;
             } else {
-                saw_unrepresentable_volume = true;
+                roots.volumes.push(v);
             }
+            prev_eta = Some(eta);
         }
     }
 
     // Sort ascending molar volume (liquid = smallest v first, vapor = largest v last).
-    volumes.sort_by(f64::total_cmp);
-    if volumes.is_empty() {
-        if saw_unrepresentable_volume {
-            return Err(Error::InvalidInput(
-                "molar volume overflowed finite floating-point range",
-            ));
+    roots.volumes.sort_by(f64::total_cmp);
+    if roots.volumes.is_empty() {
+        if roots.below_range || roots.above_range {
+            return Err(MOLAR_VOLUME_RANGE_ERROR);
         }
         return Err(Error::NotConverged(
             "no mechanically stable physical volume root found",
         ));
     }
-    Ok(volumes)
+    Ok(roots)
 }
 
 /// 8-point Gauss-Legendre quadrature nodes on `[-1, 1]`.
@@ -952,7 +982,16 @@ where
     F: Fn(f64) -> Result<(f64, f64)>,
     G: Fn(f64) -> Result<f64>,
 {
-    let roots = solve_physical_volumes(temperature, pressure, eta_per_rho, &p_and_dp_drho)?;
+    let roots = find_physical_volume_roots(temperature, pressure, eta_per_rho, &p_and_dp_drho)?;
+    let phase_outside_range = match phase {
+        Phase::Liquid => roots.below_range,
+        Phase::Vapor => roots.above_range,
+        Phase::MinimumGibbs => roots.below_range || roots.above_range,
+    };
+    if phase_outside_range {
+        return Err(MOLAR_VOLUME_RANGE_ERROR);
+    }
+    let roots = roots.volumes;
     match phase {
         Phase::Liquid => Ok(roots[0]),
         Phase::Vapor => Ok(*roots.last().expect("non-empty roots")),

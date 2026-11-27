@@ -212,6 +212,11 @@ name = "ljs"
 path = "rust/benches/ljs.rs"
 harness = false
 
+[[bench]]
+name = "cpa"
+path = "rust/benches/cpa.rs"
+harness = false
+
 [lints.rust]
 unsafe_code = "forbid"
 

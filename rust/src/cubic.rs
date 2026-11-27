@@ -51,6 +51,7 @@ pub struct Cubic {
     variable_beta: bool,
     kij: Vec<f64>,
     lij: Vec<f64>,
+    b_exponent: f64,
     nonzero_kij: Vec<(usize, usize, f64)>,
     translation_parameters: Option<Vec<crate::VolumeTranslation>>,
     translation_enabled: bool,
@@ -136,6 +137,32 @@ pub struct PseudoCritical {
     pub pressure: f64,
     pub volume: f64,
     pub compressibility: f64,
+}
+
+/// Complete 10-block reduced residual Helmholtz energy `F = A^res / (R T)` and
+/// all first and second `(T, V, n)` derivatives for a cubic equation of state.
+#[derive(Debug, Clone)]
+pub struct CubicHelmholtz {
+    /// Dimensionless reduced residual Helmholtz energy `F = A^res / (R T)`.
+    pub f: f64,
+    /// `dF / dT` [1/K].
+    pub f_t: f64,
+    /// `dF / dV` [1/m^3].
+    pub f_v: f64,
+    /// `dF / dn_i` [1/mol].
+    pub f_n: Vec<f64>,
+    /// `d^2F / dT^2` [1/K^2].
+    pub f_tt: f64,
+    /// `d^2F / (dT dV)` [1/(K m^3)].
+    pub f_tv: f64,
+    /// `d^2F / (dT dn_i)` [1/(K mol)].
+    pub f_tn: Vec<f64>,
+    /// `d^2F / dV^2` [1/m^6].
+    pub f_vv: f64,
+    /// `d^2F / (dV dn_i)` [1/(m^3 mol)].
+    pub f_vn: Vec<f64>,
+    /// `d^2F / (dn_i dn_j)` [1/mol^2], row-major `nc * nc`.
+    pub f_nn: Vec<f64>,
 }
 
 /// Cached temperature and composition parameters. Volume/pressure scans
@@ -295,10 +322,10 @@ impl PreparedState<'_> {
                     .beta
                     .as_ref()
                     .map_or(self.model.bi[j], |b| b.components[j].value);
-                b2 += direction[i] * dj * (1.0 - self.model.lij[i * n + j]) * (bi + bj) / 2.0;
+                b2 += direction[i] * dj * self.model.pair_covolume(i, j, bi, bj);
                 d2 += direction[i]
                     * dj
-                    * (1.0 - self.model.kij[i * n + j])
+                    * (1.0 - self.model.vdw_kij(i, j))
                     * self.factors().0[i]
                     * self.factors().0[j];
             }
@@ -382,10 +409,10 @@ impl PreparedState<'_> {
                         .beta
                         .as_ref()
                         .map_or(self.model.bi[j], |b| b.components[j].value);
-                    let bij = (1.0 - self.model.lij[i * n + j]) * (bii + bjj) / 2.0;
+                    let bij = self.model.pair_covolume(i, j, bii, bjj);
                     (
                         2.0 * bij - bi - bj,
-                        2.0 * (1.0 - self.model.kij[i * n + j])
+                        2.0 * (1.0 - self.model.vdw_kij(i, j))
                             * self.factors().0[i]
                             * self.factors().0[j],
                     )
@@ -806,9 +833,7 @@ impl Cubic {
         if tcpr || quantum || options.volume_translation {
             model.enable_volume_translation(parameter_reference)?;
         }
-        if options.wong_sandler.is_some()
-            && options.mixing_rule != crate::excess_gibbs::MixingRule::WongSandler
-        {
+        if options.wong_sandler.is_some() && !options.mixing_rule.is_wong_sandler() {
             return Err(Error::InvalidInput(
                 "the Wong-Sandler parameters need the Wong-Sandler mixing rule",
             ));
@@ -819,10 +844,12 @@ impl Cubic {
                 crate::excess_gibbs::MixingRule::HuronVidal1
                     | crate::excess_gibbs::MixingRule::HuronVidal2
                     | crate::excess_gibbs::MixingRule::Nrtl
+                    | crate::excess_gibbs::MixingRule::HvWongSandler
             ) {
                 // cbSelect's GE path requests "Classic", whereas this fork's
-                // binary records are labelled "vdW". Its lookup returns zero;
-                // it also leaves the covolume interactions at zero.
+                // binary records are labelled "vdW" (and cbMixHVWongSandler has
+                // no branch in tpSelectInteractionParameters). Its lookup
+                // returns zero and leaves covolume interactions at zero.
                 model.kij.fill(0.0);
                 model.lij.fill(0.0);
                 model.rebuild_pairs();
@@ -845,6 +872,61 @@ impl Cubic {
                 model.wong_sandler = Some(data.clone());
             }
             model.mixing_rule = options.mixing_rule;
+        }
+        Ok(model)
+    }
+
+    /// Construct a cubic base model for CPA with CPA-specific excess Gibbs
+    /// initialization (`"CPA-SRK"` / `"CPA-PR"`).
+    pub(crate) fn new_cpa_base(
+        kind: CubicKind,
+        names: &[&str],
+        mixing_rule: crate::excess_gibbs::MixingRule,
+        alpha: crate::AlphaCorrelation,
+        parameter_reference: &str,
+        wong_sandler: Option<&crate::wong_sandler::WongSandlerData>,
+    ) -> Result<Self> {
+        let mut model = Self::new_with_references(
+            kind,
+            names,
+            alpha,
+            parameter_reference,
+            parameter_reference,
+            false,
+        )?;
+        model.kij.fill(0.0);
+        model.lij.fill(0.0);
+        model.rebuild_pairs();
+        if wong_sandler.is_some() && !mixing_rule.is_wong_sandler() {
+            return Err(Error::InvalidInput(
+                "the Wong-Sandler parameters need a Wong-Sandler mixing rule",
+            ));
+        }
+        if mixing_rule.is_excess_gibbs() {
+            let comp_idents: Vec<&str> = model.components.iter().map(|c| c.ident).collect();
+            let cpa_eos_name = match kind {
+                CubicKind::SoaveRedlichKwong => "CPA-SRK",
+                CubicKind::PengRobinson => "CPA-PR",
+                _ => kind.name(),
+            };
+            model.excess_gibbs = Some(crate::excess_gibbs::ExcessGibbsMixture::new(
+                &comp_idents,
+                mixing_rule,
+                cpa_eos_name,
+                Some(parameter_reference),
+                &model.kij,
+            )?);
+            if mixing_rule == crate::excess_gibbs::MixingRule::WongSandler {
+                let ws_data = wong_sandler
+                    .cloned()
+                    .unwrap_or_else(|| crate::wong_sandler::WongSandlerData::new(names.len()));
+                model.excess_gibbs.as_mut().unwrap().wong_sandler = Some(ws_data.clone());
+                model.wong_sandler = Some(ws_data);
+            } else if let Some(data) = wong_sandler {
+                model.excess_gibbs.as_mut().unwrap().wong_sandler = Some(data.clone());
+                model.wong_sandler = Some(data.clone());
+            }
+            model.mixing_rule = mixing_rule;
         }
         Ok(model)
     }
@@ -922,9 +1004,6 @@ impl Cubic {
         if composition.len() != count {
             return Err(Error::InvalidInput("composition mismatch"));
         }
-        let data = self.wong_sandler.as_ref().ok_or(Error::Unsupported(
-            "the Wong-Sandler mixing rule needs the binary parameters",
-        ))?;
         let mixture = self.excess_gibbs.as_ref().ok_or(Error::Unsupported(
             "the Wong-Sandler mixing rule needs the excess Gibbs model",
         ))?;
@@ -956,17 +1035,35 @@ impl Cubic {
             self.kind,
             crate::excess_gibbs::GeLimit::Infinite,
         );
-        crate::wong_sandler::wong_sandler_mix(
-            data,
-            temperature,
-            composition,
-            &a_pure,
-            &da_dt_pure,
-            &d2a_dt2_pure,
-            &self.bi,
-            limit_c,
-            &jet,
-        )
+        if self.mixing_rule == crate::excess_gibbs::MixingRule::HvWongSandler {
+            crate::wong_sandler::hv_wong_sandler_mix(
+                &self.kij,
+                &self.lij,
+                temperature,
+                composition,
+                &a_pure,
+                &da_dt_pure,
+                &d2a_dt2_pure,
+                &self.bi,
+                limit_c,
+                &jet,
+            )
+        } else {
+            let data = self.wong_sandler.as_ref().ok_or(Error::Unsupported(
+                "the Wong-Sandler mixing rule needs the binary parameters",
+            ))?;
+            crate::wong_sandler::wong_sandler_mix(
+                data,
+                temperature,
+                composition,
+                &a_pure,
+                &da_dt_pure,
+                &d2a_dt2_pure,
+                &self.bi,
+                limit_c,
+                &jet,
+            )
+        }
     }
 
     /// Initialize alpha as in tpInitAlphaCorr. The reference selects alpha
@@ -1106,6 +1203,7 @@ impl Cubic {
                 .collect(),
             kij: vec![0.0; count.pow(2)],
             lij: vec![0.0; count.pow(2)],
+            b_exponent: 1.0,
             nonzero_kij: Vec::new(),
             components,
             translation_parameters: None,
@@ -1254,6 +1352,7 @@ impl Cubic {
         pure.ideal_gases[0] = self.ideal_gases[index].clone();
         pure.set_volume_translation(0, self.volume_translation(index)?)?;
         pure.translation_enabled = self.translation_enabled;
+        pure.b_exponent = self.b_exponent;
         pure.caloric_minimum = self.caloric_minimum;
         pure.caloric_maximum = self.caloric_maximum;
         Ok(pure)
@@ -1368,6 +1467,12 @@ impl Cubic {
         Ok(matrix)
     }
 
+    #[inline]
+    fn vdw_kij(&self, i: usize, j: usize) -> f64 {
+        let (lo, hi) = if i <= j { (i, j) } else { (j, i) };
+        self.kij[lo * self.components.len() + hi]
+    }
+
     pub fn kij(&self, i: usize, j: usize) -> Result<f64> {
         self.validate_pair(i, j)?;
         Ok(self.kij[i * self.components.len() + j])
@@ -1391,6 +1496,31 @@ impl Cubic {
         Ok(())
     }
 
+    /// Set a single `(i, j)` entry of `kij` without modifying `(j, i)`,
+    /// mirroring `thermopack_setkij`.
+    pub fn set_kij_entry(&mut self, i: usize, j: usize, value: f64) -> Result<()> {
+        self.validate_pair(i, j)?;
+        if !value.is_finite() || (i == j && value != 0.0) {
+            return Err(Error::InvalidInput(
+                "finite kij with zero diagonal required",
+            ));
+        }
+        let n = self.components.len();
+        self.kij[i * n + j] = value;
+        if let Some(ge) = &mut self.excess_gibbs {
+            ge.pairs[i * n + j].kij = value;
+        }
+        self.rebuild_pairs();
+        Ok(())
+    }
+
+    /// Get binary covolume interaction parameter `lij` for pair `(i, j)`
+    /// (`thermopack_getlij`).
+    pub fn lij(&self, i: usize, j: usize) -> Result<f64> {
+        self.validate_pair(i, j)?;
+        Ok(self.lij[i * self.components.len() + j])
+    }
+
     pub fn set_lij(&mut self, i: usize, j: usize, value: f64) -> Result<()> {
         self.validate_pair(i, j)?;
         if !value.is_finite() || (i == j && value != 0.0) {
@@ -1402,6 +1532,168 @@ impl Cubic {
         self.lij[i * n + j] = value;
         self.lij[j * n + i] = value;
         Ok(())
+    }
+
+    /// Power-mean covolume mixing exponent `s` (`1.0` = linear, `4/3` = VTPR, `2.0` = UMR).
+    #[inline]
+    pub fn b_exponent(&self) -> f64 {
+        self.b_exponent
+    }
+
+    /// Set power-mean covolume mixing exponent `s > 0` (`cbCalcLowcasebij`).
+    pub fn set_b_exponent(&mut self, exponent: f64) -> Result<()> {
+        positive(exponent, "covolume mixing exponent")?;
+        self.b_exponent = exponent;
+        Ok(())
+    }
+
+    #[inline]
+    fn has_power_covolume(&self) -> bool {
+        (self.b_exponent - 1.0).abs() >= 1.0e-15
+    }
+
+    #[inline]
+    fn uses_quadratic_covolume(&self) -> bool {
+        self.has_power_covolume() || self.lij.iter().any(|&l| l != 0.0)
+    }
+
+    #[inline]
+    fn pair_covolume(&self, i: usize, j: usize, bii: f64, bjj: f64) -> f64 {
+        let n = self.components.len();
+        let lij_fac = 1.0 - self.lij[i * n + j];
+        if !self.has_power_covolume() {
+            lij_fac * 0.5 * (bii + bjj)
+        } else {
+            let s = self.b_exponent;
+            let inv_s = 1.0 / s;
+            let g = 0.5 * (bii.powf(inv_s) + bjj.powf(inv_s));
+            lij_fac * g.powf(s)
+        }
+    }
+
+    #[inline]
+    fn pair_covolume_with_t(
+        &self,
+        i: usize,
+        j: usize,
+        bi: crate::BetaValue,
+        bj: crate::BetaValue,
+    ) -> (f64, f64, f64) {
+        let n = self.components.len();
+        let lij_fac = 1.0 - self.lij[i * n + j];
+        if !self.has_power_covolume() {
+            (
+                lij_fac * 0.5 * (bi.value + bj.value),
+                lij_fac * 0.5 * (bi.dt + bj.dt),
+                lij_fac * 0.5 * (bi.dtt + bj.dtt),
+            )
+        } else {
+            let s = self.b_exponent;
+            let p = 1.0 / s;
+            let ui = bi.value.powf(p);
+            let uj = bj.value.powf(p);
+            let ui_t = p * ui * bi.dt / bi.value;
+            let uj_t = p * uj * bj.dt / bj.value;
+            let ui_tt = (p * ui / bi.value) * (bi.dtt + (p - 1.0) * bi.dt * bi.dt / bi.value);
+            let uj_tt = (p * uj / bj.value) * (bj.dtt + (p - 1.0) * bj.dt * bj.dt / bj.value);
+            let g = 0.5 * (ui + uj);
+            let g_t = 0.5 * (ui_t + uj_t);
+            let g_tt = 0.5 * (ui_tt + uj_tt);
+            let bij = lij_fac * g.powf(s);
+            let bij_t = s * bij * g_t / g;
+            let bij_tt = (s * bij / g) * (g_tt + (s - 1.0) * g_t * g_t / g);
+            (bij, bij_t, bij_tt)
+        }
+    }
+
+    /// Power-mean pair covolume `lowcase_bij(i, j) = (0.5 * (b_i^(1/s) + b_j^(1/s)))^s`
+    /// in SI units (`m^3/mol`), matching `cbmix::cbCalcLowcasebij`.
+    pub fn lowcase_bij(&self, i: usize, j: usize) -> Result<f64> {
+        self.validate_pair(i, j)?;
+        if !self.has_power_covolume() {
+            Ok(0.5 * (self.bi[i] + self.bi[j]))
+        } else {
+            let s = self.b_exponent;
+            let inv_s = 1.0 / s;
+            Ok((0.5 * (self.bi[i].powf(inv_s) + self.bi[j].powf(inv_s))).powf(s))
+        }
+    }
+
+    /// Mixture molar covolume `Bmix(z)` [m^3/mol] evaluated via `lowcase_bij`,
+    /// mirroring `cbmix::calcBmixCubic`.
+    pub fn calc_bmix_cubic(&self, z: &[f64]) -> Result<f64> {
+        let n = self.components.len();
+        if z.len() != n || z.iter().any(|v| !v.is_finite() || *v < 0.0) {
+            return Err(Error::InvalidInput("non-negative composition required"));
+        }
+        let sumn: f64 = z.iter().copied().sum();
+        positive(sumn, "total moles")?;
+        if !self.has_power_covolume() {
+            let sum_b: f64 = z.iter().zip(&self.bi).map(|(&zi, &bi)| zi * bi).sum();
+            return Ok(sum_b / sumn);
+        }
+        let mut bmix = 0.0;
+        for (i, &zi) in z.iter().enumerate() {
+            let mut bi = 0.0;
+            for (j, &zj) in z.iter().enumerate() {
+                bi += zj * self.lowcase_bij(i, j)?;
+            }
+            bmix += zi * bi;
+        }
+        Ok(bmix / (sumn * sumn))
+    }
+
+    pub(crate) fn validate_pair_indices(&self, i: usize, j: usize) -> Result<()> {
+        self.validate_pair(i, j)
+    }
+
+    pub(crate) fn set_alpha_direct(&mut self, index: usize, alpha: crate::Alpha) -> Result<()> {
+        let destination = self
+            .alpha
+            .get_mut(index)
+            .ok_or(Error::InvalidInput("component index out of range"))?;
+        *destination = alpha;
+        Ok(())
+    }
+
+    pub(crate) fn set_component_criticals_internal(
+        &mut self,
+        i: usize,
+        tc: f64,
+        pc: f64,
+        acf: f64,
+        a0: f64,
+        bi: f64,
+    ) -> Result<()> {
+        let comp = self
+            .components
+            .get_mut(i)
+            .ok_or(Error::InvalidInput("component index out of range"))?;
+        comp.critical_temperature = tc;
+        comp.critical_pressure = pc;
+        comp.acentric_factor = acf;
+        self.a0[i] = a0;
+        self.bi[i] = bi;
+        Ok(())
+    }
+
+    pub(crate) fn set_pure_ab_override(&mut self, i: usize, a0: f64, bi: f64) -> Result<()> {
+        positive(a0, "pure attraction parameter a0")?;
+        positive(bi, "pure covolume parameter b")?;
+        if i >= self.components.len() {
+            return Err(Error::InvalidInput("component index out of range"));
+        }
+        self.a0[i] = a0;
+        self.bi[i] = bi;
+        Ok(())
+    }
+
+    pub(crate) fn pure_a0(&self) -> &[f64] {
+        &self.a0
+    }
+
+    pub(crate) fn pure_bi(&self) -> &[f64] {
+        &self.bi
     }
 
     fn validate_pair(&self, i: usize, j: usize) -> Result<()> {
@@ -1443,11 +1735,7 @@ impl Cubic {
             ));
         }
         let n = self.components.len();
-        let wong_sandler = self.mixing_rule == crate::excess_gibbs::MixingRule::WongSandler;
-        if wong_sandler {
-            let data = self.wong_sandler.as_ref().ok_or(Error::Unsupported(
-                "the Wong-Sandler mixing rule needs the binary parameters",
-            ))?;
+        if self.mixing_rule.is_wong_sandler() {
             let mixture = self.excess_gibbs.as_ref().ok_or(Error::Unsupported(
                 "the Wong-Sandler mixing rule needs the excess Gibbs model",
             ))?;
@@ -1473,15 +1761,31 @@ impl Cubic {
                 self.kind,
                 crate::excess_gibbs::GeLimit::Infinite,
             );
-            let (a, b) = crate::wong_sandler::wong_sandler_ab_values(
-                data,
-                temperature,
-                composition,
-                &a_pure,
-                &self.bi,
-                limit_c,
-                g_ex,
-            )?;
+            let (a, b) = if self.mixing_rule == crate::excess_gibbs::MixingRule::HvWongSandler {
+                crate::wong_sandler::hv_wong_sandler_ab_values(
+                    &self.kij,
+                    &self.lij,
+                    temperature,
+                    composition,
+                    &a_pure,
+                    &self.bi,
+                    limit_c,
+                    g_ex,
+                )?
+            } else {
+                let data = self.wong_sandler.as_ref().ok_or(Error::Unsupported(
+                    "the Wong-Sandler mixing rule needs the binary parameters",
+                ))?;
+                crate::wong_sandler::wong_sandler_ab_values(
+                    data,
+                    temperature,
+                    composition,
+                    &a_pure,
+                    &self.bi,
+                    limit_c,
+                    g_ex,
+                )?
+            };
             positive(b, "mixture covolume")?;
             if !a.is_finite() {
                 return Err(Error::InvalidInput("temperature outside numerical range"));
@@ -1500,7 +1804,7 @@ impl Cubic {
         } else {
             b_pure.extend_from_slice(&self.bi);
         }
-        let b = if self.lij.iter().all(|&l| l == 0.0) {
+        let b = if !self.uses_quadratic_covolume() {
             composition
                 .iter()
                 .zip(b_pure.iter())
@@ -1511,7 +1815,7 @@ impl Cubic {
             for i in 0..n {
                 let mut b_i = 0.0;
                 for (j, &xj) in composition.iter().enumerate() {
-                    b_i += xj * (1.0 - self.lij[i * n + j]) * (b_pure[i] + b_pure[j]) * 0.5;
+                    b_i += xj * self.pair_covolume(i, j, b_pure[i], b_pure[j]);
                 }
                 b_sum += composition[i] * b_i;
             }
@@ -1659,7 +1963,7 @@ impl Cubic {
             }
             None => b_partial.copy_from_slice(&self.bi),
         }
-        if self.lij.iter().all(|l| *l == 0.0) {
+        if !self.uses_quadratic_covolume() {
             b = composition
                 .iter()
                 .zip(b_partial.iter())
@@ -1684,12 +1988,14 @@ impl Cubic {
                 let mut bt_partial = 0.;
                 let mut btt_partial = 0.;
                 for (j, &xj) in composition.iter().enumerate() {
-                    let bjj = beta.as_ref().map_or(self.bi[j], |b| b.components[j].value);
-                    b_partial[i] += xj * (1.0 - self.lij[i * n + j]) * (bii + bjj) / 2.0;
                     if let Some(beta) = &beta {
-                        let weight = xj * (1. - self.lij[i * n + j]) / 2.;
-                        bt_partial += weight * (beta.components[i].dt + beta.components[j].dt);
-                        btt_partial += weight * (beta.components[i].dtt + beta.components[j].dtt);
+                        let (bij, bij_t, bij_tt) =
+                            self.pair_covolume_with_t(i, j, beta.components[i], beta.components[j]);
+                        b_partial[i] += xj * bij;
+                        bt_partial += xj * bij_t;
+                        btt_partial += xj * bij_tt;
+                    } else {
+                        b_partial[i] += xj * self.pair_covolume(i, j, bii, self.bi[j]);
                     }
                 }
                 b += composition[i] * b_partial[i];
@@ -1710,7 +2016,7 @@ impl Cubic {
         }
         positive(b, "mixture covolume")?;
 
-        let wong_sandler = self.mixing_rule == crate::excess_gibbs::MixingRule::WongSandler;
+        let wong_sandler = self.mixing_rule.is_wong_sandler();
         let mut ai_t = None;
         let mut ge_a_nn = None;
         let mut prepared_wong_sandler = None;
@@ -1775,9 +2081,8 @@ impl Cubic {
             let mut b_second = vec![0.; n * n];
             for i in 0..n {
                 for j in 0..n {
-                    b_second[i * n + j] = (1. - self.lij[i * n + j]) * (self.bi[i] + self.bi[j])
-                        - buffer[2 * n + i]
-                        - buffer[2 * n + j];
+                    let bij = self.pair_covolume(i, j, self.bi[i], self.bi[j]);
+                    b_second[i * n + j] = 2.0 * bij - buffer[2 * n + i] - buffer[2 * n + j];
                 }
             }
             let jet = crate::excess_gibbs::excess_gibbs_cubic_mix_with_covolume(
@@ -1853,6 +2158,57 @@ impl Cubic {
             wong_sandler: prepared_wong_sandler,
         })
     }
+    /// Complete 10-block reduced residual Helmholtz energy `F = A^res / (R T)`
+    /// and all first and second `(T, V, n)` derivatives at `(temperature, volume, moles)`,
+    /// evaluated in unit-mole coordinates with exact Euler scaling.
+    pub fn residual_helmholtz_tv(
+        &self,
+        temperature: f64,
+        volume: f64,
+        moles: &[f64],
+    ) -> Result<CubicHelmholtz> {
+        positive(temperature, "temperature")?;
+        positive(volume, "volume")?;
+        let nc = self.components.len();
+        if moles.len() != nc || moles.iter().any(|&v| !v.is_finite() || v < 0.0) {
+            return Err(Error::InvalidInput(
+                "finite non-negative mole numbers matching the model required",
+            ));
+        }
+        let total: f64 = moles.iter().copied().sum();
+        positive(total, "total moles")?;
+        let v_unit = volume / total;
+        positive(v_unit, "molar volume")?;
+        let x: Vec<f64> = moles.iter().map(|&v| v / total).collect();
+        let state = self.prepare(temperature, &x)?;
+        let mut h = state.residual_helmholtz_tv_unit(v_unit)?;
+        if total != 1.0 {
+            let inv_n = 1.0 / total;
+            h.f *= total;
+            h.f_t *= total;
+            h.f_tt *= total;
+            h.f_vv *= inv_n;
+            for v in &mut h.f_vn {
+                *v *= inv_n;
+            }
+            for v in &mut h.f_nn {
+                *v *= inv_n;
+            }
+        }
+        let all_finite = [h.f, h.f_t, h.f_v, h.f_tt, h.f_tv, h.f_vv]
+            .iter()
+            .all(|v| v.is_finite())
+            && h.f_n.iter().all(|v| v.is_finite())
+            && h.f_tn.iter().all(|v| v.is_finite())
+            && h.f_vn.iter().all(|v| v.is_finite())
+            && h.f_nn.iter().all(|v| v.is_finite());
+        if !all_finite {
+            return Err(Error::InvalidInput(
+                "non-finite cubic residual Helmholtz derivative",
+            ));
+        }
+        Ok(h)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -1878,6 +2234,194 @@ impl PreparedState<'_> {
         (self.a, self.b)
     }
 
+    #[inline]
+    pub(crate) fn mixture_a_derivatives(&self) -> (f64, f64, f64) {
+        (self.a, self.at, self.att)
+    }
+
+    /// Allocation-free scalar pressure jet `(f, f_v, f_vv, f_tv)` on a unit-mole
+    /// basis (`N = 1`, molar volume `v_unit [m^3/mol]`).
+    pub(crate) fn residual_helmholtz_pressure_jet_unit(
+        &self,
+        v_unit: f64,
+    ) -> Result<(f64, f64, f64, f64)> {
+        self.volume_check(v_unit)?;
+        let t = self.temperature;
+        let rt = R * t;
+        let inv_rt = 1.0 / rt;
+        let inv_t = 1.0 / t;
+        let b_t = self.beta.as_ref().map_or(0.0, |beta| beta.dt);
+        let (c, c_t) = self
+            .translation
+            .as_ref()
+            .map_or((0.0, 0.0), |tr| (tr.c, tr.ct));
+        let v_eos = v_unit + c;
+        let free = v_eos - self.b;
+        let inv_free2 = 1.0 / (free * free);
+        let w_t = c_t - b_t;
+
+        let f_rep = -((c - self.b) / v_unit).ln_1p();
+        let f_rep_v = (c - self.b) / (v_unit * free);
+        let f_rep_tv = inv_free2 * w_t;
+        let f_rep_vv = (self.b - c) * (2.0 * v_unit + c - self.b) / (v_unit * v_unit * free * free);
+
+        let (d1, d2) = self.model.kind.deltas();
+        let (i_val, _, _) = self.attraction_integral_derivatives(v_eos);
+        let denom = (v_eos + d1 * self.b) * (v_eos + d2 * self.b);
+        let denom2 = denom * denom;
+        let i_ve = -1.0 / denom;
+        let i_veve = (2.0 * v_eos + (d1 + d2) * self.b) / denom2;
+        let i_veb = ((d1 + d2) * v_eos + 2.0 * d1 * d2 * self.b) / denom2;
+
+        let alpha = self.a * inv_rt;
+        let alpha_t = (self.at - self.a * inv_t) * inv_rt;
+        let i_tv = i_veve * c_t + i_veb * b_t;
+
+        Ok((
+            f_rep - alpha * i_val,
+            f_rep_v - alpha * i_ve,
+            f_rep_vv - alpha * i_veve,
+            f_rep_tv - (alpha_t * i_ve + alpha * i_tv),
+        ))
+    }
+
+    /// Complete 10-block reduced residual Helmholtz energy `F = A^res / (R T)`
+    /// and all first and second `(T, V, n)` derivatives on a unit-mole basis
+    /// (`N = 1`, molar volume `v_unit [m^3/mol]`).
+    pub fn residual_helmholtz_tv_unit(&self, v_unit: f64) -> Result<CubicHelmholtz> {
+        self.volume_check(v_unit)?;
+        let nc = self.count();
+        let t = self.temperature;
+        let rt = R * t;
+        let inv_rt = 1.0 / rt;
+        let inv_t = 1.0 / t;
+
+        let mix = self.mixture_parameter_jet(1.0)?;
+        let (c, c_t, c_tt) = self
+            .translation
+            .as_ref()
+            .map_or((0.0, 0.0, 0.0), |tr| (tr.c, tr.ct, tr.ctt));
+        let v_eos = v_unit + c;
+        let free = v_eos - self.b;
+        let inv_free = 1.0 / free;
+        let inv_free2 = inv_free * inv_free;
+
+        // Repulsive + volume-shift term: F_rep = -N ln((V + C - B) / V)
+        let w_t = c_t - mix.b_t;
+        let w_tt = c_tt - mix.b_tt;
+        let f_rep = -((c - self.b) / v_unit).ln_1p();
+        let f_rep_t = -inv_free * w_t;
+        let f_rep_v = (c - self.b) / (v_unit * free);
+        let f_rep_tt = inv_free2 * w_t * w_t - inv_free * w_tt;
+        let f_rep_tv = inv_free2 * w_t;
+        let f_rep_vv = (self.b - c) * (2.0 * v_unit + c - self.b) / (v_unit * v_unit * free * free);
+
+        // Attraction term: F_att = -(D / (R T)) * I(V_eos, B)
+        let (d1, d2) = self.model.kind.deltas();
+        let (i_val, i_b, i_bb) = self.attraction_integral_derivatives(v_eos);
+        let denom = (v_eos + d1 * self.b) * (v_eos + d2 * self.b);
+        let denom2 = denom * denom;
+        let i_ve = -1.0 / denom;
+        let i_veve = (2.0 * v_eos + (d1 + d2) * self.b) / denom2;
+        let i_veb = ((d1 + d2) * v_eos + 2.0 * d1 * d2 * self.b) / denom2;
+
+        let alpha = mix.d * inv_rt;
+        let alpha_t = (mix.d_t - mix.d * inv_t) * inv_rt;
+        let alpha_tt = (mix.d_tt - 2.0 * mix.d_t * inv_t + 2.0 * mix.d * inv_t * inv_t) * inv_rt;
+
+        let i_t = i_ve * c_t + i_b * mix.b_t;
+        let i_tv = i_veve * c_t + i_veb * mix.b_t;
+        let i_tt = i_veve * c_t * c_t
+            + 2.0 * i_veb * c_t * mix.b_t
+            + i_bb * mix.b_t * mix.b_t
+            + i_ve * c_tt
+            + i_b * mix.b_tt;
+
+        let f = f_rep - alpha * i_val;
+        let f_t = f_rep_t - (alpha_t * i_val + alpha * i_t);
+        let f_v = f_rep_v - alpha * i_ve;
+        let f_tt = f_rep_tt - (alpha_tt * i_val + 2.0 * alpha_t * i_t + alpha * i_tt);
+        let f_tv = f_rep_tv - (alpha_t * i_ve + alpha * i_tv);
+        let f_vv = f_rep_vv - alpha * i_veve;
+
+        let mut f_n = vec![0.0; nc];
+        let mut f_tn = vec![0.0; nc];
+        let mut f_vn = vec![0.0; nc];
+        let mut f_nn = vec![0.0; nc * nc];
+
+        let mut w_i_vec = vec![0.0; nc];
+        let mut alpha_i_vec = vec![0.0; nc];
+        let mut i_i_vec = vec![0.0; nc];
+
+        for i in 0..nc {
+            let (ci, cit) = self.translation.as_ref().map_or((0.0, 0.0), |tr| {
+                (tr.components[i].value, tr.components[i].dt)
+            });
+            let bi = mix.b_i[i];
+            let bit = mix.b_it[i];
+            let wi = ci - bi;
+            let wit = cit - bit;
+            w_i_vec[i] = wi;
+
+            let ai = mix.d_i[i] * inv_rt;
+            let ait = (mix.d_it[i] - mix.d_i[i] * inv_t) * inv_rt;
+            alpha_i_vec[i] = ai;
+
+            let ii = i_ve * ci + i_b * bi;
+            let ivi = i_veve * ci + i_veb * bi;
+            let iti = i_veve * c_t * ci
+                + i_veb * (c_t * bi + ci * mix.b_t)
+                + i_bb * mix.b_t * bi
+                + i_ve * cit
+                + i_b * bit;
+            i_i_vec[i] = ii;
+
+            f_n[i] = (f_rep - inv_free * wi) - (ai * i_val + alpha * ii);
+            f_tn[i] = (f_rep_t + inv_free2 * w_t * wi - inv_free * wit)
+                - (ait * i_val + ai * i_t + alpha_t * ii + alpha * iti);
+            f_vn[i] = (f_rep_v + inv_free2 * wi) - (ai * i_ve + alpha * ivi);
+        }
+
+        for i in 0..nc {
+            let ci = self
+                .translation
+                .as_ref()
+                .map_or(0.0, |tr| tr.components[i].value);
+            let bi = mix.b_i[i];
+            let wi = w_i_vec[i];
+            let ai = alpha_i_vec[i];
+            let ii = i_i_vec[i];
+            for j in 0..nc {
+                let cj = self
+                    .translation
+                    .as_ref()
+                    .map_or(0.0, |tr| tr.components[j].value);
+                let bj = mix.b_i[j];
+                let wj = w_i_vec[j];
+                let bij = mix.b_ij[i * nc + j];
+                let aij = mix.d_ij[i * nc + j] * inv_rt;
+                let iij =
+                    i_veve * ci * cj + i_veb * (ci * bj + cj * bi) + i_bb * bi * bj + i_b * bij;
+                let rep_ij = -inv_free * (wi + wj - bij) + inv_free2 * wi * wj;
+                let att_ij = -(aij * i_val + ai * i_i_vec[j] + alpha_i_vec[j] * ii + alpha * iij);
+                f_nn[i * nc + j] = rep_ij + att_ij;
+            }
+        }
+
+        Ok(CubicHelmholtz {
+            f,
+            f_t,
+            f_v,
+            f_n,
+            f_tt,
+            f_tv,
+            f_tn,
+            f_vv,
+            f_vn,
+            f_nn,
+        })
+    }
+
     /// Extensive mixture parameters `B(T, n)` (`[m^3]`) and `D(T, n)` (`[Pa m^6]`)
     /// with full first and second derivatives with respect to `(T, n)` for total
     /// mole number `moles`, preserving the exact scaling of `cbmix::cbCalcMixtureParams`.
@@ -1901,7 +2445,7 @@ impl PreparedState<'_> {
             for (dst, &src) in b_ij.iter_mut().zip(ws.b_ij.iter()) {
                 *dst = src * inv_n;
             }
-        } else if !self.model.lij.iter().all(|&l| l == 0.0) {
+        } else if self.model.uses_quadratic_covolume() {
             for i in 0..n {
                 let bii = self
                     .beta
@@ -1912,7 +2456,7 @@ impl PreparedState<'_> {
                         .beta
                         .as_ref()
                         .map_or(self.model.bi[j], |beta| beta.components[j].value);
-                    let bij = (1.0 - self.model.lij[i * n + j]) * (bii + bjj) * 0.5;
+                    let bij = self.model.pair_covolume(i, j, bii, bjj);
                     b_ij[i * n + j] = (2.0 * bij - b_i[i] - b_i[j]) * inv_n;
                 }
             }
@@ -1936,7 +2480,7 @@ impl PreparedState<'_> {
                 let mut sum = 0.0;
                 for j in 0..n {
                     sum +=
-                        comp[j] * (1.0 - self.model.kij[i * n + j]) * (ft[i] * f[j] + f[i] * ft[j]);
+                        comp[j] * (1.0 - self.model.vdw_kij(i, j)) * (ft[i] * f[j] + f[i] * ft[j]);
                 }
                 out[i] = 2.0 * moles * sum;
             }
@@ -1951,7 +2495,7 @@ impl PreparedState<'_> {
             let mut out = vec![0.0; n * n];
             for i in 0..n {
                 for j in 0..n {
-                    out[i * n + j] = 2.0 * (1.0 - self.model.kij[i * n + j]) * f[i] * f[j];
+                    out[i * n + j] = 2.0 * (1.0 - self.model.vdw_kij(i, j)) * f[i] * f[j];
                 }
             }
             out
@@ -2049,7 +2593,7 @@ impl PreparedState<'_> {
                 let (f, ft, _) = self.factors();
                 for j in 0..n {
                     s += self.composition_slice()[j]
-                        * (1.0 - self.model.kij[i * n + j])
+                        * (1.0 - self.model.vdw_kij(i, j))
                         * (ft[i] * f[j] + f[i] * ft[j]);
                 }
                 s
@@ -2083,12 +2627,12 @@ impl PreparedState<'_> {
                         .beta
                         .as_ref()
                         .map_or(self.model.bi[j], |b| b.components[j].value);
-                    let bij = (1.0 - self.model.lij[i * n + j]) * (bii + bjj) / 2.0;
+                    let bij = self.model.pair_covolume(i, j, bii, bjj);
                     (
                         2.0 * bij - bi - bj,
                         self.ge_a_nn.as_ref().map_or_else(
                             || {
-                                2.0 * (1.0 - self.model.kij[i * n + j])
+                                2.0 * (1.0 - self.model.vdw_kij(i, j))
                                     * self.factors().0[i]
                                     * self.factors().0[j]
                             },

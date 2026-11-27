@@ -218,6 +218,163 @@ impl WongSandlerCoefficients {
     }
 }
 
+/// Solve the Fidel non-randomness equation
+/// `alpha = 1 / (2 + exp(-(tau12 + tau21) * alpha))` from
+/// `src/wong_sandler.f90:fidel_alpha`.
+pub fn fidel_alpha(tau12: f64, tau21: f64) -> Result<f64> {
+    if !tau12.is_finite() || !tau21.is_finite() {
+        return Err(Error::InvalidInput("finite tau values required"));
+    }
+    let taus = tau12 + tau21;
+    let mut aa = 1.0 / 2.5;
+    for _ in 0..10 {
+        let ee = (-taus * aa).exp();
+        let ff = 2.0 + ee - 1.0 / aa;
+        let dfda = -taus * ee + 1.0 / (aa * aa);
+        if !dfda.is_finite() || dfda == 0.0 {
+            return Err(Error::NotConverged("fidel_alpha derivative vanished"));
+        }
+        let da = -ff / dfda;
+        aa += da;
+        if !aa.is_finite() || aa <= 0.0 {
+            return Err(Error::NotConverged("fidel_alpha diverged"));
+        }
+        if da.abs() < 1.0e-12 {
+            break;
+        }
+    }
+    Ok(aa)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn assemble_wong_sandler_from_q(
+    count: usize,
+    temperature: f64,
+    total: f64,
+    composition: &[f64],
+    a_pure: &[f64],
+    a_pure_t: &[f64],
+    a_pure_tt: &[f64],
+    b_pure: &[f64],
+    limit_c: f64,
+    excess: &ExcessGibbsJet,
+    q: f64,
+    q_t: f64,
+    q_tt: f64,
+    q_i: &[f64],
+    q_it: &[f64],
+    q_ij: &[f64],
+) -> Result<WongSandlerCoefficients> {
+    let gas_constant = crate::R;
+    let gas_temperature = gas_constant * temperature;
+    let mut d_scratch = vec![0.0; 2 * count + count * count];
+    let (d_i, rest) = d_scratch.split_at_mut(count);
+    let (d_it, d_ij) = rest.split_at_mut(count);
+
+    // The sums of Appendix A9 of Wong & Sandler (1992).
+    let mut d = 0.0;
+    let mut d_t = 0.0;
+    let mut d_tt = 0.0;
+    for i in 0..count {
+        d += composition[i] * a_pure[i] / b_pure[i];
+        d_t += composition[i] * a_pure_t[i] / b_pure[i];
+        d_tt += composition[i] * a_pure_tt[i] / b_pure[i];
+        d_i[i] = (a_pure[i] / b_pure[i] - excess.dg_dn[i] / limit_c) / gas_temperature;
+        d_it[i] = (a_pure_t[i] / b_pure[i] - excess.d2g_dn_dt[i] / limit_c - d_i[i] * gas_constant)
+            / gas_temperature;
+        for j in 0..count {
+            d_ij[i * count + j] = -excess.d2g_dn_dn[i * count + j] / (limit_c * gas_temperature);
+        }
+    }
+    d = (d - excess.gibbs / limit_c) / gas_temperature;
+    d_t = (d_t - excess.dg_dt / limit_c - d * gas_constant) / gas_temperature;
+    d_tt = (d_tt - excess.d2g_dt2 / limit_c - 2.0 * d_t * gas_constant) / gas_temperature;
+
+    // The covolume of the mixture and its derivatives (Appendix A6).
+    let denominator = total - d;
+    if !denominator.is_finite() || denominator == 0.0 {
+        return Err(Error::InvalidInput(
+            "singular Wong-Sandler denominator (n - D)",
+        ));
+    }
+    let b = q / denominator;
+    let b_t = (q_t + d_t * b) / denominator;
+    let b_tt = (q_tt + 2.0 * d_t * b_t + d_tt * b) / denominator;
+
+    // The partial derivatives of the coefficients share one allocation.
+    let mut values = vec![0.0; 4 * count + 2 * count * count];
+    let (a_i, rest) = values.split_at_mut(count);
+    let (a_it, rest) = rest.split_at_mut(count);
+    let (a_ij, rest) = rest.split_at_mut(count * count);
+    let (b_i, rest) = rest.split_at_mut(count);
+    let (b_it, rest) = rest.split_at_mut(count);
+    let (b_ij, _rest) = rest.split_at_mut(count * count);
+    for i in 0..count {
+        b_i[i] = (q_i[i] + b * (d_i[i] - 1.0)) / denominator;
+        b_it[i] = (q_it[i] + b_i[i] * d_t + b_t * (d_i[i] - 1.0) + b * d_it[i]) / denominator;
+    }
+    for i in 0..count {
+        for j in 0..count {
+            b_ij[i * count + j] = (q_ij[i * count + j]
+                + b_i[i] * (d_i[j] - 1.0)
+                + b_i[j] * (d_i[i] - 1.0)
+                + b * d_ij[i * count + j])
+                / denominator;
+        }
+    }
+
+    // The attraction of the mixture and its derivatives (Appendix A7).
+    let a = q * d * gas_temperature / denominator;
+    let a_t = gas_constant * (b_t * d * temperature + b * d_t * temperature + b * d);
+    let a_tt = gas_constant
+        * (b_tt * d * temperature
+            + 2.0 * b_t * d_t * temperature
+            + 2.0 * b_t * d
+            + 2.0 * b * d_t
+            + b * d_tt * temperature);
+    for k in 0..count {
+        a_i[k] = gas_temperature * (b_i[k] * d + b * d_i[k]);
+        a_it[k] = gas_constant
+            * (b_it[k] * d * temperature
+                + b_i[k] * d_t * temperature
+                + b_i[k] * d
+                + b_t * d_i[k] * temperature
+                + b * d_it[k] * temperature
+                + b * d_i[k]);
+    }
+    for i in 0..count {
+        for j in 0..count {
+            a_ij[i * count + j] = gas_temperature
+                * (b_ij[i * count + j] * d
+                    + b_i[i] * d_i[j]
+                    + b_i[j] * d_i[i]
+                    + b * d_ij[i * count + j]);
+        }
+    }
+    if !a.is_finite()
+        || !a_t.is_finite()
+        || !a_tt.is_finite()
+        || !b.is_finite()
+        || !b_t.is_finite()
+        || !b_tt.is_finite()
+        || values.iter().any(|v| !v.is_finite())
+    {
+        return Err(Error::InvalidInput(
+            "non-finite Wong-Sandler mixture coefficients",
+        ));
+    }
+    Ok(WongSandlerCoefficients {
+        a,
+        a_t,
+        a_tt,
+        b,
+        b_t,
+        b_tt,
+        values,
+        count,
+    })
+}
+
 /// The mixture coefficients of the Wong-Sandler mixing rule.
 ///
 /// The attraction parameters of the components are the products of the
@@ -250,19 +407,12 @@ pub fn wong_sandler_mix(
     if limit_c == 0.0 {
         return Err(Error::InvalidInput("the limiting constant vanishes"));
     }
-    let gas_constant = crate::R;
-    let gas_temperature = gas_constant * temperature;
-    let mut total = 0.0;
-    for &share in composition {
-        total += share;
-    }
+    let gas_temperature = crate::R * temperature;
+    let total: f64 = composition.iter().copied().sum();
     if total <= 0.0 {
         return Err(Error::InvalidInput("the composition must be positive"));
     }
-    // The reduced covolume of every component and its temperature
-    // derivatives, the pair coefficients and the partial derivatives of the
-    // sums share one allocation.
-    let mut scratch = vec![0.0; 9 * count + 5 * count * count];
+    let mut scratch = vec![0.0; 5 * count + 4 * count * count];
     let (reduced, rest) = scratch.split_at_mut(count);
     let (reduced_t, rest) = rest.split_at_mut(count);
     let (reduced_tt, rest) = rest.split_at_mut(count);
@@ -270,11 +420,7 @@ pub fn wong_sandler_mix(
     let (pair_t, rest) = rest.split_at_mut(count * count);
     let (pair_tt, rest) = rest.split_at_mut(count * count);
     let (q_i, rest) = rest.split_at_mut(count);
-    let (q_it, rest) = rest.split_at_mut(count);
-    let (q_ij, rest) = rest.split_at_mut(count * count);
-    let (d_i, rest) = rest.split_at_mut(count);
-    let (d_it, rest) = rest.split_at_mut(count);
-    let (d_ij, _rest) = rest.split_at_mut(count * count);
+    let (q_it, q_ij) = rest.split_at_mut(count);
     for i in 0..count {
         reduced[i] = b_pure[i] - a_pure[i] / gas_temperature;
         reduced_t[i] = -a_pure_t[i] / gas_temperature + a_pure[i] / (gas_temperature * temperature);
@@ -282,7 +428,6 @@ pub fn wong_sandler_mix(
             + 2.0 * a_pure_t[i] / (gas_temperature * temperature)
             - 2.0 * a_pure[i] / (gas_temperature * temperature * temperature);
     }
-    // The pair coefficients and their temperature derivatives.
     for i in 0..count {
         for j in 0..count {
             let index = i * count + j;
@@ -295,7 +440,6 @@ pub fn wong_sandler_mix(
                 - 0.5 * (reduced[i] + reduced[j]) * kij_tt;
         }
     }
-    // The sums of the appendix A8 of the original.
     let mut q = 0.0;
     let mut q_t = 0.0;
     let mut q_tt = 0.0;
@@ -306,7 +450,7 @@ pub fn wong_sandler_mix(
             q += share * pair[index];
             q_t += share * pair_t[index];
             q_tt += share * pair_tt[index];
-            q_it[i] += 2.0 * pair_t[index] * composition[j];
+            q_it[i] += (pair_t[index] + pair_t[j * count + i]) * composition[j];
         }
     }
     for k in 0..count {
@@ -315,88 +459,201 @@ pub fn wong_sandler_mix(
             q_ij[i * count + k] = pair[i * count + k] + pair[k * count + i];
         }
     }
-    // The sums of the appendix A9 of the original.
-    let mut d = 0.0;
-    let mut d_t = 0.0;
-    let mut d_tt = 0.0;
+    assemble_wong_sandler_from_q(
+        count,
+        temperature,
+        total,
+        composition,
+        a_pure,
+        a_pure_t,
+        a_pure_tt,
+        b_pure,
+        limit_c,
+        excess,
+        q,
+        q_t,
+        q_tt,
+        q_i,
+        q_it,
+        q_ij,
+    )
+}
+
+/// The mixture coefficients of the Huron-Vidal Wong-Sandler mixing rule
+/// (`cbMixHVWongSandler` in `src/wong_sandler.f90`).
+///
+/// Uses `B_ij(T) = 0.5 * (b_i + b_j) * (1 - l_ij) - sqrt(a_i * a_j) * (1 - k_ij) / (R T)`
+/// (analytic equivalent of `calc_Q_HVNRTL`) combined with the HV-NRTL infinite-pressure
+/// excess Gibbs jet and Wong-Sandler Appendix A6-A9 relations.
+#[allow(clippy::too_many_arguments)]
+pub fn hv_wong_sandler_mix(
+    kij: &[f64],
+    lij: &[f64],
+    temperature: f64,
+    composition: &[f64],
+    a_pure: &[f64],
+    a_pure_t: &[f64],
+    a_pure_tt: &[f64],
+    b_pure: &[f64],
+    limit_c: f64,
+    excess: &ExcessGibbsJet,
+) -> Result<WongSandlerCoefficients> {
+    let count = composition.len();
+    if count == 0
+        || kij.len() != count * count
+        || lij.len() != count * count
+        || a_pure.len() != count
+        || a_pure_t.len() != count
+        || a_pure_tt.len() != count
+        || b_pure.len() != count
+    {
+        return Err(Error::InvalidInput("component count mismatch"));
+    }
+    if limit_c == 0.0 {
+        return Err(Error::InvalidInput("the limiting constant vanishes"));
+    }
+    let gas_temperature = crate::R * temperature;
+    let total: f64 = composition.iter().copied().sum();
+    if total <= 0.0 {
+        return Err(Error::InvalidInput("the composition must be positive"));
+    }
+    let mut scratch = vec![0.0; 5 * count + 4 * count * count];
+    let (f_i, rest) = scratch.split_at_mut(count);
+    let (f_t, rest) = rest.split_at_mut(count);
+    let (f_tt, rest) = rest.split_at_mut(count);
+    let (pair, rest) = rest.split_at_mut(count * count);
+    let (pair_t, rest) = rest.split_at_mut(count * count);
+    let (pair_tt, rest) = rest.split_at_mut(count * count);
+    let (q_i, rest) = rest.split_at_mut(count);
+    let (q_it, q_ij) = rest.split_at_mut(count);
+
     for i in 0..count {
-        d += composition[i] * a_pure[i] / b_pure[i];
-        d_t += composition[i] * a_pure_t[i] / b_pure[i];
-        d_tt += composition[i] * a_pure_tt[i] / b_pure[i];
-        d_i[i] = (a_pure[i] / b_pure[i] - excess.dg_dn[i] / limit_c) / gas_temperature;
-        d_it[i] = (a_pure_t[i] / b_pure[i] - excess.d2g_dn_dt[i] / limit_c - d_i[i] * gas_constant)
-            / gas_temperature;
-        for j in 0..count {
-            d_ij[i * count + j] = -excess.d2g_dn_dn[i * count + j] / (limit_c * gas_temperature);
+        if a_pure[i] < 0.0 {
+            return Err(Error::InvalidInput(
+                "non-negative pure attraction required for HVWongSandler",
+            ));
+        }
+        let fi = a_pure[i].sqrt();
+        f_i[i] = fi;
+        if fi > 0.0 {
+            let fti = 0.5 * a_pure_t[i] / fi;
+            f_t[i] = fti;
+            f_tt[i] = (0.5 * a_pure_tt[i] - fti * fti) / fi;
         }
     }
-    d = (d - excess.gibbs / limit_c) / gas_temperature;
-    d_t = (d_t - excess.dg_dt / limit_c - d * gas_constant) / gas_temperature;
-    d_tt = (d_tt - excess.d2g_dt2 / limit_c - 2.0 * d_t * gas_constant) / gas_temperature;
-    // The covolume of the mixture and its derivatives.
+
+    let inv_rt = 1.0 / gas_temperature;
+    let inv_t = 1.0 / temperature;
+    let inv_t2 = inv_t * inv_t;
+    for i in 0..count {
+        for j in 0..count {
+            let index = i * count + j;
+            let k_fac = 1.0 - kij[index];
+            let bij = 0.5 * (b_pure[i] + b_pure[j]) * (1.0 - lij[index]);
+            let aij = f_i[i] * f_i[j] * k_fac;
+            let aij_t = (f_t[i] * f_i[j] + f_i[i] * f_t[j]) * k_fac;
+            let aij_tt = (f_tt[i] * f_i[j] + 2.0 * f_t[i] * f_t[j] + f_i[i] * f_tt[j]) * k_fac;
+            pair[index] = bij - aij * inv_rt;
+            pair_t[index] = (-aij_t + aij * inv_t) * inv_rt;
+            pair_tt[index] = (-aij_tt + 2.0 * aij_t * inv_t - 2.0 * aij * inv_t2) * inv_rt;
+        }
+    }
+
+    let mut q = 0.0;
+    let mut q_t = 0.0;
+    let mut q_tt = 0.0;
+    for i in 0..count {
+        for j in 0..count {
+            let index = i * count + j;
+            let share = composition[i] * composition[j];
+            q += share * pair[index];
+            q_t += share * pair_t[index];
+            q_tt += share * pair_tt[index];
+            q_it[i] += (pair_t[index] + pair_t[j * count + i]) * composition[j];
+        }
+    }
+    for k in 0..count {
+        for i in 0..count {
+            q_i[k] += composition[i] * (pair[i * count + k] + pair[k * count + i]);
+            q_ij[i * count + k] = pair[i * count + k] + pair[k * count + i];
+        }
+    }
+
+    assemble_wong_sandler_from_q(
+        count,
+        temperature,
+        total,
+        composition,
+        a_pure,
+        a_pure_t,
+        a_pure_tt,
+        b_pure,
+        limit_c,
+        excess,
+        q,
+        q_t,
+        q_tt,
+        q_i,
+        q_it,
+        q_ij,
+    )
+}
+
+/// Value-only Huron-Vidal Wong-Sandler mixture attraction `a` and covolume `b`.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn hv_wong_sandler_ab_values(
+    kij: &[f64],
+    lij: &[f64],
+    temperature: f64,
+    composition: &[f64],
+    a_pure: &[f64],
+    b_pure: &[f64],
+    limit_c: f64,
+    excess_gibbs: f64,
+) -> Result<(f64, f64)> {
+    let count = composition.len();
+    if count == 0
+        || kij.len() != count * count
+        || lij.len() != count * count
+        || a_pure.len() != count
+        || b_pure.len() != count
+    {
+        return Err(Error::InvalidInput("component count mismatch"));
+    }
+    if limit_c == 0.0 {
+        return Err(Error::InvalidInput("the limiting constant vanishes"));
+    }
+    let gas_temperature = crate::R * temperature;
+    let total: f64 = composition.iter().copied().sum();
+    if total <= 0.0 {
+        return Err(Error::InvalidInput("the composition must be positive"));
+    }
+    let mut q = 0.0;
+    let mut d_sum = 0.0;
+    for i in 0..count {
+        if a_pure[i] < 0.0 {
+            return Err(Error::InvalidInput(
+                "non-negative pure attraction required for HVWongSandler",
+            ));
+        }
+        d_sum += composition[i] * a_pure[i] / b_pure[i];
+        let fi = a_pure[i].sqrt();
+        for j in 0..count {
+            let idx = i * count + j;
+            let fj = a_pure[j].sqrt();
+            let bij = 0.5 * (b_pure[i] + b_pure[j]) * (1.0 - lij[idx]);
+            let aij = fi * fj * (1.0 - kij[idx]);
+            q += composition[i] * composition[j] * (bij - aij / gas_temperature);
+        }
+    }
+    let d = (d_sum - excess_gibbs / limit_c) / gas_temperature;
     let denominator = total - d;
     let b = q / denominator;
-    let b_t = (q_t + d_t * b) / denominator;
-    let b_tt = (q_tt + 2.0 * d_t * b_t + d_tt * b) / denominator;
-    // The partial derivatives of the coefficients share one allocation.
-    let mut values = vec![0.0; 4 * count + 2 * count * count];
-    let (a_i, rest) = values.split_at_mut(count);
-    let (a_it, rest) = rest.split_at_mut(count);
-    let (a_ij, rest) = rest.split_at_mut(count * count);
-    let (b_i, rest) = rest.split_at_mut(count);
-    let (b_it, rest) = rest.split_at_mut(count);
-    let (b_ij, _rest) = rest.split_at_mut(count * count);
-    for i in 0..count {
-        b_i[i] = (q_i[i] + b * (d_i[i] - 1.0)) / denominator;
-        b_it[i] = (q_it[i] + b_i[i] * d_t + b_t * (d_i[i] - 1.0) + b * d_it[i]) / denominator;
-    }
-    for i in 0..count {
-        for j in 0..count {
-            b_ij[i * count + j] = (q_ij[i * count + j]
-                + b_i[i] * (d_i[j] - 1.0)
-                + b_i[j] * (d_i[i] - 1.0)
-                + b * d_ij[i * count + j])
-                / denominator;
-        }
-    }
-    // The attraction of the mixture and its derivatives.
     let a = q * d * gas_temperature / denominator;
-    let a_t = gas_constant * (b_t * d * temperature + b * d_t * temperature + b * d);
-    let a_tt = gas_constant
-        * (b_tt * d * temperature
-            + 2.0 * b_t * d_t * temperature
-            + 2.0 * b_t * d
-            + 2.0 * b * d_t
-            + b * d_tt * temperature);
-    for k in 0..count {
-        a_i[k] = gas_temperature * (b_i[k] * d + b * d_i[k]);
-        a_it[k] = gas_constant
-            * (b_it[k] * d * temperature
-                + b_i[k] * d_t * temperature
-                + b_i[k] * d
-                + b_t * d_i[k] * temperature
-                + b * d_it[k] * temperature
-                + b * d_i[k]);
+    if !q.is_finite() || !d.is_finite() || !a.is_finite() || !b.is_finite() {
+        return Err(Error::InvalidInput("temperature outside numerical range"));
     }
-    for i in 0..count {
-        for j in 0..count {
-            a_ij[i * count + j] = gas_temperature
-                * (b_ij[i * count + j] * d
-                    + b_i[i] * d_i[j]
-                    + b_i[j] * d_i[i]
-                    + b * d_ij[i * count + j]);
-        }
-    }
-    Ok(WongSandlerCoefficients {
-        a,
-        a_t,
-        a_tt,
-        b,
-        b_t,
-        b_tt,
-        values,
-        count,
-    })
+    Ok((a, b))
 }
 
 /// Value-only Wong-Sandler mixture attraction `a` and covolume `b` without

@@ -643,3 +643,71 @@ Note also that `calc_ahs_div_nRT_CSK` in `src/saftvrmie_hardsphere.f90` omits
 the `-12.5/3` integration constant (giving `a_hs(0) = 12.5/3`); native
 `pure_hard_sphere_eta(..., true)` preserves that exact source formula so
 `kolafa_pure_reference = true` matches Fortran `PURE_HS_CSK`.
+
+## CPA mixing/tuning, UMR/VTPR, apparent composition, and UNIFAC tuning upstream defects
+
+Eight upstream defects affect `src/complexmodelinit.f90`, `src/cbmix.f90`,
+`src/cbselect.f90`, `src/apparent_composition.f90`, `src/tuning.f90`,
+`src/assocschemeutils.f90`, and `src/unifac.f90`:
+
+1. `src/complexmodelinit.f90:40,83,89` (`init_VTPR` and `init_UMR`): both
+   routines call `act_mod_ptr => get_active_thermo_model()` *before*
+   `init_thermo` (which is what allocates the first model via `add_eos()`), so
+   calling either routine in a fresh session aborts with
+   `"get_active_thermo_model: No active eos found"`. Even after `add_eos()`,
+   `init_UMR` passes `alpha = 'ALPHA_UMR'` instead of `'UMR'`, unconditionally
+   aborting with `"nameToIdx::unknown alpha corr name"`; moreover `cbalpha.f90`
+   omits a `case (cbAlphaUMRIdx)` evaluator branch for non-water components.
+   Native `init_vtpr` / `init_umr` construct self-contained `Cubic` models;
+   `init_umr` uses `MathiasCopeman` for `H2O` (when a matching MC record exists,
+   falling back to `PengRobinson` on `"DEFAULT"` as in `cbalpha.f90`) and
+   evaluates the UMR acentric polynomial with `AlphaCorrelation::ClassicFit`
+   for other components while leaving explicit `AlphaCorrelation::Umr`
+   evaluation unsupported to preserve existing `tests/alpha.rs` parity.
+2. `src/cbmix.f90:316-343` vs `367-442` (`cbCalcLowcasebij` vs `cbCalcBmix`):
+   `init_VTPR` sets `b_exponent = 4/3` and populates `lowcase_bij` (used by
+   `calcBmixCubic`), but `cbCalcBmix` hardcodes
+   `bij = (1 - lij)*(bii + bjj)/2.0` and ignores `lowcase_bij` and
+   `b_exponent`. Native `Cubic` applies the exact power-mean
+   `bij = (1 - lij) * ((bii^(1/s) + bjj^(1/s)) / 2)^s` consistently across
+   `lowcase_bij`, `calc_bmix_cubic`, `prepare`, `residual_helmholtz_tv`, and
+   `fugacity_derivatives_into` (verified by independent central finite
+   differences at `s = 4/3` and `s = 2.0`, including quantum `beta(T)`).
+3. `src/cbselect.f90:385-399` (`tpSelectInteractionParameters`): the
+   `cbMixHVCPA` / `cbMixHVCPA2` branch calls `getCpaGEij` without ever setting
+   `cbeos%mixGE%mGE`, so `init_cpa(..., mixing='HV1')` and `'HV2'` abort with
+   `"Wrong GE mixing rule for CPA"` for `nc >= 2`. Native `Cpa::with_cpa_options`
+   initializes `HuronVidal1` / `HuronVidal2` cleanly.
+4. `src/apparent_composition.f90:227` (`TP_lnfug_apparent`): computes
+   `v_stoich(i,j) * (log(xe(j)) + lnfug_real(j))` without guarding
+   `v_stoich(i,j) > 0`. In a multi-salt mixture where one salt is absent
+   (`xe(j) = 0`), `0.0 * (-inf) = NaN` corrupts the fugacity coefficients of
+   *present* salts as well. Native `ApparentComposition::tp_lnfug_apparent`
+   skips zero stoichiometry entries so present salts remain finite.
+5. `src/tuning.f90:358-359,411-412` (`thermopack_setkijandji` /
+   `thermopack_setlijandji`): a `type is (cpa_eos)` branch intercepts CPA before
+   `class is (cb_eos)` and aborts with
+   `"Not able to set binary kij/lij for CPA eos."`, whereas single-entry
+   `thermopack_setkij` uses `class is (cb_eos)` and succeeds asymmetrically on
+   CPA. Native `Cpa` provides `try_set_kij`, `set_kij_entry`, and `set_lij`.
+6. `src/assocschemeutils.f90:67-86` (`assocIndices_bookkeeping`): omits
+   `assoc_scheme_1ea` (used by `CO2` under CPA reference `"SINTEF"`),
+   incrementing `numAssocComps` without incrementing `numAssocSites` or
+   assigning `comp_vs_sites(ic, :)` (leaving uninitialized memory that can cause
+   out-of-bounds access in `cpa_setAssocParams`). Native `AssociationParams`
+   handles `AssocScheme::Scheme1ea` properly.
+7. `src/unifac.f90:131` (`setUNIFACgroupInteraction`): declares
+   `type(unifacdb), intent(out) :: UFdb` instead of `intent(inout)`, which in
+   Fortran deallocates all allocatable components of `UFdb` on subroutine entry.
+   Native `Unifac::set_group_interaction` / `Cubic::set_unifac_group_interaction`
+   mutates the active interaction tables in place.
+8. `src/saft_association.f90:407-410` (`solve_for_X_k`, shared with PC-SAFT and
+   SAFT-VR Mie above): sets `X_k = 1.0` at `n_i = 0`; native `Cpa` reuses
+   `rust/src/association.rs` and computes the exact infinite-dilution site
+   fractions and `F_n` limit.
+
+Defects 1–6 are verified live against `.reference/thermopack.dll` in
+`tools/rust_port/validate_cpa_cubic_tuning.py` (with negative-case parser
+self-tests under `python` and `python -O`), and defects 2, 4, 7, and 8 are
+independently qualified in `tests/cpa_cubic_tuning.rs`. See
+[cpa-cubic-tuning.md](cpa-cubic-tuning.md).

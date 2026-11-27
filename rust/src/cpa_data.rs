@@ -473,6 +473,41 @@ pub const CPA_BINARY_RECORDS: [CpaBinaryRecord; 12] = [
     },
 ];
 
+/// Lookup pure CPA parameters by EOS label (`"CPA-SRK"` or `"CPA-PR"`),
+/// component identifier, and optional reference.
+pub fn lookup_cpa_pure_for_eos(
+    eos: &str,
+    comp: &str,
+    preferred_ref: Option<&str>,
+) -> Option<&'static CpaPureRecord> {
+    let comp_up = comp.to_ascii_uppercase();
+    if let Some(pref) = preferred_ref {
+        let pref_up = pref.trim().to_ascii_uppercase();
+        if !pref_up.is_empty()
+            && pref_up != "DEFAULT"
+            && let Some(r) = CPA_PURE_RECORDS.iter().find(|r| {
+                r.eos.eq_ignore_ascii_case(eos)
+                    && r.comp_name.eq_ignore_ascii_case(&comp_up)
+                    && r.reference.to_ascii_uppercase().contains(&pref_up)
+            })
+        {
+            return Some(r);
+        }
+    }
+    CPA_PURE_RECORDS
+        .iter()
+        .find(|r| {
+            r.eos.eq_ignore_ascii_case(eos)
+                && r.comp_name.eq_ignore_ascii_case(&comp_up)
+                && r.reference.to_ascii_uppercase().contains("DEFAULT")
+        })
+        .or_else(|| {
+            CPA_PURE_RECORDS.iter().find(|r| {
+                r.eos.eq_ignore_ascii_case(eos) && r.comp_name.eq_ignore_ascii_case(&comp_up)
+            })
+        })
+}
+
 /// Lookup pure CPA parameters by component identifier and optional reference.
 pub fn lookup_cpa_pure(comp: &str, preferred_ref: Option<&str>) -> Option<&'static CpaPureRecord> {
     let comp_up = comp.to_ascii_uppercase();
@@ -494,6 +529,22 @@ pub fn lookup_cpa_pure(comp: &str, preferred_ref: Option<&str>) -> Option<&'stat
                 .iter()
                 .find(|r| r.comp_name.eq_ignore_ascii_case(&comp_up))
         })
+}
+
+/// Lookup binary CPA parameters for a specific CPA EOS (`"CPA-SRK"` or `"CPA-PR"`)
+/// and pair of components.
+pub fn lookup_cpa_binary_for_eos(
+    eos: &str,
+    comp1: &str,
+    comp2: &str,
+) -> Option<&'static CpaBinaryRecord> {
+    let c1 = comp1.to_ascii_uppercase();
+    let c2 = comp2.to_ascii_uppercase();
+    CPA_BINARY_RECORDS.iter().find(|r| {
+        r.eos.eq_ignore_ascii_case(eos)
+            && ((r.comp1.eq_ignore_ascii_case(&c1) && r.comp2.eq_ignore_ascii_case(&c2))
+                || (r.comp1.eq_ignore_ascii_case(&c2) && r.comp2.eq_ignore_ascii_case(&c1)))
+    })
 }
 
 /// Lookup binary CPA parameters for a pair of components.

@@ -20,11 +20,33 @@ pub enum MixingRule {
     Nrtl,
     /// UNIFAC with the Flory-Huggins and Staverman-Guggenheim combinatorial terms.
     Unifac,
+    /// UMR-PRU UNIFAC with the Staverman-Guggenheim combinatorial term only.
+    Umr,
+    /// VTPR UNIFAC residual-only group contribution mixing rule.
+    Vtpr,
     /// The Wong-Sandler mixing rule of the cubic equation of state.
     WongSandler,
+    /// Wong-Sandler mixing rule combined with the Huron-Vidal NRTL excess Gibbs formulation.
+    HvWongSandler,
 }
 
 impl MixingRule {
+    /// Resolve a mixing rule from its ThermoPack label or alias.
+    pub fn from_name(name: &str) -> Result<Self> {
+        match name.trim().to_ascii_uppercase().as_str() {
+            "VDW" | "CLASSIC" => Ok(Self::VdW),
+            "HV" | "HV1" | "HV0" | "HURON-VIDAL" | "HVCPA" => Ok(Self::HuronVidal1),
+            "HV2" | "HURON-VIDAL2" | "HVCPA2" => Ok(Self::HuronVidal2),
+            "NRTL" => Ok(Self::Nrtl),
+            "UNIFAC" => Ok(Self::Unifac),
+            "UMR" => Ok(Self::Umr),
+            "VTPR" => Ok(Self::Vtpr),
+            "WS" | "WONG-SANDLER" | "WONGSANDLER" | "WSCPA" => Ok(Self::WongSandler),
+            "HVWONGSANDLER" | "HV-WS" | "HVWS" => Ok(Self::HvWongSandler),
+            _ => Err(Error::InvalidInput("unknown cubic mixing rule")),
+        }
+    }
+
     /// Database code for the mixing rule.
     pub fn as_str(self) -> &'static str {
         match self {
@@ -33,7 +55,10 @@ impl MixingRule {
             Self::HuronVidal2 => "HV2",
             Self::Nrtl => "NRTL",
             Self::Unifac => "UNIFAC",
+            Self::Umr => "UMR",
+            Self::Vtpr => "VTPR",
             Self::WongSandler => "WONG-SANDLER",
+            Self::HvWongSandler => "HVWONGSANDLER",
         }
     }
 
@@ -42,7 +67,46 @@ impl MixingRule {
     pub fn is_excess_gibbs(self) -> bool {
         matches!(
             self,
-            Self::HuronVidal1 | Self::HuronVidal2 | Self::Nrtl | Self::Unifac | Self::WongSandler
+            Self::HuronVidal1
+                | Self::HuronVidal2
+                | Self::Nrtl
+                | Self::Unifac
+                | Self::Umr
+                | Self::Vtpr
+                | Self::WongSandler
+                | Self::HvWongSandler
+        )
+    }
+
+    /// Whether this mixing rule uses the UNIFAC group-contribution model.
+    #[inline]
+    pub fn is_unifac(self) -> bool {
+        matches!(self, Self::Unifac | Self::Umr | Self::Vtpr)
+    }
+
+    /// Corresponding UNIFAC combinatorial variant, if this is a UNIFAC-family rule.
+    #[inline]
+    pub fn unifac_variant(self) -> Option<crate::unifac::UnifacVariant> {
+        match self {
+            Self::Unifac => Some(crate::unifac::UnifacVariant::Unifac),
+            Self::Umr => Some(crate::unifac::UnifacVariant::Umr),
+            Self::Vtpr => Some(crate::unifac::UnifacVariant::Vtpr),
+            _ => None,
+        }
+    }
+
+    /// Whether this mixing rule uses the Wong-Sandler mixing formulation.
+    #[inline]
+    pub fn is_wong_sandler(self) -> bool {
+        matches!(self, Self::WongSandler | Self::HvWongSandler)
+    }
+
+    /// Whether this mixing rule uses covolume-weighted Huron-Vidal NRTL (`isHVmixModel`).
+    #[inline]
+    pub fn is_hv_model(self) -> bool {
+        matches!(
+            self,
+            Self::HuronVidal1 | Self::HuronVidal2 | Self::HvWongSandler
         )
     }
 }
@@ -131,64 +195,69 @@ impl ExcessGibbsMixture {
         let nc = component_names.len();
         let mut pairs = vec![ExcessGibbsPair::default(); nc * nc];
 
-        for i in 0..nc {
-            for j in 0..nc {
-                let idx = i * nc + j;
-                if i == j {
-                    continue;
-                }
-
-                let mut kij_val = if !kij_matrix.is_empty() {
-                    kij_matrix[idx]
-                } else {
-                    0.0
-                };
-
-                let name_i = component_names[i];
-                let name_j = component_names[j];
-
-                if let Some((rec, swapped)) =
-                    lookup_excess_gibbs(eos_name, mrule.as_str(), name_i, name_j, preferred_ref)
-                {
-                    kij_val = rec.kij;
-                    let (alpha, poly) = if !swapped {
-                        // (i, j) matches (uid1, uid2) in record
-                        (rec.alpha_ij[0], rec.poly_ij)
-                    } else {
-                        // (i, j) matches (uid2, uid1) in record
-                        (rec.alpha_ij[1], rec.poly_ji)
-                    };
-
-                    pairs[idx] = ExcessGibbsPair {
-                        kij: kij_val,
-                        has_record: true,
-                        correlation: rec.correlation,
-                        alpha_ij: alpha,
-                        poly_ij: poly,
-                    };
-                } else {
-                    // Fallback to classic vdW with kij
-                    pairs[idx] = ExcessGibbsPair {
-                        kij: kij_val,
-                        has_record: false,
-                        correlation: GeCorrelation::Polynomial,
-                        alpha_ij: 0.0,
-                        poly_ij: [0.0; 3],
-                    };
-                }
-            }
-        }
-
-        // The UNIFAC model keeps its own group database. The original aborts
-        // when a component is missing from it.
-        let unifac = if mrule == MixingRule::Unifac {
-            Some(crate::unifac::Unifac::new(
-                component_names,
-                crate::unifac::UnifacVariant::Unifac,
-            )?)
+        let unifac = if let Some(variant) = mrule.unifac_variant() {
+            Some(crate::unifac::Unifac::new(component_names, variant)?)
         } else {
             None
         };
+
+        if unifac.is_none() && !mrule.is_wong_sandler() {
+            for i in 0..nc {
+                for j in 0..nc {
+                    let idx = i * nc + j;
+                    if i == j {
+                        continue;
+                    }
+
+                    let mut kij_val = if !kij_matrix.is_empty() {
+                        kij_matrix[idx]
+                    } else {
+                        0.0
+                    };
+
+                    let name_i = component_names[i];
+                    let name_j = component_names[j];
+
+                    if let Some((rec, swapped)) =
+                        lookup_excess_gibbs(eos_name, mrule.as_str(), name_i, name_j, preferred_ref)
+                    {
+                        kij_val = rec.kij;
+                        let (alpha, poly) = if !swapped {
+                            // (i, j) matches (uid1, uid2) in record
+                            (rec.alpha_ij[0], rec.poly_ij)
+                        } else {
+                            // (i, j) matches (uid2, uid1) in record
+                            (rec.alpha_ij[1], rec.poly_ji)
+                        };
+
+                        pairs[idx] = ExcessGibbsPair {
+                            kij: kij_val,
+                            has_record: true,
+                            correlation: rec.correlation,
+                            alpha_ij: alpha,
+                            poly_ij: poly,
+                        };
+                    } else {
+                        // Fallback to classic vdW with kij
+                        pairs[idx] = ExcessGibbsPair {
+                            kij: kij_val,
+                            has_record: false,
+                            correlation: GeCorrelation::Polynomial,
+                            alpha_ij: 0.0,
+                            poly_ij: [0.0; 3],
+                        };
+                    }
+                }
+            }
+        } else if mrule == MixingRule::HvWongSandler && !kij_matrix.is_empty() {
+            for i in 0..nc {
+                for j in 0..nc {
+                    if i != j {
+                        pairs[i * nc + j].kij = kij_matrix[i * nc + j];
+                    }
+                }
+            }
+        }
 
         Ok(Self {
             mrule,
@@ -295,9 +364,10 @@ pub fn excess_gibbs_cubic_mix_with_covolume(
         ));
     }
 
-    // The UNIFAC mixing rule uses the zero-pressure limit of the cubic
-    // equation, every other excess Gibbs model the infinite-pressure limit.
-    let (kernel, lambda_ge) = if ge_mix.mrule == MixingRule::Unifac {
+    // The UNIFAC mixing rules (UNIFAC, UMR, VTPR) use the zero-pressure limit
+    // of the cubic equation; every other excess Gibbs model uses the
+    // infinite-pressure limit.
+    let (kernel, lambda_ge) = if ge_mix.mrule.is_unifac() {
         let database = ge_mix.unifac.as_ref().ok_or(Error::InvalidInput(
             "UNIFAC mixing rule without a group database",
         ))?;
@@ -413,7 +483,7 @@ pub fn excess_gibbs_jet(
             "component count mismatch in ExcessGibbs",
         ));
     }
-    if ge_mix.mrule == MixingRule::Unifac {
+    if ge_mix.mrule.is_unifac() {
         return Err(Error::Unsupported(
             "the UNIFAC model does not deliver the excess Gibbs energy of the limit",
         ));
@@ -474,9 +544,8 @@ fn hv_nrtl_kernel(
     // 1. Calculate temperature-dependent tau_ji and C_ji
     if ge_mix.mrule == MixingRule::WongSandler {
         // The Wong-Sandler parameters come from the user, as in the original.
-        // The original stores the parameters of the pair (i, j) and uses them
-        // in the sums of the component j in the component i, so the matrices
-        // are filled in transposed order.
+        // `getWSParam` fills `tau(r, c) = mixWS%f_tauij(r, c)` directly, and
+        // `gEinf` sums `tau(j, i) * z_j * Cij(j, i)` for each component `i`.
         let ws = ge_mix
             .wong_sandler
             .as_ref()
@@ -489,10 +558,9 @@ fn hv_nrtl_kernel(
                     continue;
                 }
                 let idx_ji = j * nc + i;
-                let source = i * nc + j;
-                let exponent = ws.alphaij[source];
+                let exponent = ws.alphaij[idx_ji];
                 if exponent.abs() > 1.0e-20 {
-                    let (value, derivative, second) = ws.tauij[source].evaluate(t);
+                    let (value, derivative, second) = ws.tauij[idx_ji].evaluate(t);
                     tau[idx_ji] = value;
                     dtaudt[idx_ji] = derivative;
                     d2taudt2[idx_ji] = second;
@@ -816,10 +884,10 @@ fn hv_nrtl_value(
             let (tau_ji, c_ji) = if i == j {
                 (0.0, 1.0)
             } else if let Some(ws) = ws {
-                let source = i * nc + j;
-                let exponent = ws.alphaij[source];
+                let idx_ji = j * nc + i;
+                let exponent = ws.alphaij[idx_ji];
                 if exponent.abs() > 1.0e-20 {
-                    let (value, _, _) = ws.tauij[source].evaluate(t);
+                    let (value, _, _) = ws.tauij[idx_ji].evaluate(t);
                     (value, (-exponent * value).exp())
                 } else {
                     (0.0, 1.0)
@@ -905,7 +973,7 @@ pub(crate) fn excess_gibbs_value(
             "component count mismatch in ExcessGibbs",
         ));
     }
-    if ge_mix.mrule == MixingRule::Unifac {
+    if ge_mix.mrule.is_unifac() {
         return Err(Error::Unsupported(
             "the UNIFAC model does not deliver the excess Gibbs energy of the limit",
         ));
@@ -937,7 +1005,7 @@ pub(crate) fn excess_gibbs_cubic_a_value(
             "component count mismatch in ExcessGibbs",
         ));
     }
-    let (g_ex, lambda_ge) = if ge_mix.mrule == MixingRule::Unifac {
+    let (g_ex, lambda_ge) = if ge_mix.mrule.is_unifac() {
         let database = ge_mix.unifac.as_ref().ok_or(Error::InvalidInput(
             "UNIFAC mixing rule without a group database",
         ))?;

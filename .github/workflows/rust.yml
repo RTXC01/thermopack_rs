@@ -43,6 +43,8 @@ jobs:
       - run: python -m unittest discover -s tools/rust_port -p test_quality_validation.py
       - run: python -m unittest discover -s tools/rust_port -p test_csp_lk_validators.py
       - run: python -m unittest discover -s tools/rust_port -p test_pcsaft_validators.py
+      - run: python tools/rust_port/validate_cpa_cubic_tuning.py --self-test
+      - run: python -O tools/rust_port/validate_cpa_cubic_tuning.py --self-test
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test --all-targets
       - run: cargo test --release --tests
@@ -184,4 +186,5 @@ jobs:
       - run: python tools/rust_port/validate_pcsaft.py
       - run: python tools/rust_port/validate_saftvrmie.py --compiler /usr/bin/gfortran-13
       - run: python tools/rust_port/validate_ljs_complete.py --compiler /usr/bin/gfortran-13
+      - run: python tools/rust_port/validate_cpa_cubic_tuning.py --compiler /usr/bin/gfortran-13
       - run: python tools/rust_port/verify_fixtures.py

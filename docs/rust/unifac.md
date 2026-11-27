@@ -120,9 +120,12 @@ The committed fixtures are `tests/fixtures/unifac.csv`,
 
 ## Remaining scope
 
-* The UMR and VTPR labels are available on the model but not yet selectable as
-  cubic mixing rules; the original reaches them through the VTPR and UMR
-  model initializers.
+* `MixingRule::Umr` and `MixingRule::Vtpr` are now selectable directly on
+  `Cubic` (`CubicOptions`) as well as through `init_umr` and `init_vtpr`, and
+  active main-group interaction parameters can be queried and tuned via
+  `Unifac::get_group_interaction` / `set_group_interaction` and
+  `Cubic::unifac_group_interaction` / `set_unifac_group_interaction` (see
+  [cpa-cubic-tuning.md](cpa-cubic-tuning.md)).
 * The original does not use the binary interaction parameters of the UNIFAC
   mixing rule; the native model does not either.
 * The `UNIFAC` and `UMR` labels use the Staverman-Guggenheim term, which needs

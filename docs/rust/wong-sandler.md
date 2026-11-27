@@ -110,23 +110,18 @@ attraction, the covolume and their derivatives from the rule, and the second
 mole derivatives of the rule replace the binary coefficients of the classic
 mixing rules in the second mole derivatives of the fugacity.
 
-The original offers the rule also for the cubic part of the cubic
-association model, `cbMixWSCPA`, and for the combination of the
-Huron-Vidal and the Wong-Sandler rules, `cbMixHVWongSandler`. The three
-variants of the original share the routine `WongSandlerMix` and differ in the
-excess Gibbs model of the infinite pressure limit, which the rule consumes:
-the parameters of the rule for `cbMixWongSandler` and `cbMixWSCPA`, the
-Huron-Vidal model for `cbMixHVWongSandler`. The native library offers the
-rule for the cubic equation of state with the parameters of the rule only.
+All three variants of the original are now supported and qualified against the
+exact-source library:
 
-The original loads the interaction parameters of the pairs only for the
-mixing rules of its selection, `src/cbselect.f90:tpSelectInteractionParameters`.
-Neither `cbMixWSCPA` nor `cbMixHVWongSandler` has a branch there, so the
-records of the excess Gibbs model stay empty and the binary interaction
-parameters stay zero for those two variants. The Huron-Vidal model of
-`cbMixHVWongSandler` therefore delivers an excess Gibbs energy of zero and
-the rule reduces to the sum `D` of its appendix A9 without the correction of
-the excess Gibbs energy. The native library offers the rule with the
-parameters of the rule, which the original does not load for those two
-variants either.
+* `MixingRule::WongSandler` on `Cubic` (`cbMixWongSandler`) and on `Cpa`
+  (`cbMixWSCPA`), with full asymmetric `(tau_ij, alpha_ij, k_ij)` support
+  matching `excess_gibbs::gEinf` indexing,
+* `MixingRule::HvWongSandler` (`cbMixHVWongSandler`) on both `Cubic` and `Cpa`,
+  evaluating the exact analytic equivalent of Fortran `calc_Q_HVNRTL` without
+  hyperdual overhead,
+* `wong_sandler::fidel_alpha` (`alpha = 1 / (2 + g12 g21)`).
+
+See [cpa-cubic-tuning.md](cpa-cubic-tuning.md) for the live parity and
+independent finite-difference qualification of `WSCPA`, `HVWongSandler`, and
+`fidel_alpha`.
 

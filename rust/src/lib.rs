@@ -64,11 +64,13 @@
 //! # }
 //! ```
 pub mod alpha;
+pub mod apparent_composition;
 pub mod association;
 pub mod beta;
 pub mod bmcsl;
 pub mod caloric;
 pub mod chain_rule;
+pub mod complex_model;
 pub mod component;
 pub mod cpa;
 pub mod cpa_data;
@@ -121,11 +123,15 @@ pub mod solid_water;
 pub mod spinodal;
 pub mod spinodal_properties;
 pub mod translation;
+pub mod tuning;
 pub mod unifac;
 pub mod unifac_data;
 pub mod wong_sandler;
 
 pub use alpha::{Alpha, AlphaCorrelation, AlphaValue};
+pub use apparent_composition::{
+    ApparentComposition, ApparentDifferentials, ApparentFugacityResult, MIN_MOL_NUM,
+};
 pub use association::{
     AssocCombRule, AssociationHelmholtz, AssociationParams, AssociationPressureJet,
     AssociationRdfProvider, DeltaCombRule,
@@ -134,14 +140,16 @@ pub use beta::{Beta, BetaCorrelation, BetaValue};
 pub use caloric::{
     CaloricFlashOptions, EquilibriumProperties, EquilibriumResponse, VolumeFlashOptions,
 };
+pub use complex_model::{init_umr, init_umr_with_refs, init_vtpr, init_vtpr_with_refs};
 pub use component::{Component, component, components};
 pub use cpa::{
-    Cpa, CpaComponent, CpaCubicKind, CpaPressureJet, CpaSaturation, CpaState, PreparedCpa,
+    Cpa, CpaComponent, CpaCubicKind, CpaDerivatives, CpaFugacityDerivatives, CpaHelmholtz,
+    CpaOptions, CpaPressureJet, CpaSaturation, CpaState, CpaTpState, PreparedCpa,
 };
 pub use cpa_data::{AssocScheme, CpaBinaryRecord, CpaPureRecord};
 pub use cubic::{
-    Cubic, CubicKind, CubicOptions, Phase, PreparedState, Pressure, PseudoCritical, Residual,
-    Saturation, TvProperties,
+    Cubic, CubicHelmholtz, CubicKind, CubicOptions, Phase, PreparedState, Pressure, PseudoCritical,
+    Residual, Saturation, TvProperties,
 };
 pub use error::{Error, Result};
 pub use excess_gibbs::{ExcessGibbsMixture, MixingRule};
@@ -214,6 +222,7 @@ pub use solid_data::{
 };
 pub use solid_water::{PreparedSolidWater, SolidWater, SolidWaterGibbs, SolidWaterState};
 pub use translation::{TranslationKind, TranslationValue, VolumeTranslation};
+pub use tuning::{HvPairParams, VolumeShiftParams, WsPairParams};
 pub use unifac::{Unifac, UnifacExcessGibbs, UnifacVariant};
 pub use unifac_data::{
     UnifacComponent, UnifacInteraction, UnifacSubGroup, lookup_unifac_component,

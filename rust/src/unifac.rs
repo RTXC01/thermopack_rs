@@ -183,6 +183,62 @@ impl Unifac {
         &self.main_group_mapping
     }
 
+    /// Set main-group interaction parameters `(a_ij, b_ij, c_ij)` for all active
+    /// sub-group pairs belonging to `(main_group_i, main_group_j)`, mirroring
+    /// `unifac::setUNIFACgroupInteraction` without the Fortran `intent(out)`
+    /// deallocation defect.
+    pub fn set_group_interaction(
+        &mut self,
+        main_group_i: u8,
+        main_group_j: u8,
+        aij: f64,
+        bij: f64,
+        cij: f64,
+    ) -> Result<()> {
+        if !aij.is_finite() || !bij.is_finite() || !cij.is_finite() {
+            return Err(Error::InvalidInput(
+                "finite UNIFAC group interaction parameters required",
+            ));
+        }
+        let ng = self.ng;
+        for ii in 0..ng {
+            if self.main_group_mapping[ii] != main_group_i {
+                continue;
+            }
+            for jj in 0..ng {
+                if self.main_group_mapping[jj] == main_group_j {
+                    let idx = ii * ng + jj;
+                    self.ajk[idx] = aij;
+                    self.bjk[idx] = bij;
+                    self.cjk[idx] = cij;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Retrieve main-group interaction parameters `(a_ij, b_ij, c_ij)` for an
+    /// active pair of main groups, mirroring `unifac::getUNIFACgroupInteraction`.
+    pub fn get_group_interaction(
+        &self,
+        main_group_i: u8,
+        main_group_j: u8,
+    ) -> Option<(f64, f64, f64)> {
+        let ng = self.ng;
+        for ii in 0..ng {
+            if self.main_group_mapping[ii] != main_group_i {
+                continue;
+            }
+            for jj in 0..ng {
+                if self.main_group_mapping[jj] == main_group_j {
+                    let idx = ii * ng + jj;
+                    return Some((self.ajk[idx], self.bjk[idx], self.cjk[idx]));
+                }
+            }
+        }
+        None
+    }
+
     /// Excess Gibbs energy and its analytical derivatives.
     ///
     /// All inputs and outputs are molar: the composition is a vector of mole

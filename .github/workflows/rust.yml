@@ -183,4 +183,5 @@ jobs:
       - run: python tools/rust_port/validate_extcsp.py
       - run: python tools/rust_port/validate_pcsaft.py
       - run: python tools/rust_port/validate_saftvrmie.py --compiler /usr/bin/gfortran-13
+      - run: python tools/rust_port/validate_ljs_complete.py --compiler /usr/bin/gfortran-13
       - run: python tools/rust_port/verify_fixtures.py

@@ -1558,14 +1558,29 @@ fn subnormal_packing_fraction_preserves_vapor_root_range() {
     }
 
     let model = LjsBh::with_parameters(ARGON_SIGMA / 16.0, ARGON_EPS);
-    let pressure = 3.970_625_475_093_25e-306;
-    let roots = model.volumes(temperature, pressure).unwrap();
-    assert_eq!(roots.len(), 2);
-    let vapor = roots[1];
-    assert!(vapor.is_finite() && vapor > 1.0e308);
-    let round_trip = model.pressure_tv(temperature, vapor, 1.0).unwrap().value;
-    assert!((round_trip / pressure - 1.0).abs() < 1e-8, "{round_trip:e}");
-    for phase in [Phase::Vapor, Phase::MinimumGibbs] {
-        assert_eq!(model.volume(temperature, pressure, phase).unwrap(), vapor);
+    let boundary = model.pressure(temperature, f64::MAX, 1.0).unwrap().0;
+    let below_boundary = boundary.next_down();
+    assert!(matches!(
+        model.volume(temperature, below_boundary, Phase::Vapor),
+        Err(thermopack_rs::Error::InvalidInput(_))
+    ));
+    let pressures = (0..=8)
+        .map(|offset| f64::from_bits(boundary.to_bits() + offset))
+        .chain([3.970_625_475_093_25e-306]);
+    for pressure in pressures {
+        let roots = model
+            .volumes(temperature, pressure)
+            .unwrap_or_else(|err| panic!("expected both roots at pressure {pressure:.17e}: {err}"));
+        assert_eq!(roots.len(), 2);
+        let vapor = roots[1];
+        assert!(vapor.is_finite() && vapor > 1.0e308);
+        let round_trip = model.pressure_tv(temperature, vapor, 1.0).unwrap().value;
+        assert!(
+            (round_trip / pressure - 1.0).abs() < 1e-12,
+            "{round_trip:e}"
+        );
+        for phase in [Phase::Vapor, Phase::MinimumGibbs] {
+            assert_eq!(model.volume(temperature, pressure, phase).unwrap(), vapor);
+        }
     }
 }

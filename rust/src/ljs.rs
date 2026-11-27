@@ -672,7 +672,14 @@ where
     if let Some(rho) = refine_pressure_root(lo, hi, pressure, rt, 1.0, p_and_dp_drho)? {
         let (p, dp) = p_and_dp_drho(rho)?;
         if stable_root_closes(pressure, p, rho, dp, rt) {
-            return Ok(Some(1.0 / rho));
+            // The rounded density at MAX can be selected by refinement even
+            // above its boundary pressure. Its reciprocal itself overflows.
+            let volume = if rho == density_at_max_volume {
+                f64::MAX
+            } else {
+                1.0 / rho
+            };
+            return Ok(Some(volume));
         }
     }
     Ok(None)
